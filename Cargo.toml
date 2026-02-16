@@ -5,7 +5,7 @@ edition = "2024"
 description = "A JSX-like macro for GPUI - simplify UI development with HTML-like syntax"
 authors = ["GPUI-RSX Contributors"]
 license = "MIT"
-repository = "https://github.com/your-username/gpui-rsx"
+repository = "https://github.com/wsafight/gpui-rsx"
 keywords = ["gpui", "rsx", "jsx", "macro", "ui"]
 categories = ["gui", "development-tools"]
 
@@ -23,10 +23,10 @@ trybuild = "1.0"
 
 # Examples 依赖 GPUI，标记为可选
 # 如果要运行 examples，需要先安装 gpui
-[[example]]
-name = "counter"
-required-features = []
+# [[example]]
+# name = "counter"
+# required-features = []
 
-[[example]]
-name = "todo_app"
-required-features = []
+# [[example]]
+# name = "todo_app"
+# required-features = []
