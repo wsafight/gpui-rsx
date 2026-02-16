@@ -11,6 +11,9 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
 - 📦 **Lightweight** - Only depends on `syn`, `quote`, `proc-macro2`
 - 🔧 **Flexible** - Supports expressions, conditional rendering, component composition
 - 💡 **Type Safe** - Full compile-time type checking
+- 🧩 **Fragment Support** - Return multiple root elements with `<>...</>`
+- 🔁 **For-loop Sugar** - Iterate with `{for item in iter { ... }}`
+- 🎨 **Full Tailwind Colors** - 242 built-in colors + arbitrary hex values
 
 ## 📦 Installation
 
@@ -153,7 +156,30 @@ Expands to:
 div().child("Hello GPUI")
 ```
 
-### 2. Attributes
+### 2. Fragment (Multiple Root Elements)
+
+When you need to return multiple elements without a wrapper:
+
+```rust
+rsx! {
+    <>
+        <div>{"First"}</div>
+        <div>{"Second"}</div>
+        <div>{"Third"}</div>
+    </>
+}
+```
+
+Expands to:
+```rust
+vec![
+    div().child("First"),
+    div().child("Second"),
+    div().child("Third"),
+]
+```
+
+### 3. Attributes
 
 #### Boolean Attributes (Flags)
 
@@ -181,7 +207,9 @@ Expands to:
 div().gap(px(16.0)).bg(rgb(0xffffff))
 ```
 
-### 3. Class Attribute (Special Handling)
+### 4. Class Attribute
+
+The `class` attribute accepts a Tailwind-like string that expands into multiple GPUI method calls:
 
 ```rust
 rsx! {
@@ -194,15 +222,49 @@ Expands to:
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
-Supported class patterns:
-- `gap-4` → `gap(px(4.0))`
-- `p-4` → `p(px(4.0))`
-- `px-4` → `px(px(4.0))`
-- `py-4` → `py(px(4.0))`
-- `flex` → `flex()`
-- `flex-col` → `flex_col()`
+> **Note:** `class` only accepts string literals. For dynamic styling, use individual attributes (e.g., `bg={color_var}`).
 
-### 4. Event Handling
+#### Supported class patterns
+
+**Layout:**
+- `flex`, `flex-col`, `flex-row`, `flex-wrap`, `flex-1`, `flex-none`, `flex-auto`
+- `items-center`, `items-start`, `items-end`
+- `justify-center`, `justify-between`
+
+**Spacing** (numeric values become `px(n)`):
+- `gap-4` → `.gap(px(4.0))`
+- `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`
+- `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, `ml-4`, `mr-4`
+- `w-64`, `h-32`
+- Fractional values: `p-0.5` → `.p(px(0.5))`
+
+**Sizing:**
+- `w-full`, `h-full`, `size-full`
+
+**Text:**
+- `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`
+- `text-2xl`, `text-3xl`, `text-4xl`, `text-5xl`
+- `font-bold`
+
+**Border:**
+- `border` → `.border_1()`
+- `border-2` → `.border_2()`, `border-4` → `.border_4()`
+- `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-full`, `rounded-none`
+
+**Colors** (full Tailwind palette):
+- `text-red-500` → `.text_color(rgb(0xef4444))`
+- `bg-blue-600` → `.bg(rgb(0x2563eb))`
+- `border-green-500` → `.border_color(rgb(0x22c55e))`
+- Arbitrary hex: `bg-[#ff0000]`, `text-[#333]`, `border-[#abc]`
+
+**Effects:**
+- `shadow-sm`, `shadow-md`, `shadow-lg`
+- `overflow-hidden`, `overflow-scroll`
+- `cursor-pointer`, `cursor-default`, `cursor-text`
+
+**Supported colors:** slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose (shades 50-950) + white, black
+
+### 5. Event Handling
 
 ```rust
 rsx! {
@@ -214,14 +276,27 @@ rsx! {
 }
 ```
 
-Supported events:
-- `onClick` / `on_click`
-- `onMouseDown` / `on_mouse_down`
-- `onMouseUp` / `on_mouse_up`
-- `onKeyDown` / `on_key_down`
-- `onKeyUp` / `on_key_up`
+Supported events (camelCase / snake_case):
 
-### 5. Nested Elements
+| Event | Method |
+|-------|--------|
+| `onClick` / `on_click` | `.on_click(handler)` |
+| `onMouseDown` / `on_mouse_down` | `.on_mouse_down(handler)` |
+| `onMouseUp` / `on_mouse_up` | `.on_mouse_up(handler)` |
+| `onMouseMove` / `on_mouse_move` | `.on_mouse_move(handler)` |
+| `onMouseDownOut` / `on_mouse_down_out` | `.on_mouse_down_out(handler)` |
+| `onMouseUpOut` / `on_mouse_up_out` | `.on_mouse_up_out(handler)` |
+| `onKeyDown` / `on_key_down` | `.on_key_down(handler)` |
+| `onKeyUp` / `on_key_up` | `.on_key_up(handler)` |
+| `onFocus` / `on_focus` | `.on_focus(handler)` |
+| `onBlur` / `on_blur` | `.on_blur(handler)` |
+| `onHover` / `on_hover` | `.on_hover(handler)` |
+| `onScrollWheel` / `on_scroll_wheel` | `.on_scroll_wheel(handler)` |
+| `onDrag` / `on_drag` | `.on_drag(handler)` |
+| `onDrop` / `on_drop` | `.on_drop(handler)` |
+| `onAction` / `on_action` | `.on_action(handler)` |
+
+### 6. Nested Elements
 
 ```rust
 rsx! {
@@ -236,7 +311,7 @@ rsx! {
 }
 ```
 
-### 6. Expressions
+### 7. Expressions
 
 ```rust
 rsx! {
@@ -252,7 +327,9 @@ rsx! {
 }
 ```
 
-### 7. List Rendering
+### 8. List Rendering
+
+#### Using iterators (traditional)
 
 ```rust
 rsx! {
@@ -267,6 +344,159 @@ rsx! {
     </div>
 }
 ```
+
+#### Using for-loop syntax sugar
+
+```rust
+rsx! {
+    <ul>
+        {for item in &self.items {
+            <li>{item.name.clone()}</li>
+        }}
+    </ul>
+}
+```
+
+Expands to:
+```rust
+div().children((&self.items).into_iter().map(|item| {
+    div().child(item.name.clone())
+}))
+```
+
+For-loops also support ranges and method calls:
+
+```rust
+rsx! {
+    <div>
+        {for i in 0..5 {
+            <span>{i}</span>
+        }}
+    </div>
+}
+```
+
+### 9. Spread Syntax
+
+```rust
+rsx! {
+    <div>
+        {...items.iter().map(|item| rsx! { <span>{item}</span> })}
+    </div>
+}
+```
+
+### 10. Attribute Mapping Reference
+
+camelCase attributes are automatically mapped to GPUI snake_case methods:
+
+| RSX Attribute | GPUI Method |
+|---------------|-------------|
+| `zIndex` | `.z_index()` |
+| `opacity` | `.opacity()` |
+| `visible` | `.visible()` |
+| `invisible` (flag) | `.visible(false)` |
+| `width` / `height` | `.w()` / `.h()` |
+| `minWidth` / `maxWidth` | `.min_w()` / `.max_w()` |
+| `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
+| `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
+| `flexBasis` | `.basis()` |
+| `flexGrow` / `flexShrink` | `.flex_grow()` / `.flex_shrink()` |
+| `flexOrder` | `.order()` |
+| `fontSize` | `.font_size()` |
+| `lineHeight` | `.line_height()` |
+| `fontWeight` | `.font_weight()` |
+| `textAlign` | `.text_align()` |
+| `textDecoration` | `.text_decoration()` |
+| `borderRadius` | `.border_radius()` |
+| `borderTop` / `borderBottom` | `.border_t()` / `.border_b()` |
+| `borderLeft` / `borderRight` | `.border_l()` / `.border_r()` |
+| `roundedTop` / `roundedBottom` | `.rounded_t()` / `.rounded_b()` |
+| `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
+| `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
+| `boxShadow` | `.shadow()` |
+| `overflowX` / `overflowY` | `.overflow_x_hidden()` / `.overflow_y_hidden()` |
+| `inset` | `.inset()` |
+
+Attributes not in this table are passed through as-is (e.g., `bg={color}` → `.bg(color)`).
+
+### 11. Conditional Styling with `when` and `whenSome`
+
+#### when - Apply styles based on condition
+
+```rust
+rsx! {
+    <div
+        flex
+        when={(is_active, |this| {
+            this.bg(rgb(0x3b82f6))
+                .text_color(rgb(0xffffff))
+        })}
+    >
+        {"Button"}
+    </div>
+}
+```
+
+#### whenSome - Apply styles when Option has value
+
+```rust
+let custom_width: Option<f32> = Some(200.0);
+
+rsx! {
+    <div
+        flex
+        whenSome={(custom_width, |this, w| this.w(px(w)))}
+    >
+        {"Content"}
+    </div>
+}
+```
+
+#### Multiple conditions
+
+```rust
+rsx! {
+    <button
+        class="px-4 py-2 rounded-md"
+        when={(is_selected, |this| this.bg(rgb(0x3b82f6)))}
+        when={(is_disabled, |this| this.bg(rgb(0xe5e7eb)))}
+        whenSome={(custom_color, |this, color| this.bg(rgb(color)))}
+    >
+        {"Button"}
+    </button>
+}
+```
+
+### 12. Styled Flag (Default Tag Styles)
+
+The `styled` flag injects sensible default styles based on the tag name:
+
+```rust
+rsx! {
+    <h1 styled>{"Title"}</h1>
+    // Expands to: div().text_3xl().font_bold().child("Title")
+
+    <button styled>{"Click"}</button>
+    // Expands to: div().cursor_pointer().child("Click")
+}
+```
+
+Default styles per tag:
+
+| Tag | Default Styles |
+|-----|---------------|
+| `h1` | `text-3xl font-bold` |
+| `h2` | `text-2xl font-bold` |
+| `h3` | `text-xl font-bold` |
+| `h4` | `text-lg font-bold` |
+| `h5` | `text-base font-bold` |
+| `h6` | `text-sm font-bold` |
+| `button`, `a` | `cursor-pointer` |
+| `input`, `textarea` | `px-2 py-1` |
+| `ul`, `ol` | `flex flex-col` |
+
+User attributes are applied after defaults and can override them.
 
 ## 🎯 Complete Example
 
@@ -301,11 +531,7 @@ impl Render for TodoApp {
                         value={self.input.clone()}
                     />
                     <button
-                        bg={rgb(0x3b82f6)}
-                        text_color={rgb(0xffffff)}
-                        px_4
-                        py_2
-                        rounded_md
+                        class="bg-blue-500 text-white px-4 py-2 rounded-md"
                         onClick={cx.listener(|view, _, cx| {
                             view.add_todo();
                             cx.notify();
@@ -316,27 +542,18 @@ impl Render for TodoApp {
                 </div>
 
                 <div class="flex flex-col gap-2">
-                    {self.todos.iter().map(|todo| {
-                        rsx! {
-                            <div
-                                key={todo.id}
-                                class="flex gap-2 items-center p-2 rounded-md"
-                                bg={if todo.completed {
-                                    rgb(0xf3f4f6)
-                                } else {
-                                    rgb(0xffffff)
-                                }}
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={todo.completed}
-                                />
-                                <span>
-                                    {todo.text.clone()}
-                                </span>
-                            </div>
-                        }
-                    }).collect::<Vec<_>>()}
+                    {for todo in self.todos.iter() {
+                        <div
+                            class="flex gap-2 items-center p-2 rounded-md"
+                            bg={if todo.completed {
+                                rgb(0xf3f4f6)
+                            } else {
+                                rgb(0xffffff)
+                            }}
+                        >
+                            <span>{todo.text.clone()}</span>
+                        </div>
+                    }}
                 </div>
             </div>
         }
@@ -364,7 +581,7 @@ impl TodoApp {
 ```rust
 fn render_card(&self, title: &str, content: &str) -> impl IntoElement {
     rsx! {
-        <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="rounded-lg shadow-md p-6">
             <h2 class="text-xl font-bold">
                 {title}
             </h2>
@@ -442,7 +659,7 @@ cargo build
 ### Test
 
 ```bash
-cargo test
+cargo test --test macro_tests
 ```
 
 ### Run Examples
@@ -563,6 +780,25 @@ cargo expand --lib
 ### Q4: Which elements are supported?
 
 All GPUI-supported elements can be used, such as `div`, `button`, `input`, `span`, etc.
+
+### Q5: Can I use dynamic class values?
+
+No. The `class` attribute only accepts string literals. For dynamic styling, use individual attributes:
+
+```rust
+// ❌ Won't work
+rsx! { <div class={my_class} /> }
+
+// ✅ Use individual attributes
+rsx! {
+    <div bg={dynamic_color} flex />
+}
+
+// ✅ Or use `when` for conditional styles
+rsx! {
+    <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} />
+}
+```
 
 ## 🤝 Contributing
 

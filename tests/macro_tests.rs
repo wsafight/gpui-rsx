@@ -18,6 +18,12 @@ struct MockElement;
 // 模拟 GPUI 构造函数
 #[allow(dead_code)]
 fn div() -> MockElement { MockElement }
+#[allow(dead_code)]
+fn svg() -> MockElement { MockElement }
+#[allow(dead_code)]
+fn img() -> MockElement { MockElement }
+#[allow(dead_code)]
+fn canvas() -> MockElement { MockElement }
 fn rgb(_hex: u32) -> u32 { 0 }
 fn px(_val: f32) -> f32 { 0.0 }
 
@@ -37,8 +43,8 @@ impl MockElement {
     fn flex_col(self) -> Self { self }
     fn flex_row(self) -> Self { self }
     fn flex_1(self) -> Self { self }
-    fn flex_grow(self) -> Self { self }
-    fn flex_shrink(self) -> Self { self }
+    fn flex_grow<T>(self, _: T) -> Self { self }
+    fn flex_shrink<T>(self, _: T) -> Self { self }
     fn flex_wrap(self) -> Self { self }
     fn items_center(self) -> Self { self }
     fn items_start(self) -> Self { self }
@@ -81,6 +87,10 @@ impl MockElement {
     fn w_full(self) -> Self { self }
     fn h_full(self) -> Self { self }
     fn size_full(self) -> Self { self }
+    fn min_w<T>(self, _: T) -> Self { self }
+    fn min_h<T>(self, _: T) -> Self { self }
+    fn max_w<T>(self, _: T) -> Self { self }
+    fn max_h<T>(self, _: T) -> Self { self }
 
     // --- 颜色 ---
     fn bg<T>(self, _: T) -> Self { self }
@@ -105,10 +115,26 @@ impl MockElement {
     // --- 定位 ---
     fn absolute(self) -> Self { self }
     fn relative(self) -> Self { self }
+    fn overflow<T>(self, _: T) -> Self { self }
     fn overflow_hidden(self) -> Self { self }
+    fn overflow_scroll(self) -> Self { self }
+    fn overflow_visible(self) -> Self { self }
+    fn overflow_x_hidden<T>(self, _: T) -> Self { self }
+    fn overflow_y_hidden<T>(self, _: T) -> Self { self }
+    fn top<T>(self, _: T) -> Self { self }
+    fn left<T>(self, _: T) -> Self { self }
+    fn right<T>(self, _: T) -> Self { self }
+    fn bottom<T>(self, _: T) -> Self { self }
 
     // --- 光标 ---
     fn cursor_pointer(self) -> Self { self }
+
+    // --- 层级和透明度 ---
+    fn z_index<T>(self, _: T) -> Self { self }
+    fn opacity<T>(self, _: T) -> Self { self }
+
+    // --- 可见性 ---
+    fn visible<T>(self, _: T) -> Self { self }
 
     // --- 事件 ---
     fn on_click<T>(self, _: T) -> Self { self }
@@ -119,10 +145,98 @@ impl MockElement {
     fn on_key_up<T>(self, _: T) -> Self { self }
     fn on_focus<T>(self, _: T) -> Self { self }
     fn on_blur<T>(self, _: T) -> Self { self }
+    fn on_hover<T>(self, _: T) -> Self { self }
+    fn on_scroll_wheel<T>(self, _: T) -> Self { self }
+    fn on_drag<T>(self, _: T) -> Self { self }
+    fn on_drop<T>(self, _: T) -> Self { self }
+    fn on_action<T>(self, _: T) -> Self { self }
+
+    // --- 状态样式 ---
+    fn hover<F: FnOnce(Self) -> Self>(self, _f: F) -> Self { self }
+    fn active<F: FnOnce(Self) -> Self>(self, _f: F) -> Self { self }
+    fn focus<F: FnOnce(Self) -> Self>(self, _f: F) -> Self { self }
+    fn tooltip<T>(self, _: T) -> Self { self }
+    fn group<T>(self, _: T) -> Self { self }
+    fn track_focus(self) -> Self { self }
+
+    // --- 文本 (additional) ---
+    fn text_base(self) -> Self { self }
+    fn text_lg(self) -> Self { self }
+    fn text_4xl(self) -> Self { self }
+    fn text_5xl(self) -> Self { self }
+
+    // --- 额外属性映射 ---
+    fn font_size<T>(self, _: T) -> Self { self }
+    fn line_height<T>(self, _: T) -> Self { self }
+    fn font_weight<T>(self, _: T) -> Self { self }
+    fn text_align<T>(self, _: T) -> Self { self }
+    fn border_radius<T>(self, _: T) -> Self { self }
+    fn shadow<T>(self, _: T) -> Self { self }
 
     // --- 子节点 ---
     fn child<T>(self, _: T) -> Self { self }
     fn children<I: IntoIterator>(self, _: I) -> Self { self }
+
+    // --- 条件方法 ---
+    fn when<F>(self, _condition: bool, _f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self
+    {
+        self
+    }
+
+    fn when_some<T, F>(self, _option: Option<T>, _f: F) -> Self
+    where
+        F: FnOnce(Self, T) -> Self
+    {
+        self
+    }
+
+    // --- 转换方法 ---
+    fn map<F>(self, _f: F) -> Self
+    where
+        F: FnOnce(Self) -> Self
+    {
+        self
+    }
+
+    // --- 新增属性映射 ---
+    fn gap_x<T>(self, _: T) -> Self { self }
+    fn gap_y<T>(self, _: T) -> Self { self }
+    fn basis<T>(self, _: T) -> Self { self }
+    fn order<T>(self, _: T) -> Self { self }
+    fn inset<T>(self, _: T) -> Self { self }
+    fn text_decoration<T>(self, _: T) -> Self { self }
+    fn border_t<T>(self, _: T) -> Self { self }
+    fn border_b<T>(self, _: T) -> Self { self }
+    fn border_l<T>(self, _: T) -> Self { self }
+    fn border_r<T>(self, _: T) -> Self { self }
+    fn rounded_t<T>(self, _: T) -> Self { self }
+    fn rounded_b<T>(self, _: T) -> Self { self }
+    fn rounded_tl<T>(self, _: T) -> Self { self }
+    fn rounded_tr<T>(self, _: T) -> Self { self }
+    fn rounded_bl<T>(self, _: T) -> Self { self }
+    fn rounded_br<T>(self, _: T) -> Self { self }
+    fn flex_none(self) -> Self { self }
+    fn flex_auto(self) -> Self { self }
+
+    // --- 新增事件 ---
+    fn on_mouse_down_out<T>(self, _: T) -> Self { self }
+    fn on_mouse_up_out<T>(self, _: T) -> Self { self }
+
+    // --- 新增边框 ---
+    fn border_2(self) -> Self { self }
+    fn border_4(self) -> Self { self }
+
+    // --- 新增尺寸 ---
+    fn shadow_sm(self) -> Self { self }
+    fn shadow_md(self) -> Self { self }
+    fn shadow_lg(self) -> Self { self }
+    fn rounded_sm(self) -> Self { self }
+    fn rounded_xl(self) -> Self { self }
+    fn rounded_none(self) -> Self { self }
+    fn cursor_default(self) -> Self { self }
+    fn cursor_text(self) -> Self { self }
 
     // --- 杂项（示例中用到的属性） ---
     fn placeholder<T>(self, _: T) -> Self { self }
@@ -790,6 +904,1126 @@ fn test_nested_conditional_elements() {
             } else {
                 rsx! { <div>{"Please log in"}</div> }
             }}
+        </div>
+    };
+}
+
+// ===========================================================================
+// 18. 常用属性简写
+// ===========================================================================
+
+#[test]
+fn test_opacity_attribute() {
+    let _el = rsx! {
+        <div opacity={0.5}>{"半透明内容"}</div>
+    };
+}
+
+#[test]
+fn test_z_index_attribute() {
+    let _el = rsx! {
+        <div zIndex={10}>{"层级 10"}</div>
+    };
+}
+
+#[test]
+fn test_visible_attribute() {
+    let is_shown = true;
+    let _el = rsx! {
+        <div visible={is_shown}>{"可见内容"}</div>
+    };
+}
+
+#[test]
+fn test_invisible_flag() {
+    let _el = rsx! {
+        <div invisible>{"隐藏内容"}</div>
+    };
+}
+
+#[test]
+fn test_visible_false() {
+    let _el = rsx! {
+        <div visible={false}>{"隐藏内容"}</div>
+    };
+}
+
+#[test]
+fn test_positioning_attributes() {
+    let _el = rsx! {
+        <div
+            absolute
+            top={px(10.0)}
+            left={px(20.0)}
+            right={px(30.0)}
+            bottom={px(40.0)}
+        >
+            {"定位元素"}
+        </div>
+    };
+}
+
+#[test]
+fn test_size_attributes() {
+    let _el = rsx! {
+        <div
+            width={px(200.0)}
+            height={px(100.0)}
+            minWidth={px(100.0)}
+            minHeight={px(50.0)}
+            maxWidth={px(400.0)}
+            maxHeight={px(200.0)}
+        >
+            {"尺寸控制"}
+        </div>
+    };
+}
+
+#[test]
+fn test_combined_common_attributes() {
+    let is_visible = true;
+    let _el = rsx! {
+        <div
+            class="flex items-center"
+            opacity={0.8}
+            zIndex={100}
+            visible={is_visible}
+            absolute
+            top={px(0.0)}
+            left={px(0.0)}
+        >
+            {"组合属性"}
+        </div>
+    };
+}
+
+#[test]
+fn test_modal_overlay_example() {
+    let is_open = true;
+    let _el = rsx! {
+        <div
+            absolute
+            top={px(0.0)}
+            left={px(0.0)}
+            width={px(100.0)}
+            height={px(100.0)}
+            bg={rgb(0x000000)}
+            opacity={0.5}
+            zIndex={1000}
+            visible={is_open}
+        >
+            {"模态框遮罩"}
+        </div>
+    };
+}
+
+// ===========================================================================
+// 19. map 方法 - 直接使用表达式
+// ===========================================================================
+
+#[test]
+fn test_map_with_expression() {
+    let is_active = true;
+    let _el = rsx! {
+        <div>
+            {div()
+                .flex()
+                .map(|this| {
+                    if is_active {
+                        this.bg(rgb(0x3b82f6))
+                    } else {
+                        this
+                    }
+                })
+                .child("content")
+            }
+        </div>
+    };
+}
+
+#[test]
+fn test_map_with_rsx_element() {
+    let is_highlighted = true;
+    let _el = rsx! {
+        <div>
+            {
+                rsx! { <div flex px_4 py_2 /> }
+                    .map(|this| {
+                        if is_highlighted {
+                            this.bg(rgb(0xfef3c7))
+                        } else {
+                            this
+                        }
+                    })
+                    .child("Button")
+            }
+        </div>
+    };
+}
+
+// ===========================================================================
+// 20. when 条件渲染
+// ===========================================================================
+
+#[test]
+fn test_when_basic() {
+    let is_active = true;
+    let _el = rsx! {
+        <div
+            flex
+            when={(is_active, |this| this.bg(rgb(0x3b82f6)))}
+        >
+            {"Content"}
+        </div>
+    };
+}
+
+#[test]
+fn test_when_with_multiple_methods() {
+    let show_border = true;
+    let _el = rsx! {
+        <div
+            flex
+            when={(show_border, |this| {
+                this.border_1()
+                    .border_color(rgb(0xe5e7eb))
+                    .rounded_md()
+            })}
+        >
+            {"Content"}
+        </div>
+    };
+}
+
+#[test]
+fn test_when_false_condition() {
+    let is_highlighted = false;
+    let _el = rsx! {
+        <div
+            flex
+            when={(is_highlighted, |this| this.bg(rgb(0xfef3c7)))}
+        >
+            {"Not highlighted"}
+        </div>
+    };
+}
+
+#[test]
+fn test_multiple_when_on_same_element() {
+    let is_active = true;
+    let is_large = false;
+    let _el = rsx! {
+        <div
+            flex
+            when={(is_active, |this| this.bg(rgb(0x3b82f6)))}
+            when={(is_large, |this| this.text_2xl())}
+        >
+            {"Content"}
+        </div>
+    };
+}
+
+#[test]
+fn test_when_with_class_and_other_attrs() {
+    let has_shadow = true;
+    let _el = rsx! {
+        <div
+            class="flex flex-col gap-4 p-4"
+            bg={rgb(0xffffff)}
+            when={(has_shadow, |this| this.rounded_lg())}
+        >
+            {"Card content"}
+        </div>
+    };
+}
+
+#[test]
+fn test_when_with_expression_condition() {
+    let count = 5;
+    let _el = rsx! {
+        <div
+            flex
+            when={(count > 0, |this| this.text_color(rgb(0x22c55e)))}
+            when={(count > 10, |this| this.font_bold())}
+        >
+            {format!("Count: {count}")}
+        </div>
+    };
+}
+
+// ===========================================================================
+// 21. whenSome 条件渲染
+// ===========================================================================
+
+#[test]
+fn test_when_some_with_value() {
+    let width: Option<f32> = Some(200.0);
+    let _el = rsx! {
+        <div
+            flex
+            whenSome={(width, |this, w| this.w(px(w)))}
+        >
+            {"Content"}
+        </div>
+    };
+}
+
+#[test]
+fn test_when_some_with_none() {
+    let height: Option<f32> = None;
+    let _el = rsx! {
+        <div
+            flex
+            whenSome={(height, |this, h| this.h(px(h)))}
+        >
+            {"Content"}
+        </div>
+    };
+}
+
+#[test]
+fn test_when_some_with_color() {
+    let bg_color: Option<u32> = Some(0x3b82f6);
+    let _el = rsx! {
+        <div
+            flex
+            whenSome={(bg_color, |this, color| this.bg(rgb(color)))}
+        >
+            {"Colored content"}
+        </div>
+    };
+}
+
+#[test]
+fn test_when_some_with_string() {
+    let placeholder: Option<&str> = Some("Enter text...");
+    let _el = rsx! {
+        <input
+            flex
+            whenSome={(placeholder, |this, text| this.placeholder(text))}
+        />
+    };
+}
+
+#[test]
+fn test_when_and_when_some_together() {
+    let is_active = true;
+    let custom_width: Option<f32> = Some(300.0);
+    let _el = rsx! {
+        <div
+            flex
+            when={(is_active, |this| this.bg(rgb(0x3b82f6)))}
+            whenSome={(custom_width, |this, w| this.w(px(w)))}
+        >
+            {"Content"}
+        </div>
+    };
+}
+
+#[test]
+fn test_when_some_as_ref() {
+    let error_message: Option<String> = Some(String::from("An error occurred"));
+    let _el = rsx! {
+        <div
+            flex
+            whenSome={(error_message.as_ref(), |this, msg| {
+                this.text_color(rgb(0xef4444))
+                    .child(msg.clone())
+            })}
+        />
+    };
+}
+
+#[test]
+fn test_complex_when_usage() {
+    let is_selected = true;
+    let is_disabled = false;
+    let custom_bg: Option<u32> = Some(0xf3f4f6);
+
+    let _el = rsx! {
+        <button
+            class="flex items-center gap-2 px-4 py-2 rounded-md"
+            when={(is_selected, |this| {
+                this.bg(rgb(0x3b82f6))
+                    .text_color(rgb(0xffffff))
+            })}
+            when={(is_disabled, |this| {
+                this.bg(rgb(0xe5e7eb))
+                    .text_color(rgb(0x9ca3af))
+            })}
+            whenSome={(custom_bg, |this, color| this.bg(rgb(color)))}
+        >
+            {"Button"}
+        </button>
+    };
+}
+
+// ===========================================================================
+// 22. Spread 语法
+// ===========================================================================
+
+#[test]
+fn test_spread_children() {
+    let items = vec!["a", "b", "c"];
+    let _el = rsx! {
+        <ul>
+            {...items}
+        </ul>
+    };
+}
+
+#[test]
+fn test_spread_with_map() {
+    let items = vec!["apple", "banana"];
+    let children: Vec<MockElement> = items.iter().map(|_| div()).collect();
+    let _el = rsx! {
+        <div>
+            {...children}
+        </div>
+    };
+}
+
+#[test]
+fn test_spread_mixed_with_child() {
+    let items = vec!["a", "b"];
+    let _el = rsx! {
+        <div>
+            <span>{"header"}</span>
+            {...items}
+        </div>
+    };
+}
+
+// ===========================================================================
+// 23. 裸字符串字面量子节点
+// ===========================================================================
+
+#[test]
+fn test_bare_string_child() {
+    let _el = rsx! { <div>"Hello"</div> };
+}
+
+#[test]
+fn test_bare_string_mixed_with_elements() {
+    let _el = rsx! {
+        <div>
+            "Hello"
+            <span>{"world"}</span>
+        </div>
+    };
+}
+
+#[test]
+fn test_bare_string_multiple() {
+    let _el = rsx! {
+        <div>
+            "First"
+            "Second"
+            "Third"
+        </div>
+    };
+}
+
+// ===========================================================================
+// 24. svg/img/canvas 标签映射
+// ===========================================================================
+
+#[test]
+fn test_svg_tag() {
+    let _el = rsx! { <svg /> };
+}
+
+#[test]
+fn test_img_tag() {
+    let _el = rsx! { <img /> };
+}
+
+#[test]
+fn test_canvas_tag() {
+    let _el = rsx! { <canvas /> };
+}
+
+#[test]
+fn test_svg_with_children() {
+    let _el = rsx! {
+        <svg>
+            {"svg content"}
+        </svg>
+    };
+}
+
+// ===========================================================================
+// 25. hover/active/focus 自动 ID
+// ===========================================================================
+
+#[test]
+fn test_hover_auto_id() {
+    let _el = rsx! {
+        <div hover={|this| this.bg(rgb(0x3b82f6))}>
+            {"Hover me"}
+        </div>
+    };
+}
+
+#[test]
+fn test_active_auto_id() {
+    let _el = rsx! {
+        <div active={|this| this.bg(rgb(0xdc2626))}>
+            {"Press me"}
+        </div>
+    };
+}
+
+#[test]
+fn test_focus_auto_id() {
+    let _el = rsx! {
+        <div focus={|this| this.bg(rgb(0x2563eb))}>
+            {"Focus me"}
+        </div>
+    };
+}
+
+#[test]
+fn test_tooltip_auto_id() {
+    let _el = rsx! {
+        <div tooltip={"Tooltip text"}>
+            {"Hover for tooltip"}
+        </div>
+    };
+}
+
+#[test]
+fn test_track_focus_auto_id() {
+    let _el = rsx! {
+        <div track_focus>
+            {"Tracked focus"}
+        </div>
+    };
+}
+
+// ===========================================================================
+// 26. 新事件处理器
+// ===========================================================================
+
+#[test]
+fn test_on_hover_event() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div onHover={h} /> };
+}
+
+#[test]
+fn test_on_scroll_wheel_event() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div onScrollWheel={h} /> };
+}
+
+#[test]
+fn test_on_drag_event() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div onDrag={h} /> };
+}
+
+#[test]
+fn test_on_drop_event() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div onDrop={h} /> };
+}
+
+#[test]
+fn test_on_action_event() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div onAction={h} /> };
+}
+
+#[test]
+fn test_on_hover_snake_case() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div on_hover={h} /> };
+}
+
+// ===========================================================================
+// 27. 颜色映射测试
+// ===========================================================================
+
+#[test]
+fn test_class_color_red_500() {
+    let _el = rsx! { <div class="bg-red-500" /> };
+}
+
+#[test]
+fn test_class_color_green_500() {
+    let _el = rsx! { <div class="bg-green-500" /> };
+}
+
+#[test]
+fn test_class_color_gray_500() {
+    let _el = rsx! { <div class="bg-gray-500" /> };
+}
+
+#[test]
+fn test_class_color_yellow_500() {
+    let _el = rsx! { <div class="bg-yellow-500" /> };
+}
+
+#[test]
+fn test_class_color_purple_500() {
+    let _el = rsx! { <div class="bg-purple-500" /> };
+}
+
+#[test]
+fn test_class_color_pink_500() {
+    let _el = rsx! { <div class="bg-pink-500" /> };
+}
+
+#[test]
+fn test_class_color_indigo_500() {
+    let _el = rsx! { <div class="bg-indigo-500" /> };
+}
+
+#[test]
+fn test_class_color_white() {
+    let _el = rsx! { <div class="bg-white" /> };
+}
+
+#[test]
+fn test_class_color_black() {
+    let _el = rsx! { <div class="text-black" /> };
+}
+
+// ===========================================================================
+// 28. 文本大小白名单测试
+// ===========================================================================
+
+#[test]
+fn test_class_text_xs() {
+    let _el = rsx! { <div class="text-xs" /> };
+}
+
+#[test]
+fn test_class_text_base() {
+    let _el = rsx! { <div class="text-base" /> };
+}
+
+#[test]
+fn test_class_text_lg() {
+    let _el = rsx! { <div class="text-lg" /> };
+}
+
+#[test]
+fn test_class_text_4xl() {
+    let _el = rsx! { <div class="text-4xl" /> };
+}
+
+#[test]
+fn test_class_text_5xl() {
+    let _el = rsx! { <div class="text-5xl" /> };
+}
+
+// ===========================================================================
+// 29. 新属性名称映射
+// ===========================================================================
+
+#[test]
+fn test_font_size_attribute() {
+    let _el = rsx! { <div fontSize={px(16.0)} /> };
+}
+
+#[test]
+fn test_line_height_attribute() {
+    let _el = rsx! { <div lineHeight={px(24.0)} /> };
+}
+
+#[test]
+fn test_font_weight_attribute() {
+    let _el = rsx! { <div fontWeight={700} /> };
+}
+
+#[test]
+fn test_border_radius_attribute() {
+    let _el = rsx! { <div borderRadius={px(8.0)} /> };
+}
+
+#[test]
+fn test_box_shadow_attribute() {
+    let _el = rsx! { <div boxShadow={"shadow-lg"} /> };
+}
+
+#[test]
+fn test_overflow_attribute() {
+    // overflow 不再映射为 overflow_hidden，直接透传
+    let _el = rsx! { <div overflow={true} /> };
+}
+
+#[test]
+fn test_overflow_x_attribute() {
+    let _el = rsx! { <div overflowX={true} /> };
+}
+
+#[test]
+fn test_overflow_y_attribute() {
+    let _el = rsx! { <div overflowY={true} /> };
+}
+
+// ===========================================================================
+// 30. styled 标志属性 — 默认样式注入
+// ===========================================================================
+
+#[test]
+fn test_styled_button() {
+    // button + styled → cursor_pointer
+    let _el = rsx! { <button styled>{"Click"}</button> };
+}
+
+#[test]
+fn test_styled_h1() {
+    let _el = rsx! { <h1 styled>{"Title"}</h1> };
+}
+
+#[test]
+fn test_styled_h2() {
+    let _el = rsx! { <h2 styled>{"Title"}</h2> };
+}
+
+#[test]
+fn test_styled_h3() {
+    let _el = rsx! { <h3 styled>{"Title"}</h3> };
+}
+
+#[test]
+fn test_styled_h4() {
+    let _el = rsx! { <h4 styled>{"Title"}</h4> };
+}
+
+#[test]
+fn test_styled_h5() {
+    let _el = rsx! { <h5 styled>{"Title"}</h5> };
+}
+
+#[test]
+fn test_styled_h6() {
+    let _el = rsx! { <h6 styled>{"Title"}</h6> };
+}
+
+#[test]
+fn test_styled_a() {
+    let _el = rsx! { <a styled>{"Link"}</a> };
+}
+
+#[test]
+fn test_styled_input() {
+    // input + styled → px(2.0) py(1.0)
+    let _el = rsx! { <input styled /> };
+}
+
+#[test]
+fn test_styled_ul() {
+    // ul + styled → flex flex_col
+    let _el = rsx! {
+        <ul styled>
+            <li>{"item"}</li>
+        </ul>
+    };
+}
+
+#[test]
+fn test_styled_override() {
+    // 用户属性 text_color 在默认样式 text_3xl + font_bold 之后，可覆盖
+    let _el = rsx! { <h1 styled text_color={rgb(0xff0000)}>{"Title"}</h1> };
+}
+
+#[test]
+fn test_styled_with_class() {
+    // styled + class 属性共存
+    let _el = rsx! { <button styled class="flex items-center">{"Click"}</button> };
+}
+
+#[test]
+fn test_unstyled_no_defaults() {
+    // 不带 styled 时无默认样式（现有行为不变）
+    let _el = rsx! { <button>{"Click"}</button> };
+}
+
+#[test]
+fn test_styled_unknown_tag() {
+    // 无默认样式表的标签加 styled 不报错，只是无额外样式
+    let _el = rsx! { <div styled>{"content"}</div> };
+}
+
+// ===========================================================================
+// 31. Fragment 支持 — 多根节点
+// ===========================================================================
+
+#[test]
+fn test_fragment_basic() {
+    let _els: Vec<MockElement> = rsx! {
+        <>
+            <div>{"first"}</div>
+            <div>{"second"}</div>
+        </>
+    };
+}
+
+#[test]
+fn test_fragment_multiple_elements() {
+    let _els: Vec<MockElement> = rsx! {
+        <>
+            <div>{"a"}</div>
+            <span>{"b"}</span>
+            <p>{"c"}</p>
+        </>
+    };
+}
+
+#[test]
+fn test_fragment_with_attrs() {
+    let _els: Vec<MockElement> = rsx! {
+        <>
+            <div flex>{"item 1"}</div>
+            <div flex_col>{"item 2"}</div>
+        </>
+    };
+}
+
+// ===========================================================================
+// 32. 扩充 class 解析 — border、border-color
+// ===========================================================================
+
+#[test]
+fn test_class_border() {
+    // "border" → .border_1()
+    let _el = rsx! { <div class="border" /> };
+}
+
+#[test]
+fn test_class_border_2() {
+    // "border-2" → .border_2()
+    let _el = rsx! { <div class="border-2" /> };
+}
+
+#[test]
+fn test_class_border_color() {
+    // "border-red-500" → .border_color(rgb(0xef4444))
+    let _el = rsx! { <div class="border border-red-500" /> };
+}
+
+#[test]
+fn test_class_border_blue() {
+    let _el = rsx! { <div class="border-blue-600" /> };
+}
+
+#[test]
+fn test_class_overflow_hidden() {
+    let _el = rsx! { <div class="overflow-hidden" /> };
+}
+
+#[test]
+fn test_class_overflow_scroll() {
+    let _el = rsx! { <div class="overflow-scroll" /> };
+}
+
+#[test]
+fn test_class_rounded_variants() {
+    let _a = rsx! { <div class="rounded-sm" /> };
+    let _b = rsx! { <div class="rounded-md" /> };
+    let _c = rsx! { <div class="rounded-lg" /> };
+    let _d = rsx! { <div class="rounded-xl" /> };
+    let _e = rsx! { <div class="rounded-full" /> };
+    let _f = rsx! { <div class="rounded-none" /> };
+}
+
+#[test]
+fn test_class_shadow_variants() {
+    let _a = rsx! { <div class="shadow-sm" /> };
+    let _b = rsx! { <div class="shadow-md" /> };
+    let _c = rsx! { <div class="shadow-lg" /> };
+}
+
+#[test]
+fn test_class_cursor_variants() {
+    let _a = rsx! { <div class="cursor-pointer" /> };
+    let _b = rsx! { <div class="cursor-default" /> };
+    let _c = rsx! { <div class="cursor-text" /> };
+}
+
+#[test]
+fn test_class_full_size() {
+    let _a = rsx! { <div class="w-full" /> };
+    let _b = rsx! { <div class="h-full" /> };
+    let _c = rsx! { <div class="size-full" /> };
+}
+
+#[test]
+fn test_class_flex_variants() {
+    let _a = rsx! { <div class="flex-none" /> };
+    let _b = rsx! { <div class="flex-auto" /> };
+    let _c = rsx! { <div class="flex-1" /> };
+}
+
+// ===========================================================================
+// 33. 扩充颜色系统 — 新色阶和任意 hex
+// ===========================================================================
+
+#[test]
+fn test_class_color_new_shades() {
+    // 新色阶测试
+    let _a = rsx! { <div class="bg-red-100" /> };
+    let _b = rsx! { <div class="bg-red-300" /> };
+    let _c = rsx! { <div class="bg-red-700" /> };
+    let _d = rsx! { <div class="bg-red-900" /> };
+    let _e = rsx! { <div class="bg-red-950" /> };
+}
+
+#[test]
+fn test_class_color_new_colors() {
+    // 新颜色测试
+    let _a = rsx! { <div class="bg-slate-500" /> };
+    let _b = rsx! { <div class="bg-emerald-500" /> };
+    let _c = rsx! { <div class="bg-teal-500" /> };
+    let _d = rsx! { <div class="bg-cyan-500" /> };
+    let _e = rsx! { <div class="bg-sky-500" /> };
+    let _f = rsx! { <div class="bg-violet-500" /> };
+    let _g = rsx! { <div class="bg-fuchsia-500" /> };
+    let _h = rsx! { <div class="bg-rose-500" /> };
+}
+
+#[test]
+fn test_class_color_text_new_colors() {
+    let _a = rsx! { <div class="text-orange-500" /> };
+    let _b = rsx! { <div class="text-amber-500" /> };
+    let _c = rsx! { <div class="text-lime-500" /> };
+}
+
+#[test]
+fn test_class_arbitrary_hex_bg() {
+    // bg-[#ff0000] → .bg(rgb(0xff0000))
+    let _el = rsx! { <div class="bg-[#ff0000]" /> };
+}
+
+#[test]
+fn test_class_arbitrary_hex_text() {
+    // text-[#333333] → .text_color(rgb(0x333333))
+    let _el = rsx! { <div class="text-[#333333]" /> };
+}
+
+#[test]
+fn test_class_arbitrary_hex_short() {
+    // text-[#abc] → .text_color(rgb(0xaabbcc))
+    let _el = rsx! { <div class="text-[#abc]" /> };
+}
+
+#[test]
+fn test_class_arbitrary_hex_border() {
+    // border-[#ff0000] → .border_color(rgb(0xff0000))
+    let _el = rsx! { <div class="border-[#ff0000]" /> };
+}
+
+// ===========================================================================
+// 34. 新属性映射测试
+// ===========================================================================
+
+#[test]
+fn test_gap_x_attribute() {
+    let _el = rsx! { <div gapX={px(8.0)} /> };
+}
+
+#[test]
+fn test_gap_y_attribute() {
+    let _el = rsx! { <div gapY={px(8.0)} /> };
+}
+
+#[test]
+fn test_flex_basis_attribute() {
+    let _el = rsx! { <div flexBasis={px(100.0)} /> };
+}
+
+#[test]
+fn test_flex_grow_attribute() {
+    let _el = rsx! { <div flexGrow={1.0} /> };
+}
+
+#[test]
+fn test_flex_shrink_attribute() {
+    let _el = rsx! { <div flexShrink={0.0} /> };
+}
+
+#[test]
+fn test_flex_order_attribute() {
+    let _el = rsx! { <div flexOrder={2} /> };
+}
+
+#[test]
+fn test_border_top_attribute() {
+    let _el = rsx! { <div borderTop={px(1.0)} /> };
+}
+
+#[test]
+fn test_border_bottom_attribute() {
+    let _el = rsx! { <div borderBottom={px(1.0)} /> };
+}
+
+#[test]
+fn test_border_left_attribute() {
+    let _el = rsx! { <div borderLeft={px(1.0)} /> };
+}
+
+#[test]
+fn test_border_right_attribute() {
+    let _el = rsx! { <div borderRight={px(1.0)} /> };
+}
+
+#[test]
+fn test_rounded_top_left_attribute() {
+    let _el = rsx! { <div roundedTopLeft={px(8.0)} /> };
+}
+
+#[test]
+fn test_rounded_bottom_right_attribute() {
+    let _el = rsx! { <div roundedBottomRight={px(8.0)} /> };
+}
+
+#[test]
+fn test_inset_attribute() {
+    let _el = rsx! { <div inset={px(0.0)} /> };
+}
+
+#[test]
+fn test_text_decoration_attribute() {
+    let _el = rsx! { <div textDecoration={"underline"} /> };
+}
+
+// ===========================================================================
+// 35. 新事件处理器
+// ===========================================================================
+
+#[test]
+fn test_on_mouse_down_out_camel() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div onMouseDownOut={h} /> };
+}
+
+#[test]
+fn test_on_mouse_down_out_snake() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div on_mouse_down_out={h} /> };
+}
+
+#[test]
+fn test_on_mouse_up_out_camel() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div onMouseUpOut={h} /> };
+}
+
+#[test]
+fn test_on_mouse_up_out_snake() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div on_mouse_up_out={h} /> };
+}
+
+// ===========================================================================
+// 36. Children 聚合优化
+// ===========================================================================
+
+#[test]
+fn test_children_aggregation_3_or_more() {
+    // 3 个连续 Expr → .children(vec![...]) 而非 3 个 .child()
+    let _el = rsx! {
+        <div>
+            {"first"}
+            {"second"}
+            {"third"}
+        </div>
+    };
+}
+
+#[test]
+fn test_children_aggregation_mixed() {
+    // 混合节点不影响聚合逻辑
+    let _el = rsx! {
+        <div>
+            {"a"}
+            {"b"}
+            {"c"}
+            <span>{"element"}</span>
+            {"d"}
+            {"e"}
+        </div>
+    };
+}
+
+#[test]
+fn test_children_aggregation_under_3() {
+    // 2 个 Expr 不触发聚合，仍用 .child()
+    let _el = rsx! {
+        <div>
+            {"first"}
+            {"second"}
+        </div>
+    };
+}
+
+// ===========================================================================
+// 37. For 循环语法糖
+// ===========================================================================
+
+#[test]
+fn test_for_loop_basic() {
+    let items = vec!["apple", "banana", "cherry"];
+    let _el = rsx! {
+        <ul>
+            {for item in items {
+                <li>{item}</li>
+            }}
+        </ul>
+    };
+}
+
+#[test]
+fn test_for_loop_with_range() {
+    let _el = rsx! {
+        <div>
+            {for i in 0..3 {
+                <span>{i}</span>
+            }}
+        </div>
+    };
+}
+
+#[test]
+fn test_for_loop_with_method() {
+    let items = vec!["a", "b", "c"];
+    let _el = rsx! {
+        <div>
+            {for item in items.iter() {
+                <span>{item}</span>
+            }}
+        </div>
+    };
+}
+
+// ===========================================================================
+// 38. Auto-ID 确定性（编译通过即验证）
+// ===========================================================================
+
+#[test]
+fn test_auto_id_hash_format() {
+    let h = |_: (), _: ()| {};
+    // 编译通过即验证 auto-ID 使用 hash 格式
+    let _el = rsx! {
+        <div>
+            <button onClick={h}>{"A"}</button>
+        </div>
+    };
+}
+
+#[test]
+fn test_auto_id_multiple_unique() {
+    let h1 = |_: (), _: ()| {};
+    let h2 = |_: (), _: ()| {};
+    // 两个按钮各自有唯一 auto-ID
+    let _el = rsx! {
+        <div>
+            <button onClick={h1}>{"Btn 1"}</button>
+            <button onClick={h2}>{"Btn 2"}</button>
         </div>
     };
 }

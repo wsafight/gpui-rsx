@@ -7,16 +7,22 @@
 //! div().id("auto_0").flex().bg(rgb(0xff)).on_click(handler).child("text")
 //! ```
 
-use crate::parser::{RsxAttribute, RsxElement, RsxNode};
+use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use proc_macro2::TokenStream;
 use quote::{quote, ToTokens};
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// 编译期自动 ID 计数器（每次宏展开递增，保证唯一）
 static AUTO_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-/// 需要 `.id()` 的事件（`StatefulInteractiveElement` trait）
-const STATEFUL_EVENTS: &[&str] = &["onClick", "on_click"];
+/// 需要 `.id()` 的属性（`StatefulInteractiveElement` trait）
+const NEEDS_ID_ATTRS: &[&str] = &[
+    "onClick", "on_click",
+    "hover", "active", "focus",
+    "tooltip", "group", "track_focus",
+];
 
 /// 事件处理器映射表：(camelCase, snake_case, method_name)
 const EVENT_HANDLERS: &[(&str, &str, &str)] = &[
@@ -24,20 +30,374 @@ const EVENT_HANDLERS: &[(&str, &str, &str)] = &[
     ("onMouseDown", "on_mouse_down", "on_mouse_down"),
     ("onMouseUp", "on_mouse_up", "on_mouse_up"),
     ("onMouseMove", "on_mouse_move", "on_mouse_move"),
+    ("onMouseDownOut", "on_mouse_down_out", "on_mouse_down_out"),
+    ("onMouseUpOut", "on_mouse_up_out", "on_mouse_up_out"),
     ("onKeyDown", "on_key_down", "on_key_down"),
     ("onKeyUp", "on_key_up", "on_key_up"),
     ("onFocus", "on_focus", "on_focus"),
     ("onBlur", "on_blur", "on_blur"),
+    ("onHover", "on_hover", "on_hover"),
+    ("onScrollWheel", "on_scroll_wheel", "on_scroll_wheel"),
+    ("onDrag", "on_drag", "on_drag"),
+    ("onDrop", "on_drop", "on_drop"),
+    ("onAction", "on_action", "on_action"),
 ];
 
-/// 颜色映射表
+/// 属性名称映射表：(camelCase, snake_case)
+/// 用于将 JSX 风格的 camelCase 属性名转换为 Rust 的 snake_case 方法名
+const ATTRIBUTE_NAME_MAP: &[(&str, &str)] = &[
+    // 层级和透明度
+    ("zIndex", "z_index"),
+    ("opacity", "opacity"),
+
+    // 可见性
+    ("visible", "visible"),
+
+    // 定位
+    ("top", "top"),
+    ("left", "left"),
+    ("right", "right"),
+    ("bottom", "bottom"),
+    ("inset", "inset"),
+
+    // 尺寸
+    ("width", "w"),
+    ("height", "h"),
+    ("minWidth", "min_w"),
+    ("minHeight", "min_h"),
+    ("maxWidth", "max_w"),
+    ("maxHeight", "max_h"),
+
+    // 间距方向
+    ("gapX", "gap_x"),
+    ("gapY", "gap_y"),
+
+    // Flex
+    ("flexBasis", "basis"),
+    ("flexGrow", "flex_grow"),
+    ("flexShrink", "flex_shrink"),
+    ("flexOrder", "order"),
+
+    // 文本
+    ("fontSize", "font_size"),
+    ("lineHeight", "line_height"),
+    ("fontWeight", "font_weight"),
+    ("textAlign", "text_align"),
+    ("textDecoration", "text_decoration"),
+
+    // 边框
+    ("borderRadius", "border_radius"),
+    ("borderTop", "border_t"),
+    ("borderBottom", "border_b"),
+    ("borderLeft", "border_l"),
+    ("borderRight", "border_r"),
+
+    // 方向性圆角
+    ("roundedTop", "rounded_t"),
+    ("roundedBottom", "rounded_b"),
+    ("roundedTopLeft", "rounded_tl"),
+    ("roundedTopRight", "rounded_tr"),
+    ("roundedBottomLeft", "rounded_bl"),
+    ("roundedBottomRight", "rounded_br"),
+
+    // 阴影
+    ("boxShadow", "shadow"),
+
+    // 溢出
+    ("overflowX", "overflow_x_hidden"),
+    ("overflowY", "overflow_y_hidden"),
+];
+
+/// 颜色映射表 — 完整 Tailwind 色板
 const COLOR_MAP: &[(&str, u32)] = &[
+    // Slate
+    ("slate_50", 0xf8fafc),
+    ("slate_100", 0xf1f5f9),
+    ("slate_200", 0xe2e8f0),
+    ("slate_300", 0xcbd5e1),
+    ("slate_400", 0x94a3b8),
+    ("slate_500", 0x64748b),
+    ("slate_600", 0x475569),
+    ("slate_700", 0x334155),
+    ("slate_800", 0x1e293b),
+    ("slate_900", 0x0f172a),
+    ("slate_950", 0x020617),
+    // Gray
+    ("gray_50", 0xf9fafb),
+    ("gray_100", 0xf3f4f6),
+    ("gray_200", 0xe5e7eb),
+    ("gray_300", 0xd1d5db),
+    ("gray_400", 0x9ca3af),
+    ("gray_500", 0x6b7280),
+    ("gray_600", 0x4b5563),
+    ("gray_700", 0x374151),
+    ("gray_800", 0x1f2937),
+    ("gray_900", 0x111827),
+    ("gray_950", 0x030712),
+    // Zinc
+    ("zinc_50", 0xfafafa),
+    ("zinc_100", 0xf4f4f5),
+    ("zinc_200", 0xe4e4e7),
+    ("zinc_300", 0xd4d4d8),
+    ("zinc_400", 0xa1a1aa),
+    ("zinc_500", 0x71717a),
+    ("zinc_600", 0x52525b),
+    ("zinc_700", 0x3f3f46),
+    ("zinc_800", 0x27272a),
+    ("zinc_900", 0x18181b),
+    ("zinc_950", 0x09090b),
+    // Neutral
+    ("neutral_50", 0xfafafa),
+    ("neutral_100", 0xf5f5f5),
+    ("neutral_200", 0xe5e5e5),
+    ("neutral_300", 0xd4d4d4),
+    ("neutral_400", 0xa3a3a3),
+    ("neutral_500", 0x737373),
+    ("neutral_600", 0x525252),
+    ("neutral_700", 0x404040),
+    ("neutral_800", 0x262626),
+    ("neutral_900", 0x171717),
+    ("neutral_950", 0x0a0a0a),
+    // Stone
+    ("stone_50", 0xfafaf9),
+    ("stone_100", 0xf5f5f4),
+    ("stone_200", 0xe7e5e4),
+    ("stone_300", 0xd6d3d1),
+    ("stone_400", 0xa8a29e),
+    ("stone_500", 0x78716c),
+    ("stone_600", 0x57534e),
+    ("stone_700", 0x44403c),
+    ("stone_800", 0x292524),
+    ("stone_900", 0x1c1917),
+    ("stone_950", 0x0c0a09),
+    // Red
+    ("red_50", 0xfef2f2),
+    ("red_100", 0xfee2e2),
+    ("red_200", 0xfecaca),
+    ("red_300", 0xfca5a5),
+    ("red_400", 0xf87171),
     ("red_500", 0xef4444),
-    ("red_600", 0xef4444),
-    ("green_600", 0x22c55e),
+    ("red_600", 0xdc2626),
+    ("red_700", 0xb91c1c),
+    ("red_800", 0x991b1b),
+    ("red_900", 0x7f1d1d),
+    ("red_950", 0x450a0a),
+    // Orange
+    ("orange_50", 0xfff7ed),
+    ("orange_100", 0xffedd5),
+    ("orange_200", 0xfed7aa),
+    ("orange_300", 0xfdba74),
+    ("orange_400", 0xfb923c),
+    ("orange_500", 0xf97316),
+    ("orange_600", 0xea580c),
+    ("orange_700", 0xc2410c),
+    ("orange_800", 0x9a3412),
+    ("orange_900", 0x7c2d12),
+    ("orange_950", 0x431407),
+    // Amber
+    ("amber_50", 0xfffbeb),
+    ("amber_100", 0xfef3c7),
+    ("amber_200", 0xfde68a),
+    ("amber_300", 0xfcd34d),
+    ("amber_400", 0xfbbf24),
+    ("amber_500", 0xf59e0b),
+    ("amber_600", 0xd97706),
+    ("amber_700", 0xb45309),
+    ("amber_800", 0x92400e),
+    ("amber_900", 0x78350f),
+    ("amber_950", 0x451a03),
+    // Yellow
+    ("yellow_50", 0xfefce8),
+    ("yellow_100", 0xfef9c3),
+    ("yellow_200", 0xfef08a),
+    ("yellow_300", 0xfde047),
+    ("yellow_400", 0xfacc15),
+    ("yellow_500", 0xeab308),
+    ("yellow_600", 0xca8a04),
+    ("yellow_700", 0xa16207),
+    ("yellow_800", 0x854d0e),
+    ("yellow_900", 0x713f12),
+    ("yellow_950", 0x422006),
+    // Lime
+    ("lime_50", 0xf7fee7),
+    ("lime_100", 0xecfccb),
+    ("lime_200", 0xd9f99d),
+    ("lime_300", 0xbef264),
+    ("lime_400", 0xa3e635),
+    ("lime_500", 0x84cc16),
+    ("lime_600", 0x65a30d),
+    ("lime_700", 0x4d7c0f),
+    ("lime_800", 0x3f6212),
+    ("lime_900", 0x365314),
+    ("lime_950", 0x1a2e05),
+    // Green
+    ("green_50", 0xf0fdf4),
+    ("green_100", 0xdcfce7),
+    ("green_200", 0xbbf7d0),
+    ("green_300", 0x86efac),
+    ("green_400", 0x4ade80),
+    ("green_500", 0x22c55e),
+    ("green_600", 0x16a34a),
+    ("green_700", 0x15803d),
+    ("green_800", 0x166534),
+    ("green_900", 0x14532d),
+    ("green_950", 0x052e16),
+    // Emerald
+    ("emerald_50", 0xecfdf5),
+    ("emerald_100", 0xd1fae5),
+    ("emerald_200", 0xa7f3d0),
+    ("emerald_300", 0x6ee7b7),
+    ("emerald_400", 0x34d399),
+    ("emerald_500", 0x10b981),
+    ("emerald_600", 0x059669),
+    ("emerald_700", 0x047857),
+    ("emerald_800", 0x065f46),
+    ("emerald_900", 0x064e3b),
+    ("emerald_950", 0x022c22),
+    // Teal
+    ("teal_50", 0xf0fdfa),
+    ("teal_100", 0xccfbf1),
+    ("teal_200", 0x99f6e4),
+    ("teal_300", 0x5eead4),
+    ("teal_400", 0x2dd4bf),
+    ("teal_500", 0x14b8a6),
+    ("teal_600", 0x0d9488),
+    ("teal_700", 0x0f766e),
+    ("teal_800", 0x115e59),
+    ("teal_900", 0x134e4a),
+    ("teal_950", 0x042f2e),
+    // Cyan
+    ("cyan_50", 0xecfeff),
+    ("cyan_100", 0xcffafe),
+    ("cyan_200", 0xa5f3fc),
+    ("cyan_300", 0x67e8f9),
+    ("cyan_400", 0x22d3ee),
+    ("cyan_500", 0x06b6d4),
+    ("cyan_600", 0x0891b2),
+    ("cyan_700", 0x0e7490),
+    ("cyan_800", 0x155e75),
+    ("cyan_900", 0x164e63),
+    ("cyan_950", 0x083344),
+    // Sky
+    ("sky_50", 0xf0f9ff),
+    ("sky_100", 0xe0f2fe),
+    ("sky_200", 0xbae6fd),
+    ("sky_300", 0x7dd3fc),
+    ("sky_400", 0x38bdf8),
+    ("sky_500", 0x0ea5e9),
+    ("sky_600", 0x0284c7),
+    ("sky_700", 0x0369a1),
+    ("sky_800", 0x075985),
+    ("sky_900", 0x0c4a6e),
+    ("sky_950", 0x082f49),
+    // Blue
+    ("blue_50", 0xeff6ff),
+    ("blue_100", 0xdbeafe),
+    ("blue_200", 0xbfdbfe),
+    ("blue_300", 0x93c5fd),
+    ("blue_400", 0x60a5fa),
     ("blue_500", 0x3b82f6),
     ("blue_600", 0x2563eb),
-    ("gray_600", 0x6b7280),
+    ("blue_700", 0x1d4ed8),
+    ("blue_800", 0x1e40af),
+    ("blue_900", 0x1e3a8a),
+    ("blue_950", 0x172554),
+    // Indigo
+    ("indigo_50", 0xeef2ff),
+    ("indigo_100", 0xe0e7ff),
+    ("indigo_200", 0xc7d2fe),
+    ("indigo_300", 0xa5b4fc),
+    ("indigo_400", 0x818cf8),
+    ("indigo_500", 0x6366f1),
+    ("indigo_600", 0x4f46e5),
+    ("indigo_700", 0x4338ca),
+    ("indigo_800", 0x3730a3),
+    ("indigo_900", 0x312e81),
+    ("indigo_950", 0x1e1b4b),
+    // Violet
+    ("violet_50", 0xf5f3ff),
+    ("violet_100", 0xede9fe),
+    ("violet_200", 0xddd6fe),
+    ("violet_300", 0xc4b5fd),
+    ("violet_400", 0xa78bfa),
+    ("violet_500", 0x8b5cf6),
+    ("violet_600", 0x7c3aed),
+    ("violet_700", 0x6d28d9),
+    ("violet_800", 0x5b21b6),
+    ("violet_900", 0x4c1d95),
+    ("violet_950", 0x2e1065),
+    // Purple
+    ("purple_50", 0xfaf5ff),
+    ("purple_100", 0xf3e8ff),
+    ("purple_200", 0xe9d5ff),
+    ("purple_300", 0xd8b4fe),
+    ("purple_400", 0xc084fc),
+    ("purple_500", 0xa855f7),
+    ("purple_600", 0x9333ea),
+    ("purple_700", 0x7e22ce),
+    ("purple_800", 0x6b21a8),
+    ("purple_900", 0x581c87),
+    ("purple_950", 0x3b0764),
+    // Fuchsia
+    ("fuchsia_50", 0xfdf4ff),
+    ("fuchsia_100", 0xfae8ff),
+    ("fuchsia_200", 0xf5d0fe),
+    ("fuchsia_300", 0xf0abfc),
+    ("fuchsia_400", 0xe879f9),
+    ("fuchsia_500", 0xd946ef),
+    ("fuchsia_600", 0xc026d3),
+    ("fuchsia_700", 0xa21caf),
+    ("fuchsia_800", 0x86198f),
+    ("fuchsia_900", 0x701a75),
+    ("fuchsia_950", 0x4a044e),
+    // Pink
+    ("pink_50", 0xfdf2f8),
+    ("pink_100", 0xfce7f3),
+    ("pink_200", 0xfbcfe8),
+    ("pink_300", 0xf9a8d4),
+    ("pink_400", 0xf472b6),
+    ("pink_500", 0xec4899),
+    ("pink_600", 0xdb2777),
+    ("pink_700", 0xbe185d),
+    ("pink_800", 0x9d174d),
+    ("pink_900", 0x831843),
+    ("pink_950", 0x500724),
+    // Rose
+    ("rose_50", 0xfff1f2),
+    ("rose_100", 0xffe4e6),
+    ("rose_200", 0xfecdd3),
+    ("rose_300", 0xfda4af),
+    ("rose_400", 0xfb7185),
+    ("rose_500", 0xf43f5e),
+    ("rose_600", 0xe11d48),
+    ("rose_700", 0xbe123c),
+    ("rose_800", 0x9f1239),
+    ("rose_900", 0x881337),
+    ("rose_950", 0x4c0519),
+    // 特殊颜色
+    ("white", 0xffffff),
+    ("black", 0x000000),
+];
+
+/// 标签默认样式表：(标签名, class 字符串)
+/// 仅当元素带 `styled` 标志时应用，复用 parse_class_string() 解析
+const TAG_DEFAULT_STYLES: &[(&str, &str)] = &[
+    // 标题
+    ("h1", "text-3xl font-bold"),
+    ("h2", "text-2xl font-bold"),
+    ("h3", "text-xl font-bold"),
+    ("h4", "text-lg font-bold"),
+    ("h5", "text-base font-bold"),
+    ("h6", "text-sm font-bold"),
+    // 交互
+    ("button", "cursor-pointer"),
+    ("a", "cursor-pointer"),
+    // 表单
+    ("input", "px-2 py-1"),
+    ("textarea", "px-2 py-1"),
+    // 列表
+    ("ul", "flex flex-col"),
+    ("ol", "flex flex-col"),
 ];
 
 /// 间距/尺寸 class 前缀映射表
@@ -62,26 +422,67 @@ const SPACING_PATTERNS: &[(&str, &str)] = &[
 ];
 
 /// 生成 GPUI 代码（入口）
-pub fn generate_code(element: &RsxElement) -> TokenStream {
-    generate_element(element)
+pub fn generate_body(body: &RsxBody) -> TokenStream {
+    match body {
+        RsxBody::Single(element) => generate_element(element),
+        RsxBody::Fragment(children) => {
+            let child_exprs: Vec<TokenStream> = children
+                .iter()
+                .map(generate_node)
+                .collect();
+            quote! { vec![#(#child_exprs),*] }
+        }
+    }
 }
 
-/// 检查属性列表中是否存在需要 `Stateful<Div>` 的事件
-fn needs_stateful_id(attributes: &[RsxAttribute]) -> bool {
-    attributes.iter().any(|attr| {
-        if let RsxAttribute::Value { name, .. } = attr {
-            let n = name.to_string();
-            STATEFUL_EVENTS.iter().any(|&s| n == s)
-        } else {
-            false
+/// 生成单个子节点的代码
+fn generate_node(node: &RsxNode) -> TokenStream {
+    match node {
+        RsxNode::Element(elem) => generate_element(elem),
+        RsxNode::Expr(expr) => expr.to_token_stream(),
+        RsxNode::Spread(expr) => expr.to_token_stream(),
+        RsxNode::For { binding, iter, body } => {
+            let body_exprs: Vec<TokenStream> = body.iter().map(generate_node).collect();
+            if body_exprs.len() == 1 {
+                let single = &body_exprs[0];
+                quote! { (#iter).into_iter().map(|#binding| #single) }
+            } else {
+                quote! { (#iter).into_iter().flat_map(|#binding| vec![#(#body_exprs),*]) }
+            }
         }
+    }
+}
+
+/// 检查属性列表中是否存在需要 `Stateful<Div>` 的属性
+fn needs_stateful_id(attributes: &[RsxAttribute]) -> bool {
+    attributes.iter().any(|attr| match attr {
+        RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
+            let n = name.to_string();
+            NEEDS_ID_ATTRS.iter().any(|&s| n == s)
+        }
+        _ => false,
     })
 }
 
-/// 生成唯一自动 ID 字符串
-fn next_auto_id() -> String {
+/// 生成确定性自动 ID 字符串
+///
+/// 使用标签名和属性名的哈希 + 全局计数器，减少编译顺序敏感度。
+fn next_auto_id(tag: &str, attributes: &[RsxAttribute]) -> String {
+    let mut hasher = DefaultHasher::new();
+    tag.hash(&mut hasher);
+    for attr in attributes {
+        match attr {
+            RsxAttribute::Flag(name) | RsxAttribute::Value { name, .. } => {
+                name.to_string().hash(&mut hasher);
+            }
+            _ => {}
+        }
+    }
+    // 保留计数器确保同签名元素不冲突
     let n = AUTO_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("__rsx_{n}")
+    n.hash(&mut hasher);
+    let hash = hasher.finish();
+    format!("__rsx_{tag}_{hash:x}")
 }
 
 // ---------------------------------------------------------------------------
@@ -101,21 +502,82 @@ fn generate_element(element: &RsxElement) -> TokenStream {
 
     let mut methods: Vec<TokenStream> = Vec::new();
 
-    // 属性 → 方法调用
+    // styled 标志 → 注入标签默认样式（在用户属性之前）
+    let has_styled = element.attributes.iter().any(|a| {
+        matches!(a, RsxAttribute::Flag(name) if name == "styled")
+    });
+    if has_styled {
+        let tag_name = element.name.to_string();
+        if let Some(&(_, class_str)) = TAG_DEFAULT_STYLES.iter().find(|&&(tag, _)| tag == tag_name)
+        {
+            methods.extend(parse_class_string(class_str));
+        }
+    }
+
+    // 属性 → 方法调用（用户属性在默认样式之后，可覆盖）
     for attr in &element.attributes {
         methods.extend(generate_attr_methods(attr));
     }
 
-    // 子节点 → .child() 调用
-    for child in &element.children {
-        let child_expr = match child {
-            RsxNode::Element(elem) => generate_element(elem),
-            RsxNode::Expr(expr) => expr.to_token_stream(),
-        };
-        methods.push(quote! { .child(#child_expr) });
-    }
+    // 子节点 → .child() / .children() 调用（含聚合优化）
+    generate_children_methods(&element.children, &mut methods);
 
     quote! { #base #(#methods)* }
+}
+
+/// 生成子节点的方法链片段
+///
+/// 当连续 3+ 个 Expr 子节点时，合并为单个 `.children(vec![...])` 调用。
+fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream>) {
+    let mut i = 0;
+    while i < children.len() {
+        // 收集连续的 Expr 子节点
+        let mut consecutive_exprs: Vec<TokenStream> = Vec::new();
+        while i < children.len() {
+            if let RsxNode::Expr(expr) = &children[i] {
+                consecutive_exprs.push(expr.to_token_stream());
+                i += 1;
+            } else {
+                break;
+            }
+        }
+
+        // 3 个及以上连续 Expr → .children(vec![...])
+        if consecutive_exprs.len() >= 3 {
+            methods.push(quote! { .children(vec![#(#consecutive_exprs),*]) });
+        } else {
+            for expr in consecutive_exprs {
+                methods.push(quote! { .child(#expr) });
+            }
+        }
+
+        // 处理非 Expr 节点
+        if i < children.len() {
+            match &children[i] {
+                RsxNode::Element(elem) => {
+                    let child_expr = generate_element(elem);
+                    methods.push(quote! { .child(#child_expr) });
+                }
+                RsxNode::Spread(expr) => {
+                    methods.push(quote! { .children(#expr) });
+                }
+                RsxNode::For { binding, iter, body } => {
+                    let body_exprs: Vec<TokenStream> =
+                        body.iter().map(generate_node).collect();
+                    if body_exprs.len() == 1 {
+                        let single = &body_exprs[0];
+                        methods.push(quote! { .children((#iter).into_iter().map(|#binding| #single)) });
+                    } else {
+                        methods.push(
+                            quote! { .children((#iter).into_iter().flat_map(|#binding| vec![#(#body_exprs),*])) },
+                        );
+                    }
+                }
+                RsxNode::Expr(_) => unreachable!(), // Expr 已在上面的循环中处理
+            }
+            i += 1;
+        }
+    }
 }
 
 /// 生成元素基础构造表达式（含自动 `.id()` 插入）
@@ -135,16 +597,21 @@ fn generate_base(element: &RsxElement) -> TokenStream {
     if let Some(id_value) = user_id {
         quote! { #tag.id(#id_value) }
     } else if needs_stateful_id(&element.attributes) {
-        let auto_id = next_auto_id();
+        let auto_id = next_auto_id(&element.name.to_string(), &element.attributes);
         quote! { #tag.id(#auto_id) }
     } else {
         tag
     }
 }
 
-/// HTML 标签 → `div()`，自定义组件 → 同名函数调用
+/// HTML 标签 → `div()`，特殊标签 → 同名函数，自定义组件 → 同名函数调用
 fn generate_tag(name: &syn::Ident) -> TokenStream {
     match name.to_string().as_str() {
+        // 特殊标签：保留为同名函数调用
+        "svg" => quote! { svg() },
+        "img" => quote! { img() },
+        "canvas" => quote! { canvas() },
+        // HTML 标签：统一映射为 div()
         "div" | "span" | "section" | "article" | "header" | "footer" | "main" | "nav"
         | "aside" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "label" | "a"
         | "button" | "input" | "textarea" | "select" | "form" | "ul" | "ol" | "li" => {
@@ -165,7 +632,15 @@ fn generate_attr_methods(attr: &RsxAttribute) -> Vec<TokenStream> {
         RsxAttribute::Value { name, .. } if name == "id" => vec![],
 
         RsxAttribute::Flag(name) => {
-            vec![quote! { .#name() }]
+            // invisible 标志特殊处理 → .visible(false)
+            if name == "invisible" {
+                vec![quote! { .visible(false) }]
+            } else if name == "styled" {
+                // styled 标志已在 generate_element 中处理，不生成 .styled()
+                vec![]
+            } else {
+                vec![quote! { .#name() }]
+            }
         }
 
         RsxAttribute::Value { name, value } => {
@@ -180,19 +655,42 @@ fn generate_attr_methods(attr: &RsxAttribute) -> Vec<TokenStream> {
                 {
                     return parse_class_string(&lit_str.value());
                 }
+                // class 属性仅支持字符串字面量，动态值需要用独立属性
+                return vec![
+                    quote! { compile_error!("class attribute only supports string literals; use individual attributes (e.g. flex, bg={...}) for dynamic styling") },
+                ];
             }
 
             // 事件处理器查表
             for &(camel, snake, method) in EVENT_HANDLERS {
                 if method_name == camel || method_name == snake {
                     let method_ident =
-                        syn::Ident::new(method, proc_macro2::Span::call_site());
+                        syn::Ident::new(method, name.span());
+                    return vec![quote! { .#method_ident(#value) }];
+                }
+            }
+
+            // 属性名称映射查表（camelCase -> snake_case）
+            for &(camel, snake) in ATTRIBUTE_NAME_MAP {
+                if method_name == camel {
+                    let method_ident =
+                        syn::Ident::new(snake, name.span());
                     return vec![quote! { .#method_ident(#value) }];
                 }
             }
 
             // 默认：直接作为方法调用
             vec![quote! { .#name(#value) }]
+        }
+
+        // when 条件渲染
+        RsxAttribute::When { condition, closure } => {
+            vec![quote! { .when(#condition, #closure) }]
+        }
+
+        // when_some 条件渲染
+        RsxAttribute::WhenSome { option, closure } => {
+            vec![quote! { .when_some(#option, #closure) }]
         }
     }
 }
@@ -211,16 +709,56 @@ fn parse_class_string(class_str: &str) -> Vec<TokenStream> {
         .collect()
 }
 
+/// 有效的 text 大小名称白名单
+const VALID_TEXT_SIZES: &[&str] = &[
+    "xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl", "5xl",
+];
+
 /// 解析单个 CSS class 为方法调用
 fn parse_single_class(class: &str) -> Option<TokenStream> {
     let method_name = class.replace('-', "_");
 
     // 间距/尺寸类：gap-4 → .gap(px(4.0))
     for &(prefix, method) in SPACING_PATTERNS {
-        if let Some(value) = method_name.strip_prefix(prefix) {
-            if let Ok(num) = value.parse::<f32>() {
-                let method_ident = syn::Ident::new(method, proc_macro2::Span::call_site());
-                return Some(quote! { .#method_ident(px(#num)) });
+        if let Some(value) = method_name.strip_prefix(prefix)
+            && let Ok(num) = value.parse::<f32>()
+        {
+            let method_ident = syn::Ident::new(method, proc_macro2::Span::call_site());
+            return Some(quote! { .#method_ident(px(#num)) });
+        }
+    }
+
+    // border 特殊处理：
+    // "border" (纯) → .border_1()（GPUI 没有无参 .border()）
+    // "border-2" → .border_2()
+    if method_name == "border" {
+        return Some(quote! { .border_1() });
+    }
+
+    // border-color 类：border-red-500 → .border_color(rgb(0xef4444))
+    if let Some(color) = method_name.strip_prefix("border_") {
+        // 排除方向性边框（border-t, border-b 等由 fallthrough 处理）
+        if !["t", "b", "l", "r", "x", "y"].contains(&color)
+            && !color.starts_with("t_")
+            && !color.starts_with("b_")
+            && !color.starts_with("l_")
+            && !color.starts_with("r_")
+        {
+            // 检查是否是数值边框宽度 border-2, border-4 等
+            if let Ok(_n) = color.parse::<u32>() {
+                let ident =
+                    syn::Ident::new(&method_name, proc_macro2::Span::call_site());
+                return Some(quote! { .#ident() });
+            }
+            // 检查颜色表
+            for &(color_name, color_value) in COLOR_MAP {
+                if color == color_name {
+                    return Some(quote! { .border_color(rgb(#color_value)) });
+                }
+            }
+            // 检查任意 hex 颜色: border-[#rrggbb]
+            if let Some(hex) = parse_arbitrary_hex(color) {
+                return Some(quote! { .border_color(rgb(#hex)) });
             }
         }
     }
@@ -230,11 +768,16 @@ fn parse_single_class(class: &str) -> Option<TokenStream> {
         return Some(color_code);
     }
 
-    // 文本大小类：text-xl → .text_xl()
+    // 文本大小类：text-xl → .text_xl()（仅白名单内的大小有效）
+    // 不合并 if：非白名单 text_ 前缀需 fall through 到默认处理
+    #[allow(clippy::collapsible_if)]
     if let Some(size) = method_name.strip_prefix("text_") {
-        let size_ident =
-            syn::Ident::new(&format!("text_{size}"), proc_macro2::Span::call_site());
-        return Some(quote! { .#size_ident() });
+        if VALID_TEXT_SIZES.contains(&size) {
+            let size_ident =
+                syn::Ident::new(&format!("text_{size}"), proc_macro2::Span::call_site());
+            return Some(quote! { .#size_ident() });
+        }
+        // 不在白名单中的 text_ 前缀，fall through 到默认处理
     }
 
     // 默认：无参方法调用
@@ -245,17 +788,49 @@ fn parse_single_class(class: &str) -> Option<TokenStream> {
 /// 解析颜色 class（先分离前缀，再查表，避免循环内重复 strip）
 fn parse_color_class(class: &str) -> Option<TokenStream> {
     if let Some(color) = class.strip_prefix("text_") {
+        // 查颜色表
         for &(color_name, color_value) in COLOR_MAP {
             if color == color_name {
                 return Some(quote! { .text_color(rgb(#color_value)) });
             }
         }
+        // 任意 hex: text-[#rrggbb]
+        if let Some(hex) = parse_arbitrary_hex(color) {
+            return Some(quote! { .text_color(rgb(#hex)) });
+        }
     } else if let Some(color) = class.strip_prefix("bg_") {
+        // 查颜色表
         for &(color_name, color_value) in COLOR_MAP {
             if color == color_name {
                 return Some(quote! { .bg(rgb(#color_value)) });
             }
         }
+        // 任意 hex: bg-[#rrggbb]
+        if let Some(hex) = parse_arbitrary_hex(color) {
+            return Some(quote! { .bg(rgb(#hex)) });
+        }
     }
     None
+}
+
+/// 解析任意 hex 颜色值：`[#rrggbb]` 或 `[#rgb]`
+///
+/// 输入已经过 `-` → `_` 替换，但 `[#...]` 中不含 `-`，所以保持原样。
+/// 返回解析后的 u32 颜色值。
+fn parse_arbitrary_hex(s: &str) -> Option<u32> {
+    // 匹配 [#rrggbb] 或 [#rgb]
+    let inner = s.strip_prefix("[#")?.strip_suffix(']')?;
+    match inner.len() {
+        6 => u32::from_str_radix(inner, 16).ok(),
+        3 => {
+            // 3 位 hex 扩展为 6 位: #abc → #aabbcc
+            let mut expanded = String::with_capacity(6);
+            for ch in inner.chars() {
+                expanded.push(ch);
+                expanded.push(ch);
+            }
+            u32::from_str_radix(&expanded, 16).ok()
+        }
+        _ => None,
+    }
 }
