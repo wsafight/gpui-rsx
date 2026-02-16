@@ -1,30 +1,30 @@
 # GPUI-RSX
 
-[English](./README_EN.md) | 简体中文
+English | [简体中文](./README_CN.md)
 
-一个为 GPUI 提供 JSX-like 语法的 Rust 过程宏，让 UI 开发更加简洁和直观。
+A Rust procedural macro that provides JSX-like syntax for GPUI, making UI development more concise and intuitive.
 
-## ✨ 特性
+## ✨ Features
 
-- 🎨 **HTML-like 语法** - 类似 React JSX 的开发体验
-- 🚀 **零运行时开销** - 编译时展开为原生 GPUI 代码
-- 📦 **轻量级** - 仅依赖 `syn`, `quote`, `proc-macro2`
-- 🔧 **灵活** - 支持表达式、条件渲染、组件组合
-- 💡 **类型安全** - 完全的编译时检查
+- 🎨 **HTML-like Syntax** - React JSX-like development experience
+- 🚀 **Zero Runtime Overhead** - Expands to native GPUI code at compile time
+- 📦 **Lightweight** - Only depends on `syn`, `quote`, `proc-macro2`
+- 🔧 **Flexible** - Supports expressions, conditional rendering, component composition
+- 💡 **Type Safe** - Full compile-time type checking
 
-## 📦 安装
+## 📦 Installation
 
-在你的 `Cargo.toml` 中添加：
+Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
 gpui = "0.1"
-gpui-rsx = { path = "../gpui-rsx" }
+gpui-rsx = "0.1"
 ```
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 5 分钟上手
+### Get Started in 5 Minutes
 
 ```rust
 use gpui::*;
@@ -81,9 +81,9 @@ fn main() {
 }
 ```
 
-### 前后对比
+### Before & After
 
-#### ❌ 传统 GPUI 写法（繁琐）
+#### ❌ Traditional GPUI (Verbose)
 
 ```rust
 fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
@@ -132,15 +132,15 @@ fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
 }
 ```
 
-#### ✅ 使用 GPUI-RSX（简洁）
+#### ✅ With GPUI-RSX (Concise)
 
-见上方快速开始示例。
+See the Quick Start example above.
 
-**代码减少：~50%** ✨
+**Code Reduction: ~50%** ✨
 
-## 📖 语法指南
+## 📖 Syntax Guide
 
-### 1. 基本元素
+### 1. Basic Elements
 
 ```rust
 rsx! {
@@ -148,14 +148,14 @@ rsx! {
 }
 ```
 
-展开为：
+Expands to:
 ```rust
 div().child("Hello GPUI")
 ```
 
-### 2. 属性
+### 2. Attributes
 
-#### 布尔属性（Flag）
+#### Boolean Attributes (Flags)
 
 ```rust
 rsx! {
@@ -163,12 +163,12 @@ rsx! {
 }
 ```
 
-展开为：
+Expands to:
 ```rust
 div().flex().flex_col()
 ```
 
-#### 值属性
+#### Value Attributes
 
 ```rust
 rsx! {
@@ -176,12 +176,12 @@ rsx! {
 }
 ```
 
-展开为：
+Expands to:
 ```rust
 div().gap(px(16.0)).bg(rgb(0xffffff))
 ```
 
-### 3. Class 属性（特殊处理）
+### 3. Class Attribute (Special Handling)
 
 ```rust
 rsx! {
@@ -189,12 +189,12 @@ rsx! {
 }
 ```
 
-展开为：
+Expands to:
 ```rust
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
-支持的 class 模式：
+Supported class patterns:
 - `gap-4` → `gap(px(4.0))`
 - `p-4` → `p(px(4.0))`
 - `px-4` → `px(px(4.0))`
@@ -202,7 +202,7 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - `flex` → `flex()`
 - `flex-col` → `flex_col()`
 
-### 4. 事件处理
+### 4. Event Handling
 
 ```rust
 rsx! {
@@ -214,14 +214,14 @@ rsx! {
 }
 ```
 
-支持的事件：
+Supported events:
 - `onClick` / `on_click`
 - `onMouseDown` / `on_mouse_down`
 - `onMouseUp` / `on_mouse_up`
 - `onKeyDown` / `on_key_down`
 - `onKeyUp` / `on_key_up`
 
-### 5. 嵌套元素
+### 5. Nested Elements
 
 ```rust
 rsx! {
@@ -236,7 +236,7 @@ rsx! {
 }
 ```
 
-### 6. 表达式
+### 6. Expressions
 
 ```rust
 rsx! {
@@ -252,7 +252,7 @@ rsx! {
 }
 ```
 
-### 7. 列表渲染
+### 7. List Rendering
 
 ```rust
 rsx! {
@@ -268,9 +268,9 @@ rsx! {
 }
 ```
 
-## 🎯 完整示例
+## 🎯 Complete Example
 
-### Todo 应用
+### Todo App
 
 ```rust
 use gpui::*;
@@ -357,9 +357,9 @@ impl TodoApp {
 }
 ```
 
-## 🔧 高级用法
+## 🔧 Advanced Usage
 
-### 自定义组件
+### Custom Components
 
 ```rust
 fn render_card(&self, title: &str, content: &str) -> impl IntoElement {
@@ -385,7 +385,7 @@ fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
 }
 ```
 
-### 条件渲染
+### Conditional Rendering
 
 ```rust
 rsx! {
@@ -401,7 +401,7 @@ rsx! {
 }
 ```
 
-### 动态样式
+### Dynamic Styling
 
 ```rust
 fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
@@ -419,60 +419,60 @@ fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
 }
 ```
 
-## 📊 性能
+## 📊 Performance
 
-GPUI-RSX 是一个**编译时宏**，展开后的代码与手写的 GPUI 代码完全相同，**零运行时开销**。
+GPUI-RSX is a **compile-time macro** that expands to the same code as hand-written GPUI, with **zero runtime overhead**.
 
-| 指标 | 传统 GPUI | GPUI-RSX |
-|------|----------|----------|
-| 代码量 | 100 行 | 50 行 (-50%) |
-| 运行时性能 | 基准 | 相同 |
-| 类型安全 | ✅ | ✅ |
-| 编译时检查 | ✅ | ✅ |
+| Metric | Traditional GPUI | GPUI-RSX |
+|--------|------------------|----------|
+| Code Size | 100 lines | 50 lines (-50%) |
+| Runtime Performance | Baseline | Same |
+| Type Safety | ✅ | ✅ |
+| Compile-time Checking | ✅ | ✅ |
 
-## 🛠️ 开发
+## 🛠️ Development
 
-### 构建
+### Build
 
 ```bash
 cd gpui-rsx
 cargo build
 ```
 
-### 测试
+### Test
 
 ```bash
 cargo test
 ```
 
-### 运行示例
+### Run Examples
 
 ```bash
-# 计数器示例
+# Counter example
 cargo run --example counter
 
-# Todo 应用示例
+# Todo app example
 cargo run --example todo_app
 ```
 
-### 展开宏（调试）
+### Expand Macros (Debugging)
 
 ```bash
-# 安装 cargo-expand
+# Install cargo-expand
 cargo install cargo-expand
 
-# 查看展开后的代码
+# View expanded code
 cargo expand --lib
 ```
 
-## 💡 最佳实践
+## 💡 Best Practices
 
-### 1. 组件拆分
+### 1. Component Splitting
 
-将复杂的 UI 拆分为小的、可复用的组件：
+Break complex UIs into small, reusable components:
 
 ```rust
-// ✅ 推荐：拆分为多个方法
+// ✅ Recommended: Split into multiple methods
 fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
     rsx! {
         <div>
@@ -488,9 +488,9 @@ fn render_header(&self) -> impl IntoElement {
 }
 ```
 
-### 2. 使用常量
+### 2. Use Constants
 
-将重复的样式提取为常量：
+Extract repeated styles as constants:
 
 ```rust
 const PRIMARY_BG: Rgb = rgb(0x3b82f6);
@@ -503,10 +503,10 @@ rsx! {
 }
 ```
 
-### 3. 避免过度嵌套
+### 3. Avoid Over-nesting
 
 ```rust
-// ❌ 不推荐：过度嵌套
+// ❌ Not recommended: Over-nested
 rsx! {
     <div>
         <div>
@@ -519,7 +519,7 @@ rsx! {
     </div>
 }
 
-// ✅ 推荐：扁平化结构
+// ✅ Recommended: Flatten structure
 rsx! {
     <div class="container">
         {"Content"}
@@ -527,9 +527,9 @@ rsx! {
 }
 ```
 
-## 🐛 常见问题
+## 🐛 FAQ
 
-### Q1: 如何在 RSX 中使用变量？
+### Q1: How to use variables in RSX?
 
 ```rust
 let title = "Hello";
@@ -538,7 +538,7 @@ rsx! {
 }
 ```
 
-### Q2: 如何处理 Option 类型？
+### Q2: How to handle Option types?
 
 ```rust
 rsx! {
@@ -552,49 +552,49 @@ rsx! {
 }
 ```
 
-### Q3: 宏展开后的代码是什么样的？
+### Q3: What does the expanded macro code look like?
 
-使用 `cargo expand` 查看：
+Use `cargo expand` to view:
 
 ```bash
 cargo expand --lib
 ```
 
-### Q4: 支持哪些元素？
+### Q4: Which elements are supported?
 
-所有 GPUI 支持的元素都可以使用，如 `div`, `button`, `input`, `span` 等。
+All GPUI-supported elements can be used, such as `div`, `button`, `input`, `span`, etc.
 
-## 🤝 贡献
+## 🤝 Contributing
 
-欢迎贡献！请随时提交 Issue 或 Pull Request。
+Contributions are welcome! Feel free to submit Issues or Pull Requests.
 
-### 开发流程
+### Development Workflow
 
-1. Fork 项目
-2. 创建功能分支: `git checkout -b feature/amazing-feature`
-3. 提交更改: `git commit -m 'Add amazing feature'`
-4. 推送分支: `git push origin feature/amazing-feature`
-5. 提交 Pull Request
+1. Fork the project
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Commit changes: `git commit -m 'Add amazing feature'`
+4. Push branch: `git push origin feature/amazing-feature`
+5. Submit a Pull Request
 
-### 代码规范
+### Code Standards
 
-- 使用 `rustfmt` 格式化代码
-- 使用 `clippy` 检查代码质量
-- 为新功能添加测试
-- 更新文档
+- Use `rustfmt` to format code
+- Use `clippy` to check code quality
+- Add tests for new features
+- Update documentation
 
-## 📝 许可
+## 📝 License
 
 MIT License
 
-## 🙏 致谢
+## 🙏 Acknowledgments
 
-灵感来源于：
-- [Dioxus RSX](https://dioxuslabs.com/) - RSX 语法设计
-- [Yew html! macro](https://yew.rs/) - html! 宏
-- [React JSX](https://react.dev/) - JSX 语法
-- [GPUI](https://www.gpui.rs/) - 底层 UI 框架
+Inspired by:
+- [Dioxus RSX](https://dioxuslabs.com/) - RSX syntax design
+- [Yew html! macro](https://yew.rs/) - html! macro
+- [React JSX](https://react.dev/) - JSX syntax
+- [GPUI](https://www.gpui.rs/) - Underlying UI framework
 
 ---
 
-**让 GPUI 开发更加愉快！** 🎉
+**Make GPUI development more enjoyable!** 🎉
