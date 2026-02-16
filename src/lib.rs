@@ -32,6 +32,7 @@
 //! ```
 
 use proc_macro::TokenStream;
+use proc_macro_error::proc_macro_error;
 use syn::parse_macro_input;
 
 mod codegen;
@@ -114,6 +115,7 @@ use parser::RsxBody;
 ///     </ul>
 /// }
 /// ```
+#[proc_macro_error]
 #[proc_macro]
 pub fn rsx(input: TokenStream) -> TokenStream {
     let body = parse_macro_input!(input as RsxBody);

@@ -422,6 +422,12 @@ const SPACING_PATTERNS: &[(&str, &str)] = &[
 ];
 
 /// 生成 GPUI 代码（入口）
+///
+/// 将解析后的 RSX AST 转换为 GPUI 的类型安全代码。
+///
+/// # 返回值
+/// - 单个元素：返回实现 `IntoElement` 的表达式
+/// - Fragment：返回 `Vec<impl IntoElement>`
 pub fn generate_body(body: &RsxBody) -> TokenStream {
     match body {
         RsxBody::Single(element) => generate_element(element),
@@ -430,23 +436,29 @@ pub fn generate_body(body: &RsxBody) -> TokenStream {
                 .iter()
                 .map(generate_node)
                 .collect();
+            // Fragment 返回 Vec，GPUI 会自动处理
             quote! { vec![#(#child_exprs),*] }
         }
     }
 }
 
 /// 生成单个子节点的代码
+///
+/// 确保生成的代码具有正确的类型推断，支持 IntoElement trait
 fn generate_node(node: &RsxNode) -> TokenStream {
     match node {
         RsxNode::Element(elem) => generate_element(elem),
+        // 表达式会被自动推断类型，GPUI 的 .child() 接受 impl IntoElement
         RsxNode::Expr(expr) => expr.to_token_stream(),
         RsxNode::Spread(expr) => expr.to_token_stream(),
         RsxNode::For { binding, iter, body } => {
             let body_exprs: Vec<TokenStream> = body.iter().map(generate_node).collect();
             if body_exprs.len() == 1 {
                 let single = &body_exprs[0];
+                // 单个子节点：生成 map 迭代器
                 quote! { (#iter).into_iter().map(|#binding| #single) }
             } else {
+                // 多个子节点：生成 flat_map 返回 Vec
                 quote! { (#iter).into_iter().flat_map(|#binding| vec![#(#body_exprs),*]) }
             }
         }
