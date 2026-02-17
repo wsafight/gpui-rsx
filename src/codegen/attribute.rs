@@ -6,80 +6,74 @@
 //! - class 属性 → 展开为多个样式方法
 //! - 事件处理器 → 映射到正确的 GPUI 方法
 //! - when/whenSome → 条件渲染方法
+//!
+//! 优化：
+//! - 使用 match-based `lookup_attr_method()` 替代双重线性扫描
+//! - 直接 push 到调用方 Vec，避免中间 Vec 分配
 
 use super::class::parse_class_string;
 use super::runtime::generate_dynamic_class_code;
-use super::tables::*;
+use super::tables::lookup_attr_method;
 use crate::parser::RsxAttribute;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-/// 生成属性的方法链片段（返回 `.method(args)` 列表）
-pub(crate) fn generate_attr_methods(attr: &RsxAttribute) -> Vec<TokenStream> {
+/// 生成属性的方法链片段，直接 push 到 `out`（避免中间 Vec 分配）
+pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStream>) {
     match attr {
-        // id 已在 generate_base 中处理，跳过避免重复
-        RsxAttribute::Value { name, .. } if name == "id" => vec![],
+        // id 已在 generate_element 中处理，跳过避免重复
+        RsxAttribute::Value { name, .. } if name == "id" => {}
 
         RsxAttribute::Flag(name) => {
-            // invisible 标志特殊处理 → .visible(false)
             if name == "invisible" {
-                vec![quote! { .visible(false) }]
-            } else if name == "styled" {
+                // invisible 标志特殊处理 → .visible(false)
+                out.push(quote! { .visible(false) });
+            } else if name != "styled" {
                 // styled 标志已在 generate_element 中处理，不生成 .styled()
-                vec![]
-            } else {
-                vec![quote! { .#name() }]
+                out.push(quote! { .#name() });
             }
         }
 
         RsxAttribute::Value { name, value } => {
-            let method_name = name.to_string();
-
             // class 属性 → 展开为多个样式方法（静态）或运行时解析（动态）
-            if method_name == "class" {
+            if name == "class" {
                 // 情况 1：字符串字面量 → 编译期解析（最优性能）
                 if let syn::Expr::Lit(syn::ExprLit {
                     lit: syn::Lit::Str(lit_str),
                     ..
                 }) = value
                 {
-                    return parse_class_string(&lit_str.value());
+                    let s = lit_str.value();
+                    out.extend(parse_class_string(&s));
+                    return;
                 }
 
                 // 情况 2：动态表达式 → 生成运行时解析代码
-                // 返回一个 .map() 调用，在运行时解析和应用 class
                 let dynamic_code = generate_dynamic_class_code(value);
-                return vec![quote! { .map(|__el| #dynamic_code) }];
+                out.push(quote! { .map(|__el| #dynamic_code) });
+                return;
             }
 
-            // 事件处理器查表
-            for &(camel, snake) in EVENT_HANDLERS {
-                if method_name == camel || method_name == snake {
-                    let method_ident = syn::Ident::new(snake, name.span());
-                    return vec![quote! { .#method_ident(#value) }];
-                }
-            }
-
-            // 属性名称映射查表（camelCase -> snake_case）
-            for &(camel, snake) in ATTRIBUTE_NAME_MAP {
-                if method_name == camel {
-                    let method_ident = syn::Ident::new(snake, name.span());
-                    return vec![quote! { .#method_ident(#value) }];
-                }
+            // 使用 match-based 查找替代原先的双重线性扫描
+            let name_str = name.to_string();
+            if let Some(mapped) = lookup_attr_method(&name_str) {
+                let method_ident = syn::Ident::new(mapped, name.span());
+                out.push(quote! { .#method_ident(#value) });
+                return;
             }
 
             // 默认：直接作为方法调用
-            vec![quote! { .#name(#value) }]
+            out.push(quote! { .#name(#value) });
         }
 
         // when 条件渲染
         RsxAttribute::When { condition, closure } => {
-            vec![quote! { .when(#condition, #closure) }]
+            out.push(quote! { .when(#condition, #closure) });
         }
 
         // when_some 条件渲染
         RsxAttribute::WhenSome { option, closure } => {
-            vec![quote! { .when_some(#option, #closure) }]
+            out.push(quote! { .when_some(#option, #closure) });
         }
     }
 }

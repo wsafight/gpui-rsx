@@ -12,7 +12,6 @@ use syn::{
 /// RSX 宏体
 ///
 /// 可以是单个元素或 Fragment（多根节点）
-#[derive(Debug)]
 pub enum RsxBody {
     /// 单个元素，如 `<div>...</div>`
     Single(RsxElement),
@@ -23,19 +22,15 @@ pub enum RsxBody {
 /// RSX 元素
 ///
 /// 表示一个 HTML-like 元素，如 `<div class="container">...</div>`
-#[derive(Debug)]
 pub struct RsxElement {
     pub name: Ident,
     pub attributes: Vec<RsxAttribute>,
     pub children: Vec<RsxNode>,
-    #[allow(dead_code)]
-    pub self_closing: bool,
 }
 
 /// RSX 属性
 ///
 /// 表示元素的属性，如 `class="container"` 或 `onClick={handler}`
-#[derive(Debug)]
 pub enum RsxAttribute {
     /// 布尔属性，如 `flex`
     Flag(Ident),
@@ -50,7 +45,6 @@ pub enum RsxAttribute {
 /// RSX 节点
 ///
 /// 可以是元素、表达式、展开或 for 循环
-#[derive(Debug)]
 pub enum RsxNode {
     /// 子元素
     Element(RsxElement),
@@ -97,8 +91,8 @@ impl Parse for RsxElement {
         input.parse::<Token![<]>()?;
         let name: Ident = input.parse()?;
 
-        // 解析属性
-        let mut attributes = Vec::new();
+        // 解析属性（预分配容量，典型元素有 3-8 个属性）
+        let mut attributes = Vec::with_capacity(4);
         while !input.peek(Token![>]) && !input.peek(Token![/]) {
             let attr_name: Ident = input.parse()?;
 
@@ -117,15 +111,14 @@ impl Parse for RsxElement {
                     syn::Expr::Lit(syn::ExprLit { attrs: vec![], lit })
                 };
 
-                // 特殊处理 when 和 whenSome 属性
-                let attr_name_str = attr_name.to_string();
-                if attr_name_str == "when" {
+                // 特殊处理 when 和 whenSome 属性（直接比较 Ident，避免 to_string() 分配）
+                if attr_name == "when" {
                     let (first, second) = parse_condition_tuple(value, "when")?;
                     attributes.push(RsxAttribute::When {
                         condition: first,
                         closure: second,
                     });
-                } else if attr_name_str == "whenSome" {
+                } else if attr_name == "whenSome" {
                     let (first, second) = parse_condition_tuple(value, "whenSome")?;
                     attributes.push(RsxAttribute::WhenSome {
                         option: first,
@@ -167,7 +160,7 @@ impl Parse for RsxElement {
 
             // 验证标签名称匹配
             if name != closing_name {
-                tag_mismatch_error(&closing_name, &name);
+                return Err(tag_mismatch_error(&closing_name, &name));
             }
 
             children
@@ -177,7 +170,6 @@ impl Parse for RsxElement {
             name,
             attributes,
             children,
-            self_closing,
         })
     }
 }
@@ -187,7 +179,7 @@ impl Parse for RsxElement {
 /// `parent_name` 为 None 时表示 Fragment 上下文，
 /// 为 Some 时表示某个命名元素的子节点。
 fn parse_children(input: ParseStream, parent_name: Option<&Ident>) -> Result<Vec<RsxNode>> {
-    let mut children = Vec::new();
+    let mut children = Vec::with_capacity(4);
 
     loop {
         // 检查是否到达闭合标签
@@ -197,27 +189,19 @@ fn parse_children(input: ParseStream, parent_name: Option<&Ident>) -> Result<Vec
 
         // 检查是否已经没有内容了
         if input.is_empty() {
-            match parent_name {
-                Some(name) => {
-                    unclosed_tag_error(input.span(), name);
-                }
-                None => {
-                    unclosed_fragment_error(input.span());
-                }
-            }
+            return Err(match parent_name {
+                Some(name) => unclosed_tag_error(input.span(), name),
+                None => unclosed_fragment_error(input.span()),
+            });
         }
 
         if let Some(node) = try_parse_child_node(input)? {
             children.push(node);
         } else {
-            match parent_name {
-                Some(name) => {
-                    invalid_child_in_tag_error(input.span(), name);
-                }
-                None => {
-                    invalid_child_in_fragment_error(input.span());
-                }
-            }
+            return Err(match parent_name {
+                Some(name) => invalid_child_in_tag_error(input.span(), name),
+                None => invalid_child_in_fragment_error(input.span()),
+            });
         }
     }
 
@@ -274,10 +258,10 @@ fn parse_for_loop(content: ParseStream) -> Result<RsxNode> {
     let mut iter_tokens = proc_macro2::TokenStream::new();
     while !content.peek(token::Brace) {
         if content.is_empty() {
-            for_loop_missing_brace_error(content.span());
+            return Err(for_loop_missing_brace_error(content.span()));
         }
         let tt: proc_macro2::TokenTree = content.parse()?;
-        iter_tokens.extend(std::iter::once(tt));
+        iter_tokens.extend([tt]);
     }
     let iter_expr: Expr = syn::parse2(iter_tokens)?;
 
@@ -285,12 +269,12 @@ fn parse_for_loop(content: ParseStream) -> Result<RsxNode> {
     let body_content;
     syn::braced!(body_content in content);
 
-    let mut body = Vec::new();
+    let mut body = Vec::with_capacity(2);
     while !body_content.is_empty() {
         if let Some(node) = try_parse_child_node(&body_content)? {
             body.push(node);
         } else {
-            for_loop_invalid_body_error(body_content.span());
+            return Err(for_loop_invalid_body_error(body_content.span()));
         }
     }
 
@@ -306,7 +290,6 @@ fn parse_condition_tuple(value: Expr, attr_name: &str) -> Result<(Expr, Expr)> {
     if let Expr::Tuple(tuple) = value {
         if tuple.elems.len() == 2 {
             let mut iter = tuple.elems.into_iter();
-            // 使用安全的模式匹配代替 unwrap()
             let first = iter
                 .next()
                 .expect("BUG: iterator should have first element after len() == 2 check");
@@ -315,9 +298,13 @@ fn parse_condition_tuple(value: Expr, attr_name: &str) -> Result<(Expr, Expr)> {
                 .expect("BUG: iterator should have second element after len() == 2 check");
             Ok((first, second))
         } else {
-            condition_tuple_wrong_count_error(&tuple, attr_name, tuple.elems.len());
+            Err(condition_tuple_wrong_count_error(
+                &tuple,
+                attr_name,
+                tuple.elems.len(),
+            ))
         }
     } else {
-        condition_tuple_wrong_type_error(&value, attr_name);
+        Err(condition_tuple_wrong_type_error(&value, attr_name))
     }
 }

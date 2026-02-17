@@ -5,7 +5,11 @@
 //! - 任意 hex 颜色值（bg-[#ff0000]）
 //! - 间距/尺寸类
 //!
-//! 核心优化：统一的颜色解析函数，避免代码重复。
+//! 核心优化：
+//! - 统一的颜色解析函数，避免代码重复
+//! - 间距前缀使用 rfind + match（O(1)）替代线性扫描（O(17)）
+//! - 文本大小使用 match 替代 contains 线性查找
+//! - 单遍 `-` → `_` 替换（直接 replace，无需预检 contains）
 
 use super::tables::*;
 use proc_macro2::{Span, TokenStream};
@@ -24,20 +28,22 @@ pub(crate) fn parse_class_string(class_str: &str) -> Vec<TokenStream> {
 
 /// 解析单个 CSS class 为方法调用
 pub(crate) fn parse_single_class(class: &str) -> TokenStream {
-    // 使用 Cow 避免不必要的字符串分配：只在包含 '-' 时才创建新字符串
+    // 含 '-' 时分配新 String，不含则零拷贝借用原字符串
     let method_name: Cow<str> = if class.contains('-') {
         Cow::Owned(class.replace('-', "_"))
     } else {
         Cow::Borrowed(class)
     };
 
-    // 间距/尺寸类：gap-4 → .gap(px(4.0))
-    for &(prefix, method) in SPACING_PATTERNS {
-        if let Some(value) = method_name.strip_prefix(prefix)
-            && let Ok(num) = value.parse::<f32>()
-        {
-            let method_ident = syn::Ident::new(method, Span::call_site());
-            return quote! { .#method_ident(px(#num)) };
+    // 间距/尺寸类：使用 rfind('_') + match 实现 O(1) 前缀查找
+    if let Some(underscore_pos) = method_name.rfind('_') {
+        let suffix = &method_name[underscore_pos + 1..];
+        if let Ok(num) = suffix.parse::<f32>() {
+            let prefix = &method_name[..=underscore_pos];
+            if let Some(method) = lookup_spacing_method(prefix) {
+                let method_ident = syn::Ident::new(method, Span::call_site());
+                return quote! { .#method_ident(px(#num)) };
+            }
         }
     }
 
@@ -50,19 +56,21 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
 
     // border-color 类：border-red-500 → .border_color(rgb(0xef4444))
     if let Some(color) = method_name.strip_prefix("border_") {
-        // 排除方向性边框（border-t, border-b 等由 fallthrough 处理）
-        if !["t", "b", "l", "r", "x", "y"].contains(&color)
-            && !color.starts_with("t_")
-            && !color.starts_with("b_")
-            && !color.starts_with("l_")
-            && !color.starts_with("r_")
-        {
-            // 检查是否是数值边框宽度 border-2, border-4 等
-            if let Ok(_n) = color.parse::<u32>() {
+        // 排除方向性边框和数值边框宽度，用首字节快速判断
+        let skip = match color.as_bytes().first() {
+            Some(b't' | b'b' | b'l' | b'r' | b'x' | b'y')
+                if color.len() == 1 || color.as_bytes().get(1) == Some(&b'_') =>
+            {
+                true
+            }
+            Some(b'0'..=b'9') => {
+                // 数值边框宽度 border-2, border-4 等
                 let ident = syn::Ident::new(&method_name, Span::call_site());
                 return quote! { .#ident() };
             }
-            // 使用统一的颜色解析
+            _ => false,
+        };
+        if !skip {
             if let Some(token) = parse_color_with_method(color, "border_color") {
                 return token;
             }
@@ -74,12 +82,11 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
         return color_code;
     }
 
-    // 文本大小类：text-xl → .text_xl()（仅白名单内的大小有效）
-    // 不合并 if：非白名单 text_ 前缀需 fall through 到默认处理
+    // 文本大小类：text-xl → .text_xl()（使用 match 替代线性查找）
     #[allow(clippy::collapsible_if)]
     if let Some(size) = method_name.strip_prefix("text_") {
-        if VALID_TEXT_SIZES.contains(&size) {
-            let size_ident = syn::Ident::new(&format!("text_{size}"), Span::call_site());
+        if is_valid_text_size(size) {
+            let size_ident = syn::Ident::new(&method_name, Span::call_site());
             return quote! { .#size_ident() };
         }
         // 不在白名单中的 text_ 前缀，fall through 到默认处理
@@ -108,7 +115,6 @@ fn parse_color_class(class: &str) -> Option<TokenStream> {
 /// 统一的颜色解析函数（核心去重逻辑）
 ///
 /// 将颜色名称或任意 hex 值转换为方法调用。
-/// 这个函数消除了之前在 text_color, bg, border_color 中重复的颜色查找逻辑。
 ///
 /// # 参数
 /// - `color`: 颜色字符串（如 "red_500", "[#ff0000]"）

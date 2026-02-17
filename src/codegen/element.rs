@@ -5,30 +5,25 @@
 //! - 自动 ID 管理
 //! - 子节点聚合优化
 //! - Fragment 和 For 循环支持
+//!
+//! 优化：
+//! - 缓存 `Ident::to_string()` 避免重复堆分配
+//! - 使用 match-based `is_stateful_attr()` 替代双重线性扫描
+//! - 使用 `lookup_tag_default()` 替代 `.iter().find()` 线性查找
+//! - `generate_attr_methods` 直接 push 到调用方 Vec
+//! - 复用 `consecutive_exprs` Vec 避免循环内反复分配
 
 use super::attribute::generate_attr_methods;
 use super::class::parse_class_string;
-use super::tables::{EVENT_HANDLERS, TAG_DEFAULT_STYLES};
+use super::tables::{is_stateful_attr, lookup_tag_default};
 use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// 编译期自动 ID 计数器（每次宏展开递增，保证唯一）
 static AUTO_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-/// 需要 `.id()` 的非事件属性（`StatefulInteractiveElement` trait）
-/// 事件处理器通过 EVENT_HANDLERS 表检查，这里只列出其他 stateful 属性
-const STATEFUL_ATTRS: &[&str] = &[
-    "hover",
-    "active",
-    "focus",
-    "tooltip",
-    "group",
-    "track_focus",
-];
 
 /// 生成 GPUI 代码（入口）
 ///
@@ -87,6 +82,9 @@ fn generate_for_loop(binding: &syn::Pat, iter: &syn::Expr, body: &[RsxNode]) -> 
 /// - 与 GPUI 惯用写法一致
 /// - 正确处理 `Div` → `Stateful<Div>` 的类型变换（`.id()` 后类型改变）
 pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
+    // 缓存标签名字符串，避免多次 to_string() 堆分配
+    let tag_str = element.name.to_string();
+
     // 单次遍历提取所有需要的信息
     let mut user_id = None;
     let mut has_styled = false;
@@ -102,14 +100,9 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
             }
             RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
                 if !needs_id {
-                    let n = name.to_string();
-                    // 检查是否是事件处理器（支持 camelCase 和 snake_case）
-                    let is_event_handler = EVENT_HANDLERS
-                        .iter()
-                        .any(|&(camel, snake)| n == camel || n == snake);
-                    // 检查是否是其他需要 stateful 的属性
-                    let is_stateful_attr = STATEFUL_ATTRS.iter().any(|&s| n == s);
-                    needs_id = is_event_handler || is_stateful_attr;
+                    // 缓存属性名字符串，避免循环内重复 to_string()
+                    let attr_str = name.to_string();
+                    needs_id = is_stateful_attr(&attr_str);
                 }
             }
             _ => {}
@@ -117,30 +110,30 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
     }
 
     // 生成基础元素和 id
-    let tag = generate_tag(&element.name);
+    let tag = generate_tag(&tag_str, &element.name);
     let base = if let Some(id_value) = user_id {
         quote! { #tag.id(#id_value) }
     } else if needs_id {
-        let auto_id = next_auto_id(&element.name.to_string(), &element.attributes);
+        let auto_id = next_auto_id(&tag_str);
         quote! { #tag.id(#auto_id) }
     } else {
         tag
     };
 
-    let mut methods: Vec<TokenStream> = Vec::new();
+    // 预分配方法链容量（属性数 + 子节点数的估计值）
+    let mut methods: Vec<TokenStream> =
+        Vec::with_capacity(element.attributes.len() + element.children.len());
 
     // styled 标志 → 注入标签默认样式（在用户属性之前）
     if has_styled {
-        let tag_name = element.name.to_string();
-        if let Some(&(_, class_str)) = TAG_DEFAULT_STYLES.iter().find(|&&(tag, _)| tag == tag_name)
-        {
+        if let Some(class_str) = lookup_tag_default(&tag_str) {
             methods.extend(parse_class_string(class_str));
         }
     }
 
-    // 属性 → 方法调用（用户属性在默认样式之后，可覆盖）
+    // 属性 → 方法调用（直接 push 到 methods，避免中间 Vec 分配）
     for attr in &element.attributes {
-        methods.extend(generate_attr_methods(attr));
+        generate_attr_methods(attr, &mut methods);
     }
 
     // 子节点 → .child() / .children() 调用（含聚合优化）
@@ -151,12 +144,15 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
 
 /// 生成子节点的方法链片段
 ///
-/// 当连续 3+ 个 Expr 子节点时，合并为单个 `.children(vec![...])` 调用。
+/// 当连续 3+ 个 Expr 子节点时，合并为单个 `.children([...])` 调用。
+/// `consecutive_exprs` 在循环外分配，每轮用 `.clear()` 复用，减少堆分配。
 fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream>) {
     let mut i = 0;
+    let mut consecutive_exprs: Vec<TokenStream> = Vec::with_capacity(4);
+
     while i < children.len() {
-        // 收集连续的 Expr 子节点
-        let mut consecutive_exprs: Vec<TokenStream> = Vec::new();
+        // 收集连续的 Expr 子节点（复用 Vec）
+        consecutive_exprs.clear();
         while i < children.len() {
             if let RsxNode::Expr(expr) = &children[i] {
                 consecutive_exprs.push(expr.to_token_stream());
@@ -170,7 +166,7 @@ fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream
         if consecutive_exprs.len() >= 3 {
             methods.push(quote! { .children([#(#consecutive_exprs),*]) });
         } else {
-            for expr in consecutive_exprs {
+            for expr in &consecutive_exprs {
                 methods.push(quote! { .child(#expr) });
             }
         }
@@ -194,12 +190,9 @@ fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream
                     methods.push(quote! { .children(#for_expr) });
                 }
                 RsxNode::Expr(_) => {
-                    // Expr 节点应该已在上面的 consecutive_exprs 循环（第 134-140 行）中处理
-                    // 如果执行到这里，说明代码逻辑存在 bug
-                    panic!(
-                        "INTERNAL BUG in gpui-rsx codegen: Expr node reached unreachable code path. \
-                         All Expr nodes should have been consumed in the consecutive_exprs loop (lines 134-140). \
-                         This indicates a logic error in generate_children_methods()."
+                    // Expr 节点应该已在上面的 consecutive_exprs 循环中处理
+                    unreachable!(
+                        "BUG in gpui-rsx codegen: Expr node should have been consumed above"
                     )
                 }
             }
@@ -209,8 +202,10 @@ fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream
 }
 
 /// HTML 标签 → `div()`，特殊标签 → 同名函数，自定义组件 → 同名函数调用
-fn generate_tag(name: &syn::Ident) -> TokenStream {
-    match name.to_string().as_str() {
+///
+/// 接受预缓存的 `tag_str` 避免重复 `to_string()`
+fn generate_tag(tag_str: &str, name: &syn::Ident) -> TokenStream {
+    match tag_str {
         // 特殊标签：保留为同名函数调用
         "svg" => quote! { svg() },
         "img" => quote! { img() },
@@ -227,21 +222,9 @@ fn generate_tag(name: &syn::Ident) -> TokenStream {
 
 /// 生成确定性自动 ID 字符串
 ///
-/// 使用标签名和属性名的哈希 + 全局计数器，减少编译顺序敏感度。
-fn next_auto_id(tag: &str, attributes: &[RsxAttribute]) -> String {
-    let mut hasher = DefaultHasher::new();
-    tag.hash(&mut hasher);
-    for attr in attributes {
-        match attr {
-            RsxAttribute::Flag(name) | RsxAttribute::Value { name, .. } => {
-                name.to_string().hash(&mut hasher);
-            }
-            _ => {}
-        }
-    }
-    // 保留计数器确保同签名元素不冲突
+/// 使用全局计数器 + 标签名生成唯一 ID，替代原先的 SipHash 计算。
+/// 计数器在单次编译过程中保证唯一性。
+fn next_auto_id(tag: &str) -> String {
     let n = AUTO_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-    n.hash(&mut hasher);
-    let hash = hasher.finish();
-    format!("__rsx_{tag}_{hash:x}")
+    format!("__rsx_{tag}_{n}")
 }
