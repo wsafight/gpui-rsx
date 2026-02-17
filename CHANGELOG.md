@@ -27,6 +27,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Best Practices (`docs/best-practices.md`)
   - Migration Guide (`docs/migration-guide.md`)
   - Troubleshooting (`docs/troubleshooting.md`)
+- 📐 **Architecture documentation**
+  - Comprehensive architecture guide (`ARCHITECTURE.md`)
+  - Chinese architecture documentation (`ARCHITECTURE_CN.md`)
+  - Detailed module organization and data flow
+  - Code generation strategies and design patterns
+  - Extension points and debugging guide
 - 🌐 **English as primary README** - Switched README.md to English, moved Chinese to README_CN.md
 
 #### Infrastructure
@@ -34,10 +40,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - CI pipeline (`.github/workflows/ci.yml`)
   - GPUI compatibility testing (`.github/workflows/gpui-compatibility.yml`)
   - Release automation (`.github/workflows/release.yml`)
-- 🧪 **Compile tests**
-  - 7 compile-fail tests (invalid syntax detection)
-  - 7 compile-pass tests (valid syntax verification)
-  - Test runner script (`test_syntax.sh`)
+  - Code coverage tracking with Codecov
+- 📊 **Code Coverage**
+  - Local coverage script (`./coverage.sh`)
+  - Codecov integration in CI
+  - Coverage badges in README
+  - Target: 80%+ coverage
 
 #### Developer Experience
 - 🔧 Better error messages with `proc-macro-error` dependency
@@ -56,15 +64,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added complete attribute mapping reference table
 - Included FAQ section with common questions
 
+### 🐛 Fixed
+- **Auto ID injection for stateful events** - Added missing `onHover`/`on_hover`, `onDrag`/`on_drag`, `onDrop`/`on_drop` to `NEEDS_ID_ATTRS`, fixing cases where these event handlers would fail to compile without a manual `id` attribute
+  - Added 6 test cases to verify auto ID injection for these event handlers
+
 ### 🔧 Enhancements
 - Parser improvements for better syntax support
 - Code generation optimizations in `src/codegen.rs`
 - Enhanced macro error reporting
+- Fixed 4 Clippy warnings about useless `vec!` usage in tests
+
+### ♻️ Refactored
+- **Deduplicated child-node parsing** - Extracted `try_parse_child_node()` in parser, eliminating duplicated logic between `parse_children()` and `parse_for_loop()` body parsing
+- **Deduplicated for-loop code generation** - Extracted `generate_for_loop()` in codegen, unifying the `map`/`flat_map` generation logic previously duplicated in `generate_node()` and `generate_children_methods()`
+- **Simplified color class parsing** - Replaced redundant `starts_with()` + `strip_prefix()` pattern with a single `strip_prefix()` call in `parse_color_class()`
+
+### 🗑️ Removed
+- Removed `examples/` directory (counter.rs, todo_app.rs)
+  - Examples required external GPUI dependency
+  - Core functionality fully covered by 203 macro expansion tests
+- Removed trybuild compile tests
+  - Simplified test structure
+  - Eliminated `trybuild` dev-dependency
+  - Focus on comprehensive macro expansion testing
 
 ### 🛠️ Internal
-- Added `trybuild` for compile test support
 - Improved project structure and organization
 - Updated Cargo.toml keywords and categories
+- Updated documentation to remove references to removed examples
+- Cleaned up CONTRIBUTING.md test instructions
+- Streamlined project structure
 
 ## [0.1.2] - 2026-02-16
 

@@ -465,13 +465,7 @@ syn = { version = "2.0", features = ["full"] }
 
 If you're still stuck:
 
-1. **Check the examples:**
-   ```bash
-   cargo run --example counter
-   cargo run --example todo_app
-   ```
-
-2. **Enable debug logging:**
+1. **Enable debug logging:**
    ```rust
    env_logger::init();
    log::debug!("State: {:?}", self);

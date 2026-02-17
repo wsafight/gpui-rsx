@@ -83,8 +83,9 @@ cargo test
 # Run specific test
 cargo test test_name
 
-# Run compile tests
-cargo test --test compile_tests
+# Generate code coverage report
+./coverage.sh          # HTML report (opens in browser on macOS)
+./coverage.sh --text   # Terminal output only
 
 # View macro expansions (for debugging)
 cargo install cargo-expand
@@ -200,10 +201,6 @@ fn parse_element(input: ParseStream) -> Result<Element> {
    - Located in `tests/macro_tests.rs`
    - Cover various RSX syntax patterns
 
-3. **Compile Tests** - Test error handling
-   - `tests/compile-pass/` - Valid syntax tests
-   - `tests/compile-fail/` - Invalid syntax tests
-
 ### Writing Tests
 
 - Test both success and failure cases
@@ -213,10 +210,12 @@ fn parse_element(input: ParseStream) -> Result<Element> {
 
 ### Test Coverage
 
-We aim for high test coverage:
+We aim for high test coverage (target: 80%+):
 - New features must include tests
 - Bug fixes should include regression tests
 - Edge cases should be tested
+- Run `./coverage.sh` to generate a local coverage report
+- Coverage is automatically tracked in CI via Codecov
 
 ## Documentation
 
@@ -353,8 +352,9 @@ cargo test
 # 运行特定测试
 cargo test test_name
 
-# 运行编译测试
-cargo test --test compile_tests
+# 生成代码覆盖率报告
+./coverage.sh          # HTML 报告（macOS 自动打开浏览器）
+./coverage.sh --text   # 仅终端输出
 
 # 查看宏展开（用于调试）
 cargo install cargo-expand
@@ -470,10 +470,6 @@ fn parse_element(input: ParseStream) -> Result<Element> {
    - 位于 `tests/macro_tests.rs`
    - 覆盖各种 RSX 语法模式
 
-3. **编译测试** - 测试错误处理
-   - `tests/compile-pass/` - 有效语法测试
-   - `tests/compile-fail/` - 无效语法测试
-
 ### 编写测试
 
 - 同时测试成功和失败情况
@@ -483,10 +479,12 @@ fn parse_element(input: ParseStream) -> Result<Element> {
 
 ### 测试覆盖率
 
-我们追求高测试覆盖率：
+我们追求高测试覆盖率（目标：80%+）：
 - 新功能必须包含测试
 - Bug 修复应包含回归测试
 - 边界情况应被测试
+- 运行 `./coverage.sh` 生成本地覆盖率报告
+- CI 自动通过 Codecov 跟踪覆盖率
 
 ## 文档
 

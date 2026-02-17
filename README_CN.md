@@ -2,6 +2,12 @@
 
 [English](./README.md) | 简体中文
 
+[![CI](https://github.com/wsafight/gpui-rsx/actions/workflows/ci.yml/badge.svg)](https://github.com/wsafight/gpui-rsx/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/wsafight/gpui-rsx/branch/main/graph/badge.svg)](https://codecov.io/gh/wsafight/gpui-rsx)
+[![Crates.io](https://img.shields.io/crates/v/gpui-rsx.svg)](https://crates.io/crates/gpui-rsx)
+[![Documentation](https://docs.rs/gpui-rsx/badge.svg)](https://docs.rs/gpui-rsx)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 一个为 GPUI 提供 JSX-like 语法的 Rust 过程宏，让 UI 开发更加简洁和直观。
 
 ## ✨ 特性
@@ -14,6 +20,19 @@
 - 🧩 **Fragment 支持** - 使用 `<>...</>` 返回多个根元素
 - 🔁 **For 循环语法糖** - 使用 `{for item in iter { ... }}` 迭代
 - 🎨 **完整 Tailwind 色板** - 内置 242 种颜色 + 任意 hex 值
+
+## 📚 文档资源
+
+- **[架构指南](./ARCHITECTURE_CN.md)** - 详细的架构文档
+  - 模块组织和数据流
+  - 代码生成策略
+  - 设计模式和测试方法
+  - 扩展点和调试指南
+- **[快速入门](./docs/getting-started.md)** - 分步教程
+- **[API 参考](./docs/api-reference.md)** - 完整 API 文档
+- **[最佳实践](./docs/best-practices.md)** - 推荐模式
+- **[迁移指南](./docs/migration-guide.md)** - 升级说明
+- **[问题排查](./docs/troubleshooting.md)** - 常见问题和解决方案
 
 ## 📦 安装
 
@@ -660,16 +679,6 @@ cargo build
 
 ```bash
 cargo test --test macro_tests
-```
-
-### 运行示例
-
-```bash
-# 计数器示例
-cargo run --example counter
-
-# Todo 应用示例
-cargo run --example todo_app
 ```
 
 ### 展开宏（调试）

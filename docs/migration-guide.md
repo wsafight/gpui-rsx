@@ -442,12 +442,7 @@ cargo build
 
 If you encounter issues during migration:
 
-1. **Check examples:**
-   ```bash
-   cargo run --example counter
-   ```
-
-2. **Review documentation:**
+1. **Review documentation:**
    - [Getting Started](getting-started.md)
    - [API Reference](api-reference.md)
    - [Best Practices](best-practices.md)

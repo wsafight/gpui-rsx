@@ -17,177 +17,411 @@ struct MockElement;
 
 // 模拟 GPUI 构造函数
 #[allow(dead_code)]
-fn div() -> MockElement { MockElement }
+fn div() -> MockElement {
+    MockElement
+}
 #[allow(dead_code)]
-fn svg() -> MockElement { MockElement }
+fn svg() -> MockElement {
+    MockElement
+}
 #[allow(dead_code)]
-fn img() -> MockElement { MockElement }
+fn img() -> MockElement {
+    MockElement
+}
 #[allow(dead_code)]
-fn canvas() -> MockElement { MockElement }
-fn rgb(_hex: u32) -> u32 { 0 }
-fn px(_val: f32) -> f32 { 0.0 }
+fn canvas() -> MockElement {
+    MockElement
+}
+fn rgb(_hex: u32) -> u32 {
+    0
+}
+fn px(_val: f32) -> f32 {
+    0.0
+}
 
 // 模拟自定义组件构造函数
 #[allow(non_snake_case, dead_code)]
-fn MyComponent() -> MockElement { MockElement }
+fn MyComponent() -> MockElement {
+    MockElement
+}
 #[allow(non_snake_case, dead_code)]
-fn CustomWidget() -> MockElement { MockElement }
+fn CustomWidget() -> MockElement {
+    MockElement
+}
 
 #[allow(dead_code)]
 impl MockElement {
     // --- 身份 ---
-    fn id<T>(self, _: T) -> Self { self }
+    fn id<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 布局 ---
-    fn flex(self) -> Self { self }
-    fn flex_col(self) -> Self { self }
-    fn flex_row(self) -> Self { self }
-    fn flex_1(self) -> Self { self }
-    fn flex_grow<T>(self, _: T) -> Self { self }
-    fn flex_shrink<T>(self, _: T) -> Self { self }
-    fn flex_wrap(self) -> Self { self }
-    fn items_center(self) -> Self { self }
-    fn items_start(self) -> Self { self }
-    fn items_end(self) -> Self { self }
-    fn justify_center(self) -> Self { self }
-    fn justify_between(self) -> Self { self }
+    fn flex(self) -> Self {
+        self
+    }
+    fn flex_col(self) -> Self {
+        self
+    }
+    fn flex_row(self) -> Self {
+        self
+    }
+    fn flex_1(self) -> Self {
+        self
+    }
+    fn flex_grow<T>(self, _: T) -> Self {
+        self
+    }
+    fn flex_shrink<T>(self, _: T) -> Self {
+        self
+    }
+    fn flex_wrap(self) -> Self {
+        self
+    }
+    fn items_center(self) -> Self {
+        self
+    }
+    fn items_start(self) -> Self {
+        self
+    }
+    fn items_end(self) -> Self {
+        self
+    }
+    fn justify_center(self) -> Self {
+        self
+    }
+    fn justify_between(self) -> Self {
+        self
+    }
 
     // --- 间距（参数化 + 预设） ---
-    fn gap<T>(self, _: T) -> Self { self }
-    fn gap_2(self) -> Self { self }
-    fn gap_3(self) -> Self { self }
-    fn gap_4(self) -> Self { self }
-    fn p<T>(self, _: T) -> Self { self }
-    fn p_3(self) -> Self { self }
-    fn p_4(self) -> Self { self }
+    fn gap<T>(self, _: T) -> Self {
+        self
+    }
+    fn gap_2(self) -> Self {
+        self
+    }
+    fn gap_3(self) -> Self {
+        self
+    }
+    fn gap_4(self) -> Self {
+        self
+    }
+    fn p<T>(self, _: T) -> Self {
+        self
+    }
+    fn p_3(self) -> Self {
+        self
+    }
+    fn p_4(self) -> Self {
+        self
+    }
     #[allow(clippy::wrong_self_convention)]
-    fn px<T>(self, _: T) -> Self { self } // 注意：方法 px 与函数 px 不冲突
-    fn py<T>(self, _: T) -> Self { self }
-    fn pt<T>(self, _: T) -> Self { self }
-    fn pb<T>(self, _: T) -> Self { self }
-    fn pl<T>(self, _: T) -> Self { self }
-    fn pr<T>(self, _: T) -> Self { self }
-    fn px_2(self) -> Self { self }
-    fn px_3(self) -> Self { self }
-    fn px_4(self) -> Self { self }
-    fn px_6(self) -> Self { self }
-    fn py_1(self) -> Self { self }
-    fn py_2(self) -> Self { self }
-    fn m<T>(self, _: T) -> Self { self }
-    fn mx<T>(self, _: T) -> Self { self }
-    fn my<T>(self, _: T) -> Self { self }
-    fn mt<T>(self, _: T) -> Self { self }
-    fn mb<T>(self, _: T) -> Self { self }
-    fn ml<T>(self, _: T) -> Self { self }
-    fn mr<T>(self, _: T) -> Self { self }
+    fn px<T>(self, _: T) -> Self {
+        self
+    } // 注意：方法 px 与函数 px 不冲突
+    fn py<T>(self, _: T) -> Self {
+        self
+    }
+    fn pt<T>(self, _: T) -> Self {
+        self
+    }
+    fn pb<T>(self, _: T) -> Self {
+        self
+    }
+    fn pl<T>(self, _: T) -> Self {
+        self
+    }
+    fn pr<T>(self, _: T) -> Self {
+        self
+    }
+    fn px_2(self) -> Self {
+        self
+    }
+    fn px_3(self) -> Self {
+        self
+    }
+    fn px_4(self) -> Self {
+        self
+    }
+    fn px_6(self) -> Self {
+        self
+    }
+    fn py_1(self) -> Self {
+        self
+    }
+    fn py_2(self) -> Self {
+        self
+    }
+    fn m<T>(self, _: T) -> Self {
+        self
+    }
+    fn mx<T>(self, _: T) -> Self {
+        self
+    }
+    fn my<T>(self, _: T) -> Self {
+        self
+    }
+    fn mt<T>(self, _: T) -> Self {
+        self
+    }
+    fn mb<T>(self, _: T) -> Self {
+        self
+    }
+    fn ml<T>(self, _: T) -> Self {
+        self
+    }
+    fn mr<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 尺寸 ---
-    fn w<T>(self, _: T) -> Self { self }
-    fn h<T>(self, _: T) -> Self { self }
-    fn w_full(self) -> Self { self }
-    fn h_full(self) -> Self { self }
-    fn size_full(self) -> Self { self }
-    fn min_w<T>(self, _: T) -> Self { self }
-    fn min_h<T>(self, _: T) -> Self { self }
-    fn max_w<T>(self, _: T) -> Self { self }
-    fn max_h<T>(self, _: T) -> Self { self }
+    fn w<T>(self, _: T) -> Self {
+        self
+    }
+    fn h<T>(self, _: T) -> Self {
+        self
+    }
+    fn w_full(self) -> Self {
+        self
+    }
+    fn h_full(self) -> Self {
+        self
+    }
+    fn size_full(self) -> Self {
+        self
+    }
+    fn min_w<T>(self, _: T) -> Self {
+        self
+    }
+    fn min_h<T>(self, _: T) -> Self {
+        self
+    }
+    fn max_w<T>(self, _: T) -> Self {
+        self
+    }
+    fn max_h<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 颜色 ---
-    fn bg<T>(self, _: T) -> Self { self }
-    fn text_color<T>(self, _: T) -> Self { self }
-    fn border_color<T>(self, _: T) -> Self { self }
+    fn bg<T>(self, _: T) -> Self {
+        self
+    }
+    fn text_color<T>(self, _: T) -> Self {
+        self
+    }
+    fn border_color<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 文本 ---
-    fn text_xs(self) -> Self { self }
-    fn text_sm(self) -> Self { self }
-    fn text_xl(self) -> Self { self }
-    fn text_2xl(self) -> Self { self }
-    fn text_3xl(self) -> Self { self }
-    fn font_bold(self) -> Self { self }
+    fn text_xs(self) -> Self {
+        self
+    }
+    fn text_sm(self) -> Self {
+        self
+    }
+    fn text_xl(self) -> Self {
+        self
+    }
+    fn text_2xl(self) -> Self {
+        self
+    }
+    fn text_3xl(self) -> Self {
+        self
+    }
+    fn font_bold(self) -> Self {
+        self
+    }
 
     // --- 边框 ---
-    fn rounded<T>(self, _: T) -> Self { self }
-    fn rounded_md(self) -> Self { self }
-    fn rounded_lg(self) -> Self { self }
-    fn rounded_full(self) -> Self { self }
-    fn border_1(self) -> Self { self }
+    fn rounded<T>(self, _: T) -> Self {
+        self
+    }
+    fn rounded_md(self) -> Self {
+        self
+    }
+    fn rounded_lg(self) -> Self {
+        self
+    }
+    fn rounded_full(self) -> Self {
+        self
+    }
+    fn border_1(self) -> Self {
+        self
+    }
 
     // --- 定位 ---
-    fn absolute(self) -> Self { self }
-    fn relative(self) -> Self { self }
-    fn overflow<T>(self, _: T) -> Self { self }
-    fn overflow_hidden(self) -> Self { self }
-    fn overflow_scroll(self) -> Self { self }
-    fn overflow_visible(self) -> Self { self }
-    fn overflow_x_hidden<T>(self, _: T) -> Self { self }
-    fn overflow_y_hidden<T>(self, _: T) -> Self { self }
-    fn top<T>(self, _: T) -> Self { self }
-    fn left<T>(self, _: T) -> Self { self }
-    fn right<T>(self, _: T) -> Self { self }
-    fn bottom<T>(self, _: T) -> Self { self }
+    fn absolute(self) -> Self {
+        self
+    }
+    fn relative(self) -> Self {
+        self
+    }
+    fn overflow<T>(self, _: T) -> Self {
+        self
+    }
+    fn overflow_hidden(self) -> Self {
+        self
+    }
+    fn overflow_scroll(self) -> Self {
+        self
+    }
+    fn overflow_visible(self) -> Self {
+        self
+    }
+    fn overflow_x_hidden<T>(self, _: T) -> Self {
+        self
+    }
+    fn overflow_y_hidden<T>(self, _: T) -> Self {
+        self
+    }
+    fn top<T>(self, _: T) -> Self {
+        self
+    }
+    fn left<T>(self, _: T) -> Self {
+        self
+    }
+    fn right<T>(self, _: T) -> Self {
+        self
+    }
+    fn bottom<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 光标 ---
-    fn cursor_pointer(self) -> Self { self }
+    fn cursor_pointer(self) -> Self {
+        self
+    }
 
     // --- 层级和透明度 ---
-    fn z_index<T>(self, _: T) -> Self { self }
-    fn opacity<T>(self, _: T) -> Self { self }
+    fn z_index<T>(self, _: T) -> Self {
+        self
+    }
+    fn opacity<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 可见性 ---
-    fn visible<T>(self, _: T) -> Self { self }
+    fn visible<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 事件 ---
-    fn on_click<T>(self, _: T) -> Self { self }
-    fn on_mouse_down<T>(self, _: T) -> Self { self }
-    fn on_mouse_up<T>(self, _: T) -> Self { self }
-    fn on_mouse_move<T>(self, _: T) -> Self { self }
-    fn on_key_down<T>(self, _: T) -> Self { self }
-    fn on_key_up<T>(self, _: T) -> Self { self }
-    fn on_focus<T>(self, _: T) -> Self { self }
-    fn on_blur<T>(self, _: T) -> Self { self }
-    fn on_hover<T>(self, _: T) -> Self { self }
-    fn on_scroll_wheel<T>(self, _: T) -> Self { self }
-    fn on_drag<T>(self, _: T) -> Self { self }
-    fn on_drop<T>(self, _: T) -> Self { self }
-    fn on_action<T>(self, _: T) -> Self { self }
+    fn on_click<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_mouse_down<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_mouse_up<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_mouse_move<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_key_down<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_key_up<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_focus<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_blur<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_hover<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_scroll_wheel<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_drag<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_drop<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_action<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 状态样式 ---
-    fn hover<F: FnOnce(Self) -> Self>(self, _f: F) -> Self { self }
-    fn active<F: FnOnce(Self) -> Self>(self, _f: F) -> Self { self }
-    fn focus<F: FnOnce(Self) -> Self>(self, _f: F) -> Self { self }
-    fn tooltip<T>(self, _: T) -> Self { self }
-    fn group<T>(self, _: T) -> Self { self }
-    fn track_focus(self) -> Self { self }
+    fn hover<F: FnOnce(Self) -> Self>(self, _f: F) -> Self {
+        self
+    }
+    fn active<F: FnOnce(Self) -> Self>(self, _f: F) -> Self {
+        self
+    }
+    fn focus<F: FnOnce(Self) -> Self>(self, _f: F) -> Self {
+        self
+    }
+    fn tooltip<T>(self, _: T) -> Self {
+        self
+    }
+    fn group<T>(self, _: T) -> Self {
+        self
+    }
+    fn track_focus(self) -> Self {
+        self
+    }
 
     // --- 文本 (additional) ---
-    fn text_base(self) -> Self { self }
-    fn text_lg(self) -> Self { self }
-    fn text_4xl(self) -> Self { self }
-    fn text_5xl(self) -> Self { self }
+    fn text_base(self) -> Self {
+        self
+    }
+    fn text_lg(self) -> Self {
+        self
+    }
+    fn text_4xl(self) -> Self {
+        self
+    }
+    fn text_5xl(self) -> Self {
+        self
+    }
 
     // --- 额外属性映射 ---
-    fn font_size<T>(self, _: T) -> Self { self }
-    fn line_height<T>(self, _: T) -> Self { self }
-    fn font_weight<T>(self, _: T) -> Self { self }
-    fn text_align<T>(self, _: T) -> Self { self }
-    fn border_radius<T>(self, _: T) -> Self { self }
-    fn shadow<T>(self, _: T) -> Self { self }
+    fn font_size<T>(self, _: T) -> Self {
+        self
+    }
+    fn line_height<T>(self, _: T) -> Self {
+        self
+    }
+    fn font_weight<T>(self, _: T) -> Self {
+        self
+    }
+    fn text_align<T>(self, _: T) -> Self {
+        self
+    }
+    fn border_radius<T>(self, _: T) -> Self {
+        self
+    }
+    fn shadow<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 子节点 ---
-    fn child<T>(self, _: T) -> Self { self }
-    fn children<I: IntoIterator>(self, _: I) -> Self { self }
+    fn child<T>(self, _: T) -> Self {
+        self
+    }
+    fn children<I: IntoIterator>(self, _: I) -> Self {
+        self
+    }
 
     // --- 条件方法 ---
     fn when<F>(self, _condition: bool, _f: F) -> Self
     where
-        F: FnOnce(Self) -> Self
+        F: FnOnce(Self) -> Self,
     {
         self
     }
 
     fn when_some<T, F>(self, _option: Option<T>, _f: F) -> Self
     where
-        F: FnOnce(Self, T) -> Self
+        F: FnOnce(Self, T) -> Self,
     {
         self
     }
@@ -195,51 +429,113 @@ impl MockElement {
     // --- 转换方法 ---
     fn map<F>(self, _f: F) -> Self
     where
-        F: FnOnce(Self) -> Self
+        F: FnOnce(Self) -> Self,
     {
         self
     }
 
     // --- 新增属性映射 ---
-    fn gap_x<T>(self, _: T) -> Self { self }
-    fn gap_y<T>(self, _: T) -> Self { self }
-    fn basis<T>(self, _: T) -> Self { self }
-    fn order<T>(self, _: T) -> Self { self }
-    fn inset<T>(self, _: T) -> Self { self }
-    fn text_decoration<T>(self, _: T) -> Self { self }
-    fn border_t<T>(self, _: T) -> Self { self }
-    fn border_b<T>(self, _: T) -> Self { self }
-    fn border_l<T>(self, _: T) -> Self { self }
-    fn border_r<T>(self, _: T) -> Self { self }
-    fn rounded_t<T>(self, _: T) -> Self { self }
-    fn rounded_b<T>(self, _: T) -> Self { self }
-    fn rounded_tl<T>(self, _: T) -> Self { self }
-    fn rounded_tr<T>(self, _: T) -> Self { self }
-    fn rounded_bl<T>(self, _: T) -> Self { self }
-    fn rounded_br<T>(self, _: T) -> Self { self }
-    fn flex_none(self) -> Self { self }
-    fn flex_auto(self) -> Self { self }
+    fn gap_x<T>(self, _: T) -> Self {
+        self
+    }
+    fn gap_y<T>(self, _: T) -> Self {
+        self
+    }
+    fn basis<T>(self, _: T) -> Self {
+        self
+    }
+    fn order<T>(self, _: T) -> Self {
+        self
+    }
+    fn inset<T>(self, _: T) -> Self {
+        self
+    }
+    fn text_decoration<T>(self, _: T) -> Self {
+        self
+    }
+    fn border_t<T>(self, _: T) -> Self {
+        self
+    }
+    fn border_b<T>(self, _: T) -> Self {
+        self
+    }
+    fn border_l<T>(self, _: T) -> Self {
+        self
+    }
+    fn border_r<T>(self, _: T) -> Self {
+        self
+    }
+    fn rounded_t<T>(self, _: T) -> Self {
+        self
+    }
+    fn rounded_b<T>(self, _: T) -> Self {
+        self
+    }
+    fn rounded_tl<T>(self, _: T) -> Self {
+        self
+    }
+    fn rounded_tr<T>(self, _: T) -> Self {
+        self
+    }
+    fn rounded_bl<T>(self, _: T) -> Self {
+        self
+    }
+    fn rounded_br<T>(self, _: T) -> Self {
+        self
+    }
+    fn flex_none(self) -> Self {
+        self
+    }
+    fn flex_auto(self) -> Self {
+        self
+    }
 
     // --- 新增事件 ---
-    fn on_mouse_down_out<T>(self, _: T) -> Self { self }
-    fn on_mouse_up_out<T>(self, _: T) -> Self { self }
+    fn on_mouse_down_out<T>(self, _: T) -> Self {
+        self
+    }
+    fn on_mouse_up_out<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 新增边框 ---
-    fn border_2(self) -> Self { self }
-    fn border_4(self) -> Self { self }
+    fn border_2(self) -> Self {
+        self
+    }
+    fn border_4(self) -> Self {
+        self
+    }
 
     // --- 新增尺寸 ---
-    fn shadow_sm(self) -> Self { self }
-    fn shadow_md(self) -> Self { self }
-    fn shadow_lg(self) -> Self { self }
-    fn rounded_sm(self) -> Self { self }
-    fn rounded_xl(self) -> Self { self }
-    fn rounded_none(self) -> Self { self }
-    fn cursor_default(self) -> Self { self }
-    fn cursor_text(self) -> Self { self }
+    fn shadow_sm(self) -> Self {
+        self
+    }
+    fn shadow_md(self) -> Self {
+        self
+    }
+    fn shadow_lg(self) -> Self {
+        self
+    }
+    fn rounded_sm(self) -> Self {
+        self
+    }
+    fn rounded_xl(self) -> Self {
+        self
+    }
+    fn rounded_none(self) -> Self {
+        self
+    }
+    fn cursor_default(self) -> Self {
+        self
+    }
+    fn cursor_text(self) -> Self {
+        self
+    }
 
     // --- 杂项（示例中用到的属性） ---
-    fn placeholder<T>(self, _: T) -> Self { self }
+    fn placeholder<T>(self, _: T) -> Self {
+        self
+    }
 }
 
 // ===========================================================================
@@ -1439,6 +1735,46 @@ fn test_on_action_event() {
 fn test_on_hover_snake_case() {
     let h = |_: (), _: ()| {};
     let _el = rsx! { <div on_hover={h} /> };
+}
+
+// 验证 onHover/onDrag/onDrop 事件处理器会自动注入 ID（v0.2.0 修复）
+#[test]
+fn test_on_hover_event_auto_id() {
+    let h = |_: (), _: ()| {};
+    // onHover 事件应该自动注入 .id()，因为它是 StatefulInteractiveElement 方法
+    let _el = rsx! { <div onHover={h}>{"Hover me"}</div> };
+}
+
+#[test]
+fn test_on_hover_event_snake_auto_id() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div on_hover={h}>{"Hover me"}</div> };
+}
+
+#[test]
+fn test_on_drag_event_auto_id() {
+    let h = |_: (), _: ()| {};
+    // onDrag 事件应该自动注入 .id()
+    let _el = rsx! { <div onDrag={h}>{"Drag me"}</div> };
+}
+
+#[test]
+fn test_on_drag_event_snake_auto_id() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div on_drag={h}>{"Drag me"}</div> };
+}
+
+#[test]
+fn test_on_drop_event_auto_id() {
+    let h = |_: (), _: ()| {};
+    // onDrop 事件应该自动注入 .id()
+    let _el = rsx! { <div onDrop={h}>{"Drop here"}</div> };
+}
+
+#[test]
+fn test_on_drop_event_snake_auto_id() {
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <div on_drop={h}>{"Drop here"}</div> };
 }
 
 // ===========================================================================

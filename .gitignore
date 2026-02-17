@@ -4,6 +4,13 @@
 *.pdb
 Cargo.lock
 
+# Code coverage
+lcov.info
+*.profraw
+*.profdata
+/coverage/
+/target/llvm-cov/
+
 # IDE
 .vscode/
 .idea/

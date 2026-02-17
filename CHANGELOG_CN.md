@@ -27,6 +27,12 @@
   - 最佳实践（`docs/best-practices.md`）
   - 迁移指南（`docs/migration-guide.md`）
   - 故障排除（`docs/troubleshooting.md`）
+- 📐 **架构文档**
+  - 综合架构指南（`ARCHITECTURE.md`）
+  - 中文架构文档（`ARCHITECTURE_CN.md`）
+  - 详细的模块组织和数据流
+  - 代码生成策略和设计模式
+  - 扩展点和调试指南
 - 🌐 **英文为主要 README** - 将 README.md 切换为英文版，中文版移至 README_CN.md
 
 #### 基础设施
@@ -34,6 +40,12 @@
   - CI 流水线（`.github/workflows/ci.yml`）
   - GPUI 兼容性测试（`.github/workflows/gpui-compatibility.yml`）
   - 发布自动化（`.github/workflows/release.yml`）
+  - Codecov 代码覆盖率跟踪
+- 📊 **代码覆盖率**
+  - 本地覆盖率脚本（`./coverage.sh`）
+  - CI 中集成 Codecov
+  - README 中添加覆盖率徽章
+  - 目标：80%+ 覆盖率
 - 🧪 **编译测试**
   - 7 个编译失败测试（无效语法检测）
   - 7 个编译通过测试（有效语法验证）
@@ -56,15 +68,36 @@
 - 添加完整的属性映射参考表
 - 包含常见问题的 FAQ 部分
 
+### 🐛 修复
+- **有状态事件的自动 ID 注入** - 补充了 `NEEDS_ID_ATTRS` 中缺失的 `onHover`/`on_hover`、`onDrag`/`on_drag`、`onDrop`/`on_drop`，修复了这些事件处理器在没有手动 `id` 属性时编译失败的问题
+  - 新增 6 个测试用例验证这些事件处理器的自动 ID 注入
+
 ### 🔧 功能增强
 - 解析器改进以支持更好的语法
 - `src/codegen.rs` 中的代码生成优化
 - 增强宏错误报告
+- 修复 4 个测试中 Clippy 关于无用 `vec!` 的警告
+
+### ♻️ 重构
+- **消除子节点解析逻辑重复** - 提取 `try_parse_child_node()` 函数，消除 `parse_children()` 和 `parse_for_loop()` 循环体解析中的重复代码
+- **消除 for 循环代码生成重复** - 提取 `generate_for_loop()` 函数，统一 `generate_node()` 和 `generate_children_methods()` 中重复的 `map`/`flat_map` 生成逻辑
+- **简化颜色 class 解析** - 将 `parse_color_class()` 中冗余的 `starts_with()` + `strip_prefix()` 模式替换为单次 `strip_prefix()` 调用
+
+### 🗑️ 移除
+- 移除 `examples/` 目录 (counter.rs, todo_app.rs)
+  - 示例需要外部 GPUI 依赖
+  - 核心功能已被 203 个宏展开测试完全覆盖
+- 移除 trybuild 编译测试
+  - 简化测试结构
+  - 消除 `trybuild` 开发依赖
+  - 专注于全面的宏展开测试
 
 ### 🛠️ 内部改进
-- 添加 `trybuild` 以支持编译测试
 - 改进项目结构和组织方式
 - 更新 Cargo.toml 关键字和分类
+- 更新文档以移除已删除示例的引用
+- 清理 CONTRIBUTING.md 测试说明
+- 精简项目结构
 
 ## [0.1.2] - 2026-02-16
 

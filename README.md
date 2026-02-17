@@ -2,6 +2,12 @@
 
 English | [简体中文](./README_CN.md)
 
+[![CI](https://github.com/wsafight/gpui-rsx/actions/workflows/ci.yml/badge.svg)](https://github.com/wsafight/gpui-rsx/actions/workflows/ci.yml)
+[![codecov](https://codecov.io/gh/wsafight/gpui-rsx/branch/main/graph/badge.svg)](https://codecov.io/gh/wsafight/gpui-rsx)
+[![Crates.io](https://img.shields.io/crates/v/gpui-rsx.svg)](https://crates.io/crates/gpui-rsx)
+[![Documentation](https://docs.rs/gpui-rsx/badge.svg)](https://docs.rs/gpui-rsx)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 A Rust procedural macro that provides JSX-like syntax for GPUI, making UI development more concise and intuitive.
 
 ## ✨ Features
@@ -14,6 +20,19 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
 - 🧩 **Fragment Support** - Return multiple root elements with `<>...</>`
 - 🔁 **For-loop Sugar** - Iterate with `{for item in iter { ... }}`
 - 🎨 **Full Tailwind Colors** - 242 built-in colors + arbitrary hex values
+
+## 📚 Documentation
+
+- **[Architecture Guide](./ARCHITECTURE.md)** - Detailed architecture documentation
+  - Module organization and data flow
+  - Code generation strategies
+  - Design patterns and testing approach
+  - Extension points and debugging guide
+- **[Getting Started](./docs/getting-started.md)** - Step-by-step tutorial
+- **[API Reference](./docs/api-reference.md)** - Complete API documentation
+- **[Best Practices](./docs/best-practices.md)** - Recommended patterns
+- **[Migration Guide](./docs/migration-guide.md)** - Upgrade instructions
+- **[Troubleshooting](./docs/troubleshooting.md)** - Common issues and solutions
 
 ## 📦 Installation
 
@@ -660,16 +679,6 @@ cargo build
 
 ```bash
 cargo test --test macro_tests
-```
-
-### Run Examples
-
-```bash
-# Counter example
-cargo run --example counter
-
-# Todo app example
-cargo run --example todo_app
 ```
 
 ### Expand Macros (Debugging)

@@ -4,8 +4,9 @@
 
 use proc_macro_error::abort;
 use syn::{
+    Expr, ExprLit, Ident, Lit, Pat, Result, Token,
     parse::{Parse, ParseStream},
-    token, Expr, ExprLit, Ident, Lit, Pat, Result, Token,
+    token,
 };
 
 /// RSX 宏体
@@ -113,20 +114,23 @@ impl Parse for RsxElement {
                     // 非大括号值只接受字面量（如 "string"、42）。
                     // 不能用 Expr::parse，否则它会贪婪消费后续的 / > 等运算符。
                     let lit: syn::Lit = input.parse()?;
-                    syn::Expr::Lit(syn::ExprLit {
-                        attrs: vec![],
-                        lit,
-                    })
+                    syn::Expr::Lit(syn::ExprLit { attrs: vec![], lit })
                 };
 
                 // 特殊处理 when 和 whenSome 属性
                 let attr_name_str = attr_name.to_string();
                 if attr_name_str == "when" {
                     let (first, second) = parse_condition_tuple(value, "when")?;
-                    attributes.push(RsxAttribute::When { condition: first, closure: second });
+                    attributes.push(RsxAttribute::When {
+                        condition: first,
+                        closure: second,
+                    });
                 } else if attr_name_str == "whenSome" {
                     let (first, second) = parse_condition_tuple(value, "whenSome")?;
-                    attributes.push(RsxAttribute::WhenSome { option: first, closure: second });
+                    attributes.push(RsxAttribute::WhenSome {
+                        option: first,
+                        closure: second,
+                    });
                 } else {
                     attributes.push(RsxAttribute::Value {
                         name: attr_name,
@@ -219,35 +223,8 @@ fn parse_children(input: ParseStream, parent_name: Option<&Ident>) -> Result<Vec
             }
         }
 
-        if input.peek(token::Brace) {
-            // 表达式 {expr} 或展开 {...expr} 或 for 循环 {for ...}
-            let content;
-            syn::braced!(content in input);
-
-            if content.peek(Token![..]) {
-                // Rust tokenizer 将 `...` 分割为 `..` (Range) 和 `.` (Dot)，
-                // 因此需要分两步解析，这是 proc-macro 中处理 `...` 的标准方式。
-                content.parse::<Token![..]>()?;
-                content.parse::<Token![.]>()?;
-                let expr: Expr = content.parse()?;
-                children.push(RsxNode::Spread(expr));
-            } else if content.peek(Token![for]) {
-                // for 循环语法糖: {for item in iter { <child /> }}
-                children.push(parse_for_loop(&content)?);
-            } else {
-                let expr: Expr = content.parse()?;
-                children.push(RsxNode::Expr(expr));
-            }
-        } else if input.peek(Token![<]) {
-            // 子元素 <child>
-            children.push(RsxNode::Element(input.parse()?));
-        } else if input.peek(syn::LitStr) {
-            // 裸字符串字面量: "Hello"
-            let lit: syn::LitStr = input.parse()?;
-            children.push(RsxNode::Expr(Expr::Lit(ExprLit {
-                attrs: vec![],
-                lit: Lit::Str(lit),
-            })));
+        if let Some(node) = try_parse_child_node(input)? {
+            children.push(node);
         } else {
             match parent_name {
                 Some(name) => {
@@ -270,6 +247,41 @@ fn parse_children(input: ParseStream, parent_name: Option<&Ident>) -> Result<Vec
     }
 
     Ok(children)
+}
+
+/// 尝试从输入流中解析单个子节点
+///
+/// 处理所有子节点类型：`{expr}`, `{...spread}`, `{for ...}`, `<element>`, `"string"`。
+/// 如果当前 token 不匹配任何已知类型，返回 `Ok(None)`，由调用方决定如何报错。
+fn try_parse_child_node(input: ParseStream) -> Result<Option<RsxNode>> {
+    if input.peek(token::Brace) {
+        let content;
+        syn::braced!(content in input);
+
+        if content.peek(Token![..]) {
+            // Rust tokenizer 将 `...` 分割为 `..` (Range) 和 `.` (Dot)，
+            // 因此需要分两步解析，这是 proc-macro 中处理 `...` 的标准方式。
+            content.parse::<Token![..]>()?;
+            content.parse::<Token![.]>()?;
+            let expr: Expr = content.parse()?;
+            Ok(Some(RsxNode::Spread(expr)))
+        } else if content.peek(Token![for]) {
+            Ok(Some(parse_for_loop(&content)?))
+        } else {
+            let expr: Expr = content.parse()?;
+            Ok(Some(RsxNode::Expr(expr)))
+        }
+    } else if input.peek(Token![<]) {
+        Ok(Some(RsxNode::Element(input.parse()?)))
+    } else if input.peek(syn::LitStr) {
+        let lit: syn::LitStr = input.parse()?;
+        Ok(Some(RsxNode::Expr(Expr::Lit(ExprLit {
+            attrs: vec![],
+            lit: Lit::Str(lit),
+        }))))
+    } else {
+        Ok(None)
+    }
 }
 
 /// 解析 for 循环: `for item in iter { <child /> ... }`
@@ -305,28 +317,8 @@ fn parse_for_loop(content: ParseStream) -> Result<RsxNode> {
 
     let mut body = Vec::new();
     while !body_content.is_empty() {
-        if body_content.peek(Token![<]) {
-            body.push(RsxNode::Element(body_content.parse()?));
-        } else if body_content.peek(token::Brace) {
-            let inner;
-            syn::braced!(inner in body_content);
-            if inner.peek(Token![..]) {
-                inner.parse::<Token![..]>()?;
-                inner.parse::<Token![.]>()?;
-                let expr: Expr = inner.parse()?;
-                body.push(RsxNode::Spread(expr));
-            } else if inner.peek(Token![for]) {
-                body.push(parse_for_loop(&inner)?);
-            } else {
-                let expr: Expr = inner.parse()?;
-                body.push(RsxNode::Expr(expr));
-            }
-        } else if body_content.peek(syn::LitStr) {
-            let lit: syn::LitStr = body_content.parse()?;
-            body.push(RsxNode::Expr(Expr::Lit(ExprLit {
-                attrs: vec![],
-                lit: Lit::Str(lit),
-            })));
+        if let Some(node) = try_parse_child_node(&body_content)? {
+            body.push(node);
         } else {
             abort!(
                 body_content.span(),
