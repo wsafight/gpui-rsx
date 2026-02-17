@@ -1,6 +1,6 @@
 [package]
 name = "gpui-rsx"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2024"
 description = "A JSX-like macro for GPUI - simplify UI development with HTML-like syntax"
 authors = ["GPUI-RSX Contributors"]
@@ -20,6 +20,13 @@ syn = { version = "2.0", features = ["full", "extra-traits"] }
 quote = "1.0"
 proc-macro2 = "1.0"
 proc-macro-error = "1.0"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
+[[bench]]
+name = "class_performance"
+harness = false
 
 # Documentation configuration for docs.rs
 [package.metadata.docs.rs]

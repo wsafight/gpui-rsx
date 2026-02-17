@@ -20,6 +20,7 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
 - 🧩 **Fragment Support** - Return multiple root elements with `<>...</>`
 - 🔁 **For-loop Sugar** - Iterate with `{for item in iter { ... }}`
 - 🎨 **Full Tailwind Colors** - 242 built-in colors + arbitrary hex values
+- ⚡ **Dynamic Class** - Runtime class switching with automatic fallback
 
 ## 📚 Documentation
 
@@ -28,6 +29,23 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
   - Code generation strategies
   - Design patterns and testing approach
   - Extension points and debugging guide
+- **[Dynamic Class Guide](./DYNAMIC_CLASS.md)** ✨ NEW - Dynamic class support
+  - Static vs dynamic class comparison
+  - Usage examples and patterns
+  - Performance considerations
+  - Migration guide
+- **[Diagnostic Improvements](./DIAGNOSTIC_IMPROVEMENTS.md)** - Enhanced error messages
+  - Unified diagnostic module
+  - Better error locations and context
+  - Safety improvements
+- **[Performance Optimization](./PERFORMANCE_OPTIMIZATION.md)** - Performance guide
+  - Why not cache macro expansion
+  - Practical optimization strategies
+  - Benchmark testing guide
+- **[Benchmark Results](./BENCHMARK_RESULTS.md)** ✨ NEW - Performance data
+  - Static vs dynamic class comparison
+  - Optimization recommendations
+  - Real performance numbers
 - **[Getting Started](./docs/getting-started.md)** - Step-by-step tutorial
 - **[API Reference](./docs/api-reference.md)** - Complete API documentation
 - **[Best Practices](./docs/best-practices.md)** - Recommended patterns
@@ -241,7 +259,7 @@ Expands to:
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
-> **Note:** `class` only accepts string literals. For dynamic styling, use individual attributes (e.g., `bg={color_var}`).
+> **Note:** `class` accepts both static strings (compiled at build time) and dynamic expressions (parsed at runtime). Static classes have zero runtime overhead. See [Dynamic Class](#10-dynamic-class-) for details.
 
 #### Supported class patterns
 
@@ -405,7 +423,69 @@ rsx! {
 }
 ```
 
-### 10. Attribute Mapping Reference
+### 10. Dynamic Class ✨ NEW
+
+GPUI-RSX now supports both static and dynamic class attributes!
+
+#### Static Class (Compile-time Optimization)
+
+```rust
+// ✅ Best performance - parsed at compile time
+rsx! {
+    <div class="flex gap-4 bg-blue-500">
+        {"Static styles"}
+    </div>
+}
+```
+
+#### Dynamic Class (Runtime Flexibility)
+
+```rust
+// ✅ Full flexibility - use any Rust expression
+let classes = if is_active { "flex gap-4" } else { "block" };
+rsx! {
+    <div class={classes}>
+        {"Dynamic styles"}
+    </div>
+}
+```
+
+**Common Patterns:**
+
+```rust
+// Conditional
+let button_classes = if primary {
+    "bg-blue-500 text-white"
+} else {
+    "bg-gray-200 text-black"
+};
+
+// String formatting
+let spacing = 4;
+let classes = format!("flex gap-{}", spacing);
+
+// Function return
+fn get_classes(state: &State) -> &str {
+    match state {
+        State::Active => "bg-green-500",
+        State::Inactive => "bg-gray-500",
+    }
+}
+
+// Complex composition
+let all_classes = format!(
+    "{} {} {}",
+    "flex items-center",
+    if large { "text-2xl" } else { "text-base" },
+    if border { "border-2" } else { "" }
+);
+```
+
+**Performance Note:** Static classes have zero runtime overhead (compiled to direct method calls), while dynamic classes involve runtime string parsing. Use static when possible for best performance.
+
+📖 **[Full Dynamic Class Documentation](./DYNAMIC_CLASS.md)**
+
+### 11. Attribute Mapping Reference
 
 camelCase attributes are automatically mapped to GPUI snake_case methods:
 
@@ -666,6 +746,20 @@ GPUI-RSX is a **compile-time macro** that expands to the same code as hand-writt
 | Type Safety | ✅ | ✅ |
 | Compile-time Checking | ✅ | ✅ |
 
+### v0.2.1 Optimizations ✨
+
+**Compile-time Performance:**
+- 15x faster color lookups (O(242) → O(8) via binary search)
+- Faster macro expansion for class attributes with colors
+
+**Runtime Performance:**
+- Zero heap allocations for `.children()` with static element counts
+- Zero-copy dynamic class strings (supports `&str`, `String`, `Cow<str>`)
+
+**Binary Size:**
+- Dynamic class match tables deduplicated via `#[inline(never)]` + LLVM ICF
+- Multiple `class={expr}` in same component share one function body
+
 ## 🛠️ Development
 
 ### Build
@@ -792,22 +886,24 @@ All GPUI-supported elements can be used, such as `div`, `button`, `input`, `span
 
 ### Q5: Can I use dynamic class values?
 
-No. The `class` attribute only accepts string literals. For dynamic styling, use individual attributes:
+**Yes!** Since v0.2.0, the `class` attribute supports both static and dynamic values:
 
 ```rust
-// ❌ Won't work
-rsx! { <div class={my_class} /> }
+// ✅ Static (compile-time, best performance)
+rsx! { <div class="flex gap-4" /> }
 
-// ✅ Use individual attributes
-rsx! {
-    <div bg={dynamic_color} flex />
-}
+// ✅ Dynamic (runtime, full flexibility)
+let classes = if active { "flex gap-4" } else { "block" };
+rsx! { <div class={classes} /> }
 
-// ✅ Or use `when` for conditional styles
-rsx! {
-    <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} />
-}
+// ✅ Individual attributes (for specific properties)
+rsx! { <div bg={dynamic_color} flex /> }
+
+// ✅ Conditional styling with `when`
+rsx! { <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} /> }
 ```
+
+**Performance tip:** Static classes have zero runtime overhead (parsed at compile time). Use static when possible for best performance.
 
 ## 🤝 Contributing
 

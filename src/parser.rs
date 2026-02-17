@@ -2,7 +2,7 @@
 //!
 //! 解析类似 JSX 的语法结构
 
-use proc_macro_error::abort;
+use crate::diagnostics::*;
 use syn::{
     Expr, ExprLit, Ident, Lit, Pat, Result, Token,
     parse::{Parse, ParseStream},
@@ -167,13 +167,7 @@ impl Parse for RsxElement {
 
             // 验证标签名称匹配
             if name != closing_name {
-                abort!(
-                    closing_name,
-                    "Closing tag `</{}>` does not match opening tag `<{}>`. Tags must be properly nested.",
-                    closing_name, name;
-                    help = "Change the closing tag to `</{}>`", name;
-                    note = "RSX syntax requires matching tags like in HTML/JSX"
-                );
+                tag_mismatch_error(&closing_name, &name);
             }
 
             children
@@ -205,20 +199,10 @@ fn parse_children(input: ParseStream, parent_name: Option<&Ident>) -> Result<Vec
         if input.is_empty() {
             match parent_name {
                 Some(name) => {
-                    abort!(
-                        input.span(),
-                        "Unclosed tag `<{}>`. Expected closing tag before end of input.", name;
-                        help = "Add a closing tag `</{}>`", name;
-                        note = "All RSX tags must be properly closed"
-                    );
+                    unclosed_tag_error(input.span(), name);
                 }
                 None => {
-                    abort!(
-                        input.span(),
-                        "Unclosed fragment `<>`. Expected closing tag `</>` before end of input.";
-                        help = "Add a closing tag `</>`";
-                        note = "Fragments must be properly closed"
-                    );
+                    unclosed_fragment_error(input.span());
                 }
             }
         }
@@ -228,19 +212,10 @@ fn parse_children(input: ParseStream, parent_name: Option<&Ident>) -> Result<Vec
         } else {
             match parent_name {
                 Some(name) => {
-                    abort!(
-                        input.span(),
-                        "Unexpected token in `<{}>`. Expected one of: {{expr}}, \"text\", <child>, or </{}>", name, name;
-                        help = "RSX children must be expressions in {{}}, text in quotes, or nested elements";
-                        note = "Bare identifiers are not allowed - wrap them in braces like {{variable}}"
-                    );
+                    invalid_child_in_tag_error(input.span(), name);
                 }
                 None => {
-                    abort!(
-                        input.span(),
-                        "Unexpected token in fragment. Expected one of: {{expr}}, \"text\", <child>, or </>";
-                        help = "RSX children must be expressions in {{}}, text in quotes, or nested elements"
-                    );
+                    invalid_child_in_fragment_error(input.span());
                 }
             }
         }
@@ -299,12 +274,7 @@ fn parse_for_loop(content: ParseStream) -> Result<RsxNode> {
     let mut iter_tokens = proc_macro2::TokenStream::new();
     while !content.peek(token::Brace) {
         if content.is_empty() {
-            abort!(
-                content.span(),
-                "Expected '{{' after for-in expression to start the loop body.";
-                help = "Add a block like: for item in items {{ <li>{{item}}</li> }}";
-                note = "The for loop syntax is: for pattern in expression {{ body }}"
-            );
+            for_loop_missing_brace_error(content.span());
         }
         let tt: proc_macro2::TokenTree = content.parse()?;
         iter_tokens.extend(std::iter::once(tt));
@@ -320,12 +290,7 @@ fn parse_for_loop(content: ParseStream) -> Result<RsxNode> {
         if let Some(node) = try_parse_child_node(&body_content)? {
             body.push(node);
         } else {
-            abort!(
-                body_content.span(),
-                "Unexpected token in for-loop body. Expected element, expression, or spread.";
-                help = "For-loop bodies must contain RSX elements like <div> or expressions like {{item}}";
-                note = "Example: for item in items {{ <li>{{item}}</li> }}"
-            );
+            for_loop_invalid_body_error(body_content.span());
         }
     }
 
@@ -341,23 +306,18 @@ fn parse_condition_tuple(value: Expr, attr_name: &str) -> Result<(Expr, Expr)> {
     if let Expr::Tuple(tuple) = value {
         if tuple.elems.len() == 2 {
             let mut iter = tuple.elems.into_iter();
-            let first = iter.next().unwrap();
-            let second = iter.next().unwrap();
+            // 使用安全的模式匹配代替 unwrap()
+            let first = iter
+                .next()
+                .expect("BUG: iterator should have first element after len() == 2 check");
+            let second = iter
+                .next()
+                .expect("BUG: iterator should have second element after len() == 2 check");
             Ok((first, second))
         } else {
-            abort!(
-                tuple,
-                "The `{}` attribute expects exactly 2 values, found {}.", attr_name, tuple.elems.len();
-                help = "Use the format: {}={{(condition, |el| el.method())}}", attr_name;
-                note = "The first value is the condition, the second is a closure that modifies the element"
-            );
+            condition_tuple_wrong_count_error(&tuple, attr_name, tuple.elems.len());
         }
     } else {
-        abort!(
-            value,
-            "The `{}` attribute expects a tuple of (condition, closure).", attr_name;
-            help = "Use the format: {}={{(condition, |el| el.method())}}", attr_name;
-            note = "Example: when={{(is_active, |el| el.bg(rgb(0x00ff00)))}}"
-        );
+        condition_tuple_wrong_type_error(&value, attr_name);
     }
 }

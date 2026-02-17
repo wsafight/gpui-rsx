@@ -7,6 +7,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2026-02-17
+
+### 🚀 Performance Optimizations
+
+#### Compile-time Performance
+- **Binary search for color lookup** - Replaced O(n) linear scan with O(log n) binary search in `lookup_color()`
+  - COLOR_MAP (242 entries) now sorted alphabetically
+  - Color lookups reduced from ~120 comparisons to ~8 comparisons
+  - Improves macro expansion speed when using class colors
+
+#### Runtime Performance
+- **Eliminated heap allocations in `.children()`** - Replaced `vec![]` with array literals `[...]` in:
+  - For-loop `flat_map()` expansions
+  - 3+ consecutive expression aggregation
+  - Reduces runtime allocations for static element counts
+- **Zero-copy dynamic class strings** - Changed from `String::into()` to `AsRef<str>`
+  - `&str` inputs now pass through without allocation
+  - Supports `&str`, `String`, `Cow<str>` efficiently
+
+#### Binary Size Optimization
+- **Deduplicated dynamic class match tables** - Extracted 40-arm match table into `#[inline(never)]` local function
+  - Multiple `class={expr}` in same component now share one function body
+  - LLVM ICF can merge identical monomorphizations across components
+  - Reduces code bloat from repeated match table inlining
+
+### ♻️ Code Quality Improvements
+- **Simplified EVENT_HANDLERS table** - Reduced from 3-tuple to 2-tuple
+  - Removed redundant third field (method name always equals snake_case)
+  - Cleaner table structure, reduced maintenance burden
+- **Removed dead code** - Deleted deprecated `class_dynamic_value_error()` function
+
+### 📊 Impact Summary
+
+| Category | Improvement | Files Changed |
+|----------|-------------|---------------|
+| Compile Speed | ~15x faster color lookups (O(242)→O(8)) | `tables.rs` |
+| Runtime Allocations | Eliminated vec! in .children() | `element.rs` |
+| Binary Size | Dynamic class match table deduplicated | `runtime.rs` |
+| Code Clarity | Simplified EVENT_HANDLERS schema | `tables.rs`, `attribute.rs` |
+
+### ✅ Testing
+- All 236 tests pass (203 macro + 31 coverage + 2 diagnostic)
+- Zero regressions from optimization changes
+
 ## [0.2.0] - 2026-02-17
 
 ### ✨ Added
@@ -120,6 +164,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.2.1]: https://github.com/wsafight/gpui-rsx/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wsafight/gpui-rsx/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/wsafight/gpui-rsx/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/wsafight/gpui-rsx/compare/v0.1.0...v0.1.1

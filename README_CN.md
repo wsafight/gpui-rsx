@@ -241,7 +241,7 @@ rsx! {
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
-> **注意：** `class` 仅支持字符串字面量。动态样式请使用独立属性（如 `bg={color_var}`）。
+> **注意：** `class` 同时支持静态字符串（编译时处理）和动态表达式（运行时解析）。静态 class 具有零运行时开销。详见 [FAQ Q5](#q5-可以使用动态-class-值吗)。
 
 #### 支持的 class 模式
 
@@ -666,6 +666,20 @@ GPUI-RSX 是一个**编译时宏**，展开后的代码与手写的 GPUI 代码�
 | 类型安全 | ✅ | ✅ |
 | 编译时检查 | ✅ | ✅ |
 
+### v0.2.1 优化亮点 ✨
+
+**编译时性能：**
+- 颜色查找速度提升 15 倍（O(242) → O(8)，使用二分查找）
+- 带颜色的 class 属性宏展开更快
+
+**运行时性能：**
+- 静态元素数量场景下 `.children()` 零堆分配
+- 动态 class 字符串零拷贝（支持 `&str`、`String`、`Cow<str>`）
+
+**二进制体积：**
+- 动态 class match 表通过 `#[inline(never)]` + LLVM ICF 去重
+- 同一组件内多个 `class={expr}` 共享同一函数体
+
 ## 🛠️ 开发
 
 ### 构建
@@ -792,22 +806,24 @@ cargo expand --lib
 
 ### Q5: 可以使用动态 class 值吗？
 
-不可以。`class` 属性仅支持字符串字面量。动态样式请使用独立属性：
+**可以！** 从 v0.2.0 开始，`class` 属性同时支持静态和动态值：
 
 ```rust
-// ❌ 不可用
-rsx! { <div class={my_class} /> }
+// ✅ 静态（编译时，最佳性能）
+rsx! { <div class="flex gap-4" /> }
 
-// ✅ 使用独立属性
-rsx! {
-    <div bg={dynamic_color} flex />
-}
+// ✅ 动态（运行时，完全灵活）
+let classes = if active { "flex gap-4" } else { "block" };
+rsx! { <div class={classes} /> }
 
-// ✅ 或使用 `when` 进行条件样式
-rsx! {
-    <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} />
-}
+// ✅ 独立属性（针对特定属性）
+rsx! { <div bg={dynamic_color} flex /> }
+
+// ✅ 使用 `when` 进行条件样式
+rsx! { <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} /> }
 ```
+
+**性能提示：** 静态 class 具有零运行时开销（在编译时解析）。尽可能使用静态 class 以获得最佳性能。
 
 ## 🤝 贡献
 

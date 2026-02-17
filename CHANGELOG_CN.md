@@ -7,6 +7,50 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.2.1] - 2026-02-17
+
+### 🚀 性能优化
+
+#### 编译时性能
+- **颜色查找改用二分查找** - 将 `lookup_color()` 从 O(n) 线性扫描优化为 O(log n) 二分查找
+  - COLOR_MAP（242 个条目）现已按字母序排列
+  - 颜色查找从约 120 次比较减少至约 8 次比较
+  - 提升使用 class 颜色时的宏展开速度
+
+#### 运行时性能
+- **消除 `.children()` 堆分配** - 将以下场景中的 `vec![]` 替换为数组字面量 `[...]`：
+  - For 循环 `flat_map()` 展开
+  - 3+ 个连续表达式聚合
+  - 减少静态元素数量场景下的运行时分配
+- **动态 class 字符串零拷贝** - 从 `String::into()` 改为 `AsRef<str>`
+  - `&str` 输入现可直接通过无需分配
+  - 高效支持 `&str`、`String`、`Cow<str>`
+
+#### 二进制体积优化
+- **动态 class match 表去重** - 将 40 分支 match 表提取为 `#[inline(never)]` 局部函数
+  - 同一组件内多个 `class={expr}` 现共享同一函数体
+  - LLVM ICF 可跨组件合并相同的单态化实例
+  - 减少重复 match 表内联导致的代码膨胀
+
+### ♻️ 代码质量改进
+- **简化 EVENT_HANDLERS 表** - 从三元组简化为二元组
+  - 删除冗余的第三字段（方法名始终等于 snake_case）
+  - 更清晰的表结构，减少维护负担
+- **删除死代码** - 删除已废弃的 `class_dynamic_value_error()` 函数
+
+### 📊 优化总结
+
+| 类别 | 改进效果 | 修改文件 |
+|------|---------|---------|
+| 编译速度 | 颜色查找快约 15 倍（O(242)→O(8)） | `tables.rs` |
+| 运行时分配 | 消除 .children() 中的 vec! | `element.rs` |
+| 二进制体积 | 动态 class match 表去重 | `runtime.rs` |
+| 代码清晰度 | 简化 EVENT_HANDLERS 结构 | `tables.rs`, `attribute.rs` |
+
+### ✅ 测试
+- 全部 236 个测试通过（203 宏测试 + 31 覆盖率测试 + 2 诊断测试）
+- 优化改动零回归
+
 ## [0.2.0] - 2026-02-17
 
 ### ✨ 新增功能
@@ -124,6 +168,7 @@
 
 ---
 
+[0.2.1]: https://github.com/wsafight/gpui-rsx/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wsafight/gpui-rsx/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/wsafight/gpui-rsx/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/wsafight/gpui-rsx/compare/v0.1.0...v0.1.1

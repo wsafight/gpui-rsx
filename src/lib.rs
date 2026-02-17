@@ -36,6 +36,7 @@ use proc_macro_error::proc_macro_error;
 use syn::parse_macro_input;
 
 mod codegen;
+mod diagnostics;
 mod parser;
 
 use codegen::generate_body;

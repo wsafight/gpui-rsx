@@ -49,7 +49,7 @@ pub fn generate_body(body: &RsxBody) -> TokenStream {
         RsxBody::Single(element) => generate_element(element),
         RsxBody::Fragment(children) => {
             let child_exprs: Vec<TokenStream> = children.iter().map(generate_node).collect();
-            // Fragment 返回 Vec，GPUI 会自动处理
+            // Fragment 保持 vec![] —— 返回类型是用户可见 API
             quote! { vec![#(#child_exprs),*] }
         }
     }
@@ -81,7 +81,7 @@ fn generate_for_loop(binding: &syn::Pat, iter: &syn::Expr, body: &[RsxNode]) -> 
         let single = &body_exprs[0];
         quote! { (#iter).into_iter().map(|#binding| #single) }
     } else {
-        quote! { (#iter).into_iter().flat_map(|#binding| vec![#(#body_exprs),*]) }
+        quote! { (#iter).into_iter().flat_map(|#binding| [#(#body_exprs),*]) }
     }
 }
 
@@ -139,9 +139,9 @@ fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream
             }
         }
 
-        // 3 个及以上连续 Expr → .children(vec![...])
+        // 3 个及以上连续 Expr → .children([...])，用数组避免堆分配
         if consecutive_exprs.len() >= 3 {
-            methods.push(quote! { .children(vec![#(#consecutive_exprs),*]) });
+            methods.push(quote! { .children([#(#consecutive_exprs),*]) });
         } else {
             for expr in consecutive_exprs {
                 methods.push(quote! { .child(#expr) });
@@ -166,7 +166,15 @@ fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream
                     let for_expr = generate_for_loop(binding, iter, body);
                     methods.push(quote! { .children(#for_expr) });
                 }
-                RsxNode::Expr(_) => unreachable!(), // Expr 已在上面的循环中处理
+                RsxNode::Expr(_) => {
+                    // Expr 节点应该已在上面的 consecutive_exprs 循环（第 134-140 行）中处理
+                    // 如果执行到这里，说明代码逻辑存在 bug
+                    panic!(
+                        "INTERNAL BUG in gpui-rsx codegen: Expr node reached unreachable code path. \
+                         All Expr nodes should have been consumed in the consecutive_exprs loop (lines 134-140). \
+                         This indicates a logic error in generate_children_methods()."
+                    )
+                }
             }
             i += 1;
         }

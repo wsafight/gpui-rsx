@@ -8,6 +8,7 @@
 //! - when/whenSome → 条件渲染方法
 
 use super::class::parse_class_string;
+use super::runtime::generate_dynamic_class_code;
 use super::tables::*;
 use crate::parser::RsxAttribute;
 use proc_macro2::TokenStream;
@@ -34,8 +35,9 @@ pub(crate) fn generate_attr_methods(attr: &RsxAttribute) -> Vec<TokenStream> {
         RsxAttribute::Value { name, value } => {
             let method_name = name.to_string();
 
-            // class 属性 → 展开为多个样式方法
+            // class 属性 → 展开为多个样式方法（静态）或运行时解析（动态）
             if method_name == "class" {
+                // 情况 1：字符串字面量 → 编译期解析（最优性能）
                 if let syn::Expr::Lit(syn::ExprLit {
                     lit: syn::Lit::Str(lit_str),
                     ..
@@ -43,16 +45,17 @@ pub(crate) fn generate_attr_methods(attr: &RsxAttribute) -> Vec<TokenStream> {
                 {
                     return parse_class_string(&lit_str.value());
                 }
-                // class 属性仅支持字符串字面量，动态值需要用独立属性
-                return vec![
-                    quote! { compile_error!("class attribute only supports string literals; use individual attributes (e.g. flex, bg={...}) for dynamic styling") },
-                ];
+
+                // 情况 2：动态表达式 → 生成运行时解析代码
+                // 返回一个 .map() 调用，在运行时解析和应用 class
+                let dynamic_code = generate_dynamic_class_code(value);
+                return vec![quote! { .map(|__el| #dynamic_code) }];
             }
 
             // 事件处理器查表
-            for &(camel, snake, method) in EVENT_HANDLERS {
+            for &(camel, snake) in EVENT_HANDLERS {
                 if method_name == camel || method_name == snake {
-                    let method_ident = syn::Ident::new(method, name.span());
+                    let method_ident = syn::Ident::new(snake, name.span());
                     return vec![quote! { .#method_ident(#value) }];
                 }
             }
