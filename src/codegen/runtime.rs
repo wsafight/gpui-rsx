@@ -123,11 +123,10 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
     ];
 
     for class_str in common_classes {
-        if let Some(method_call) = parse_single_class(class_str) {
-            matches.push(quote! {
-                #class_str => el #method_call,
-            });
-        }
+        let method_call = parse_single_class(class_str);
+        matches.push(quote! {
+            #class_str => el #method_call,
+        });
     }
 
     matches

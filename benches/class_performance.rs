@@ -250,52 +250,144 @@ trait Styled: Sized {
 }
 
 impl Styled for MockElement {
-    fn flex(self) -> Self { self }
-    fn flex_col(self) -> Self { self }
-    fn flex_row(self) -> Self { self }
-    fn flex_1(self) -> Self { self }
-    fn flex_wrap(self) -> Self { self }
-    fn gap(self, _: f32) -> Self { self }
-    fn gap_2(self) -> Self { self }
-    fn gap_4(self) -> Self { self }
-    fn gap_6(self) -> Self { self }
-    fn p(self, _: f32) -> Self { self }
-    fn p_2(self) -> Self { self }
-    fn p_4(self) -> Self { self }
-    fn px(self, _: f32) -> Self { self }
-    fn py(self, _: f32) -> Self { self }
-    fn m(self, _: f32) -> Self { self }
-    fn m_2(self) -> Self { self }
-    fn m_4(self) -> Self { self }
-    fn bg(self, _: u32) -> Self { self }
-    fn text_color(self, _: u32) -> Self { self }
-    fn border_color(self, _: u32) -> Self { self }
-    fn border_1(self) -> Self { self }
-    fn border_2(self) -> Self { self }
-    fn rounded_md(self) -> Self { self }
-    fn rounded_lg(self) -> Self { self }
-    fn rounded_full(self) -> Self { self }
-    fn items_center(self) -> Self { self }
-    fn items_start(self) -> Self { self }
-    fn items_end(self) -> Self { self }
-    fn justify_center(self) -> Self { self }
-    fn justify_between(self) -> Self { self }
-    fn justify_start(self) -> Self { self }
-    fn justify_end(self) -> Self { self }
-    fn w_full(self) -> Self { self }
-    fn h_full(self) -> Self { self }
-    fn size_full(self) -> Self { self }
-    fn text_sm(self) -> Self { self }
-    fn text_base(self) -> Self { self }
-    fn text_lg(self) -> Self { self }
-    fn text_xl(self) -> Self { self }
-    fn text_2xl(self) -> Self { self }
-    fn text_3xl(self) -> Self { self }
-    fn font_bold(self) -> Self { self }
-    fn cursor_pointer(self) -> Self { self }
-    fn overflow_hidden(self) -> Self { self }
-    fn absolute(self) -> Self { self }
-    fn relative(self) -> Self { self }
+    fn flex(self) -> Self {
+        self
+    }
+    fn flex_col(self) -> Self {
+        self
+    }
+    fn flex_row(self) -> Self {
+        self
+    }
+    fn flex_1(self) -> Self {
+        self
+    }
+    fn flex_wrap(self) -> Self {
+        self
+    }
+    fn gap(self, _: f32) -> Self {
+        self
+    }
+    fn gap_2(self) -> Self {
+        self
+    }
+    fn gap_4(self) -> Self {
+        self
+    }
+    fn gap_6(self) -> Self {
+        self
+    }
+    fn p(self, _: f32) -> Self {
+        self
+    }
+    fn p_2(self) -> Self {
+        self
+    }
+    fn p_4(self) -> Self {
+        self
+    }
+    fn px(self, _: f32) -> Self {
+        self
+    }
+    fn py(self, _: f32) -> Self {
+        self
+    }
+    fn m(self, _: f32) -> Self {
+        self
+    }
+    fn m_2(self) -> Self {
+        self
+    }
+    fn m_4(self) -> Self {
+        self
+    }
+    fn bg(self, _: u32) -> Self {
+        self
+    }
+    fn text_color(self, _: u32) -> Self {
+        self
+    }
+    fn border_color(self, _: u32) -> Self {
+        self
+    }
+    fn border_1(self) -> Self {
+        self
+    }
+    fn border_2(self) -> Self {
+        self
+    }
+    fn rounded_md(self) -> Self {
+        self
+    }
+    fn rounded_lg(self) -> Self {
+        self
+    }
+    fn rounded_full(self) -> Self {
+        self
+    }
+    fn items_center(self) -> Self {
+        self
+    }
+    fn items_start(self) -> Self {
+        self
+    }
+    fn items_end(self) -> Self {
+        self
+    }
+    fn justify_center(self) -> Self {
+        self
+    }
+    fn justify_between(self) -> Self {
+        self
+    }
+    fn justify_start(self) -> Self {
+        self
+    }
+    fn justify_end(self) -> Self {
+        self
+    }
+    fn w_full(self) -> Self {
+        self
+    }
+    fn h_full(self) -> Self {
+        self
+    }
+    fn size_full(self) -> Self {
+        self
+    }
+    fn text_sm(self) -> Self {
+        self
+    }
+    fn text_base(self) -> Self {
+        self
+    }
+    fn text_lg(self) -> Self {
+        self
+    }
+    fn text_xl(self) -> Self {
+        self
+    }
+    fn text_2xl(self) -> Self {
+        self
+    }
+    fn text_3xl(self) -> Self {
+        self
+    }
+    fn font_bold(self) -> Self {
+        self
+    }
+    fn cursor_pointer(self) -> Self {
+        self
+    }
+    fn overflow_hidden(self) -> Self {
+        self
+    }
+    fn absolute(self) -> Self {
+        self
+    }
+    fn relative(self) -> Self {
+        self
+    }
 }
 
 /// 基准测试：静态 class（编译期优化）

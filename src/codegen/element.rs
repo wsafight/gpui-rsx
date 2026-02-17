@@ -8,7 +8,7 @@
 
 use super::attribute::generate_attr_methods;
 use super::class::parse_class_string;
-use super::tables::TAG_DEFAULT_STYLES;
+use super::tables::{EVENT_HANDLERS, TAG_DEFAULT_STYLES};
 use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
@@ -19,16 +19,9 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 /// 编译期自动 ID 计数器（每次宏展开递增，保证唯一）
 static AUTO_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
 
-/// 需要 `.id()` 的属性（`StatefulInteractiveElement` trait）
-const NEEDS_ID_ATTRS: &[&str] = &[
-    "onClick",
-    "on_click",
-    "onHover",
-    "on_hover",
-    "onDrag",
-    "on_drag",
-    "onDrop",
-    "on_drop",
+/// 需要 `.id()` 的非事件属性（`StatefulInteractiveElement` trait）
+/// 事件处理器通过 EVENT_HANDLERS 表检查，这里只列出其他 stateful 属性
+const STATEFUL_ATTRS: &[&str] = &[
     "hover",
     "active",
     "focus",
@@ -94,15 +87,49 @@ fn generate_for_loop(binding: &syn::Pat, iter: &syn::Expr, body: &[RsxNode]) -> 
 /// - 与 GPUI 惯用写法一致
 /// - 正确处理 `Div` → `Stateful<Div>` 的类型变换（`.id()` 后类型改变）
 pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
-    let base = generate_base(element);
+    // 单次遍历提取所有需要的信息
+    let mut user_id = None;
+    let mut has_styled = false;
+    let mut needs_id = false;
+
+    for attr in &element.attributes {
+        match attr {
+            RsxAttribute::Value { name, value } if name == "id" => {
+                user_id = Some(value);
+            }
+            RsxAttribute::Flag(name) if name == "styled" => {
+                has_styled = true;
+            }
+            RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
+                if !needs_id {
+                    let n = name.to_string();
+                    // 检查是否是事件处理器（支持 camelCase 和 snake_case）
+                    let is_event_handler = EVENT_HANDLERS
+                        .iter()
+                        .any(|&(camel, snake)| n == camel || n == snake);
+                    // 检查是否是其他需要 stateful 的属性
+                    let is_stateful_attr = STATEFUL_ATTRS.iter().any(|&s| n == s);
+                    needs_id = is_event_handler || is_stateful_attr;
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // 生成基础元素和 id
+    let tag = generate_tag(&element.name);
+    let base = if let Some(id_value) = user_id {
+        quote! { #tag.id(#id_value) }
+    } else if needs_id {
+        let auto_id = next_auto_id(&element.name.to_string(), &element.attributes);
+        quote! { #tag.id(#auto_id) }
+    } else {
+        tag
+    };
 
     let mut methods: Vec<TokenStream> = Vec::new();
 
     // styled 标志 → 注入标签默认样式（在用户属性之前）
-    let has_styled = element
-        .attributes
-        .iter()
-        .any(|a| matches!(a, RsxAttribute::Flag(name) if name == "styled"));
     if has_styled {
         let tag_name = element.name.to_string();
         if let Some(&(_, class_str)) = TAG_DEFAULT_STYLES.iter().find(|&&(tag, _)| tag == tag_name)
@@ -181,30 +208,6 @@ fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream
     }
 }
 
-/// 生成元素基础构造表达式（含自动 `.id()` 插入）
-///
-/// GPUI 中 `on_click` 属于 `StatefulInteractiveElement` trait，
-/// 需要先调用 `.id()` 将 `Div` 转为 `Stateful<Div>` 才能使用。
-/// 此函数在检测到 `onClick` 时自动插入 `.id()`。
-fn generate_base(element: &RsxElement) -> TokenStream {
-    let tag = generate_tag(&element.name);
-
-    // 优先使用用户显式提供的 id
-    let user_id = element.attributes.iter().find_map(|a| match a {
-        RsxAttribute::Value { name, value } if name == "id" => Some(value),
-        _ => None,
-    });
-
-    if let Some(id_value) = user_id {
-        quote! { #tag.id(#id_value) }
-    } else if needs_stateful_id(&element.attributes) {
-        let auto_id = next_auto_id(&element.name.to_string(), &element.attributes);
-        quote! { #tag.id(#auto_id) }
-    } else {
-        tag
-    }
-}
-
 /// HTML 标签 → `div()`，特殊标签 → 同名函数，自定义组件 → 同名函数调用
 fn generate_tag(name: &syn::Ident) -> TokenStream {
     match name.to_string().as_str() {
@@ -220,17 +223,6 @@ fn generate_tag(name: &syn::Ident) -> TokenStream {
         }
         _ => quote! { #name() },
     }
-}
-
-/// 检查属性列表中是否存在需要 `Stateful<Div>` 的属性
-fn needs_stateful_id(attributes: &[RsxAttribute]) -> bool {
-    attributes.iter().any(|attr| match attr {
-        RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
-            let n = name.to_string();
-            NEEDS_ID_ATTRS.iter().any(|&s| n == s)
-        }
-        _ => false,
-    })
 }
 
 /// 生成确定性自动 ID 字符串

@@ -10,6 +10,7 @@
 use super::tables::*;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
+use std::borrow::Cow;
 
 /// 解析 class 字符串为方法链片段列表
 ///
@@ -17,13 +18,18 @@ use quote::quote;
 pub(crate) fn parse_class_string(class_str: &str) -> Vec<TokenStream> {
     class_str
         .split_whitespace()
-        .filter_map(parse_single_class)
+        .map(parse_single_class)
         .collect()
 }
 
 /// 解析单个 CSS class 为方法调用
-pub(crate) fn parse_single_class(class: &str) -> Option<TokenStream> {
-    let method_name = class.replace('-', "_");
+pub(crate) fn parse_single_class(class: &str) -> TokenStream {
+    // 使用 Cow 避免不必要的字符串分配：只在包含 '-' 时才创建新字符串
+    let method_name: Cow<str> = if class.contains('-') {
+        Cow::Owned(class.replace('-', "_"))
+    } else {
+        Cow::Borrowed(class)
+    };
 
     // 间距/尺寸类：gap-4 → .gap(px(4.0))
     for &(prefix, method) in SPACING_PATTERNS {
@@ -31,7 +37,7 @@ pub(crate) fn parse_single_class(class: &str) -> Option<TokenStream> {
             && let Ok(num) = value.parse::<f32>()
         {
             let method_ident = syn::Ident::new(method, Span::call_site());
-            return Some(quote! { .#method_ident(px(#num)) });
+            return quote! { .#method_ident(px(#num)) };
         }
     }
 
@@ -39,7 +45,7 @@ pub(crate) fn parse_single_class(class: &str) -> Option<TokenStream> {
     // "border" (纯) → .border_1()（GPUI 没有无参 .border()）
     // "border-2" → .border_2()
     if method_name == "border" {
-        return Some(quote! { .border_1() });
+        return quote! { .border_1() };
     }
 
     // border-color 类：border-red-500 → .border_color(rgb(0xef4444))
@@ -54,18 +60,18 @@ pub(crate) fn parse_single_class(class: &str) -> Option<TokenStream> {
             // 检查是否是数值边框宽度 border-2, border-4 等
             if let Ok(_n) = color.parse::<u32>() {
                 let ident = syn::Ident::new(&method_name, Span::call_site());
-                return Some(quote! { .#ident() });
+                return quote! { .#ident() };
             }
             // 使用统一的颜色解析
             if let Some(token) = parse_color_with_method(color, "border_color") {
-                return Some(token);
+                return token;
             }
         }
     }
 
     // 颜色类：text-red-600, bg-blue-500 → .text_color(rgb(...)), .bg(rgb(...))
     if let Some(color_code) = parse_color_class(&method_name) {
-        return Some(color_code);
+        return color_code;
     }
 
     // 文本大小类：text-xl → .text_xl()（仅白名单内的大小有效）
@@ -74,14 +80,14 @@ pub(crate) fn parse_single_class(class: &str) -> Option<TokenStream> {
     if let Some(size) = method_name.strip_prefix("text_") {
         if VALID_TEXT_SIZES.contains(&size) {
             let size_ident = syn::Ident::new(&format!("text_{size}"), Span::call_site());
-            return Some(quote! { .#size_ident() });
+            return quote! { .#size_ident() };
         }
         // 不在白名单中的 text_ 前缀，fall through 到默认处理
     }
 
     // 默认：无参方法调用
     let ident = syn::Ident::new(&method_name, Span::call_site());
-    Some(quote! { .#ident() })
+    quote! { .#ident() }
 }
 
 /// 解析颜色 class（先分离前缀，再查表）
