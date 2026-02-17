@@ -1,3 +1,27 @@
+# =============================================================================
+# Continuous Integration Workflow
+# 持续集成工作流
+# =============================================================================
+#
+# English:
+# Runs on every push to main and on pull requests. Performs the following:
+# - Test Suite: Runs tests on multiple platforms (Ubuntu, macOS, Windows)
+#               and Rust versions (stable, beta)
+# - Rustfmt: Checks code formatting
+# - Clippy: Runs linter for code quality
+# - Documentation: Builds and validates documentation
+# - Security Audit: Checks for known vulnerabilities in dependencies
+#
+# 中文：
+# 在每次推送到 main 分支和 PR 时运行。执行以下任务：
+# - 测试套件：在多个平台（Ubuntu、macOS、Windows）和 Rust 版本
+#           （stable、beta）上运行测试
+# - Rustfmt：检查代码格式
+# - Clippy：运行代码质量检查器
+# - 文档：构建和验证文档
+# - 安全审计：检查依赖中的已知漏洞
+# =============================================================================
+
 name: CI
 
 on:

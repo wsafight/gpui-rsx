@@ -1,3 +1,28 @@
+# =============================================================================
+# GPUI Compatibility Check Workflow
+# GPUI 兼容性检查工作流
+# =============================================================================
+#
+# English:
+# Monitors compatibility with the latest GPUI version. Performs:
+# - Daily Checks: Automatically runs at 00:00 UTC every day
+# - Manual Trigger: Can be manually triggered via workflow_dispatch
+# - Version Detection: Checks for GPUI version updates
+# - Build & Test: Builds and tests with the latest GPUI version
+# - Issue Creation: Automatically creates GitHub issues if incompatibilities
+#                   are detected
+# - Issue Resolution: Automatically closes issues when compatibility is restored
+#
+# 中文：
+# 监控与最新 GPUI 版本的兼容性。执行：
+# - 每日检查：每天 UTC 时间 00:00 自动运行
+# - 手动触发：可通过 workflow_dispatch 手动触发
+# - 版本检测：检查 GPUI 版本更新
+# - 构建和测试：使用最新 GPUI 版本进行构建和测试
+# - Issue 创建：检测到不兼容时自动创建 GitHub issue
+# - Issue 解决：恢复兼容性时自动关闭 issue
+# =============================================================================
+
 name: GPUI Compatibility
 
 on:

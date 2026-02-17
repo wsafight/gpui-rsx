@@ -1,0 +1,64 @@
+# =============================================================================
+# Dependabot Configuration
+# Dependabot 依赖自动更新配置
+# =============================================================================
+#
+# English:
+# Automatically checks for dependency updates on a weekly basis and creates
+# pull requests to keep dependencies up-to-date. Includes both Rust crates
+# (via Cargo) and GitHub Actions versions.
+#
+# 中文：
+# 每周自动检查依赖更新并创建 Pull Request 以保持依赖的最新状态。
+# 包括 Rust crates（通过 Cargo）和 GitHub Actions 版本。
+#
+# Documentation / 文档:
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+# =============================================================================
+
+version: 2
+updates:
+  # Maintain dependencies for Cargo (Rust)
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 10
+    reviewers:
+      - "wsafight"
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # Group all patch updates into a single PR
+    groups:
+      patch-updates:
+        patterns:
+          - "*"
+        update-types:
+          - "patch"
+    # Allow both direct and indirect dependencies
+    versioning-strategy: auto
+
+  # Maintain dependencies for GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "wsafight"
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"

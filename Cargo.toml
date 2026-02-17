@@ -1,11 +1,14 @@
 [package]
 name = "gpui-rsx"
-version = "0.1.2"
+version = "0.2.0"
 edition = "2024"
 description = "A JSX-like macro for GPUI - simplify UI development with HTML-like syntax"
 authors = ["GPUI-RSX Contributors"]
 license = "MIT"
 repository = "https://github.com/wsafight/gpui-rsx"
+homepage = "https://github.com/wsafight/gpui-rsx"
+documentation = "https://docs.rs/gpui-rsx"
+readme = "README.md"
 keywords = ["gpui", "rsx", "jsx", "macro", "ui"]
 categories = ["gui", "development-tools"]
 
@@ -22,12 +25,12 @@ proc-macro-error = "1.0"
 # 用于测试
 trybuild = "1.0"
 
-# Examples 依赖 GPUI，标记为可选
-# 如果要运行 examples，需要先安装 gpui
-[[example]]
-name = "counter"
-required-features = []
+# Documentation configuration for docs.rs
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
 
-[[example]]
-name = "todo_app"
-required-features = []
+# Optimized release profile
+[profile.release]
+lto = true
+codegen-units = 1
