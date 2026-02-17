@@ -20,6 +20,7 @@ fn px(_val: f32) -> f32 {
     0.0
 }
 
+#[allow(dead_code)] // 不同测试使用不同方法，并非所有方法都在每个测试中使用
 impl MockElement {
     fn id<T>(self, _: T) -> Self {
         self
@@ -491,7 +492,7 @@ fn test_for_loop_nested() {
 #[test]
 fn test_for_loop_with_filter() {
     // for 循环与迭代器链
-    let items = vec![1, 2, 3, 4, 5];
+    let items = [1, 2, 3, 4, 5];
     let _el = rsx! {
         <div>
             {for item in items.iter().filter(|&&x| x > 2) {

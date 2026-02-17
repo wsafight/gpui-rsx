@@ -714,7 +714,7 @@ fn test_variable_child() {
 
 #[test]
 fn test_method_call_child() {
-    let items = vec!["a", "b", "c"];
+    let items = ["a", "b", "c"];
     let _el = rsx! { <div>{items.len()}</div> };
 }
 
@@ -1040,7 +1040,7 @@ fn test_id_without_events() {
 
 #[test]
 fn test_iterator_map_children() {
-    let items = vec!["apple", "banana", "cherry"];
+    let items = ["apple", "banana", "cherry"];
     let _el = rsx! {
         <ul>
             {items.iter().map(|item| {
@@ -1560,7 +1560,7 @@ fn test_complex_when_usage() {
 
 #[test]
 fn test_spread_children() {
-    let items = vec!["a", "b", "c"];
+    let items = ["a", "b", "c"];
     let _el = rsx! {
         <ul>
             {...items}
@@ -1570,7 +1570,7 @@ fn test_spread_children() {
 
 #[test]
 fn test_spread_with_map() {
-    let items = vec!["apple", "banana"];
+    let items = ["apple", "banana"];
     let children: Vec<MockElement> = items.iter().map(|_| div()).collect();
     let _el = rsx! {
         <div>
@@ -2303,7 +2303,7 @@ fn test_children_aggregation_under_3() {
 
 #[test]
 fn test_for_loop_basic() {
-    let items = vec!["apple", "banana", "cherry"];
+    let items = ["apple", "banana", "cherry"];
     let _el = rsx! {
         <ul>
             {for item in items {
@@ -2326,7 +2326,7 @@ fn test_for_loop_with_range() {
 
 #[test]
 fn test_for_loop_with_method() {
-    let items = vec!["a", "b", "c"];
+    let items = ["a", "b", "c"];
     let _el = rsx! {
         <div>
             {for item in items.iter() {

@@ -2,7 +2,7 @@
 //!
 //! 提供一致的错误消息和诊断助手函数
 
-use proc_macro_error::abort;
+use proc_macro_error2::abort;
 use syn::{Ident, spanned::Spanned};
 
 /// 报告标签不匹配错误

@@ -51,6 +51,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - All 236 tests pass (203 macro + 31 coverage + 2 diagnostic)
 - Zero regressions from optimization changes
 
+### 🔒 Security
+- **Updated dependency** - Replaced unmaintained `proc-macro-error` with `proc-macro-error2`
+  - Addresses RUSTSEC-2024-0370 advisory
+  - Eliminates duplicate `syn 1.x` dependency tree
+  - Fully compatible API (drop-in replacement)
+
 ## [0.2.0] - 2026-02-17
 
 ### ✨ Added

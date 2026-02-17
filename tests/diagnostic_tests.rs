@@ -158,7 +158,6 @@ mod diagnostic_quality_tests {
     fn test_diagnostic_module_exists() {
         // 这个测试验证诊断模块已被正确创建和导出
         // 如果编译通过，说明模块结构正确
-        assert!(true);
     }
 
     /// 测试诊断消息的一致性
@@ -168,6 +167,5 @@ mod diagnostic_quality_tests {
         // - 主消息描述问题
         // - help 字段提供修复建议
         // - note 字段提供背景信息
-        assert!(true);
     }
 }
