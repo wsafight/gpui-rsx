@@ -29,23 +29,6 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
   - Code generation strategies
   - Design patterns and testing approach
   - Extension points and debugging guide
-- **[Dynamic Class Guide](./DYNAMIC_CLASS.md)** ✨ NEW - Dynamic class support
-  - Static vs dynamic class comparison
-  - Usage examples and patterns
-  - Performance considerations
-  - Migration guide
-- **[Diagnostic Improvements](./DIAGNOSTIC_IMPROVEMENTS.md)** - Enhanced error messages
-  - Unified diagnostic module
-  - Better error locations and context
-  - Safety improvements
-- **[Performance Optimization](./PERFORMANCE_OPTIMIZATION.md)** - Performance guide
-  - Why not cache macro expansion
-  - Practical optimization strategies
-  - Benchmark testing guide
-- **[Benchmark Results](./BENCHMARK_RESULTS.md)** ✨ NEW - Performance data
-  - Static vs dynamic class comparison
-  - Optimization recommendations
-  - Real performance numbers
 - **[Getting Started](./docs/getting-started.md)** - Step-by-step tutorial
 - **[API Reference](./docs/api-reference.md)** - Complete API documentation
 - **[Best Practices](./docs/best-practices.md)** - Recommended patterns
@@ -423,14 +406,14 @@ rsx! {
 }
 ```
 
-### 10. Dynamic Class ✨ NEW
+### 10. Dynamic Class
 
-GPUI-RSX now supports both static and dynamic class attributes!
+GPUI-RSX supports both static and dynamic `class` attributes.
 
-#### Static Class (Compile-time Optimization)
+#### Static Class (Compile-time — Recommended)
 
 ```rust
-// ✅ Best performance - parsed at compile time
+// ✅ Best performance - parsed at compile time, supports all classes
 rsx! {
     <div class="flex gap-4 bg-blue-500">
         {"Static styles"}
@@ -438,10 +421,11 @@ rsx! {
 }
 ```
 
-#### Dynamic Class (Runtime Flexibility)
+#### Dynamic Class (Runtime — Limited)
 
 ```rust
-// ✅ Full flexibility - use any Rust expression
+// ⚠️ Only ~58 pre-compiled common classes are supported at runtime.
+// Unknown classes are silently ignored.
 let classes = if is_active { "flex gap-4" } else { "block" };
 rsx! {
     <div class={classes}>
@@ -450,40 +434,29 @@ rsx! {
 }
 ```
 
+> **Important limitation:** When `class` is a runtime expression, only the ~58 pre-compiled
+> common classes (flex, gap-1..gap-8, p-1..p-8, text-xl, rounded-md, etc.) are recognised.
+> Any class not in this list is **silently ignored** at runtime.
+>
+> **Recommended alternatives** (in priority order):
+> 1. **String literal** (best): `class="flex gap-4"` — compile-time, supports all classes
+> 2. **Conditional literal**: `class={if active { "flex gap-4" } else { "block" }}` — still a literal
+> 3. **Individual attributes**: `<div flex gap_4 />` — compile-time, type-checked
+> 4. **`when` attribute**: `when={(cond, |el| el.flex())}` — compile-time, fully flexible
+> 5. **Dynamic expression**: `class={expr}` — runtime only, ~58 classes supported
+
 **Common Patterns:**
 
 ```rust
-// Conditional
-let button_classes = if primary {
-    "bg-blue-500 text-white"
-} else {
-    "bg-gray-200 text-black"
-};
+// ✅ Conditional literal (compile-time, all classes work)
+let button_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 text-black" };
 
-// String formatting
-let spacing = 4;
-let classes = format!("flex gap-{}", spacing);
+// ✅ when attribute (compile-time, fully flexible)
+rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }
 
-// Function return
-fn get_classes(state: &State) -> &str {
-    match state {
-        State::Active => "bg-green-500",
-        State::Inactive => "bg-gray-500",
-    }
-}
-
-// Complex composition
-let all_classes = format!(
-    "{} {} {}",
-    "flex items-center",
-    if large { "text-2xl" } else { "text-base" },
-    if border { "border-2" } else { "" }
-);
+// ⚠️ Dynamic string (only common classes work)
+let classes = format!("flex gap-{}", spacing);  // gap-4 works; gap-32 may not
 ```
-
-**Performance Note:** Static classes have zero runtime overhead (compiled to direct method calls), while dynamic classes involve runtime string parsing. Use static when possible for best performance.
-
-📖 **[Full Dynamic Class Documentation](./DYNAMIC_CLASS.md)**
 
 ### 11. Attribute Mapping Reference
 
@@ -746,18 +719,24 @@ GPUI-RSX is a **compile-time macro** that expands to the same code as hand-writt
 | Type Safety | ✅ | ✅ |
 | Compile-time Checking | ✅ | ✅ |
 
-### v0.2.1 Optimizations ✨
+### v0.2.1 Optimizations
 
 **Compile-time Performance:**
-- 15x faster color lookups (O(242) → O(8) via binary search)
-- Faster macro expansion for class attributes with colors
+- O(1) color / attribute / spacing lookups via `match` (jump table, no linear scan)
+- Single-pass attribute scanning in `generate_element`
+- Thread-local cache for dynamic class match arms (generated once per process)
+
+**Memory Allocation Reductions:**
+- `parse_class_string` returns an iterator (no intermediate `Vec`)
+- `generate_attr_methods` pushes directly into caller's buffer
+- `Cow<str>` for class name transformations (zero-copy when no `-` present)
+- `Vec::with_capacity` pre-allocation throughout
 
 **Runtime Performance:**
-- Zero heap allocations for `.children()` with static element counts
-- Zero-copy dynamic class strings (supports `&str`, `String`, `Cow<str>`)
+- Zero-copy dynamic class strings via `AsRef<str>` (`&str` needs no allocation)
 
 **Binary Size:**
-- Dynamic class match tables deduplicated via `#[inline(never)]` + LLVM ICF
+- Dynamic class match table extracted to `#[inline(never)]` + LLVM ICF deduplication
 - Multiple `class={expr}` in same component share one function body
 
 ## 🛠️ Development
@@ -886,24 +865,26 @@ All GPUI-supported elements can be used, such as `div`, `button`, `input`, `span
 
 ### Q5: Can I use dynamic class values?
 
-**Yes!** Since v0.2.0, the `class` attribute supports both static and dynamic values:
+Yes, but with an important limitation:
 
 ```rust
-// ✅ Static (compile-time, best performance)
+// ✅ Static literal (compile-time, supports ALL classes — recommended)
 rsx! { <div class="flex gap-4" /> }
 
-// ✅ Dynamic (runtime, full flexibility)
-let classes = if active { "flex gap-4" } else { "block" };
-rsx! { <div class={classes} /> }
-
-// ✅ Individual attributes (for specific properties)
+// ✅ Individual attributes (compile-time, type-checked)
 rsx! { <div bg={dynamic_color} flex /> }
 
-// ✅ Conditional styling with `when`
+// ✅ Conditional styling with `when` (compile-time, fully flexible)
 rsx! { <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} /> }
+
+// ⚠️ Dynamic expression (runtime — only ~58 common classes supported)
+let classes = if active { "flex gap-4" } else { "block" };
+rsx! { <div class={classes} /> }
+// Classes not in the pre-compiled list are silently ignored at runtime.
 ```
 
-**Performance tip:** Static classes have zero runtime overhead (parsed at compile time). Use static when possible for best performance.
+**Tip:** When you need dynamic styling, prefer `when`/`whenSome` or individual value
+attributes (`bg={color}`) — they are compile-time and support everything GPUI offers.
 
 ## 🤝 Contributing
 

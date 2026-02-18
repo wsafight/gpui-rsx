@@ -334,8 +334,8 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "roundedBottomLeft" => Some("rounded_bl"),
         "roundedBottomRight" => Some("rounded_br"),
         "boxShadow" => Some("shadow"),
-        "overflowX" => Some("overflow_x_hidden"),
-        "overflowY" => Some("overflow_y_hidden"),
+        "overflowX" => Some("overflow_x"),
+        "overflowY" => Some("overflow_y"),
         _ => None,
     }
 }
@@ -345,9 +345,15 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
 /// 事件处理器和部分交互属性需要 `StatefulInteractiveElement` trait，
 /// 该 trait 要求元素先调用 `.id()`。
 pub(crate) fn is_stateful_attr(name: &str) -> bool {
-    // 事件处理器：映射后的方法名以 "on_" 开头
-    if let Some(method) = lookup_attr_method(name) {
-        return method.starts_with("on_");
+    // 事件处理器：snake_case 以 "on_" 开头，或 camelCase 以 "on" 开头且第三字符为大写
+    if name.starts_with("on_")
+        || (name.starts_with("on")
+            && name
+                .as_bytes()
+                .get(2)
+                .is_some_and(|b| b.is_ascii_uppercase()))
+    {
+        return true;
     }
     // 其他 stateful 属性
     matches!(

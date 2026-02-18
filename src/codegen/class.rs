@@ -16,14 +16,13 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::borrow::Cow;
 
-/// 解析 class 字符串为方法链片段列表
+/// 解析 class 字符串为方法链片段迭代器
 ///
 /// `"flex flex-col gap-4"` → `[.flex(), .flex_col(), .gap(px(4.0))]`
-pub(crate) fn parse_class_string(class_str: &str) -> Vec<TokenStream> {
-    class_str
-        .split_whitespace()
-        .map(parse_single_class)
-        .collect()
+///
+/// 返回迭代器而非 Vec，调用方通过 `extend` 消费时避免中间 Vec 分配。
+pub(crate) fn parse_class_string(class_str: &str) -> impl Iterator<Item = TokenStream> + '_ {
+    class_str.split_whitespace().map(parse_single_class)
 }
 
 /// 解析单个 CSS class 为方法调用
@@ -55,23 +54,22 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
     }
 
     // border-color 类：border-red-500 → .border_color(rgb(0xef4444))
-    if let Some(color) = method_name.strip_prefix("border_") {
-        // 排除方向性边框和数值边框宽度，用首字节快速判断
-        let skip = match color.as_bytes().first() {
-            Some(b't' | b'b' | b'l' | b'r' | b'x' | b'y')
-                if color.len() == 1 || color.as_bytes().get(1) == Some(&b'_') =>
-            {
-                true
-            }
-            Some(b'0'..=b'9') => {
+    if let Some(rest) = method_name.strip_prefix("border_") {
+        // 方向性边框（border-t/b/l/r 及带数值的方向边框）→ fall through 到默认处理
+        let is_directional = matches!(rest, "t" | "b" | "l" | "r")
+            || rest.starts_with("t_")
+            || rest.starts_with("b_")
+            || rest.starts_with("l_")
+            || rest.starts_with("r_")
+            || rest.starts_with("x_")
+            || rest.starts_with("y_");
+
+        if !is_directional {
+            if rest.as_bytes().first().is_some_and(|b| b.is_ascii_digit()) {
                 // 数值边框宽度 border-2, border-4 等
                 let ident = syn::Ident::new(&method_name, Span::call_site());
                 return quote! { .#ident() };
-            }
-            _ => false,
-        };
-        if !skip {
-            if let Some(token) = parse_color_with_method(color, "border_color") {
+            } else if let Some(token) = parse_color_with_method(rest, "border_color") {
                 return token;
             }
         }
@@ -124,19 +122,10 @@ fn parse_color_class(class: &str) -> Option<TokenStream> {
 /// - `Some(TokenStream)`: 成功解析，返回 `.method(rgb(value))`
 /// - `None`: 无法解析颜色
 fn parse_color_with_method(color: &str, method: &str) -> Option<TokenStream> {
-    // 1. 尝试颜色表查找
-    if let Some(hex) = lookup_color(color) {
-        let ident = syn::Ident::new(method, Span::call_site());
-        return Some(quote! { .#ident(rgb(#hex)) });
-    }
-
-    // 2. 尝试任意 hex 值
-    if let Some(hex) = parse_arbitrary_hex(color) {
-        let ident = syn::Ident::new(method, Span::call_site());
-        return Some(quote! { .#ident(rgb(#hex)) });
-    }
-
-    None
+    // 统一颜色表查找和任意 hex 解析，仅在匹配成功时创建 Ident
+    let hex = lookup_color(color).or_else(|| parse_arbitrary_hex(color))?;
+    let ident = syn::Ident::new(method, Span::call_site());
+    Some(quote! { .#ident(rgb(#hex)) })
 }
 
 /// 解析任意 hex 颜色值：`[#rrggbb]` 或 `[#rgb]`
@@ -150,12 +139,14 @@ fn parse_arbitrary_hex(s: &str) -> Option<u32> {
         6 => u32::from_str_radix(inner, 16).ok(),
         3 => {
             // 3 位 hex 扩展为 6 位: #abc → #aabbcc
-            let mut expanded = String::with_capacity(6);
-            for ch in inner.chars() {
-                expanded.push(ch);
-                expanded.push(ch);
-            }
-            u32::from_str_radix(&expanded, 16).ok()
+            // 用位运算零分配实现，避免 String 堆分配
+            let b = inner.as_bytes();
+            let d = |c: u8| -> Option<u32> { (c as char).to_digit(16) };
+            let r = d(b[0])?;
+            let g = d(b[1])?;
+            let bl = d(b[2])?;
+            // 每个 4-bit 数字复制到高低 nibble: 0xA → 0xAA
+            Some(r << 20 | r << 16 | g << 12 | g << 8 | bl << 4 | bl)
         }
         _ => None,
     }

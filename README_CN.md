@@ -20,12 +20,13 @@
 - 🧩 **Fragment 支持** - 使用 `<>...</>` 返回多个根元素
 - 🔁 **For 循环语法糖** - 使用 `{for item in iter { ... }}` 迭代
 - 🎨 **完整 Tailwind 色板** - 内置 242 种颜色 + 任意 hex 值
+- ⚡ **动态 Class** - 支持运行时 class 切换（约 58 个常用 class，见限制说明）
 
 ## 📚 文档资源
 
 - **[架构指南](./ARCHITECTURE_CN.md)** - 详细的架构文档
   - 模块组织和数据流
-  - 代码生成策略
+  - 代码生成策略（match 查找表、单次扫描、Vec 复用等）
   - 设计模式和测试方法
   - 扩展点和调试指南
 - **[快速入门](./docs/getting-started.md)** - 分步教程
@@ -395,7 +396,56 @@ rsx! {
 }
 ```
 
-### 9. 展开语法
+### 9. 动态 Class
+
+GPUI-RSX 同时支持静态和动态 `class` 属性。
+
+#### 静态 Class（编译期——推荐）
+
+```rust
+// ✅ 最佳性能 - 编译时解析，支持所有 class
+rsx! {
+    <div class="flex gap-4 bg-blue-500">
+        {"静态样式"}
+    </div>
+}
+```
+
+#### 动态 Class（运行时——有限制）
+
+```rust
+// ⚠️ 运行时仅支持约 58 个预编译的常用 class，其余静默忽略
+let classes = if is_active { "flex gap-4" } else { "block" };
+rsx! {
+    <div class={classes}>
+        {"动态样式"}
+    </div>
+}
+```
+
+> **重要限制：** 当 `class` 是运行时表达式时，仅约 58 个预编译的常用 class（flex、gap-1..gap-8、p-1..p-8、text-xl、rounded-md 等）会生效，不在列表中的 class 会被**静默忽略**。
+>
+> **推荐替代方案**（按优先级排序）：
+> 1. **字符串字面量**（最佳）：`class="flex gap-4"` — 编译期，支持所有 class
+> 2. **条件字面量**：`class={if active { "flex gap-4" } else { "block" }}` — 仍是字面量
+> 3. **独立属性**：`<div flex gap_4 />` — 编译期，类型检查
+> 4. **`when` 属性**：`when={(cond, |el| el.flex())}` — 编译期，完全灵活
+> 5. **动态表达式**：`class={expr}` — 运行时，约 58 个 class
+
+**常见模式：**
+
+```rust
+// ✅ 条件字面量（编译期，所有 class 均可用）
+let btn_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 text-black" };
+
+// ✅ when 属性（编译期，完全灵活）
+rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }
+
+// ⚠️ 动态字符串（仅常用 class 生效）
+let classes = format!("flex gap-{}", spacing);  // gap-4 可用；gap-32 可能不生效
+```
+
+### 10. 展开语法
 
 ```rust
 rsx! {
@@ -405,7 +455,7 @@ rsx! {
 }
 ```
 
-### 10. 属性映射参考
+### 11. 属性映射参考
 
 camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
 
@@ -439,7 +489,7 @@ camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
 
 不在此表中的属性将原样透传（如 `bg={color}` → `.bg(color)`）。
 
-### 11. 使用 `when` 和 `whenSome` 进行条件样式
+### 12. 使用 `when` 和 `whenSome` 进行条件样式
 
 #### when - 根据条件应用样式
 
@@ -487,7 +537,7 @@ rsx! {
 }
 ```
 
-### 12. styled 标志（默认标签样式）
+### 13. styled 标志（默认标签样式）
 
 `styled` 标志会根据标签名注入合理的默认样式：
 
@@ -666,15 +716,21 @@ GPUI-RSX 是一个**编译时宏**，展开后的代码与手写的 GPUI 代码�
 | 类型安全 | ✅ | ✅ |
 | 编译时检查 | ✅ | ✅ |
 
-### v0.2.1 优化亮点 ✨
+### v0.2.1 优化亮点
 
 **编译时性能：**
-- 颜色查找速度提升 15 倍（O(242) → O(8)，使用二分查找）
-- 带颜色的 class 属性宏展开更快
+- O(1) 颜色/属性/间距查找（`match` 跳转表，无线性扫描）
+- `generate_element` 单次属性扫描
+- 动态 class match 分支 thread_local 缓存（每进程只生成一次）
+
+**内存分配减少：**
+- `parse_class_string` 返回迭代器（无中间 `Vec`）
+- `generate_attr_methods` 直接推送到调用方缓冲区
+- `Cow<str>` 实现 class 名称转换（无连字符时零拷贝）
+- 全面使用 `Vec::with_capacity` 预分配
 
 **运行时性能：**
-- 静态元素数量场景下 `.children()` 零堆分配
-- 动态 class 字符串零拷贝（支持 `&str`、`String`、`Cow<str>`）
+- 动态 class 字符串通过 `AsRef<str>` 零拷贝传递（`&str` 无需分配）
 
 **二进制体积：**
 - 动态 class match 表通过 `#[inline(never)]` + LLVM ICF 去重
@@ -806,24 +862,25 @@ cargo expand --lib
 
 ### Q5: 可以使用动态 class 值吗？
 
-**可以！** 从 v0.2.0 开始，`class` 属性同时支持静态和动态值：
+可以，但有重要限制：
 
 ```rust
-// ✅ 静态（编译时，最佳性能）
+// ✅ 静态字面量（编译期，支持所有 class——推荐）
 rsx! { <div class="flex gap-4" /> }
 
-// ✅ 动态（运行时，完全灵活）
-let classes = if active { "flex gap-4" } else { "block" };
-rsx! { <div class={classes} /> }
-
-// ✅ 独立属性（针对特定属性）
+// ✅ 独立属性（编译期，类型检查）
 rsx! { <div bg={dynamic_color} flex /> }
 
-// ✅ 使用 `when` 进行条件样式
+// ✅ when 条件样式（编译期，完全灵活）
 rsx! { <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} /> }
+
+// ⚠️ 动态表达式（运行时，仅约 58 个常用 class 生效）
+let classes = if active { "flex gap-4" } else { "block" };
+rsx! { <div class={classes} /> }
+// 不在预编译列表中的 class 会被静默忽略。
 ```
 
-**性能提示：** 静态 class 具有零运行时开销（在编译时解析）。尽可能使用静态 class 以获得最佳性能。
+**建议：** 需要动态样式时，优先使用 `when`/`whenSome` 或独立值属性（如 `bg={color}`）——它们是编译期处理，支持所有 GPUI 提供的功能。
 
 ## 🤝 贡献
 

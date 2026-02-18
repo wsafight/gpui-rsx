@@ -32,6 +32,16 @@ fn get_cached_common_class_matches() -> Rc<Vec<TokenStream>> {
 ///
 /// 当 class 属性是动态表达式时，生成一个在运行时解析和应用 class 的闭包。
 ///
+/// # 重要限制：仅支持预定义 class 列表
+///
+/// **动态 class 只能识别 [`generate_common_class_matches`] 中预编译的 ~58 个常用 class。**
+/// 不在列表中的 class（如 `"w-32"`、`"text-orange-400"`、自定义 class）会被**静默忽略**。
+///
+/// 推荐方案（按性能从高到低）：
+/// 1. **字符串字面量**（最佳）：`class="flex gap-4"` → 编译期展开，支持所有 class
+/// 2. **条件表达式**（次佳）：`class={if active { "flex" } else { "block" }}` → 值仍为字面量，编译期处理
+/// 3. **动态表达式**（受限）：`class={dynamic_str}` → 仅支持预定义 class，其余静默丢弃
+///
 /// # 代码体积优化
 ///
 /// match 表被提取到 `#[inline(never)]` 泛型局部函数中，带来两个好处：
@@ -47,20 +57,19 @@ fn get_cached_common_class_matches() -> Rc<Vec<TokenStream>> {
 ///         match class {
 ///             "flex" => el.flex(),
 ///             "gap-4" => el.gap(px(4.0)),
-///             _ => el,
+///             _ => el,  // ← 不在预定义列表的 class 静默忽略
 ///         }
 ///     }
 ///     let __class_expr = <expression>;
 ///     let __class_str: &str = __class_expr.as_ref();
-///     __class_str.split_whitespace().fold(__el, __rsx_apply_class)
+///     // 空字符串快速路径（O(1) 跳过迭代器创建）
+///     if __class_str.is_empty() {
+///         __el
+///     } else {
+///         __class_str.split_ascii_whitespace().fold(__el, __rsx_apply_class)
+///     }
 /// }
 /// ```
-///
-/// # 性能说明
-///
-/// - 运行时解析比编译期解析慢
-/// - 建议优先使用字符串字面量以获得最佳性能
-/// - 对于少量条件变化，使用条件表达式: `if active { "flex" } else { "block" }`
 pub(crate) fn generate_dynamic_class_code(class_expr: &syn::Expr) -> TokenStream {
     let common_classes = get_cached_common_class_matches();
     let common_classes = &*common_classes;
@@ -74,13 +83,21 @@ pub(crate) fn generate_dynamic_class_code(class_expr: &syn::Expr) -> TokenStream
             fn __rsx_apply_class<E: Styled>(el: E, class: &str) -> E {
                 match class {
                     #(#common_classes)*
+                    // 不在预定义列表的 class 静默忽略。
+                    // 若需支持任意动态 class，请改用字符串字面量或条件表达式。
                     _ => el,
                 }
             }
             // AsRef<str>：&str、String、Cow<str> 均零拷贝通过
             let __class_expr = #class_expr;
             let __class_str: &str = __class_expr.as_ref();
-            __class_str.split_whitespace().fold(__el, __rsx_apply_class)
+            // 空字符串快速路径：跳过迭代器创建（常见于 class={if c { "flex" } else { "" }}）
+            // split_ascii_whitespace 比 split_whitespace 更快——class 名只含 ASCII 字符
+            if __class_str.is_empty() {
+                __el
+            } else {
+                __class_str.split_ascii_whitespace().fold(__el, __rsx_apply_class)
+            }
         }
     }
 }

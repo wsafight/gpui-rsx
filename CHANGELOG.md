@@ -7,55 +7,98 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.1] - 2026-02-17
+## [0.2.1] - 2026-02-18
 
 ### 🚀 Performance Optimizations
 
 #### Compile-time Performance
-- **Binary search for color lookup** - Replaced O(n) linear scan with O(log n) binary search in `lookup_color()`
-  - COLOR_MAP (242 entries) now sorted alphabetically
-  - Color lookups reduced from ~120 comparisons to ~8 comparisons
-  - Improves macro expansion speed when using class colors
+- **Match-based O(1) color lookup** - Replaced `COLOR_MAP` const array + `.iter().find()` linear
+  scan with a `match` statement in `lookup_color()`. The compiler generates an efficient jump
+  table/trie, reducing worst-case comparisons from O(242) to O(1).
+- **Match-based attribute / spacing / text-size lookups** - Same pattern applied to
+  `lookup_attr_method()`, `lookup_spacing_method()`, and `is_valid_text_size()`, replacing four
+  separate linear-scan arrays.
+- **Single-pass attribute scanning in `generate_element`** - `user_id`, `has_styled`, and
+  `needs_id` are now extracted in one loop instead of separate passes.
+- **Cached `Ident::to_string()` results** - Tag and attribute name strings are computed once and
+  reused within each code-generation call, avoiding repeated heap allocations.
 
 #### Runtime Performance
-- **Eliminated heap allocations in `.children()`** - Replaced `vec![]` with array literals `[...]` in:
-  - For-loop `flat_map()` expansions
-  - 3+ consecutive expression aggregation
-  - Reduces runtime allocations for static element counts
-- **Zero-copy dynamic class strings** - Changed from `String::into()` to `AsRef<str>`
-  - `&str` inputs now pass through without allocation
-  - Supports `&str`, `String`, `Cow<str>` efficiently
+- **Zero-copy dynamic class strings** - Changed from `String::into()` to `AsRef<str>`.
+  `&str` inputs pass through without any allocation; `String` and `Cow<str>` are also supported.
+- **`Vec` reuse for consecutive child expressions** - `consecutive_exprs` is allocated once
+  outside the loop and cleared with `.clear()` each iteration instead of being reallocated.
+- **`split_ascii_whitespace` for dynamic class parsing** - Generated class iteration now uses
+  `split_ascii_whitespace` instead of `split_whitespace`. Class names are ASCII-only, so this
+  avoids the Unicode whitespace scanning overhead of the standard iterator.
+- **Empty-string fast path for dynamic class** - An `is_empty()` guard before the fold skips
+  iterator creation entirely for empty strings — the common case in patterns like
+  `class={if cond { "flex" } else { "" }}`.
+
+#### Memory / Allocation Improvements
+- **`parse_class_string` returns an iterator** - Avoids an intermediate `Vec<TokenStream>`;
+  callers consume via `.extend()` directly into the output buffer.
+- **`generate_attr_methods` pushes directly into caller's `Vec`** - Eliminates one extra
+  `Vec` allocation per attribute list.
+- **`Vec::with_capacity` pre-allocation throughout** - Attribute lists, child lists, and method
+  chains pre-allocate with realistic capacity hints.
+- **`Cow<str>` for class string transformations** - Zero-copy borrow when the class name
+  contains no hyphens; only allocates when a `-` → `_` replacement is needed.
 
 #### Binary Size Optimization
-- **Deduplicated dynamic class match tables** - Extracted 40-arm match table into `#[inline(never)]` local function
-  - Multiple `class={expr}` in same component now share one function body
-  - LLVM ICF can merge identical monomorphizations across components
-  - Reduces code bloat from repeated match table inlining
+- **Dynamic class match table extracted to `#[inline(never)]` local function** - Multiple
+  `class={expr}` in the same component now share one function body. LLVM ICF can merge identical
+  single-monomorphisation instances across components, reducing code bloat from repeated match
+  table inlining.
+- **Thread-local cache for common class match arms** - `generate_common_class_matches()` is
+  called only once per compiler process (via `thread_local! + RefCell<Option<Rc<…>>>`). Shared
+  ownership via `Rc` keeps subsequent calls to `get_cached_common_class_matches()` at O(1).
 
 ### ♻️ Code Quality Improvements
-- **Simplified EVENT_HANDLERS table** - Reduced from 3-tuple to 2-tuple
-  - Removed redundant third field (method name always equals snake_case)
-  - Cleaner table structure, reduced maintenance burden
-- **Removed dead code** - Deleted deprecated `class_dynamic_value_error()` function
+- **Merged `EVENT_HANDLERS` and `ATTRIBUTE_NAME_MAP`** into a single `lookup_attr_method()`
+  match function, removing the redundant third tuple field (method name always equalled
+  snake_case).
+- **Unified color parsing** via `parse_color_with_method(color, method)` - Removed three
+  near-identical implementations (text_color / bg / border_color) into one function.
+- **`is_stateful_attr()` uses `starts_with` + `match`** instead of a two-step linear scan
+  through `NEEDS_ID_ATTRS` and `EVENT_HANDLERS` arrays.
+- **Removed dead code** - Deleted deprecated `class_dynamic_value_error()` diagnostic function.
+- **Fixed `generate_for_loop` type constraint** (`element.rs`) - Multi-child for-loop bodies
+  previously used a fixed-size array `[...]` in `flat_map`, which requires all elements to share
+  the same type. Changed to `vec![...]` to correctly support mixed element types (e.g., `div()`
+  alongside custom components) in the same for-loop body.
+- **Zero-allocation 3-char hex expansion** (`class.rs`) - `parse_arbitrary_hex` now expands
+  3-digit hex values (`[#rgb]` → `[#rrggbb]`) using bitwise arithmetic instead of allocating a
+  `String`. Each nibble is duplicated via `d << 4 | d` without any heap allocation.
+- **Refactored `border_` conditional logic** (`class.rs`) - Replaced the empty `if { }` +
+  `else if` pattern with an explicit `is_directional` binding and a single `if !is_directional`
+  guard, making the intent immediately clear without dead branches.
+- **Idiomatic tuple extraction in `parse_condition_tuple`** (`parser.rs`) - Replaced iterator
+  creation + two `.next().expect()` calls with `Punctuated::pop()`, which directly removes
+  elements by index without constructing an intermediate iterator.
 
-### 📊 Impact Summary
-
-| Category | Improvement | Files Changed |
-|----------|-------------|---------------|
-| Compile Speed | ~15x faster color lookups (O(242)→O(8)) | `tables.rs` |
-| Runtime Allocations | Eliminated vec! in .children() | `element.rs` |
-| Binary Size | Dynamic class match table deduplicated | `runtime.rs` |
-| Code Clarity | Simplified EVENT_HANDLERS schema | `tables.rs`, `attribute.rs` |
+### 📖 Documentation
+- **Dynamic class limitation now clearly documented** (`runtime.rs`) - The `generate_dynamic_class_code`
+  doc comment and the `_ => el` wildcard arm now both explicitly state that only the ~58 pre-compiled
+  common classes are recognised at runtime; unknown classes are silently ignored. Recommended
+  alternatives (literal strings, conditional expressions) are listed in priority order.
+- **`auto_id` counter incremental-compile caveat** (`element.rs`) - `AUTO_ID_COUNTER` and
+  `next_auto_id` now document the known limitation: because the thread-local counter increments
+  monotonically across all macro expansions in a single compile process, incremental rebuilds that
+  change which files are recompiled may produce different IDs for the same element. Elements that
+  rely on ID stability for focus/state tracking should use an explicit `id` attribute.
 
 ### ✅ Testing
 - All 236 tests pass (203 macro + 31 coverage + 2 diagnostic)
-- Zero regressions from optimization changes
+- Zero regressions from optimisation changes
 
 ### 🔒 Security
 - **Updated dependency** - Replaced unmaintained `proc-macro-error` with `proc-macro-error2`
   - Addresses RUSTSEC-2024-0370 advisory
   - Eliminates duplicate `syn 1.x` dependency tree
   - Fully compatible API (drop-in replacement)
+
+---
 
 ## [0.2.0] - 2026-02-17
 
@@ -67,83 +110,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Conditional styling** - `when` and `whenSome` attributes for dynamic styling
 - **Fragment support** - Return multiple root elements with `<>...</>` syntax
 - **Full Tailwind color palette** - 242 built-in colors (slate, gray, red, blue, etc.) + arbitrary hex values
-- **Comprehensive event handling** - Support for onClick, onMouseDown, onKeyDown, onHover, etc. (14 event types)
+- **Comprehensive event handling** - Support for onClick, onMouseDown, onKeyDown, onHover, etc. (15 event types)
 - **Attribute mapping** - camelCase to snake_case conversion (zIndex → z_index, fontSize → font_size, etc.)
 
 #### Documentation
-- 📖 **Complete documentation system**
-  - Getting Started guide (`docs/getting-started.md`)
-  - API Reference (`docs/api-reference.md`)
-  - Best Practices (`docs/best-practices.md`)
-  - Migration Guide (`docs/migration-guide.md`)
-  - Troubleshooting (`docs/troubleshooting.md`)
-- 📐 **Architecture documentation**
-  - Comprehensive architecture guide (`ARCHITECTURE.md`)
-  - Chinese architecture documentation (`ARCHITECTURE_CN.md`)
-  - Detailed module organization and data flow
-  - Code generation strategies and design patterns
-  - Extension points and debugging guide
-- 🌐 **English as primary README** - Switched README.md to English, moved Chinese to README_CN.md
+- Complete documentation system: Getting Started, API Reference, Best Practices, Migration Guide, Troubleshooting
+- Architecture documentation (`ARCHITECTURE.md` / `ARCHITECTURE_CN.md`)
+- English as primary README; Chinese moved to `README_CN.md`
 
 #### Infrastructure
-- ⚙️ **GitHub Actions workflows**
-  - CI pipeline (`.github/workflows/ci.yml`)
-  - GPUI compatibility testing (`.github/workflows/gpui-compatibility.yml`)
-  - Release automation (`.github/workflows/release.yml`)
-  - Code coverage tracking with Codecov
-- 📊 **Code Coverage**
-  - Local coverage script (`./coverage.sh`)
-  - Codecov integration in CI
-  - Coverage badges in README
-  - Target: 80%+ coverage
+- GitHub Actions CI, GPUI compatibility testing, and release automation workflows
+- Codecov integration and local coverage script
 
 #### Developer Experience
-- 🔧 Better error messages with `proc-macro-error` dependency
-- 📦 Updated repository URL to `https://github.com/wsafight/gpui-rsx`
-- ✅ Comprehensive test suite with 1200+ test cases
-
-### 🚀 Performance
-- Optimized parser for better compile-time performance
-- Improved code generation efficiency for `class` attribute expansion
-- Reduced allocations in for-loop syntax transformation
-
-### 📝 Documentation Improvements
-- Updated README with comprehensive examples
-- Added "Before & After" comparison showing ~50% code reduction
-- Documented all 14 event handlers
-- Added complete attribute mapping reference table
-- Included FAQ section with common questions
+- Better error messages via `proc-macro-error` dependency
+- Updated repository URL to `https://github.com/wsafight/gpui-rsx`
+- Comprehensive test suite
 
 ### 🐛 Fixed
-- **Auto ID injection for stateful events** - Added missing `onHover`/`on_hover`, `onDrag`/`on_drag`, `onDrop`/`on_drop` to `NEEDS_ID_ATTRS`, fixing cases where these event handlers would fail to compile without a manual `id` attribute
-  - Added 6 test cases to verify auto ID injection for these event handlers
-
-### 🔧 Enhancements
-- Parser improvements for better syntax support
-- Code generation optimizations in `src/codegen.rs`
-- Enhanced macro error reporting
-- Fixed 4 Clippy warnings about useless `vec!` usage in tests
+- **Auto ID injection for stateful events** - Added missing `onHover`/`on_hover`, `onDrag`/`on_drag`,
+  `onDrop`/`on_drop` to stateful attribute detection, fixing compile failures when these event
+  handlers were used without an explicit `id` attribute. Added 6 test cases to verify.
 
 ### ♻️ Refactored
-- **Deduplicated child-node parsing** - Extracted `try_parse_child_node()` in parser, eliminating duplicated logic between `parse_children()` and `parse_for_loop()` body parsing
-- **Deduplicated for-loop code generation** - Extracted `generate_for_loop()` in codegen, unifying the `map`/`flat_map` generation logic previously duplicated in `generate_node()` and `generate_children_methods()`
-- **Simplified color class parsing** - Replaced redundant `starts_with()` + `strip_prefix()` pattern with a single `strip_prefix()` call in `parse_color_class()`
+- **Deduplicated child-node parsing** - Extracted `try_parse_child_node()`, eliminating duplicated
+  logic between `parse_children()` and `parse_for_loop()`.
+- **Deduplicated for-loop code generation** - Extracted `generate_for_loop()`, unifying
+  `map`/`flat_map` generation logic.
+- **Simplified color class parsing** - Replaced redundant `starts_with()` + `strip_prefix()`
+  with a single `strip_prefix()` call.
 
 ### 🗑️ Removed
-- Removed `examples/` directory (counter.rs, todo_app.rs)
-  - Examples required external GPUI dependency
-  - Core functionality fully covered by 203 macro expansion tests
-- Removed trybuild compile tests
-  - Simplified test structure
-  - Eliminated `trybuild` dev-dependency
-  - Focus on comprehensive macro expansion testing
+- `examples/` directory (required external GPUI dependency; functionality covered by tests)
+- `trybuild` compile-fail tests (simplified test structure)
 
-### 🛠️ Internal
-- Improved project structure and organization
-- Updated Cargo.toml keywords and categories
-- Updated documentation to remove references to removed examples
-- Cleaned up CONTRIBUTING.md test instructions
-- Streamlined project structure
+---
 
 ## [0.1.2] - 2026-02-16
 

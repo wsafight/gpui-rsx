@@ -40,20 +40,24 @@ GPUI-RSX is a procedural macro that provides JSX-like syntax for the GPUI UI fra
 │  │   tables.rs  │  │   class.rs   │  │ attribute.rs │         │
 │  │ (Lookups)    │◄─┤ (Parsing)    │◄─┤ (Methods)    │         │
 │  └──────────────┘  └──────────────┘  └──────────────┘         │
-│                                              │                  │
-│                         ┌────────────────────┘                  │
-│                         │                                       │
-│                         ▼                                       │
-│                  ┌──────────────┐                               │
-│                  │  element.rs  │                               │
-│                  │ (Generation) │                               │
-│                  └──────────────┘                               │
+│                          │                   │                  │
+│                          └─────────┬─────────┘                  │
+│                                    ▼                            │
+│                  ┌──────────────────────────┐                   │
+│                  │  element.rs (Generation) │                   │
+│                  └────────────┬─────────────┘                   │
+│                               │                                 │
+│              ┌────────────────┘                                 │
+│              ▼                                                   │
+│  ┌──────────────────┐                                           │
+│  │   runtime.rs     │  (dynamic class only)                     │
+│  └──────────────────┘                                           │
 └────────────────────────┬────────────────────────────────────────┘
                          │
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                    Generated GPUI Code                          │
-│  div().id("auto_0").flex().gap(px(4.0)).on_click(handler).child│
+│  div().id("__rsx_div_0").flex().gap(px(4.0)).on_click(handler) │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -61,14 +65,16 @@ GPUI-RSX is a procedural macro that provides JSX-like syntax for the GPUI UI fra
 
 ```
 src/
-├── lib.rs                     (124 lines)  - Macro entry point
-├── parser.rs                  (371 lines)  - RSX → AST
+├── lib.rs                     (~123 lines) - Macro entry point
+├── parser.rs                  (~311 lines) - RSX → AST
+├── diagnostics.rs             (~110 lines) - Error messages
 └── codegen/
-    ├── mod.rs                 (~20 lines)  - Module orchestration
-    ├── tables.rs              (~450 lines) - Static lookup tables
-    ├── class.rs               (~150 lines) - CSS class parsing
-    ├── attribute.rs           (~80 lines)  - Attribute → method
-    └── element.rs             (~230 lines) - Element generation
+    ├── mod.rs                 (~24 lines)  - Module orchestration
+    ├── tables.rs              (~417 lines) - O(1) match-based lookup tables
+    ├── class.rs               (~151 lines) - CSS class parsing
+    ├── attribute.rs           (~79 lines)  - Attribute → method
+    ├── element.rs             (~250 lines) - Element generation + auto ID
+    └── runtime.rs             (~170 lines) - Dynamic class code generation
 ```
 
 ### Module Responsibilities
@@ -77,10 +83,12 @@ src/
 |--------|---------|--------------|---------------|
 | `lib.rs` | Macro entry point | `parser`, `codegen` | `rsx!` macro |
 | `parser.rs` | RSX syntax parsing | `syn`, `quote` | `parse()`, AST types |
-| `codegen/tables.rs` | Const tables | None | `lookup_color()` |
+| `diagnostics.rs` | Error messages | `syn` | span-aware error constructors |
+| `codegen/tables.rs` | O(1) match lookups | None | `lookup_color()`, `lookup_attr_method()` |
 | `codegen/class.rs` | Class parsing | `tables` | `parse_class_string()`, `parse_color_with_method()` |
-| `codegen/attribute.rs` | Attribute processing | `tables`, `class` | `generate_attr_methods()` |
+| `codegen/attribute.rs` | Attribute processing | `tables`, `class`, `runtime` | `generate_attr_methods()` |
 | `codegen/element.rs` | Element generation | All above | `generate_body()`, `generate_element()` |
+| `codegen/runtime.rs` | Dynamic class gen | `class` | `generate_dynamic_class_code()` |
 
 ## Data Flow
 
@@ -122,13 +130,15 @@ RsxBody::Single(
 
 ### 3. Code Generation Phase
 
-**Step 3a**: Element base construction
+**Step 3a**: Single-pass attribute scan extracts `user_id`, `has_styled`, `needs_id`
 
 ```rust
-generate_base() → div().id("__rsx_div_a1b2c3d4")
+// needs_id = true because onClick is stateful
+// → auto ID injected
+generate_base() → div().id("__rsx_div_0")
 ```
 
-**Step 3b**: Class parsing (with deduplication)
+**Step 3b**: Class parsing — string literal → compile-time expansion
 
 ```rust
 parse_class_string("flex gap-4 bg-blue-500") → [
@@ -154,7 +164,7 @@ generate_children_methods([Expr("Hello")]) → .child("Hello")
 
 ```rust
 div()
-    .id("__rsx_div_a1b2c3d4")
+    .id("__rsx_div_0")
     .flex()
     .gap(px(4.0))
     .bg(rgb(0x3b82f6))
@@ -183,230 +193,272 @@ div()
 
 ### Code Generator (codegen/)
 
-#### tables.rs - Foundation
+#### tables.rs — O(1) Lookup Foundation
 
-**Purpose**: Central source of truth for all mappings
+**Purpose**: Central source of truth for all compile-time mappings.
 
-**Contents**:
-- `COLOR_MAP`: 242 Tailwind colors (slate, gray, ... rose)
-- `EVENT_HANDLERS`: 14 event mappings (onClick → on_click)
-- `ATTRIBUTE_NAME_MAP`: 30+ camelCase → snake_case
-- `TAG_DEFAULT_STYLES`: 11 semantic tag defaults
-- `SPACING_PATTERNS`: 17 spacing/sizing prefixes
-- `VALID_TEXT_SIZES`: 9 text size variants
-- `lookup_color()`: Fast color table search
+**All lookups use `match` statements** — the compiler generates efficient jump tables or trie
+structures, giving O(1) worst-case performance without any runtime initialisation cost.
 
-**Design**: Zero dependencies, pure const data
+**Functions**:
 
-#### class.rs - Deduplication
+| Function | Entries | Description |
+|----------|---------|-------------|
+| `lookup_color(name)` | 242 | Full Tailwind palette (all shades + black/white) |
+| `lookup_attr_method(name)` | 15 events + 30+ attrs | camelCase/snake_case → GPUI method |
+| `lookup_spacing_method(prefix)` | 17 | `"gap_"`, `"px_"`, … → GPUI method name |
+| `is_valid_text_size(size)` | 9 | `"xs"` … `"5xl"` whitelist |
+| `lookup_tag_default(tag)` | 11 | Semantic default class strings |
+| `is_stateful_attr(name)` | — | `starts_with("on_")` + explicit match |
 
-**Purpose**: Parse class strings into method calls
+**Design**: Zero dependencies, pure functions, no heap allocation.
 
-**Key Innovation**: `parse_color_with_method()`
+#### class.rs — Class String Parsing
 
-**Before refactoring** (duplicated 3 times):
-```rust
-// text_color
-if let Some(color) = class.strip_prefix("text_") {
-    for &(color_name, color_value) in COLOR_MAP {
-        if color == color_name {
-            return Some(quote! { .text_color(rgb(#color_value)) });
-        }
-    }
-}
+**Purpose**: Parse Tailwind-style class strings into GPUI method call `TokenStream`s.
 
-// bg (same logic repeated)
-// border_color (same logic repeated again)
-```
+**Key Innovations**:
 
-**After refactoring** (unified):
-```rust
-fn parse_color_with_method(color: &str, method: &str) -> Option<TokenStream> {
-    // 1. Try color table
-    if let Some(hex) = lookup_color(color) {
-        let ident = syn::Ident::new(method, Span::call_site());
-        return Some(quote! { .#ident(rgb(#hex)) });
-    }
-    // 2. Try arbitrary hex
-    if let Some(hex) = parse_arbitrary_hex(color) {
-        let ident = syn::Ident::new(method, Span::call_site());
-        return Some(quote! { .#ident(rgb(#hex)) });
-    }
-    None
-}
+1. **Unified `parse_color_with_method(color, method)`** — shared by `text_color`, `bg`,
+   and `border_color` paths, eliminating three near-identical implementations.
 
-// Usage
-parse_color_with_method(color, "text_color")
-parse_color_with_method(color, "bg")
-parse_color_with_method(color, "border_color")
-```
+2. **Prefix lookup via `rfind('_') + match`** — O(1) spacing prefix detection without
+   scanning the full string.
 
-**Benefits**:
-- DRY: 3 implementations → 1
-- Maintainability: Single point of change
-- Consistency: All colors handled identically
+3. **Zero-allocation 3-digit hex expansion** — `[#abc]` → `0xaabbcc` via bitwise
+   nibble duplication, no `String` allocated.
+
+4. **`Cow<str>` for `-` → `_` conversion** — borrows the original slice when no
+   hyphens are present; only allocates on replacement.
 
 **Supported Patterns**:
 - Named colors: `text-red-500` → `.text_color(rgb(0xef4444))`
-- Arbitrary hex: `bg-[#ff0000]` → `.bg(rgb(0xff0000))`
-- Short hex: `text-[#f00]` → `.text_color(rgb(0xff0000))`
+- Arbitrary hex 6-digit: `bg-[#ff0000]` → `.bg(rgb(0xff0000))`
+- Arbitrary hex 3-digit: `text-[#f00]` → `.text_color(rgb(0xff0000))`
 - Spacing: `gap-4` → `.gap(px(4.0))`
 - Text sizes: `text-xl` → `.text_xl()`
+- Border: `border` → `.border_1()`, `border-2` → `.border_2()`
 
-#### attribute.rs - Mapping
+#### attribute.rs — Attribute-to-Method Mapping
 
-**Purpose**: RSX attributes → GPUI methods
+**Purpose**: RSX attributes → GPUI method call `TokenStream`s
 
 **Attribute Types**:
 1. **Flag**: `<div flex />` → `.flex()`
 2. **Value**: `<div width={100} />` → `.w(100)`
-3. **Class**: `<div class="flex" />` → `.flex()`
-4. **Events**: `<div onClick={h} />` → `.on_click(h)`
-5. **Conditional**: `<div when={cond, |el| el.flex()} />` → `.when(cond, |el| el.flex())`
+3. **Class (static)**: `<div class="flex" />` → `.flex()` (compile-time)
+4. **Class (dynamic)**: `<div class={expr} />` → runtime match via `runtime.rs`
+5. **Events**: `<div onClick={h} />` → `.on_click(h)`
+6. **Conditional**: `<div when={(cond, |el| el.flex())} />` → `.when(cond, …)`
 
 **Special Cases**:
 - `invisible` → `.visible(false)`
-- `styled` → Inject tag defaults (processed in element.rs)
-- `id` → Skip (handled in element.rs base generation)
-- `class` → Must be string literal (no dynamic values)
+- `styled` → Inject tag defaults (processed in `element.rs` before user attrs)
+- `id` → Skipped here; handled in `element.rs` base generation
 
-#### element.rs - Generation
+#### element.rs — Orchestration and Generation
 
-**Purpose**: Orchestrate all code generation
+**Purpose**: Orchestrate all code generation into a complete method chain.
 
 **Key Concepts**:
 
-1. **Method Chaining**: GPUI uses fluent API
+1. **Method Chaining** — GPUI uses a fluent API where each method returns `Self` (or a
+   new type after `.id()`):
    ```rust
    div().flex().gap(px(4.0)).child(...)
    ```
 
-2. **Type Transformations**: `.id()` changes type
+2. **Type Transformation** — `.id()` changes the return type:
    ```rust
    Div → Stateful<Div>
    ```
+   Generated code must chain `.id()` before any stateful method.
 
-3. **Auto ID Injection**: Events require stateful elements
+3. **Single-Pass Attribute Scan** — `user_id`, `has_styled`, and `needs_id` are all
+   extracted in one loop before any code is emitted:
+   ```rust
+   for attr in &element.attributes {
+       match attr {
+           RsxAttribute::Value { name, value } if name == "id" => user_id = Some(value),
+           RsxAttribute::Flag(name) if name == "styled" => has_styled = true,
+           RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
+               if !needs_id { needs_id = is_stateful_attr(&name.to_string()); }
+           }
+           _ => {}
+       }
+   }
+   ```
+
+4. **Auto ID Injection** — Elements with stateful attributes receive a deterministic ID:
    ```rust
    <div onClick={h} />
    ↓
-   div().id("__rsx_div_a1b2c3d4").on_click(h)
+   div().id("__rsx_div_0").on_click(h)
    ```
 
-4. **Child Aggregation**: Optimize consecutive children
+5. **Child Aggregation** — 3+ consecutive `Expr` children are batched:
    ```rust
-   // 3+ expressions
-   .children(vec![expr1, expr2, expr3])
-   // vs
+   // 3+ consecutive expressions → single .children([...])
+   .children([expr1, expr2, expr3])
+
+   // < 3 → individual .child() calls
    .child(expr1).child(expr2)
    ```
 
-5. **Default Styles**: `styled` flag injects semantics
+6. **For-loop Code Generation** — Single child uses `.map()`; multiple children use
+   `.flat_map()` with `vec![]` to support mixed element types:
    ```rust
-   <h1 styled>{"Title"}</h1>
-   ↓
-   div().text_3xl().font_bold().child("Title")
+   // Single child
+   (iter).into_iter().map(|binding| child_expr)
+
+   // Multiple children (vec! allows different element types)
+   (iter).into_iter().flat_map(|binding| vec![child1, child2])
    ```
 
-**Auto ID Algorithm**:
+**Auto ID Counter**:
 ```rust
-fn next_auto_id(tag: &str, attrs: &[Attr]) -> String {
-    let mut hasher = DefaultHasher::new();
-    tag.hash(&mut hasher);
-    for attr in attrs {
-        attr.name.hash(&mut hasher);
+// Thread-local counter; increments monotonically per compile process.
+// Known limitation: incremental builds may change expansion order,
+// producing different IDs. Use explicit `id` for state-sensitive elements.
+thread_local! {
+    static AUTO_ID_COUNTER: Cell<usize> = const { Cell::new(0) };
+}
+
+fn next_auto_id(tag: &str) -> String {
+    AUTO_ID_COUNTER.with(|c| {
+        let n = c.get();
+        c.set(n + 1);
+        format!("__rsx_{tag}_{n}")
+    })
+}
+```
+
+#### runtime.rs — Dynamic Class Code Generation
+
+**Purpose**: Generate runtime code for `class={expression}` attributes.
+
+**Important Limitation**: Only the ~58 pre-compiled common classes are recognised at
+runtime. Unknown classes are **silently ignored**. Prefer static string literals for
+full class support.
+
+**Pre-compiled common classes** (selected examples):
+```
+flex, flex-col, flex-row, flex-1, items-center, justify-center,
+gap-1..gap-8, p-1..p-8, px-2, px-4, py-1..py-4, m-2, m-4,
+w-full, h-full, text-xs..text-3xl, font-bold, border, rounded-*,
+cursor-pointer, overflow-hidden, bg-white, bg-black, …
+```
+
+**Generated code pattern**:
+```rust
+{
+    #[inline(never)]  // prevents match table inlining; enables LLVM ICF
+    fn __rsx_apply_class<E: Styled>(el: E, class: &str) -> E {
+        match class {
+            "flex" => el.flex(),
+            "gap-4" => el.gap(px(4.0)),
+            // … ~58 pre-compiled classes …
+            _ => el,  // unknown class → silently ignored
+        }
     }
-    let counter = AUTO_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-    counter.hash(&mut hasher);
-    format!("__rsx_{tag}_{:x}", hasher.finish())
+    let __class_expr = <expression>;
+    let __class_str: &str = __class_expr.as_ref();  // zero-copy for &str
+    __class_str.split_whitespace().fold(__el, __rsx_apply_class)
 }
 ```
 
 ## Design Patterns
 
-### 1. Compile-Time Tables
+### 1. Match-Based O(1) Lookup Tables
 
-**Pattern**: `const` lookup tables instead of runtime hashmaps
+**Pattern**: `match` statements inside pure functions instead of runtime hashmaps or
+linear-scan const arrays.
 
 ```rust
-const COLOR_MAP: &[(&str, u32)] = &[
-    ("red_500", 0xef4444),
-    // ...
-];
-
-fn lookup_color(name: &str) -> Option<u32> {
-    COLOR_MAP.iter().find(|(n, _)| *n == name).map(|(_, v)| *v)
+pub(crate) fn lookup_color(name: &str) -> Option<u32> {
+    match name {
+        "red_500" => Some(0xef4444),
+        "blue_500" => Some(0x3b82f6),
+        // … 242 entries …
+        _ => None,
+    }
 }
 ```
 
-**Benefits**:
-- Zero runtime cost
-- No allocations
-- Binary size efficient (string interning)
+The Rust compiler generates an efficient jump table or trie for these match statements,
+giving O(1) lookup with no runtime initialisation and zero heap allocation.
 
 ### 2. Recursive Descent Parsing
 
-**Pattern**: Each syntax construct has a dedicated parser
+**Pattern**: Each syntax construct implements `syn::parse::Parse`
 
 ```rust
 impl Parse for RsxBody {
     fn parse(input: ParseStream) -> Result<Self> {
-        if input.peek(Token![<]) {
-            if input.peek2(Token![>]) {
-                // Fragment
-            } else {
-                // Single element
-            }
+        if input.peek(Token![<]) && input.peek2(Token![>]) {
+            // Fragment <>...</>
+        } else {
+            // Single element
         }
     }
 }
 ```
 
-### 3. Token Streaming
+### 3. Token Streaming — Push to Caller
 
-**Pattern**: Generate `TokenStream` incrementally
+**Pattern**: Generate `TokenStream` incrementally; attribute methods push directly into
+the caller's `Vec` to avoid intermediate allocations.
 
 ```rust
-let mut methods = Vec::new();
-methods.push(quote! { .flex() });
-methods.push(quote! { .gap(px(4.0)) });
-quote! { div() #(#methods)* }
+pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStream>) {
+    // ... push directly into `out`, no intermediate Vec
+    out.push(quote! { .flex() });
+}
 ```
-
-**Benefits**:
-- Composable
-- Type-safe
-- Preserves span information for errors
 
 ### 4. Method Chain Building
 
-**Pattern**: Generate fluent API calls
+**Pattern**: Generate fluent API calls, not mutation-style assignments.
 
 ```rust
-// WRONG: Mutation pattern
+// WRONG: mutation pattern (breaks when .id() changes type)
 let mut el = div();
 el = el.flex();
-el = el.gap(px(4.0));
 
-// RIGHT: Method chain
+// CORRECT: method chain
 div().flex().gap(px(4.0))
 ```
 
-**Why**: GPUI methods often change type (`.id()` returns `Stateful<T>`)
+**Why**: GPUI's `.id()` returns `Stateful<T>`, a different type. Chaining is the only
+correct pattern.
+
+### 5. Thread-Local Caching for Proc-Macro Context
+
+**Pattern**: `thread_local! + Cell/RefCell` for state that must be shared across macro
+invocations in the same compilation unit.
+
+```rust
+// proc macro runs single-threaded; thread_local is correct and cheaper than AtomicUsize
+thread_local! {
+    static AUTO_ID_COUNTER: Cell<usize> = const { Cell::new(0) };
+    static COMMON_CLASS_MATCHES: RefCell<Option<Rc<Vec<TokenStream>>>> = ...;
+}
+```
 
 ## Testing Strategy
 
 ### Test Pyramid
 
 ```
-                   ┌──────────────┐
-                   │ Integration  │  Examples (manual)
-                   │   Tests      │
-                   └──────────────┘
-                  ┌────────────────┐
-                  │  Macro Tests   │  203 expansion tests
-                  │                │
-                  └────────────────┘
+               ┌──────────────────┐
+               │ diagnostic_tests │  2 compile-error format tests
+               └──────────────────┘
+              ┌────────────────────┐
+              │  coverage_tests    │  31 edge case / behaviour tests
+              └────────────────────┘
+            ┌──────────────────────┐
+            │    macro_tests       │  203 expansion correctness tests
+            └──────────────────────┘
 ```
 
 ### Macro Tests (tests/macro_tests.rs)
@@ -414,25 +466,21 @@ div().flex().gap(px(4.0))
 **Coverage**: 203 test cases
 
 **Categories**:
-- Elements (29): Tags, nesting, self-closing
+- Elements (29): Tags, nesting, self-closing, special tags
 - Attributes (45): Flags, values, camelCase/snake_case
-- Events (18): All 14 event handlers
-- Styling (32): Classes, colors, spacing
-- Children (24): Expr, spread, for loops
+- Events (18): All 15 event handlers + auto ID
+- Styling (32): Classes, colors, spacing, border
+- Children (24): Expr, spread, for loops, aggregation
 - Conditional (12): when, whenSome
-- Edge cases (43): Auto IDs (including onHover/onDrag/onDrop), styled tags, fragments
+- Edge cases (43): Auto IDs, styled tags, fragments, invisible
 
 **Pattern**:
 ```rust
 #[test]
 fn test_feature() {
-    let expanded = quote! {
-        rsx! { <div class="flex" /> }
-    };
-    let expected = quote! {
-        div().flex()
-    };
-    assert_eq!(expanded.to_string(), expected.to_string());
+    let result = quote! { rsx! { <div class="flex" /> } };
+    let expected = quote! { div().flex() };
+    assert_eq!(result.to_string(), expected.to_string());
 }
 ```
 
@@ -440,107 +488,132 @@ fn test_feature() {
 
 ### Adding New Colors
 
-**File**: `src/codegen/tables.rs`
+**File**: `src/codegen/tables.rs` → `lookup_color()`
 
+Add a new match arm:
 ```rust
-const COLOR_MAP: &[(&str, u32)] = &[
-    // ...existing colors...
-    ("my_custom_500", 0xabcdef),  // Add here
-];
+pub(crate) fn lookup_color(name: &str) -> Option<u32> {
+    match name {
+        // …existing colors…
+        "my_brand_500" => Some(0xabcdef),  // add here
+        _ => None,
+    }
+}
 ```
 
-**Usage**: `class="text-my-custom-500"` → `.text_color(rgb(0xabcdef))`
+**Usage**: `class="text-my-brand-500"` → `.text_color(rgb(0xabcdef))`
 
-### Adding New Attributes
+### Adding New Attribute Mappings
 
-**File**: `src/codegen/tables.rs`
+**File**: `src/codegen/tables.rs` → `lookup_attr_method()`
 
 ```rust
-const ATTRIBUTE_NAME_MAP: &[(&str, &str)] = &[
-    // ...existing mappings...
-    ("customAttr", "custom_attr"),  // Add here
-];
+pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
+    match name {
+        // …existing mappings…
+        "customAttr" | "custom_attr" => Some("custom_attr"),  // add here
+        _ => None,
+    }
+}
 ```
 
 **Usage**: `<div customAttr={value} />` → `.custom_attr(value)`
 
 ### Adding New Event Handlers
 
-**File**: `src/codegen/tables.rs`
+**File**: `src/codegen/tables.rs` — two changes needed:
+
+1. Add to `lookup_attr_method()`:
+   ```rust
+   "onCustom" | "on_custom" => Some("on_custom"),
+   ```
+
+2. If the event requires stateful element (`.id()`), also update `is_stateful_attr()`:
+   ```rust
+   pub(crate) fn is_stateful_attr(name: &str) -> bool {
+       // on_ prefix already handled; add explicit names for camelCase:
+       matches!(name, "hover" | "active" | … | "onCustom")
+   }
+   ```
+
+### Adding New Spacing Prefixes
+
+**File**: `src/codegen/tables.rs` → `lookup_spacing_method()`
 
 ```rust
-const EVENT_HANDLERS: &[(&str, &str, &str)] = &[
-    // ...existing handlers...
-    ("onCustom", "on_custom", "on_custom"),  // Add here
-];
+pub(crate) fn lookup_spacing_method(prefix: &str) -> Option<&'static str> {
+    match prefix {
+        // …existing prefixes…
+        "inset_" => Some("inset"),  // add here
+        _ => None,
+    }
+}
 ```
 
-**Usage**: `<div onCustom={h} />` → `.on_custom(h)` (with auto ID)
+**Usage**: `class="inset-4"` → `.inset(px(4.0))`
 
-### Adding New Spacing Patterns
+### Adding New Tag Default Styles
 
-**File**: `src/codegen/tables.rs`
+**File**: `src/codegen/tables.rs` → `lookup_tag_default()`
 
 ```rust
-const SPACING_PATTERNS: &[(&str, &str)] = &[
-    // ...existing patterns...
-    ("custom_", "custom"),  // Add here
-];
+pub(crate) fn lookup_tag_default(tag: &str) -> Option<&'static str> {
+    match tag {
+        // …existing defaults…
+        "nav" => Some("flex items-center"),  // add here
+        _ => None,
+    }
+}
 ```
 
-**Usage**: `class="custom-4"` → `.custom(px(4.0))`
+**Usage**: `<nav styled />` → `div().flex().items_center()`
 
-### Adding New Default Styles
+### Adding Common Dynamic Classes
 
-**File**: `src/codegen/tables.rs`
+**File**: `src/codegen/runtime.rs` → `generate_common_class_matches()`
 
 ```rust
-const TAG_DEFAULT_STYLES: &[(&str, &str)] = &[
-    // ...existing defaults...
-    ("myTag", "flex gap-2"),  // Add here
+let common_classes = [
+    // …existing classes…
+    "my-custom-class",  // add here; will be pre-compiled into the match table
 ];
 ```
-
-**Usage**: `<myTag styled />` → `myTag().flex().gap(px(2.0))`
 
 ## Performance Considerations
 
 ### Compile Time
 
-**Optimizations**:
-1. **Const tables**: No runtime initialization
-2. **Linear lookups**: Small tables (< 500 entries)
-3. **No allocations**: Stack-based parsing
-4. **Minimal cloning**: TokenStream reuse
-
-**Benchmarks**: ~0.1s for 1000 element macro expansion
+**Macro-expansion optimisations**:
+1. **O(1) match lookups** — all tables use `match`, no linear scans
+2. **Single-pass attribute scanning** — `generate_element` extracts all info in one loop
+3. **Cached `Ident::to_string()`** — string conversion per call site, not per match arm
+4. **Iterator returns** — `parse_class_string` returns an iterator, not a `Vec`
+5. **Direct Vec push** — `generate_attr_methods` pushes into caller's buffer
+6. **`Vec::with_capacity` pre-allocation** — realistic capacity hints throughout
+7. **Thread-local caching** — common class match arms generated once per process
 
 ### Runtime
 
-**Zero cost**:
-- No reflection
-- No string parsing
-- No dynamic dispatch
-- Identical to handwritten GPUI code
-
-**Generated code**:
+**Zero cost** — the generated GPUI code is identical to hand-written code:
 ```rust
 // RSX
-rsx! { <div class="flex" /> }
+rsx! { <div class="flex gap-4" onClick={handler} /> }
 
-// Handwritten (identical after monomorphization)
-div().flex()
+// Generated (identical to handwritten after monomorphisation)
+div().id("__rsx_div_0").flex().gap(px(4.0)).on_click(handler)
 ```
+
+No reflection, no string parsing, no dynamic dispatch at runtime.
+
+**Dynamic class exception** — `class={expression}` generates a runtime `fold` + `match`.
+Use static string literals for zero-overhead styling.
 
 ### Binary Size
 
-**Impact**: Minimal
-
-**Why**:
 - No runtime library
-- String literals interned
-- Method calls inlined
-- Dead code eliminated
+- String literals interned by the linker
+- `#[inline(never)]` on dynamic class helper prevents match table duplication
+- LLVM ICF merges identical monomorphisations across components
 
 ## Debugging Guide
 
@@ -550,80 +623,72 @@ div().flex()
 # Install cargo-expand
 cargo install cargo-expand
 
-# View expanded macro
+# View all expanded macros
 cargo expand --lib
 
 # Specific test
-cargo expand --test macro_tests --tests test_name
+cargo test test_name -- --nocapture
 ```
 
 ### Understanding Errors
 
-**Compile error**:
+**Common pattern**:
 ```
 error[E0599]: no method named `flex_col` found for struct `Div`
 ```
 
-**Diagnosis**: Typo in class name (`flex-col` vs `flex_col`)
+**Diagnosis**: Typo in class name — the class `flex-col` is not in the pre-compiled list
+and is being passed as a method name literally.
 
-**Fix**: Use correct Tailwind class `flex-col`
-
-### Testing Changes
-
-**Workflow**:
-1. Modify code in `src/codegen/`
-2. Run `cargo test --test macro_tests`
-3. Check specific test: `cargo test test_name`
-4. View expansion: `cargo expand --test macro_tests`
-5. Compare: `diff <(cargo expand) expected.rs`
+**Fix**: Check the class name spelling and confirm it is in the supported list.
 
 ### Common Issues
 
 | Error | Cause | Fix |
 |-------|-------|-----|
-| "no method named X" | Invalid GPUI method | Check GPUI docs |
-| "mismatched types" | `.id()` type change | Verify auto ID insertion |
-| "expected struct `Div`" | Missing auto ID | Check `NEEDS_ID_ATTRS` |
-| "cannot find value" | Scope issue | Check expression escaping |
+| `no method named X` | Invalid GPUI method name | Check GPUI docs |
+| `mismatched types` | `.id()` type change not handled | Verify auto ID is injected |
+| Dynamic class not applied | Class not in ~58 common list | Use static string literal |
+| Auto ID changes on rebuild | Incremental compile order change | Add explicit `id` attribute |
+| `expected &str, found String` | Wrong type passed to `class={}` | Use `.as_str()` or a literal |
+
+### Testing Changes
+
+**Workflow**:
+1. Modify code in `src/codegen/`
+2. Run `cargo test` (all 236 tests)
+3. Check a specific test: `cargo test test_name`
+4. View generated code: `cargo expand --test macro_tests`
 
 ## Future Improvements
 
 ### Short Term
 
-1. **Component support**: `<MyComponent prop={value} />`
-2. **Ref handling**: `ref={my_ref}`
-3. **More Tailwind utilities**: Shadows, transforms, animations
-4. **Custom color palette**: User-defined colors
+1. **More dynamic class coverage** — expand the ~58 pre-compiled class list based on usage data
+2. **Compile-time warning for unknown classes** — emit a `proc_macro_warning` for unrecognised
+   static class names
+3. **More Tailwind utilities** — shadows, transforms, animations
+4. **Custom color palette** — user-defined color tokens
 
 ### Medium Term
 
-1. **LSP integration**: Autocomplete for classes
-2. **Compile-time validation**: Warn on unknown classes
-3. **Hot reload**: Fast iteration during development
-4. **Source maps**: Better error locations
+1. **LSP integration** — autocomplete for class names and attributes
+2. **Snapshot tests** — generated code regression detection via `insta`
+3. **Source maps** — better error locations pointing into RSX syntax
+4. **`trybuild` compile-fail tests** — restore error-message validation
 
 ### Long Term
 
-1. **Theme system**: Dark mode, color schemes
-2. **Responsive design**: `class="md:flex lg:grid"`
-3. **Accessibility**: ARIA attributes, semantic HTML
-4. **Performance profiling**: Macro expansion metrics
+1. **Theme system** — dark mode, CSS custom properties
+2. **Responsive design** — `class="md:flex lg:grid"`
+3. **Accessibility** — ARIA attributes, semantic HTML
+4. **Performance profiling** — macro expansion metrics with `criterion`
 
 ## Migration Guide
 
 ### From 0.1.x to 0.2.x
 
 **Breaking changes**: None (internal refactoring only)
-
-**Verification**:
-```bash
-# Same output guaranteed
-cargo expand --lib > before.rs
-# Upgrade
-cargo update -p gpui-rsx
-cargo expand --lib > after.rs
-diff before.rs after.rs  # Should be empty
-```
 
 ### From Handwritten GPUI
 
@@ -646,11 +711,7 @@ rsx! {
 }
 ```
 
-**Benefits**:
-- 40% less code
-- HTML-like structure
-- Tailwind familiarity
-- Same performance
+**Benefits**: ~50% less code, HTML-like structure, Tailwind familiarity, identical performance.
 
 ## References
 
@@ -669,14 +730,11 @@ rsx! {
 
 ### Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Code style guidelines
-- PR process
-- Testing requirements
-- Release procedure
+See [CONTRIBUTING.md](CONTRIBUTING.md) for code style guidelines, PR process, testing
+requirements, and release procedure.
 
 ---
 
-**Last Updated**: 2026-02-17
-**Version**: 0.2.0
+**Last Updated**: 2026-02-18
+**Version**: 0.2.1 (+ unreleased fixes)
 **Maintainers**: @wangshian

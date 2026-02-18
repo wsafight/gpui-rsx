@@ -19,10 +19,20 @@ use super::tables::{is_stateful_attr, lookup_tag_default};
 use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::cell::Cell;
 
-/// 编译期自动 ID 计数器（每次宏展开递增，保证唯一）
-static AUTO_ID_COUNTER: AtomicUsize = AtomicUsize::new(0);
+// 编译期自动 ID 计数器（每次宏展开递增，保证唯一）
+//
+// proc macro 运行在单线程环境中，使用 `thread_local! + Cell` 替代 `AtomicUsize`，
+// 语义更准确且无原子操作开销。
+//
+// 已知限制：增量编译下的 ID 稳定性
+// 计数器在单次编译进程中单调递增。若增量编译只重新处理部分文件，
+// 宏展开顺序可能改变，导致自动生成的 ID 与上次编译不同。
+// 对于依赖 ID 做焦点/状态追踪的元素，建议显式指定 `id` 属性以保证稳定性。
+thread_local! {
+    static AUTO_ID_COUNTER: Cell<usize> = const { Cell::new(0) };
+}
 
 
 /// 生成 GPUI 代码（入口）
@@ -63,13 +73,16 @@ fn generate_node(node: &RsxNode) -> TokenStream {
 /// 生成 for 循环的迭代器代码
 ///
 /// 单个子节点 → `.map()`，多个子节点 → `.flat_map()` + `vec![]`
+///
+/// 多子节点使用 `vec![]` 而非数组 `[...]`：数组要求所有元素同类型，
+/// 当 body 中混合不同元素类型时（如 `div()` 和自定义组件）会产生类型错误。
 fn generate_for_loop(binding: &syn::Pat, iter: &syn::Expr, body: &[RsxNode]) -> TokenStream {
     let body_exprs: Vec<TokenStream> = body.iter().map(generate_node).collect();
     if body_exprs.len() == 1 {
         let single = &body_exprs[0];
         quote! { (#iter).into_iter().map(|#binding| #single) }
     } else {
-        quote! { (#iter).into_iter().flat_map(|#binding| [#(#body_exprs),*]) }
+        quote! { (#iter).into_iter().flat_map(|#binding| vec![#(#body_exprs),*]) }
     }
 }
 
@@ -119,6 +132,11 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
     } else {
         tag
     };
+
+    // 快速路径：无属性且无子节点时直接返回基础元素
+    if element.attributes.is_empty() && element.children.is_empty() {
+        return base;
+    }
 
     // 预分配方法链容量（属性数 + 子节点数的估计值）
     let mut methods: Vec<TokenStream> =
@@ -223,8 +241,12 @@ fn generate_tag(tag_str: &str, name: &syn::Ident) -> TokenStream {
 /// 生成确定性自动 ID 字符串
 ///
 /// 使用全局计数器 + 标签名生成唯一 ID，替代原先的 SipHash 计算。
-/// 计数器在单次编译过程中保证唯一性。
+/// 计数器在单次编译过程中保证唯一性，但在增量编译下可能因展开顺序变化而改变。
+/// 若元素的状态追踪依赖稳定 ID，请在 RSX 中显式指定 `id` 属性。
 fn next_auto_id(tag: &str) -> String {
-    let n = AUTO_ID_COUNTER.fetch_add(1, Ordering::Relaxed);
-    format!("__rsx_{tag}_{n}")
+    AUTO_ID_COUNTER.with(|c| {
+        let n = c.get();
+        c.set(n + 1);
+        format!("__rsx_{tag}_{n}")
+    })
 }
