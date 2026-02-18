@@ -8,8 +8,10 @@
 //! 核心优化：
 //! - 统一的颜色解析函数，避免代码重复
 //! - 间距前缀使用 rfind + match（O(1)）替代线性扫描（O(17)）
+//! - text_ 前缀只做一次 strip_prefix，颜色与文本大小分支合并处理
 //! - 文本大小使用 match 替代 contains 线性查找
 //! - 单遍 `-` → `_` 替换（直接 replace，无需预检 contains）
+//! - split_ascii_whitespace 替代 split_whitespace（class 名只含 ASCII）
 
 use super::tables::*;
 use proc_macro2::{Span, TokenStream};
@@ -22,7 +24,7 @@ use std::borrow::Cow;
 ///
 /// 返回迭代器而非 Vec，调用方通过 `extend` 消费时避免中间 Vec 分配。
 pub(crate) fn parse_class_string(class_str: &str) -> impl Iterator<Item = TokenStream> + '_ {
-    class_str.split_whitespace().map(parse_single_class)
+    class_str.split_ascii_whitespace().map(parse_single_class)
 }
 
 /// 解析单个 CSS class 为方法调用
@@ -75,39 +77,31 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
         }
     }
 
-    // 颜色类：text-red-600, bg-blue-500 → .text_color(rgb(...)), .bg(rgb(...))
-    if let Some(color_code) = parse_color_class(&method_name) {
-        return color_code;
-    }
-
-    // 文本大小类：text-xl → .text_xl()（使用 match 替代线性查找）
-    #[allow(clippy::collapsible_if)]
-    if let Some(size) = method_name.strip_prefix("text_") {
-        if is_valid_text_size(size) {
+    // text_ 前缀：统一处理颜色类（text-red-600）和文本大小类（text-xl）
+    // 只做一次 strip_prefix("text_")，避免先在颜色分支、再在大小分支各做一次。
+    if let Some(rest) = method_name.strip_prefix("text_") {
+        // 先查颜色表（text-red-500 → .text_color(rgb(...))）
+        if let Some(token) = parse_color_with_method(rest, "text_color") {
+            return token;
+        }
+        // 再查文本大小（text-xl → .text_xl()）
+        if is_valid_text_size(rest) {
             let size_ident = syn::Ident::new(&method_name, Span::call_site());
             return quote! { .#size_ident() };
         }
         // 不在白名单中的 text_ 前缀，fall through 到默认处理
     }
 
+    // bg_ 颜色类：bg-blue-500 → .bg(rgb(...))
+    if let Some(rest) = method_name.strip_prefix("bg_") {
+        if let Some(token) = parse_color_with_method(rest, "bg") {
+            return token;
+        }
+    }
+
     // 默认：无参方法调用
     let ident = syn::Ident::new(&method_name, Span::call_site());
     quote! { .#ident() }
-}
-
-/// 解析颜色 class（先分离前缀，再查表）
-///
-/// 使用统一的 `parse_color_with_method` 函数，避免重复代码。
-fn parse_color_class(class: &str) -> Option<TokenStream> {
-    if let Some(color) = class.strip_prefix("text_") {
-        return parse_color_with_method(color, "text_color");
-    }
-
-    if let Some(color) = class.strip_prefix("bg_") {
-        return parse_color_with_method(color, "bg");
-    }
-
-    None
 }
 
 /// 统一的颜色解析函数（核心去重逻辑）

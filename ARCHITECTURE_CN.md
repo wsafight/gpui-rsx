@@ -70,11 +70,11 @@ src/
 ├── diagnostics.rs             (~110 行)  - 错误消息
 └── codegen/
     ├── mod.rs                 (~24 行)   - 模块协调
-    ├── tables.rs              (~417 行)  - O(1) match 查找表
-    ├── class.rs               (~151 行)  - CSS class 解析
+    ├── tables.rs              (~421 行)  - O(1) match 查找表
+    ├── class.rs               (~147 行)  - CSS class 解析
     ├── attribute.rs           (~79 行)   - 属性 → 方法
-    ├── element.rs             (~250 行)  - 元素生成 + 自动 ID
-    └── runtime.rs             (~170 行)  - 动态 class 代码生成
+    ├── element.rs             (~254 行)  - 元素生成 + 自动 ID
+    └── runtime.rs             (~188 行)  - 动态 class 代码生成
 ```
 
 ### 模块职责
@@ -219,15 +219,47 @@ div()
 
 **关键创新**：
 
-1. **统一的 `parse_color_with_method(color, method)`** — 被 `text_color`、`bg`、
+1. **`split_ascii_whitespace` 替代 `split_whitespace`** — CSS class 名只含 ASCII，
+   跳过 Unicode 空白字符扫描，每个词元边界少一次表查询。
+
+   ```rust
+   // parse_class_string
+   class_str.split_ascii_whitespace().map(parse_single_class)
+   ```
+
+2. **合并 `text_` 前缀处理** — 颜色分支和文本大小分支统一在一次 `strip_prefix("text_")`
+   下处理。之前 `parse_color_class` 和大小分支各做一次相同的前缀剥离，对所有
+   `text-*` class 造成冗余操作。`parse_color_class` 函数已删除。
+
+   ```rust
+   // 之前（text-xl、text-red-500 等各做两次 strip_prefix）：
+   if let Some(color_code) = parse_color_class(&method_name) { return color_code; }
+   if let Some(size) = method_name.strip_prefix("text_") { … }
+
+   // 之后（一次 strip_prefix，两个分支）：
+   if let Some(rest) = method_name.strip_prefix("text_") {
+       if let Some(token) = parse_color_with_method(rest, "text_color") {
+           return token;                                 // text-red-500 → .text_color(rgb(...))
+       }
+       if is_valid_text_size(rest) {
+           let size_ident = syn::Ident::new(&method_name, Span::call_site());
+           return quote! { .#size_ident() };            // text-xl → .text_xl()
+       }
+   }
+   if let Some(rest) = method_name.strip_prefix("bg_") {
+       if let Some(token) = parse_color_with_method(rest, "bg") { return token; }
+   }
+   ```
+
+3. **统一的 `parse_color_with_method(color, method)`** — 被 `text_color`、`bg`、
    `border_color` 三条路径共享，消除了三个近乎相同的实现。
 
-2. **`rfind('_') + match` 前缀查找** — O(1) 间距前缀检测，无需扫描完整字符串。
+4. **`rfind('_') + match` 前缀查找** — O(1) 间距前缀检测，无需扫描完整字符串。
 
-3. **零堆分配 3 位 hex 展开** — `[#abc]` → `0xaabbcc` 通过位运算半字节复制实现，
+5. **零堆分配 3 位 hex 展开** — `[#abc]` → `0xaabbcc` 通过位运算半字节复制实现，
    不分配任何 `String`。
 
-4. **`Cow<str>` 实现 `-` → `_` 转换** — 不含连字符时零拷贝借用；仅在需要替换时分配。
+6. **`Cow<str>` 实现 `-` → `_` 转换** — 不含连字符时零拷贝借用；仅在需要替换时分配。
 
 **支持的模式**：
 - 命名颜色：`text-red-500` → `.text_color(rgb(0xef4444))`
@@ -271,7 +303,36 @@ div()
    ```
    生成代码必须在任何有状态方法前链式调用 `.id()`。
 
-3. **单次属性扫描** — `user_id`、`has_styled`、`needs_id` 在一次循环中提取：
+3. **空元素提前快速路径** — 无属性且无子节点时，在属性扫描循环执行之前直接返回，
+   跳过所有变量初始化和 `base` 构建。快速路径被提前到函数最前面：
+
+   ```rust
+   // 之前：快速路径在循环之后（循环仍做了变量初始化）
+   // 之后：函数第一件事就是检查
+   pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
+       let tag_str = element.name.to_string();
+
+       if element.attributes.is_empty() && element.children.is_empty() {
+           return generate_tag(&tag_str, &element.name);  // ← 在此直接返回
+       }
+
+       // … 只有有属性或子节点时才进入属性扫描 …
+   }
+   ```
+
+4. **`Vec::with_capacity` 容量高估** — 方法缓冲区由 `attrs + children` 改为
+   `attrs * 2 + children`。一个 `class` 属性最多展开 3-4 个方法调用（如
+   `"flex flex-col gap-4"` → 3 个），乘以 2 可将 class 密集元素的重分配次数减半：
+
+   ```rust
+   // 之前：class 属性展开时容易不足
+   Vec::with_capacity(element.attributes.len() + element.children.len())
+
+   // 之后：预留 class 展开空间
+   Vec::with_capacity(element.attributes.len() * 2 + element.children.len())
+   ```
+
+5. **单次属性扫描** — `user_id`、`has_styled`、`needs_id` 在一次循环中提取：
    ```rust
    for attr in &element.attributes {
        match attr {
@@ -285,23 +346,40 @@ div()
    }
    ```
 
-4. **自动 ID 注入** — 含有状态属性的元素自动获得确定性 ID：
+6. **自动 ID 注入** — 含有状态属性的元素自动获得确定性 ID：
    ```rust
    <div onClick={h} />
    ↓
    div().id("__rsx_div_0").on_click(h)
    ```
 
-5. **子节点聚合** — 3+ 个连续 `Expr` 子节点批量处理：
-   ```rust
-   // 3+ 个连续表达式 → 单次 .children([...])
-   .children([expr1, expr2, expr3])
+7. **子节点聚合** — 2+ 个连续 `Expr` 子节点批量合并为单次 `.children([...])` 调用，
+   数组是栈分配，比多次 `.child()` 方法分派更高效。阈值由 3 降为 2：
 
-   // < 3 → 独立 .child() 调用
-   .child(expr1).child(expr2)
+   ```rust
+   // 2+ 个连续表达式 → 单次 .children([...])，栈分配数组
+   .children([expr1, expr2])
+
+   // 1 个 → 独立 .child() 调用
+   .child(expr1)
    ```
 
-6. **for 循环代码生成** — 单子节点用 `.map()`；多子节点用 `.flat_map()` + `vec![]`
+   `generate_children_methods` 中的改动：
+   ```rust
+   // 之前：阈值为 3
+   if consecutive_exprs.len() >= 3 {
+
+   // 之后：阈值为 2（数组栈分配，无额外开销）
+   if consecutive_exprs.len() >= 2 {
+       methods.push(quote! { .children([#(#consecutive_exprs),*]) });
+   } else {
+       for expr in &consecutive_exprs {
+           methods.push(quote! { .child(#expr) });
+       }
+   }
+   ```
+
+8. **for 循环代码生成** — 单子节点用 `.map()`；多子节点用 `.flat_map()` + `vec![]`
    以支持混合元素类型：
    ```rust
    // 单个子节点
@@ -358,7 +436,12 @@ cursor-pointer, overflow-hidden, bg-white, bg-black, …
     }
     let __class_expr = <expression>;
     let __class_str: &str = __class_expr.as_ref();  // &str 零拷贝
-    __class_str.split_whitespace().fold(__el, __rsx_apply_class)
+    // split_ascii_whitespace：class 名只含 ASCII，比 split_whitespace 更快
+    if __class_str.is_empty() {
+        __el                                         // 快速路径：跳过迭代器创建
+    } else {
+        __class_str.split_ascii_whitespace().fold(__el, __rsx_apply_class)
+    }
 }
 ```
 
@@ -574,15 +657,89 @@ let common_classes = [
 ### 编译时
 
 **宏展开优化**：
-1. **O(1) match 查找** — 所有表使用 `match`，无线性扫描
-2. **单次属性扫描** — `generate_element` 在一次循环中提取所有信息
-3. **缓存 `Ident::to_string()`** — 每次调用时字符串转换一次
-4. **返回迭代器** — `parse_class_string` 返回迭代器，不分配 `Vec`
-5. **直接 Vec push** — `generate_attr_methods` 推送到调用方缓冲区
-6. **`Vec::with_capacity` 预分配** — 全面使用合理容量提示
-7. **thread_local 缓存** — 常用 class match 分支每进程只生成一次
 
-### 运行时
+| # | 位置 | 技术 | 收益 |
+|---|------|------|------|
+| 1 | `tables.rs` | 颜色、方法、间距均用 O(1) `match` 查找 | 无线性扫描；编译器生成跳转表/trie |
+| 2 | `element.rs` | 属性扫描循环之前的空元素快速路径 | 空元素跳过所有变量初始化和循环入口 |
+| 3 | `element.rs` | 单次属性扫描（`user_id`、`has_styled`、`needs_id`） | 一次遍历而非三次 |
+| 4 | `element.rs` | `Vec::with_capacity(attrs * 2 + children)` | 减少 class 密集元素的重分配次数 |
+| 5 | `class.rs` | `split_ascii_whitespace` 替代 `split_whitespace` | 跳过 Unicode 空白扫描；class 名只含 ASCII |
+| 6 | `class.rs` | 合并 `text_` 前缀处理（单次 `strip_prefix`） | 消除每个 `text-*` class 的冗余前缀剥离 |
+| 7 | `class.rs` | `Cow<str>` 实现 `-` → `_` 转换 | 无连字符时零拷贝借用，按需分配 |
+| 8 | `class.rs` | `rfind('_') + match` 间距前缀查找 | O(1) 前缀检测，替代 O(17) 线性扫描 |
+| 9 | `attribute.rs` | 直接推送到调用方 `Vec` | 每个属性无中间 `Vec` 分配 |
+| 10 | `runtime.rs` | thread_local `Rc` 缓存常用 class match 分支 | 每进程只生成一次；`Rc::clone` 为 O(1) |
+
+**关键优化详解**：
+
+**#2 — 空元素快速路径** (`element.rs`)：
+```rust
+pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
+    let tag_str = element.name.to_string();
+    // 快速路径：裸标签如 <div /> 跳过所有扫描
+    if element.attributes.is_empty() && element.children.is_empty() {
+        return generate_tag(&tag_str, &element.name);
+    }
+    // … 其余生成逻辑 …
+}
+```
+
+**#4 — 容量高估** (`element.rs`)：
+```rust
+// 之前：class 属性展开时容量不足
+Vec::with_capacity(element.attributes.len() + element.children.len())
+
+// 之后：预留 class 展开空间（每个 class 属性平均展开 3-4 个方法）
+Vec::with_capacity(element.attributes.len() * 2 + element.children.len())
+```
+
+**#5 + #6 — ASCII 分割与合并 `text_` 前缀** (`class.rs`)：
+```rust
+pub(crate) fn parse_class_string(class_str: &str) -> impl Iterator<Item = TokenStream> + '_ {
+    class_str.split_ascii_whitespace().map(parse_single_class)
+    //        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    //        只含 ASCII：无需 Unicode 空白字符表查询
+}
+
+pub(crate) fn parse_single_class(class: &str) -> TokenStream {
+    // … 间距、border 处理 … 然后：
+
+    // 单次 strip_prefix("text_") 同时覆盖颜色和大小两种情况
+    if let Some(rest) = method_name.strip_prefix("text_") {
+        if let Some(token) = parse_color_with_method(rest, "text_color") {
+            return token;                            // text-red-500 → .text_color(rgb(...))
+        }
+        if is_valid_text_size(rest) {
+            return quote! { .#size_ident() };        // text-xl → .text_xl()
+        }
+    }
+    if let Some(rest) = method_name.strip_prefix("bg_") {
+        if let Some(token) = parse_color_with_method(rest, "bg") {
+            return token;                            // bg-blue-500 → .bg(rgb(...))
+        }
+    }
+    // 默认：无参方法调用
+}
+```
+
+### 运行时（生成代码质量）
+
+**子节点聚合阈值** (`element.rs`)：
+
+连续 2+ 个 `Expr` 子节点合并为 `.children([...])` 调用（栈分配数组），
+而非逐一 `.child()` 调用，减少方法分派次数：
+
+```rust
+// 1 个表达式 → 独立调用
+.child(expr1)
+
+// 2+ 个表达式 → 数组批量，无堆分配，方法分派次数更少
+.children([expr1, expr2])
+.children([expr1, expr2, expr3])
+```
+
+阈值由 3 降为 2，因为 `[T; N]` 数组是栈分配，无额外开销。
 
 **零成本** — 生成的 GPUI 代码与手写代码完全相同：
 ```rust
@@ -598,12 +755,20 @@ div().id("__rsx_div_0").flex().gap(px(4.0)).on_click(handler)
 **动态 class 例外** — `class={expression}` 生成运行时 `fold` + `match`。
 如需零开销样式，使用静态字符串字面量。
 
-### 二进制体积
+### 二进制体积（proc-macro）
 
-- 无运行时库
+- 无运行时库链接进用户二进制
 - 字符串字面量由链接器内联
 - 动态 class 辅助函数用 `#[inline(never)]` 防止 match 表重复
 - LLVM ICF 跨组件合并相同的单态化实例
+- `panic = "abort"` 移除 proc-macro 二进制中的展开表，减小体积并降低加载开销：
+
+  ```toml
+  [profile.release]
+  lto = true
+  codegen-units = 1
+  panic = "abort"   # proc-macro 不需要栈展开
+  ```
 
 ## 调试指南
 
@@ -723,5 +888,16 @@ rsx! {
 ---
 
 **最后更新**：2026-02-18
-**版本**：0.2.1（+ 未发布修复）
+**版本**：0.2.1
 **维护者**：@wangshian
+
+### 优化变更记录
+
+| 日期 | 文件 | 改动 |
+|------|------|------|
+| 2026-02-18 | `class.rs` | `split_whitespace` → `split_ascii_whitespace` |
+| 2026-02-18 | `class.rs` | 合并 `text_` 前缀处理；删除 `parse_color_class` |
+| 2026-02-18 | `element.rs` | 空元素快速路径移至属性扫描循环之前 |
+| 2026-02-18 | `element.rs` | `Vec::with_capacity`：`attrs + children` → `attrs * 2 + children` |
+| 2026-02-18 | `element.rs` | `.children([...])` 聚合阈值：3 → 2 |
+| 2026-02-18 | `Cargo.toml` | `[profile.release]` 增加 `panic = "abort"` |

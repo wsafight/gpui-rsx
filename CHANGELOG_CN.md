@@ -7,6 +7,39 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.2.2] - 2026-02-18
+
+### 🚀 性能优化
+
+#### 编译时性能
+- **`parse_class_string` 改用 `split_ascii_whitespace`** - class 名只含 ASCII 字符，将
+  `split_whitespace` 替换为 `split_ascii_whitespace`，跳过每个词元边界处的 Unicode 空白
+  字符表查询。
+- **统一 `text_` 前缀处理** - 删除 `parse_color_class` 函数。颜色查找（`text-red-500`）
+  和文本大小查找（`text-xl`）现在统一在 `parse_single_class` 的单次 `strip_prefix("text_")`
+  下处理，消除了每个 `text-*` class 的冗余前缀剥离操作。
+- **空元素提前快速路径** - `generate_element` 中的"无属性且无子节点"检查现在是函数的第一步，
+  在任何变量初始化或循环入口之前执行。像 `<Icon />` 这样的裸自闭合标签可直接返回，无需扫描属性。
+- **`Vec::with_capacity` 容量估算增大** - `generate_element` 中的方法缓冲区预分配从
+  `attributes.len() + children.len()` 改为 `attributes.len() * 2 + children.len()`。
+  单个 `class` 属性通常展开为 3-4 个方法调用，×2 系数可将 class 密集元素的预期重分配次数
+  减半。
+
+#### 运行时性能（生成代码质量）
+- **`.children([...])` 聚合阈值 3 → 2** - 2 个及以上连续 `Expr` 子节点现在合并为单次
+  `.children([...])` 调用，底层使用栈分配数组。数组无堆分配开销，原阈值 3 过于保守；改为 2
+  可在保持相同栈占用的前提下减少方法分派次数。
+
+#### 二进制体积
+- **`[profile.release]` 增加 `panic = "abort"`** - proc-macro 二进制不需要栈展开。启用
+  `panic = "abort"` 可从编译产物中移除展开表，减小二进制体积并降低宿主端编译时的加载开销。
+
+### ✅ 测试
+- 全部 236 个测试通过（203 宏测试 + 31 覆盖率测试 + 2 诊断测试）
+- 零回归
+
+---
+
 ## [0.2.1] - 2026-02-18
 
 ### 🚀 性能优化
@@ -159,6 +192,7 @@
 
 ---
 
+[0.2.2]: https://github.com/wsafight/gpui-rsx/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wsafight/gpui-rsx/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wsafight/gpui-rsx/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/wsafight/gpui-rsx/compare/v0.1.1...v0.1.2

@@ -24,6 +24,20 @@ fn test_class_whitespace_only() {
 }
 
 #[test]
+fn test_class_leading_trailing_whitespace() {
+    // 首尾空白应被 split_ascii_whitespace 丢弃，仍能正确解析中间的 class
+    // "  flex gap-4  " → .flex().gap(px(4.0))
+    let _el = rsx! { <div class="  flex gap-4  ">{"leading trailing"}</div> };
+}
+
+#[test]
+fn test_class_consecutive_spaces() {
+    // class 名之间的多个连续空格应视为单一分隔符
+    // "flex    gap-4" → .flex().gap(px(4.0))
+    let _el = rsx! { <div class="flex    gap-4">{"consecutive spaces"}</div> };
+}
+
+#[test]
 fn test_class_hex_uppercase() {
     // Hex 颜色大写
     let _el = rsx! { <div class="bg-[#FF00FF]">{"Uppercase hex"}</div> };
@@ -33,6 +47,13 @@ fn test_class_hex_uppercase() {
 fn test_class_hex_mixed_case() {
     // Hex 颜色混合大小写
     let _el = rsx! { <div class="bg-[#FfAa00]">{"Mixed case hex"}</div> };
+}
+
+#[test]
+fn test_class_spacing_zero() {
+    // 间距类值为 0：suffix.parse::<f32>() 对 "0" 应返回 Ok(0.0)
+    // p-0 → .p(px(0.0))，m-0 → .m(px(0.0))，gap-0 → .gap(px(0.0))
+    let _el = rsx! { <div class="p-0 m-0 gap-0">{"zero spacing"}</div> };
 }
 
 #[test]
@@ -390,5 +411,20 @@ fn test_for_loop_tuple_destructuring() {
                 <div>{format!("{}: {}", num, name)}</div>
             }}
         </div>
+    };
+}
+
+#[test]
+fn test_for_loop_multiple_body_nodes() {
+    // for 循环体内有 2 个子节点时触发 flat_map 路径（generate_for_loop 中 body_exprs.len() > 1）
+    // 生成：(items).into_iter().flat_map(|item| vec![child1, child2])
+    let items = ["a", "b", "c"];
+    let _el = rsx! {
+        <ul>
+            {for item in items {
+                <li>{"label"}</li>
+                <li>{item}</li>
+            }}
+        </ul>
     };
 }

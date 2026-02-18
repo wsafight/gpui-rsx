@@ -34,7 +34,6 @@ thread_local! {
     static AUTO_ID_COUNTER: Cell<usize> = const { Cell::new(0) };
 }
 
-
 /// 生成 GPUI 代码（入口）
 ///
 /// 将解析后的 RSX AST 转换为 GPUI 的类型安全代码。
@@ -98,6 +97,11 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
     // 缓存标签名字符串，避免多次 to_string() 堆分配
     let tag_str = element.name.to_string();
 
+    // 快速路径：无属性且无子节点时，跳过所有扫描直接返回基础标签
+    if element.attributes.is_empty() && element.children.is_empty() {
+        return generate_tag(&tag_str, &element.name);
+    }
+
     // 单次遍历提取所有需要的信息
     let mut user_id = None;
     let mut has_styled = false;
@@ -133,14 +137,11 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
         tag
     };
 
-    // 快速路径：无属性且无子节点时直接返回基础元素
-    if element.attributes.is_empty() && element.children.is_empty() {
-        return base;
-    }
-
-    // 预分配方法链容量（属性数 + 子节点数的估计值）
+    // 预分配方法链容量：
+    // - 每个属性乘以 2（class 属性平均展开 3-4 个方法，其余属性 1 个）
+    // - 加上子节点数
     let mut methods: Vec<TokenStream> =
-        Vec::with_capacity(element.attributes.len() + element.children.len());
+        Vec::with_capacity(element.attributes.len() * 2 + element.children.len());
 
     // styled 标志 → 注入标签默认样式（在用户属性之前）
     if has_styled {
@@ -162,7 +163,8 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
 
 /// 生成子节点的方法链片段
 ///
-/// 当连续 3+ 个 Expr 子节点时，合并为单个 `.children([...])` 调用。
+/// 当连续 2+ 个 Expr 子节点时，合并为单个 `.children([...])` 调用。
+/// 数组字面量是栈分配，比多次 `.child()` 调用减少方法 dispatch 次数。
 /// `consecutive_exprs` 在循环外分配，每轮用 `.clear()` 复用，减少堆分配。
 fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream>) {
     let mut i = 0;
@@ -180,8 +182,8 @@ fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream
             }
         }
 
-        // 3 个及以上连续 Expr → .children([...])，用数组避免堆分配
-        if consecutive_exprs.len() >= 3 {
+        // 2 个及以上连续 Expr → .children([...])，用数组（栈分配）替代多次 .child()
+        if consecutive_exprs.len() >= 2 {
             methods.push(quote! { .children([#(#consecutive_exprs),*]) });
         } else {
             for expr in &consecutive_exprs {

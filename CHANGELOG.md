@@ -7,6 +7,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.2] - 2026-02-18
+
+### 🚀 Performance Optimizations
+
+#### Compile-time Performance
+- **`split_ascii_whitespace` in `parse_class_string`** - Class names are ASCII-only; replaced
+  `split_whitespace` with `split_ascii_whitespace` to skip Unicode whitespace table lookups at
+  every token boundary.
+- **Unified `text_` prefix handling** - `parse_color_class` has been removed. Color lookup
+  (`text-red-500`) and text-size lookup (`text-xl`) are now handled under a single
+  `strip_prefix("text_")` call in `parse_single_class`, eliminating a redundant prefix strip for
+  every `text-*` class.
+- **Early fast-path for empty elements** - The "no attributes, no children" check in
+  `generate_element` is now the very first operation, before any variable initialisation or loop
+  entry. Bare self-closing tags like `<Icon />` return immediately without scanning attributes.
+- **Larger `Vec::with_capacity` estimate** - The method buffer in `generate_element` now
+  pre-allocates `attributes.len() * 2 + children.len()` instead of `attributes.len() +
+  children.len()`. A single `class` attribute typically expands to 3-4 method calls, so the
+  ×2 multiplier halves expected reallocation events on class-heavy elements.
+
+#### Runtime Performance (Generated Code)
+- **`.children([...])` aggregation threshold lowered 3 → 2** - Two or more consecutive `Expr`
+  children are now batched into a single `.children([...])` call backed by a stack-allocated
+  array. Arrays carry no heap-allocation cost, so the threshold of 3 was unnecessarily
+  conservative; 2 reduces method dispatch count while keeping the same stack footprint.
+
+#### Binary Size
+- **`panic = "abort"` in `[profile.release]`** - proc-macro binaries never need stack
+  unwinding. Enabling `panic = "abort"` removes unwind tables from the compiled binary,
+  reducing its size and load time during host-side compilation.
+
+### ✅ Testing
+- All 236 tests pass (203 macro + 31 coverage + 2 diagnostic)
+- Zero regressions
+
+---
+
 ## [0.2.1] - 2026-02-18
 
 ### 🚀 Performance Optimizations
@@ -171,6 +208,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.2.2]: https://github.com/wsafight/gpui-rsx/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wsafight/gpui-rsx/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wsafight/gpui-rsx/compare/v0.1.2...v0.2.0
 [0.1.2]: https://github.com/wsafight/gpui-rsx/compare/v0.1.1...v0.1.2

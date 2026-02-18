@@ -70,11 +70,11 @@ src/
 ├── diagnostics.rs             (~110 lines) - Error messages
 └── codegen/
     ├── mod.rs                 (~24 lines)  - Module orchestration
-    ├── tables.rs              (~417 lines) - O(1) match-based lookup tables
-    ├── class.rs               (~151 lines) - CSS class parsing
+    ├── tables.rs              (~421 lines) - O(1) match-based lookup tables
+    ├── class.rs               (~147 lines) - CSS class parsing
     ├── attribute.rs           (~79 lines)  - Attribute → method
-    ├── element.rs             (~250 lines) - Element generation + auto ID
-    └── runtime.rs             (~170 lines) - Dynamic class code generation
+    ├── element.rs             (~254 lines) - Element generation + auto ID
+    └── runtime.rs             (~188 lines) - Dynamic class code generation
 ```
 
 ### Module Responsibilities
@@ -219,16 +219,50 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
 
 **Key Innovations**:
 
-1. **Unified `parse_color_with_method(color, method)`** — shared by `text_color`, `bg`,
+1. **`split_ascii_whitespace` over `split_whitespace`** — CSS class names are always
+   ASCII; skipping Unicode whitespace detection shaves one check per token boundary.
+
+   ```rust
+   // parse_class_string
+   class_str.split_ascii_whitespace().map(parse_single_class)
+   ```
+
+2. **Unified `text_` prefix handling** — `text_color` and text-size paths are merged
+   under a single `strip_prefix("text_")` call; previously `parse_color_class` and the
+   size check each did their own strip, doubling work for every `text-*` class.
+
+   ```rust
+   // Before (two separate strip_prefix calls for text-xl, text-red-500, …):
+   if let Some(color_code) = parse_color_class(&method_name) { return color_code; }
+   if let Some(size) = method_name.strip_prefix("text_") { … }
+
+   // After (one strip_prefix, two branches):
+   if let Some(rest) = method_name.strip_prefix("text_") {
+       if let Some(token) = parse_color_with_method(rest, "text_color") {
+           return token;                                 // text-red-500 etc.
+       }
+       if is_valid_text_size(rest) {
+           let size_ident = syn::Ident::new(&method_name, Span::call_site());
+           return quote! { .#size_ident() };            // text-xl etc.
+       }
+   }
+   if let Some(rest) = method_name.strip_prefix("bg_") {
+       if let Some(token) = parse_color_with_method(rest, "bg") { return token; }
+   }
+   ```
+
+   `parse_color_class` has been removed; its logic is now inlined above.
+
+3. **Unified `parse_color_with_method(color, method)`** — shared by `text_color`, `bg`,
    and `border_color` paths, eliminating three near-identical implementations.
 
-2. **Prefix lookup via `rfind('_') + match`** — O(1) spacing prefix detection without
+4. **Prefix lookup via `rfind('_') + match`** — O(1) spacing prefix detection without
    scanning the full string.
 
-3. **Zero-allocation 3-digit hex expansion** — `[#abc]` → `0xaabbcc` via bitwise
+5. **Zero-allocation 3-digit hex expansion** — `[#abc]` → `0xaabbcc` via bitwise
    nibble duplication, no `String` allocated.
 
-4. **`Cow<str>` for `-` → `_` conversion** — borrows the original slice when no
+6. **`Cow<str>` for `-` → `_` conversion** — borrows the original slice when no
    hyphens are present; only allocates on replacement.
 
 **Supported Patterns**:
@@ -274,8 +308,27 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
    ```
    Generated code must chain `.id()` before any stateful method.
 
-3. **Single-Pass Attribute Scan** — `user_id`, `has_styled`, and `needs_id` are all
+3. **Early Fast-Path for Empty Elements** — If the element has no attributes and no
+   children, the function returns immediately before any variable initialisation or
+   loop execution. The check is deliberately placed *before* the attribute-scan loop:
+
+   ```rust
+   // Before: fast-path was *after* the loop (loop still initialised variables)
+   // After: fast-path is the first thing in the function
+   pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
+       let tag_str = element.name.to_string();
+
+       if element.attributes.is_empty() && element.children.is_empty() {
+           return generate_tag(&tag_str, &element.name);  // ← returns here
+       }
+
+       // … attribute scan, base construction, etc. only reached when needed …
+   }
+   ```
+
+4. **Single-Pass Attribute Scan** — `user_id`, `has_styled`, and `needs_id` are all
    extracted in one loop before any code is emitted:
+
    ```rust
    for attr in &element.attributes {
        match attr {
@@ -289,23 +342,56 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
    }
    ```
 
-4. **Auto ID Injection** — Elements with stateful attributes receive a deterministic ID:
+5. **`Vec::with_capacity` Over-Estimate** — The method buffer is pre-allocated with
+   `attributes.len() * 2 + children.len()` rather than `attributes.len() + children.len()`.
+   A single `class` attribute can expand into 3–4 method calls
+   (e.g. `"flex flex-col gap-4"` → 3 calls), so multiplying by 2 halves the expected
+   number of reallocation events on class-heavy elements:
+
+   ```rust
+   // Before
+   Vec::with_capacity(element.attributes.len() + element.children.len())
+
+   // After
+   Vec::with_capacity(element.attributes.len() * 2 + element.children.len())
+   ```
+
+6. **Auto ID Injection** — Elements with stateful attributes receive a deterministic ID:
    ```rust
    <div onClick={h} />
    ↓
    div().id("__rsx_div_0").on_click(h)
    ```
 
-5. **Child Aggregation** — 3+ consecutive `Expr` children are batched:
-   ```rust
-   // 3+ consecutive expressions → single .children([...])
-   .children([expr1, expr2, expr3])
+7. **Child Aggregation** — 2+ consecutive `Expr` children are batched into a single
+   `.children([...])` call backed by a stack-allocated array, reducing method dispatch
+   count compared to individual `.child()` chains. The threshold was lowered from 3 to 2
+   because arrays have no heap-allocation cost:
 
-   // < 3 → individual .child() calls
-   .child(expr1).child(expr2)
+   ```rust
+   // 2+ consecutive expressions → single .children([...]) with stack array
+   .children([expr1, expr2])
+
+   // 1 expression → individual .child() call
+   .child(expr1)
    ```
 
-6. **For-loop Code Generation** — Single child uses `.map()`; multiple children use
+   Implementation in `generate_children_methods`:
+   ```rust
+   // Before: threshold was 3
+   if consecutive_exprs.len() >= 3 {
+
+   // After: threshold is 2 — arrays are stack-allocated, so 2 is free
+   if consecutive_exprs.len() >= 2 {
+       methods.push(quote! { .children([#(#consecutive_exprs),*]) });
+   } else {
+       for expr in &consecutive_exprs {
+           methods.push(quote! { .child(#expr) });
+       }
+   }
+   ```
+
+8. **For-loop Code Generation** — Single child uses `.map()`; multiple children use
    `.flat_map()` with `vec![]` to support mixed element types:
    ```rust
    // Single child
@@ -363,7 +449,12 @@ cursor-pointer, overflow-hidden, bg-white, bg-black, …
     }
     let __class_expr = <expression>;
     let __class_str: &str = __class_expr.as_ref();  // zero-copy for &str
-    __class_str.split_whitespace().fold(__el, __rsx_apply_class)
+    // split_ascii_whitespace: faster than split_whitespace for ASCII-only class names
+    if __class_str.is_empty() {
+        __el                                         // fast-path: skip iterator creation
+    } else {
+        __class_str.split_ascii_whitespace().fold(__el, __rsx_apply_class)
+    }
 }
 ```
 
@@ -584,15 +675,90 @@ let common_classes = [
 ### Compile Time
 
 **Macro-expansion optimisations**:
-1. **O(1) match lookups** — all tables use `match`, no linear scans
-2. **Single-pass attribute scanning** — `generate_element` extracts all info in one loop
-3. **Cached `Ident::to_string()`** — string conversion per call site, not per match arm
-4. **Iterator returns** — `parse_class_string` returns an iterator, not a `Vec`
-5. **Direct Vec push** — `generate_attr_methods` pushes into caller's buffer
-6. **`Vec::with_capacity` pre-allocation** — realistic capacity hints throughout
-7. **Thread-local caching** — common class match arms generated once per process
 
-### Runtime
+| # | Location | Technique | Benefit |
+|---|----------|-----------|---------|
+| 1 | `tables.rs` | O(1) `match` lookups for colors, methods, spacing | No linear scan; compiler generates jump-table/trie |
+| 2 | `element.rs` | Early fast-path before attribute-scan loop | Empty elements skip all variable init and loop entry |
+| 3 | `element.rs` | Single-pass attribute scan (`user_id`, `has_styled`, `needs_id`) | One traversal instead of three |
+| 4 | `element.rs` | `Vec::with_capacity(attrs * 2 + children)` | Halves reallocation events on class-heavy elements |
+| 5 | `class.rs` | `split_ascii_whitespace` replaces `split_whitespace` | Skips Unicode whitespace scanning; class names are always ASCII |
+| 6 | `class.rs` | Merged `text_` prefix handling (single `strip_prefix`) | Eliminates a redundant call for every `text-*` class |
+| 7 | `class.rs` | `Cow<str>` for `-` → `_` conversion | Borrows without allocating when no hyphens present |
+| 8 | `class.rs` | `rfind('_') + match` for spacing prefix | O(1) prefix detection vs. O(17) linear scan |
+| 9 | `attribute.rs` | Direct push into caller's `Vec` | No intermediate `Vec` allocation per attribute |
+| 10 | `runtime.rs` | Thread-local `Rc` cache for common class match arms | Generated once per process; `Rc::clone` is O(1) |
+
+**Detailed notes on key optimisations**:
+
+**#2 — Early fast-path** (`element.rs`):
+```rust
+pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
+    let tag_str = element.name.to_string();
+    // Fast-path: skip all scanning for bare tags like <div />
+    if element.attributes.is_empty() && element.children.is_empty() {
+        return generate_tag(&tag_str, &element.name);
+    }
+    // … rest of generation …
+}
+```
+
+**#4 — Capacity estimate** (`element.rs`):
+```rust
+// Before: under-estimates when class attribute expands to many methods
+Vec::with_capacity(element.attributes.len() + element.children.len())
+
+// After: accounts for class expansion (~3-4 methods per class attribute)
+Vec::with_capacity(element.attributes.len() * 2 + element.children.len())
+```
+
+**#5 + #6 — ASCII split and merged text_ prefix** (`class.rs`):
+```rust
+pub(crate) fn parse_class_string(class_str: &str) -> impl Iterator<Item = TokenStream> + '_ {
+    class_str.split_ascii_whitespace().map(parse_single_class)
+    //        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    //        ASCII-only: no Unicode whitespace table lookup needed
+}
+
+pub(crate) fn parse_single_class(class: &str) -> TokenStream {
+    // … spacing, border … then:
+
+    // Single strip_prefix("text_") covers both color and size cases
+    if let Some(rest) = method_name.strip_prefix("text_") {
+        if let Some(token) = parse_color_with_method(rest, "text_color") {
+            return token;                            // text-red-500 → .text_color(rgb(...))
+        }
+        if is_valid_text_size(rest) {
+            return quote! { .#size_ident() };        // text-xl → .text_xl()
+        }
+    }
+    if let Some(rest) = method_name.strip_prefix("bg_") {
+        if let Some(token) = parse_color_with_method(rest, "bg") {
+            return token;                            // bg-blue-500 → .bg(rgb(...))
+        }
+    }
+    // default: bare method call
+}
+```
+
+### Runtime (Generated Code Quality)
+
+**Child aggregation threshold** (`element.rs`):
+
+Consecutive `Expr` children are batched into `.children([...])` (stack-allocated array)
+when there are 2 or more, instead of emitting individual `.child()` calls:
+
+```rust
+// 1 expression — individual call
+.child(expr1)
+
+// 2+ expressions — array batch; no heap allocation; fewer method dispatches
+.children([expr1, expr2])
+.children([expr1, expr2, expr3])
+```
+
+The threshold was lowered from 3 → 2 because `[T; N]` arrays are stack-allocated and
+have no additional overhead over a single `.child()` call.
 
 **Zero cost** — the generated GPUI code is identical to hand-written code:
 ```rust
@@ -608,12 +774,21 @@ No reflection, no string parsing, no dynamic dispatch at runtime.
 **Dynamic class exception** — `class={expression}` generates a runtime `fold` + `match`.
 Use static string literals for zero-overhead styling.
 
-### Binary Size
+### Binary Size (proc-macro)
 
-- No runtime library
+- No runtime library linked into user binaries
 - String literals interned by the linker
 - `#[inline(never)]` on dynamic class helper prevents match table duplication
 - LLVM ICF merges identical monomorphisations across components
+- `panic = "abort"` in `[profile.release]` removes unwind tables from the proc-macro
+  binary, reducing its size and load time during compilation:
+
+  ```toml
+  [profile.release]
+  lto = true
+  codegen-units = 1
+  panic = "abort"   # proc-macros never need stack unwinding
+  ```
 
 ## Debugging Guide
 
@@ -736,5 +911,16 @@ requirements, and release procedure.
 ---
 
 **Last Updated**: 2026-02-18
-**Version**: 0.2.1 (+ unreleased fixes)
+**Version**: 0.2.1
 **Maintainers**: @wangshian
+
+### Optimisation Changelog
+
+| Date | File | Change |
+|------|------|--------|
+| 2026-02-18 | `class.rs` | `split_whitespace` → `split_ascii_whitespace` |
+| 2026-02-18 | `class.rs` | Merged `text_` prefix handling; removed `parse_color_class` |
+| 2026-02-18 | `element.rs` | Moved empty-element fast-path before attribute-scan loop |
+| 2026-02-18 | `element.rs` | `Vec::with_capacity` estimate: `attrs + children` → `attrs * 2 + children` |
+| 2026-02-18 | `element.rs` | `.children([...])` aggregation threshold: 3 → 2 |
+| 2026-02-18 | `Cargo.toml` | Added `panic = "abort"` to `[profile.release]` |
