@@ -21,8 +21,8 @@ use quote::quote;
 /// 生成属性的方法链片段，直接 push 到 `out`（避免中间 Vec 分配）
 pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStream>) {
     match attr {
-        // id 已在 generate_element 中处理，跳过避免重复
-        RsxAttribute::Value { name, .. } if name == "id" => {}
+        // id / key 已在 generate_element 中处理，跳过避免重复生成方法调用
+        RsxAttribute::Value { name, .. } if name == "id" || name == "key" => {}
 
         RsxAttribute::Flag(name) => {
             if name == "invisible" {

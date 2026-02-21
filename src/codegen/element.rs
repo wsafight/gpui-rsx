@@ -2,9 +2,9 @@
 //!
 //! 将 RSX 元素转换为 GPUI 方法链代码：
 //! - 基础标签构造
-//! - 自动 ID 管理
+//! - 自动 ID 管理（支持 `key` 属性组合 ID）
 //! - 子节点聚合优化
-//! - Fragment 和 For 循环支持
+//! - Fragment 和 For 循环支持（for 循环中的 stateful 元素须提供 `id` 或 `key`）
 //!
 //! 优化：
 //! - 缓存 `Ident::to_string()` 避免重复堆分配
@@ -17,6 +17,7 @@
 use super::attribute::generate_attr_methods;
 use super::class::parse_class_string;
 use super::tables::{is_stateful_attr, lookup_tag_default};
+use crate::diagnostics::for_loop_missing_key_error;
 use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
@@ -62,7 +63,15 @@ fn generate_node(node: &RsxNode) -> TokenStream {
 ///
 /// 多子节点使用 `vec![]` 而非数组 `[...]`：数组要求所有元素同类型，
 /// 当 body 中混合不同元素类型时（如 `div()` 和自定义组件）会产生类型错误。
+///
+/// 安全检查：循环体内所有 stateful 元素（含深层嵌套）都必须提供 `id` 或 `key`，
+/// 否则每次迭代会生成相同的自动 ID，导致 GPUI 状态冲突，因此在此阶段给出编译错误。
 fn generate_for_loop(binding: &syn::Pat, iter: &syn::Expr, body: &[RsxNode]) -> TokenStream {
+    // 在生成代码之前先做安全检查
+    if let Some(bad_tag) = find_stateful_without_key(body) {
+        return for_loop_missing_key_error(bad_tag).to_compile_error();
+    }
+
     let body_exprs: Vec<TokenStream> = body.iter().map(generate_node).collect();
     if body_exprs.len() == 1 {
         let single = &body_exprs[0];
@@ -70,6 +79,43 @@ fn generate_for_loop(binding: &syn::Pat, iter: &syn::Expr, body: &[RsxNode]) -> 
     } else {
         quote! { (#iter).into_iter().flat_map(|#binding| vec![#(#body_exprs),*]) }
     }
+}
+
+/// 递归查找循环体内有 stateful 属性但未提供 `id` 或 `key` 的元素
+///
+/// 返回第一个违规元素的标签 Ident（用于 span 定位），没有则返回 `None`。
+/// 不递归进入嵌套 `RsxNode::For`——那些会在各自的 `generate_for_loop` 调用中检查。
+fn find_stateful_without_key(nodes: &[RsxNode]) -> Option<&syn::Ident> {
+    for node in nodes {
+        if let RsxNode::Element(elem) = node {
+            let mut has_id = false;
+            let mut has_key = false;
+            let mut needs_id = false;
+
+            for attr in &elem.attributes {
+                match attr {
+                    RsxAttribute::Value { name, .. } if name == "id" => has_id = true,
+                    RsxAttribute::Value { name, .. } if name == "key" => has_key = true,
+                    RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
+                        if !needs_id {
+                            needs_id = is_stateful_attr(&name.to_string());
+                        }
+                    }
+                    _ => {}
+                }
+            }
+
+            if needs_id && !has_id && !has_key {
+                return Some(&elem.name);
+            }
+
+            // 递归检查子元素（跳过嵌套 For，它们有自己的检查）
+            if let Some(ident) = find_stateful_without_key(&elem.children) {
+                return Some(ident);
+            }
+        }
+    }
+    None
 }
 
 /// 生成单个元素的代码
@@ -91,6 +137,7 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
 
     // 单次遍历提取所有需要的信息
     let mut user_id = None;
+    let mut user_key = None;
     let mut has_styled = false;
     let mut needs_id = false;
 
@@ -98,6 +145,9 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
         match attr {
             RsxAttribute::Value { name, value } if name == "id" => {
                 user_id = Some(value);
+            }
+            RsxAttribute::Value { name, value } if name == "key" => {
+                user_key = Some(value);
             }
             RsxAttribute::Flag(name) if name == "styled" => {
                 has_styled = true;
@@ -113,13 +163,22 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
         }
     }
 
-    // 生成基础元素和 id
+    // 生成基础元素和 id：
+    //  1. 显式 id              → 直接使用，优先级最高
+    //  2. 需要 id + key 存在   → 自动 ID 前缀 + key（运行时拼接，保证循环内唯一）
+    //  3. 需要 id，无 key       → 纯源码位置的自动 ID
+    //  4. 不需要 id            → 不注入（key 在此情况下静默忽略）
     let tag = generate_tag(&tag_str, &element.name);
     let base = if let Some(id_value) = user_id {
         quote! { #tag.id(#id_value) }
     } else if needs_id {
-        let auto_id = next_auto_id(&element.name);
-        quote! { #tag.id(#auto_id) }
+        if let Some(key_expr) = user_key {
+            let keyed_id = make_keyed_auto_id(&element.name, key_expr);
+            quote! { #tag.id(#keyed_id) }
+        } else {
+            let auto_id = make_auto_id(&element.name);
+            quote! { #tag.id(#auto_id) }
+        }
     } else {
         tag
     };
@@ -225,24 +284,36 @@ fn generate_tag(tag_str: &str, name: &syn::Ident) -> TokenStream {
     }
 }
 
-/// 生成基于源码位置的稳定自动 ID
+/// 生成基于源码位置的稳定自动 ID（无 key）
 ///
-/// 使用元素 `Ident` 的 span（行号 + 列号）生成 ID，
-/// 格式为 `concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")`。
+/// 格式：`concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")`
 ///
-/// **稳定性保证**：只要元素在源文件中的位置不变，ID 就不变，
-/// 增量编译不再引起 ID 漂移。改变元素位置（如在上方插入新行）
-/// 会更新 ID，这是符合预期的行为（元素本身确实移动了）。
+/// **稳定性**：只要元素源码位置不变，ID 不变（增量编译安全）。
+/// **唯一性**：`file!()` 在用户侧展开，包含完整路径，跨文件全局唯一。
 ///
-/// **唯一性**：`file!()` 在用户代码侧展开，包含完整文件路径，
-/// 配合行列号可跨文件全局唯一。不依赖 nightly API，stable Rust 即可使用。
-///
-/// 若需要跨重构完全稳定的 ID，请在 RSX 中显式指定 `id` 属性。
-fn next_auto_id(tag_ident: &syn::Ident) -> TokenStream {
+/// 若需要跨重构完全稳定的 ID，请使用 `id` 属性；
+/// 若在循环内使用，请改用 `key` 属性。
+fn make_auto_id(tag_ident: &syn::Ident) -> TokenStream {
     let span = tag_ident.span();
     let loc = span.start(); // 需要 proc-macro2 的 span-locations 特性
     let id_suffix = format!("__rsx_{}_L{}C{}", tag_ident, loc.line, loc.column);
-    // concat!(file!(), "::", "...") 在用户侧展开，file!() 包含文件路径，
-    // 消除不同文件中行列号相同导致的跨文件 ID 碰撞。
     quote! { concat!(file!(), "::", #id_suffix) }
+}
+
+/// 生成带 `key` 的复合自动 ID（用于循环场景）
+///
+/// 格式：`format!("{file}::{prefix}_{key}", file!(), key_expr)`
+///
+/// `concat!(file!(), ...)` 在编译期求值（零开销），`key_expr` 在运行时拼接，
+/// 使同一循环迭代内的每个元素获得唯一 ID。
+/// `key_expr` 需实现 `std::fmt::Display`（数字、字符串、自定义类型均可）。
+fn make_keyed_auto_id(tag_ident: &syn::Ident, key_expr: &syn::Expr) -> TokenStream {
+    let span = tag_ident.span();
+    let loc = span.start();
+    // 编译期常量前缀，包含文件路径 + 源码位置，格式如：
+    //   "src/views/list.rs::__rsx_li_L42C8_"
+    let prefix_suffix = format!("::__rsx_{}_L{}C{}_", tag_ident, loc.line, loc.column);
+    // 运行时将 key 追加到前缀后，生成如：
+    //   "src/views/list.rs::__rsx_li_L42C8_item_42"
+    quote! { format!(concat!(file!(), #prefix_suffix, "{}"), #key_expr) }
 }

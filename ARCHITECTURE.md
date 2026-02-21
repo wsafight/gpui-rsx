@@ -305,6 +305,7 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
 - `invisible` → `.visible(false)`
 - `styled` → Inject tag defaults (processed in `element.rs` before user attrs)
 - `id` → Skipped here; handled in `element.rs` base generation
+- `key` → Skipped here; consumed in `element.rs` for composite auto ID generation
 
 #### element.rs — Orchestration and Generation
 
@@ -342,13 +343,14 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
    }
    ```
 
-4. **Single-Pass Attribute Scan** — `user_id`, `has_styled`, and `needs_id` are all
-   extracted in one loop before any code is emitted:
+4. **Single-Pass Attribute Scan** — `user_id`, `user_key`, `has_styled`, and `needs_id` are
+   all extracted in one loop before any code is emitted:
 
    ```rust
    for attr in &element.attributes {
        match attr {
-           RsxAttribute::Value { name, value } if name == "id" => user_id = Some(value),
+           RsxAttribute::Value { name, value } if name == "id"  => user_id  = Some(value),
+           RsxAttribute::Value { name, value } if name == "key" => user_key = Some(value),
            RsxAttribute::Flag(name) if name == "styled" => has_styled = true,
            RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
                if !needs_id { needs_id = is_stateful_attr(&name.to_string()); }
@@ -372,12 +374,27 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
    Vec::with_capacity(element.attributes.len() * 2 + element.children.len())
    ```
 
-6. **Auto ID Injection** — Elements with stateful attributes receive a deterministic ID:
+6. **Auto ID Injection** — Priority: explicit `id` > stateful + `key` > stateful > none.
+   `key` is only effective when the element already needs an `.id()`. On non-stateful elements
+   `key` is silently ignored and no `.id()` is injected.
    ```rust
-   <div onClick={h} />
-   ↓
-   div().id("__rsx_div_0").on_click(h)
+   // explicit id
+   <div id="my-id" onClick={h} />  →  div().id("my-id").on_click(h)
+
+   // stateful + key (for-loop scenario)
+   <li key={item.id} onClick={h} />
+   →  div().id(format!(concat!(file!(), "::__rsx_li_L42C8_{}"), item.id)).on_click(h)
+
+   // stateful, no key
+   <div onClick={h} />  →  div().id(concat!(file!(), "::__rsx_div_L10C4")).on_click(h)
+
+   // not stateful — key ignored, no .id()
+   <div key={item.id} />  →  div()
    ```
+
+   **Loop safety**: A compile error is emitted when a stateful element is found inside a
+   `{for ...}` loop without `id` or `key`, because all iterations would share the same
+   auto-generated ID, causing GPUI state conflicts.
 
 7. **Child Aggregation** — 2+ consecutive `Expr` children are batched into a single
    `.children([...])` call backed by a stack-allocated array, reducing method dispatch
@@ -419,15 +436,22 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
 
 **Auto ID Generation** (span-based, stable across incremental builds):
 ```rust
-// Uses the element's Ident span (line + column) to derive a deterministic ID.
+// make_auto_id: source-location only — compile-time concat!, zero runtime cost
 // Format: concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")
 // file!() expands on the user side, providing full path for cross-file uniqueness.
-// As long as the element's source position doesn't change, its ID stays the same.
-fn next_auto_id(tag_ident: &syn::Ident) -> TokenStream {
-    let span = tag_ident.span();
-    let loc = span.start();
+fn make_auto_id(tag_ident: &syn::Ident) -> TokenStream {
+    let loc = tag_ident.span().start();
     let id_suffix = format!("__rsx_{}_L{}C{}", tag_ident, loc.line, loc.column);
     quote! { concat!(file!(), "::", #id_suffix) }
+}
+
+// make_keyed_auto_id: compile-time prefix + runtime key — for loop scenarios
+// Format: format!(concat!(file!(), "::{prefix}_{}"), key_expr)
+// key_expr must implement Display (integers, &str, UUIDs, …)
+fn make_keyed_auto_id(tag_ident: &syn::Ident, key_expr: &syn::Expr) -> TokenStream {
+    let loc = tag_ident.span().start();
+    let prefix_suffix = format!("::__rsx_{}_L{}C{}_", tag_ident, loc.line, loc.column);
+    quote! { format!(concat!(file!(), #prefix_suffix, "{}"), #key_expr) }
 }
 ```
 
@@ -634,11 +658,14 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
    "onCustom" | "on_custom" => Some("on_custom"),
    ```
 
-2. If the event requires stateful element (`.id()`), also update `is_stateful_attr()`:
+2. If the event requires stateful element (`.id()`), also update `is_stateful_attr()`.
+   Note: only add here if the attribute is NOT covered by the `on_` / `capture_` prefix
+   check and the camelCase `on[A-Z]` / `capture[A-Z]` checks that are already present:
    ```rust
    pub(crate) fn is_stateful_attr(name: &str) -> bool {
-       // on_ prefix already handled; add explicit names for camelCase:
-       matches!(name, "hover" | "active" | … | "onCustom")
+       // on_ / capture_ prefixes already handled automatically;
+       // explicit names needed only for attributes without those prefixes:
+       matches!(name, "tooltip" | "track_focus" | "onCustom")
    }
    ```
 
@@ -840,6 +867,8 @@ and is being passed as a method name literally.
 | `mismatched types` | `.id()` type change not handled | Verify auto ID is injected |
 | Dynamic class not applied | Class not in ~58 common list | Use static string literal |
 | Auto ID changes on rebuild | Incremental compile order change | Add explicit `id` attribute |
+| Compile error "missing key" | Stateful element in for-loop without `id`/`key` | Add `key={unique_expr}` attribute |
+| `key` attribute has no effect | Element has no stateful attributes | Only stateful elements use `key` |
 | `expected &str, found String` | Wrong type passed to `class={}` | Use `.as_str()` or a literal |
 
 ### Testing Changes
@@ -926,13 +955,19 @@ requirements, and release procedure.
 ---
 
 **Last Updated**: 2026-02-21
-**Version**: 0.3.0
+**Version**: 0.3.1
 **Maintainers**: @wangshian
 
 ### Changelog
 
 | Date | File | Change |
 |------|------|--------|
+| 2026-02-21 | `codegen/tables.rs` | `is_stateful_attr`: removed `hover`/`active`/`focus`/`group` (Styled trait, no ID needed) |
+| 2026-02-21 | `codegen/element.rs` | Added `user_key` scan + `make_keyed_auto_id` for `key={expr}` support |
+| 2026-02-21 | `codegen/element.rs` | Added `find_stateful_without_key` + loop safety compile error |
+| 2026-02-21 | `codegen/element.rs` | Renamed `next_auto_id` → `make_auto_id` + `make_keyed_auto_id` |
+| 2026-02-21 | `codegen/attribute.rs` | Skip `key` attribute (consumed by element.rs, not passed to GPUI) |
+| 2026-02-21 | `diagnostics.rs` | Added `for_loop_missing_key_error` |
 | 2026-02-21 | `tests/common/mod.rs` | Removed ~60 methods from `impl MockElement` already covered by `impl Styled` |
 | 2026-02-21 | `runtime.rs` | Black/white color entries: method name encoded in data, removed runtime `starts_with` |
 | 2026-02-21 | `class.rs` | Extracted `is_directional_border(rest)` helper function |

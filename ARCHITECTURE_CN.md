@@ -285,6 +285,7 @@ div()
 - `invisible` → `.visible(false)`
 - `styled` → 注入标签默认样式（在 `element.rs` 中在用户属性前处理）
 - `id` → 此处跳过；在 `element.rs` 基础生成中处理
+- `key` → 此处跳过；在 `element.rs` 中消费用于生成复合自动 ID
 
 #### element.rs — 生成编排
 
@@ -332,11 +333,12 @@ div()
    Vec::with_capacity(element.attributes.len() * 2 + element.children.len())
    ```
 
-5. **单次属性扫描** — `user_id`、`has_styled`、`needs_id` 在一次循环中提取：
+5. **单次属性扫描** — `user_id`、`user_key`、`has_styled`、`needs_id` 在一次循环中提取：
    ```rust
    for attr in &element.attributes {
        match attr {
-           RsxAttribute::Value { name, value } if name == "id" => user_id = Some(value),
+           RsxAttribute::Value { name, value } if name == "id"  => user_id  = Some(value),
+           RsxAttribute::Value { name, value } if name == "key" => user_key = Some(value),
            RsxAttribute::Flag(name) if name == "styled" => has_styled = true,
            RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
                if !needs_id { needs_id = is_stateful_attr(&name.to_string()); }
@@ -346,12 +348,25 @@ div()
    }
    ```
 
-6. **自动 ID 注入** — 含有状态属性的元素自动获得确定性 ID：
+6. **自动 ID 注入** — 优先级：显式 `id` > stateful + `key` > stateful 无 key > 非 stateful。
+   `key` 仅在元素已需要 `.id()` 时生效；非 stateful 元素上的 `key` 静默忽略，不注入 `.id()`：
    ```rust
-   <div onClick={h} />
-   ↓
-   div().id("__rsx_div_0").on_click(h)
+   // 显式 id
+   <div id="my-id" onClick={h} />  →  div().id("my-id").on_click(h)
+
+   // stateful + key（for 循环场景）
+   <li key={item.id} onClick={h} />
+   →  div().id(format!(concat!(file!(), "::__rsx_li_L42C8_{}"), item.id)).on_click(h)
+
+   // stateful，无 key
+   <div onClick={h} />  →  div().id(concat!(file!(), "::__rsx_div_L10C4")).on_click(h)
+
+   // 非 stateful — key 忽略，不注入 .id()
+   <div key={item.id} />  →  div()
    ```
+
+   **循环安全**：for 循环内的 stateful 元素若缺少 `id` 或 `key`，会报编译错误。
+   原因是所有迭代会共享相同的自动 ID，导致 GPUI 状态冲突。
 
 7. **子节点聚合** — 2+ 个连续 `Expr` 子节点批量合并为单次 `.children([...])` 调用，
    数组是栈分配，比多次 `.child()` 方法分派更高效。阈值由 3 降为 2：
@@ -391,15 +406,22 @@ div()
 
 **自动 ID 生成**（基于 span，在增量编译中保持稳定）：
 ```rust
-// 利用元素 Ident 的 span（行号 + 列号）推导确定性 ID。
+// make_auto_id：仅源码位置，编译期 concat!，零运行时开销
 // 格式：concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")
-// file!() 在用户侧展开，提供完整路径保证跨文件唯一性。
-// 只要元素的源码位置不变，其 ID 就保持不变。
-fn next_auto_id(tag_ident: &syn::Ident) -> TokenStream {
-    let span = tag_ident.span();
-    let loc = span.start();
+// file!() 在用户侧展开，提供完整路径保证跨文件唯一性
+fn make_auto_id(tag_ident: &syn::Ident) -> TokenStream {
+    let loc = tag_ident.span().start();
     let id_suffix = format!("__rsx_{}_L{}C{}", tag_ident, loc.line, loc.column);
     quote! { concat!(file!(), "::", #id_suffix) }
+}
+
+// make_keyed_auto_id：编译期前缀 + 运行时 key，用于 for 循环场景
+// 格式：format!(concat!(file!(), "::{prefix}_{}"), key_expr)
+// key_expr 须实现 Display（整数、&str、UUID 等）
+fn make_keyed_auto_id(tag_ident: &syn::Ident, key_expr: &syn::Expr) -> TokenStream {
+    let loc = tag_ident.span().start();
+    let prefix_suffix = format!("::__rsx_{}_L{}C{}_", tag_ident, loc.line, loc.column);
+    quote! { format!(concat!(file!(), #prefix_suffix, "{}"), #key_expr) }
 }
 ```
 
@@ -600,11 +622,14 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
    "onCustom" | "on_custom" => Some("on_custom"),
    ```
 
-2. 若该事件需要有状态元素（`.id()`），同时更新 `is_stateful_attr()`：
+2. 若该事件需要有状态元素（`.id()`），同时更新 `is_stateful_attr()`。
+   注意：仅当属性**不被** `on_` / `capture_` 前缀检查或 camelCase `on[A-Z]` / `capture[A-Z]`
+   检查自动覆盖时才需要显式添加：
    ```rust
    pub(crate) fn is_stateful_attr(name: &str) -> bool {
-       // on_ 前缀已自动处理；为 camelCase 形式添加显式匹配：
-       matches!(name, "hover" | "active" | … | "onCustom")
+       // on_ / capture_ 前缀已自动处理；
+       // 仅为没有这些前缀的属性添加显式匹配：
+       matches!(name, "tooltip" | "track_focus" | "onCustom")
    }
    ```
 
@@ -803,6 +828,8 @@ error[E0599]: no method named `flex_col` found for struct `Div`
 | `mismatched types` | `.id()` 类型变化未处理 | 验证自动 ID 是否注入 |
 | 动态 class 未生效 | class 不在约 58 个常用列表中 | 改用静态字符串字面量 |
 | 重新构建后自动 ID 变化 | 增量编译改变了展开顺序 | 添加显式 `id` 属性 |
+| 编译错误"缺少 key" | for 循环内 stateful 元素无 `id`/`key` | 添加 `key={unique_expr}` 属性 |
+| `key` 属性无效果 | 元素没有 stateful 属性 | 只有 stateful 元素才使用 `key` |
 | `expected &str, found String` | 传入 `class={}` 的类型错误 | 使用 `.as_str()` 或字面量 |
 
 ### 测试更改
@@ -887,13 +914,19 @@ rsx! {
 ---
 
 **最后更新**：2026-02-21
-**版本**：0.3.0
+**版本**：0.3.1
 **维护者**：@wangshian
 
 ### 变更记录
 
 | 日期 | 文件 | 改动 |
 |------|------|------|
+| 2026-02-21 | `codegen/tables.rs` | `is_stateful_attr`：移除 `hover`/`active`/`focus`/`group`（Styled trait，不需要 ID） |
+| 2026-02-21 | `codegen/element.rs` | 新增 `user_key` 扫描 + `make_keyed_auto_id` 支持 `key={expr}` |
+| 2026-02-21 | `codegen/element.rs` | 新增 `find_stateful_without_key` + 循环安全编译错误 |
+| 2026-02-21 | `codegen/element.rs` | `next_auto_id` 重命名为 `make_auto_id` + `make_keyed_auto_id` |
+| 2026-02-21 | `codegen/attribute.rs` | 跳过 `key` 属性（由 element.rs 消费，不传给 GPUI） |
+| 2026-02-21 | `diagnostics.rs` | 新增 `for_loop_missing_key_error` |
 | 2026-02-21 | `tests/common/mod.rs` | 从 `impl MockElement` 删除约 60 个已由 `impl Styled` 覆盖的重复方法 |
 | 2026-02-21 | `runtime.rs` | black/white 条目：方法名直接编码进数据，移除运行时 `starts_with` 分支 |
 | 2026-02-21 | `class.rs` | 提取 `is_directional_border(rest)` 辅助函数 |

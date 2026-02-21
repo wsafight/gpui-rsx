@@ -7,6 +7,56 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-02-21
+
+### 🐛 Fixed
+
+#### Auto ID — `is_stateful_attr` misclassification
+- **`hover`, `active`, `focus`, `group` removed from stateful attribute detection** —
+  These are `Styled` trait methods (accept `StyleRefinement`), not `StatefulInteractiveElement`
+  methods, and do not require `.id()`. Previously they caused unnecessary `.id()` injection,
+  silently changing element types from `Div` to `Stateful<Div>`.
+  Only `on_*` / `capture_*` event handlers, `tooltip`, and `track_focus` now trigger injection.
+
+#### Auto ID — loop ID collisions
+- **Compile error on stateful elements in `for` loops without `id` or `key`** —
+  All iterations of a for-loop share the same source location, so auto-generated IDs would be
+  identical across iterations, causing GPUI state conflicts. The macro now emits a clear
+  compile-time error pointing to the offending element with actionable fix suggestions.
+
+### ✨ Added
+
+#### `key` attribute — composite auto ID for loops
+- **`key={expr}` attribute** — A new macro-level attribute (never emitted as a `.key()` method
+  call) that participates in auto ID generation for stateful elements inside for-loops:
+  ```rust
+  // ❌ compile error — all <li> would share the same auto ID
+  {for item in &self.items { <li onClick={handler}>{item}</li> }}
+
+  // ✅ key makes every ID unique per iteration
+  {for item in &self.items { <li key={item.id} onClick={handler}>{item}</li> }}
+  // → div().id(format!("src/list.rs::__rsx_li_L42C8_{}", item.id)).on_click(handler)…
+  ```
+  - ID format: `format!(concat!(file!(), "::{prefix}_{}"), key_expr)` — prefix is compile-time,
+    key is runtime, no extra `String` allocation beyond the prefix.
+  - `key` accepts any type implementing `Display` (integers, `&str`, UUIDs, …).
+  - **`key` is only effective when the element has stateful attributes (`needs_id = true`).
+    On non-stateful elements, `key` is silently ignored and no `.id()` is injected.**
+  - Priority order: explicit `id` > stateful + `key` > stateful without `key` > not stateful.
+
+### ♻️ Refactoring
+
+- **`next_auto_id` renamed and split** — `next_auto_id` is replaced by:
+  - `make_auto_id(tag_ident)` — source-location only, compile-time `concat!`
+  - `make_keyed_auto_id(tag_ident, key_expr)` — source-location prefix + runtime key `format!`
+
+### ✅ Testing
+- All 288 tests pass (227 macro + 35 coverage + 24 unit + 2 diagnostic)
+- Updated test assertions: `hover`/`active`/`focus`/`group` no longer assert stateful detection;
+  new tests for `tooltip`/`track_focus` as true stateful attributes
+
+---
+
 ## [0.3.0] - 2026-02-21
 
 ### ♻️ Refactoring
@@ -248,6 +298,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.3.1]: https://github.com/wsafight/gpui-rsx/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wsafight/gpui-rsx/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wsafight/gpui-rsx/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wsafight/gpui-rsx/compare/v0.2.0...v0.2.1

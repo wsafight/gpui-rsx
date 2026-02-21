@@ -19,6 +19,7 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
 - 💡 **Type Safe** - Full compile-time type checking
 - 🧩 **Fragment Support** - Return multiple root elements with `<>...</>`
 - 🔁 **For-loop Sugar** - Iterate with `{for item in iter { ... }}`
+- 🔑 **Loop-safe IDs** - `key={expr}` generates unique IDs per iteration; compile error on missing key
 - 🎨 **Full Tailwind Colors** - 242 built-in colors + arbitrary hex values
 - ⚡ **Dynamic Class** - Runtime class switching with automatic fallback
 
@@ -384,6 +385,26 @@ div().children((&self.items).into_iter().map(|item| {
 }))
 ```
 
+#### Loop safety — `key` attribute
+
+Stateful elements (with event handlers, `tooltip`, `track_focus`) inside a for-loop **must**
+provide `id` or `key`, otherwise the macro emits a compile error:
+
+```rust
+// ❌ compile error — all <li> would share the same auto ID
+{for item in &self.items { <li onClick={handler}>{item}</li> }}
+
+// ✅ key makes every ID unique per iteration
+{for item in &self.items {
+    <li key={item.id} onClick={handler}>{item.name.clone()}</li>
+}}
+// → div().id(format!("src/list.rs::__rsx_li_L42C8_{}", item.id)).on_click(handler)…
+```
+
+`key` is consumed by the macro and does **not** become a `.key()` method call.
+It accepts any type implementing `Display`. On elements without stateful attributes,
+`key` is silently ignored (no `.id()` is injected).
+
 For-loops also support ranges and method calls:
 
 ```rust
@@ -718,6 +739,13 @@ GPUI-RSX is a **compile-time macro** that expands to the same code as hand-writt
 | Runtime Performance | Baseline | Same |
 | Type Safety | ✅ | ✅ |
 | Compile-time Checking | ✅ | ✅ |
+
+### v0.3.1 Fixes & Features
+- **Fixed** `is_stateful_attr`: `hover`/`active`/`focus`/`group` are `Styled` trait methods and
+  no longer trigger unnecessary `.id()` injection
+- **Added** `key={expr}` attribute: composite auto ID for stateful elements in for-loops
+- **Added** compile error when a stateful element in a for-loop has no `id` or `key`
+- `key` on non-stateful elements is silently ignored (no unintended type change to `Stateful<Div>`)
 
 ### v0.3.0 Refactoring
 - Eliminated ~60 duplicate method definitions in `tests/common/mod.rs` (823 → 456 lines)

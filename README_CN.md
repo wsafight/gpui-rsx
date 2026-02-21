@@ -19,6 +19,7 @@
 - 💡 **类型安全** - 完全的编译时检查
 - 🧩 **Fragment 支持** - 使用 `<>...</>` 返回多个根元素
 - 🔁 **For 循环语法糖** - 使用 `{for item in iter { ... }}` 迭代
+- 🔑 **循环安全 ID** - `key={expr}` 为每次迭代生成唯一 ID；缺少 key 时报编译错误
 - 🎨 **完整 Tailwind 色板** - 内置 242 种颜色 + 任意 hex 值
 - ⚡ **动态 Class** - 支持运行时 class 切换（约 58 个常用 class，见限制说明）
 
@@ -384,6 +385,26 @@ div().children((&self.items).into_iter().map(|item| {
 }))
 ```
 
+#### 循环安全 — `key` 属性
+
+for 循环内有 stateful 属性（事件处理器、`tooltip`、`track_focus`）的元素**必须**提供
+`id` 或 `key`，否则宏会报编译错误：
+
+```rust
+// ❌ 编译错误 — 所有 <li> 会共享相同的自动 ID
+{for item in &self.items { <li onClick={handler}>{item}</li> }}
+
+// ✅ key 使每次迭代获得唯一 ID
+{for item in &self.items {
+    <li key={item.id} onClick={handler}>{item.name.clone()}</li>
+}}
+// → div().id(format!("src/list.rs::__rsx_li_L42C8_{}", item.id)).on_click(handler)…
+```
+
+`key` 由宏在编译期消费，**不会**生成 `.key()` 方法调用。
+可接受任何实现 `Display` 的类型。非 stateful 元素上的 `key` 会被静默忽略
+（不会注入 `.id()`，不改变元素类型）。
+
 for 循环也支持 range 和方法调用：
 
 ```rust
@@ -715,6 +736,13 @@ GPUI-RSX 是一个**编译时宏**，展开后的代码与手写的 GPUI 代码�
 | 运行时性能 | 基准 | 相同 |
 | 类型安全 | ✅ | ✅ |
 | 编译时检查 | ✅ | ✅ |
+
+### v0.3.1 修复与新增
+- **修复** `is_stateful_attr`：`hover`/`active`/`focus`/`group` 是 `Styled` trait 方法，
+  不再触发不必要的 `.id()` 注入
+- **新增** `key={expr}` 属性：为 for 循环内 stateful 元素生成复合自动 ID
+- **新增** for 循环内 stateful 元素缺少 `id` 或 `key` 时报编译错误
+- 非 stateful 元素上的 `key` 静默忽略（不改变 `Div` → `Stateful<Div>` 类型）
 
 ### v0.3.0 重构亮点
 - 消除 `tests/common/mod.rs` 中约 60 个重复方法定义（823 → 456 行）

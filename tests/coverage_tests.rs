@@ -108,7 +108,8 @@ fn test_auto_id_deterministic_same_signature() {
 #[test]
 fn test_auto_id_with_multiple_stateful_attrs() {
     let h = |_: (), _: ()| {};
-    // 多个需要 stateful 的属性
+    // on_click 是真正的 stateful 属性（StatefulInteractiveElement），触发 auto ID 注入。
+    // hover / active 是 Styled trait 的样式方法，不触发 auto ID。
     let _el = rsx! {
         <div
             on_click={h}
@@ -123,7 +124,9 @@ fn test_auto_id_with_multiple_stateful_attrs() {
 #[test]
 fn test_auto_id_all_stateful_attributes() {
     let h = |_: (), _: ()| {};
-    // 测试所有需要自动 ID 的属性
+    // 真正需要 auto ID 的属性：事件处理器（on_click）、tooltip、track_focus。
+    // hover / active / focus / group 是 Styled trait 方法，不需要 ID，
+    // 但可以和 stateful 元素共存（元素因 on_click 已获得 ID）。
     let _el = rsx! {
         <div
             on_click={h}

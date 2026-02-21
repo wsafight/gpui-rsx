@@ -384,11 +384,10 @@ pub(crate) fn is_stateful_attr(name: &str) -> bool {
     {
         return true;
     }
-    // 其他 stateful 属性
-    matches!(
-        name,
-        "hover" | "active" | "focus" | "tooltip" | "group" | "track_focus"
-    )
+    // 其他真正需要 StatefulInteractiveElement / FocusableElement 的属性。
+    // 注意：hover / active / focus / group 是 Styled trait 的样式方法（接受
+    // StyleRefinement），不需要 .id()，因此不列入此处。
+    matches!(name, "tooltip" | "track_focus")
 }
 
 /// 查找间距/尺寸 class 前缀对应的 GPUI 方法名
@@ -559,10 +558,18 @@ mod tests {
 
     #[test]
     fn stateful_attr_detects_interactive_attrs() {
-        assert!(is_stateful_attr("hover"));
-        assert!(is_stateful_attr("active"));
-        assert!(is_stateful_attr("focus"));
+        // tooltip 和 track_focus 才是真正需要 ID 的交互属性
         assert!(is_stateful_attr("tooltip"));
+        assert!(is_stateful_attr("track_focus"));
+    }
+
+    #[test]
+    fn stateful_attr_ignores_styled_trait_methods() {
+        // hover / active / focus / group 是 Styled trait 的样式方法，不需要 ID
+        assert!(!is_stateful_attr("hover"));
+        assert!(!is_stateful_attr("active"));
+        assert!(!is_stateful_attr("focus"));
+        assert!(!is_stateful_attr("group"));
     }
 
     #[test]

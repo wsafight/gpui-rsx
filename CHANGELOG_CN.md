@@ -7,6 +7,54 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.3.1] - 2026-02-21
+
+### 🐛 修复
+
+#### 自动 ID — `is_stateful_attr` 误判
+- **从 stateful 属性检测中移除 `hover`、`active`、`focus`、`group`** —
+  这些是 `Styled` trait 的样式方法（接受 `StyleRefinement`），不属于 `StatefulInteractiveElement`
+  方法，不需要 `.id()`。之前它们会导致不必要的 `.id()` 注入，将元素类型从 `Div` 静默变为
+  `Stateful<Div>`。现在只有 `on_*`/`capture_*` 事件处理器、`tooltip`、`track_focus` 才会触发注入。
+
+#### 自动 ID — 循环内 ID 碰撞
+- **for 循环内缺少 `id` 或 `key` 的 stateful 元素现在报编译错误** —
+  for 循环的每次迭代共享同一源码位置，因此自动生成的 ID 在所有迭代中完全相同，
+  导致 GPUI 状态冲突。宏现在在编译期抛出清晰的错误，指向违规元素并给出可操作的修复建议。
+
+### ✨ 新增
+
+#### `key` 属性 — 循环内的复合自动 ID
+- **`key={expr}` 属性** — 一个宏层面的特殊属性（不会生成 `.key()` 方法调用），
+  用于为循环内 stateful 元素的自动 ID 提供唯一键：
+  ```rust
+  // ❌ 编译错误 — 所有 <li> 会共享相同的自动 ID
+  {for item in &self.items { <li onClick={handler}>{item}</li> }}
+
+  // ✅ key 使每次迭代获得唯一 ID
+  {for item in &self.items { <li key={item.id} onClick={handler}>{item}</li> }}
+  // → div().id(format!("src/list.rs::__rsx_li_L42C8_{}", item.id)).on_click(handler)…
+  ```
+  - ID 格式：`format!(concat!(file!(), "::{prefix}_{}"), key_expr)` —
+    前缀在编译期求值，key 在运行时追加，开销仅限一次字符串格式化。
+  - `key` 可接受任何实现 `Display` 的类型（整数、`&str`、UUID 等）。
+  - **`key` 仅在元素有 stateful 属性（`needs_id = true`）时生效。
+    非 stateful 元素上的 `key` 会被静默忽略，不会注入 `.id()`。**
+  - 优先级：显式 `id` > stateful + `key` > stateful 无 key > 非 stateful。
+
+### ♻️ 重构
+
+- **`next_auto_id` 重命名并拆分** — 替换为两个职责清晰的函数：
+  - `make_auto_id(tag_ident)` — 仅源码位置，编译期 `concat!`
+  - `make_keyed_auto_id(tag_ident, key_expr)` — 编译期前缀 + 运行时 key `format!`
+
+### ✅ 测试
+- 全部 288 个测试通过（227 宏测试 + 35 覆盖率测试 + 24 单元测试 + 2 诊断测试）
+- 更新测试断言：`hover`/`active`/`focus`/`group` 不再断言 stateful 检测；
+  新增 `tooltip`/`track_focus` 作为真正 stateful 属性的测试
+
+---
+
 ## [0.3.0] - 2026-02-21
 
 ### ♻️ 重构
@@ -228,6 +276,7 @@
 
 ---
 
+[0.3.1]: https://github.com/wsafight/gpui-rsx/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wsafight/gpui-rsx/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wsafight/gpui-rsx/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wsafight/gpui-rsx/compare/v0.2.0...v0.2.1

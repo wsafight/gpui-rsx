@@ -97,6 +97,25 @@ pub fn condition_tuple_wrong_count_error<T: Spanned>(
     )
 }
 
+/// 报告 for 循环内含 stateful 属性的元素缺少 `id` 或 `key` 的错误
+///
+/// GPUI 要求同一视图中所有 stateful 元素的 ID 全局唯一。for 循环会将
+/// 同一段代码展开多次，造成多个元素共享相同的自动 ID，导致事件路由和
+/// 状态管理出现错误。
+pub fn for_loop_missing_key_error(tag_name: &Ident) -> syn::Error {
+    syn::Error::new_spanned(
+        tag_name,
+        format!(
+            "Element `<{tag_name}>` inside a for-loop has event handlers but no `id` or `key` attribute.\n\
+             \x20 help: Add a `key={{unique_value}}` attribute so each iteration gets a unique ID:\n\
+             \x20        for item in &self.items {{ <{tag_name} key={{item.id}} onClick={{...}}>...</{tag_name}> }}\n\
+             \x20 note: Elements in loops share the same source location, so the auto-generated ID\n\
+             \x20       would be identical across iterations, causing GPUI state conflicts.\n\
+             \x20       Use `key` for a composite auto-ID, or `id` to supply a fully custom ID."
+        ),
+    )
+}
+
 /// 报告条件属性值类型错误
 pub fn condition_tuple_wrong_type_error<T: Spanned>(value: &T, attr_name: &str) -> syn::Error {
     syn::Error::new(

@@ -1,35 +1,443 @@
-//! # GPUI-RSX
+//! # gpui-rsx
 //!
-//! 一个为 GPUI 提供 JSX-like 语法的过程宏，让 UI 开发更加简洁和直观。
+//! A procedural macro that brings JSX-like syntax to [GPUI], making UI code more concise
+//! and readable while generating **zero-overhead** native GPUI method chains at compile time.
 //!
-//! ## 示例
+//! [GPUI]: https://www.gpui.rs/
 //!
-//! ```rust,ignore
+//! ## At a Glance
+//!
+//! ```ignore
 //! use gpui::*;
 //! use gpui_rsx::rsx;
 //!
-//! impl Render for MyView {
-//!     fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
-//!         rsx! {
-//!             <div class="flex flex-col gap-4 p-4">
-//!                 <h1>{"Hello GPUI"}</h1>
-//!                 <button
-//!                     bg={rgb(0x3b82f6)}
-//!                     text_color={rgb(0xffffff)}
-//!                     px_4
-//!                     py_2
-//!                     rounded_md
-//!                     onClick={cx.listener(|view, _, cx| {
-//!                         println!("clicked");
-//!                     })}
-//!                 >
-//!                     {"Click me"}
-//!                 </button>
-//!             </div>
-//!         }
-//!     }
+//! // Before — verbose GPUI method chain
+//! div()
+//!     .flex()
+//!     .flex_col()
+//!     .gap(px(16.0))
+//!     .p(px(16.0))
+//!     .bg(rgb(0x3b82f6))
+//!     .child(div().text_xl().font_bold().child("Hello GPUI"))
+//!     .child(
+//!         div()
+//!             .cursor_pointer()
+//!             .id("btn")
+//!             .on_click(cx.listener(|_, _, cx| cx.notify()))
+//!             .child("Click me"),
+//!     )
+//!
+//! // After — concise RSX (~50% less code)
+//! rsx! {
+//!     <div class="flex flex-col gap-4 p-4 bg-blue-500">
+//!         <h1 class="text-xl font-bold">{"Hello GPUI"}</h1>
+//!         <button
+//!             cursor_pointer
+//!             onClick={cx.listener(|_, _, cx| cx.notify())}
+//!         >
+//!             {"Click me"}
+//!         </button>
+//!     </div>
 //! }
 //! ```
+//!
+//! The two snippets produce **identical** compiled output.
+//!
+//! ## Features
+//!
+//! | Feature | Description |
+//! |---------|-------------|
+//! | HTML-like tags | `<div>`, `<span>`, `<button>`, … → all map to `div()` |
+//! | Boolean attributes | `<div flex flex_col />` → `.flex().flex_col()` |
+//! | Value attributes | `<div gap={px(4.0)} />` → `.gap(px(4.0))` |
+//! | `class` (static) | Tailwind-like string, parsed at compile time |
+//! | `class` (dynamic) | Runtime expression, ~58 common classes supported |
+//! | Full color palette | 242 Tailwind colors + arbitrary hex (`bg-[#ff0000]`) |
+//! | Fragments | `<>...</>` — returns `vec![...]` |
+//! | For-loop sugar | `{for item in iter { ... }}` |
+//! | Spread | `{...iterator}` |
+//! | Conditional | `when` / `whenSome` attributes |
+//! | Styled defaults | `<h1 styled>` injects sensible tag defaults |
+//! | camelCase mapping | `onClick` → `.on_click()`, `zIndex` → `.z_index()` |
+//! | `key` (loop ID) | Composite auto-ID for stateful elements in loops |
+//!
+//! ## Syntax Reference
+//!
+//! ### Basic Elements
+//!
+//! Any HTML tag maps to `div()`. Self-closing and pair tags are both valid:
+//!
+//! ```ignore
+//! rsx! { <div /> }                    // div()
+//! rsx! { <span></span> }              // div()
+//! rsx! { <button>{"OK"}</button> }    // div().child("OK")
+//! ```
+//!
+//! ### Fragment
+//!
+//! Return multiple root elements without a wrapper. Expands to `vec![...]`:
+//!
+//! ```ignore
+//! rsx! {
+//!     <>
+//!         <div>{"First"}</div>
+//!         <div>{"Second"}</div>
+//!     </>
+//! }
+//! // → vec![div().child("First"), div().child("Second")]
+//! ```
+//!
+//! ### Boolean Attributes (Flags)
+//!
+//! Bare attribute names become zero-argument method calls:
+//!
+//! ```ignore
+//! rsx! { <div flex flex_col items_center /> }
+//! // → div().flex().flex_col().items_center()
+//! ```
+//!
+//! ### Value Attributes
+//!
+//! `name={expr}` passes the expression as the method argument:
+//!
+//! ```ignore
+//! rsx! { <div gap={px(16.0)} bg={rgb(0x3b82f6)} opacity={0.8} /> }
+//! // → div().gap(px(16.0)).bg(rgb(0x3b82f6)).opacity(0.8)
+//! ```
+//!
+//! ### The `class` Attribute — Static (Compile-time, Recommended)
+//!
+//! A Tailwind-inspired string that expands to method calls at compile time.
+//! **All Tailwind utilities are supported; there is no runtime cost:**
+//!
+//! ```ignore
+//! rsx! { <div class="flex flex-col gap-4 p-4 bg-blue-500 text-white rounded-md" /> }
+//! // → div().flex().flex_col().gap(px(4.0)).p(px(4.0)).bg(rgb(0x3b82f6))
+//! //         .text_color(rgb(0xffffff)).rounded_md()
+//! ```
+//!
+//! #### Supported class patterns
+//!
+//! **Layout:** `flex`, `flex-col`, `flex-row`, `flex-1`, `flex-wrap`, `flex-none`,
+//! `block`, `grid`, `hidden`, `absolute`, `relative`
+//!
+//! **Alignment:** `items-center`, `items-start`, `items-end`, `justify-center`,
+//! `justify-between`, `justify-start`, `justify-end`, `justify-around`,
+//! `content-center`, `content-between`, …
+//!
+//! **Spacing** (numeric value → `px(n.0)`):
+//! `gap-4` → `.gap(px(4.0))`, `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`,
+//! `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, fractional `p-0.5` → `.p(px(0.5))`
+//!
+//! **Sizing:** `w-full`, `h-full`, `size-full`, `w-64`, `h-32`
+//!
+//! **Text:** `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`, `text-2xl`,
+//! `text-3xl`, `font-bold`, `italic`, `underline`, `truncate`, `text-left`, `text-center`
+//!
+//! **Border:** `border` → `.border_1()`, `border-2`, `rounded-sm`, `rounded-md`,
+//! `rounded-lg`, `rounded-xl`, `rounded-full`, `rounded-none`
+//!
+//! **Colors (full Tailwind palette):**
+//! `text-red-500` → `.text_color(rgb(0xef4444))`,
+//! `bg-blue-600` → `.bg(rgb(0x2563eb))`,
+//! `border-green-500` → `.border_color(rgb(0x22c55e))`
+//!
+//! Supported families: `slate`, `gray`, `zinc`, `neutral`, `stone`, `red`, `orange`,
+//! `amber`, `yellow`, `lime`, `green`, `emerald`, `teal`, `cyan`, `sky`, `blue`,
+//! `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose` (shades 50–950) +
+//! `black`, `white`
+//!
+//! **Arbitrary hex (6-digit and 3-digit):**
+//! `bg-[#ff0000]` → `.bg(rgb(0xff0000))`,
+//! `text-[#f00]` → `.text_color(rgb(0xff0000))`
+//!
+//! ### The `class` Attribute — Dynamic (Runtime)
+//!
+//! When `class` receives an expression, a runtime match is generated.
+//! **Only ~58 pre-compiled common classes are recognised; unknown classes are silently
+//! ignored.**
+//!
+//! ```ignore
+//! let active = true;
+//! rsx! { <div class={if active { "flex gap-4" } else { "block" }} /> }
+//! ```
+//!
+//! Prefer static strings or the `when` attribute instead:
+//!
+//! ```ignore
+//! // ✅ static literal — compile-time, all classes work
+//! rsx! { <div class="flex gap-4" /> }
+//!
+//! // ✅ conditional literal — still static
+//! let cls = if active { "flex gap-4" } else { "block" };
+//! rsx! { <div class={cls} /> }
+//!
+//! // ✅ when attribute — compile-time, fully flexible
+//! rsx! { <div when={(active, |el| el.flex().gap(px(4.0)))} /> }
+//!
+//! // ⚠️ dynamic expression — runtime, ~58 classes only
+//! rsx! { <div class={format!("gap-{}", spacing)} /> }
+//! ```
+//!
+//! ### Event Handling
+//!
+//! Event attributes (camelCase or snake_case) are mapped to GPUI listeners.
+//! Elements with event handlers automatically receive a deterministic `.id()`.
+//!
+//! ```ignore
+//! rsx! {
+//!     <button onClick={cx.listener(|view, _, cx| {
+//!         view.count += 1;
+//!         cx.notify();
+//!     })}>
+//!         {"Increment"}
+//!     </button>
+//! }
+//! // → div().id("src/main.rs::__rsx_button_L42C8").on_click(cx.listener(...)).child("Increment")
+//! ```
+//!
+//! #### `key` — Unique IDs for stateful elements in loops
+//!
+//! `key={expr}` is a **macro-level** attribute consumed at compile time; it never
+//! becomes a `.key()` method call on the GPUI element.
+//!
+//! **`key` only takes effect when the element already needs an `.id()`** (i.e. it
+//! carries an event handler, `tooltip`, `track_focus`, or another stateful attribute).
+//! On elements without any stateful attributes, `key` is silently ignored and no
+//! `.id()` is injected — the element stays a plain `Div`.
+//!
+//! | Situation | Result |
+//! |-----------|--------|
+//! | stateful attrs + `key` | composite ID: auto-prefix + key (runtime) |
+//! | stateful attrs, no `key` | pure source-location auto ID (compile-time) |
+//! | no stateful attrs + `key` | **`key` ignored**, no `.id()` injected |
+//! | explicit `id` | always used, `key` has no effect |
+//!
+//! **Loop safety:** Inside a `{for ...}` loop, every iteration shares the same source
+//! location. The macro **emits a compile error** when a stateful element is found inside
+//! a loop without an explicit `id` or `key`:
+//!
+//! ```ignore
+//! // ❌ compile error — all <li> would share the same auto ID
+//! {for item in &self.items { <li onClick={handler}>{item}</li> }}
+//!
+//! // ✅ key produces a unique ID per iteration
+//! rsx! {
+//!     <ul>
+//!         {for item in &self.items {
+//!             <li key={item.id} onClick={handler}>{item.name.clone()}</li>
+//!         }}
+//!     </ul>
+//! }
+//! // → div().id(format!("src/main.rs::__rsx_li_L42C8_{}", item.id)).on_click(handler)…
+//! //   e.g. "src/main.rs::__rsx_li_L42C8_1", "src/main.rs::__rsx_li_L42C8_2", …
+//! ```
+//!
+//! `key` accepts any type that implements `Display` (integers, `&str`, UUIDs, …).
+//! For a fully stable custom ID that survives refactors, use the `id` attribute instead.
+//!
+//! | Attribute | GPUI method |
+//! |-----------|-------------|
+//! | `onClick` / `on_click` | `.on_click(h)` |
+//! | `onMouseDown` / `on_mouse_down` | `.on_mouse_down(h)` |
+//! | `onMouseUp` / `on_mouse_up` | `.on_mouse_up(h)` |
+//! | `onMouseMove` / `on_mouse_move` | `.on_mouse_move(h)` |
+//! | `onKeyDown` / `on_key_down` | `.on_key_down(h)` |
+//! | `onKeyUp` / `on_key_up` | `.on_key_up(h)` |
+//! | `onFocus` / `on_focus` | `.on_focus(h)` |
+//! | `onBlur` / `on_blur` | `.on_blur(h)` |
+//! | `onHover` / `on_hover` | `.on_hover(h)` |
+//! | `onScrollWheel` / `on_scroll_wheel` | `.on_scroll_wheel(h)` |
+//! | `onDrag` / `on_drag` | `.on_drag(h)` |
+//! | `onDrop` / `on_drop` | `.on_drop(h)` |
+//! | `onAction` / `on_action` | `.on_action(h)` |
+//!
+//! ### Expressions and Children
+//!
+//! ```ignore
+//! rsx! {
+//!     <div>
+//!         {format!("Count: {}", self.count)}   // any expression
+//!         {self.render_child()}                 // method returning IntoElement
+//!         {if self.show {
+//!             rsx! { <span>{"Visible"}</span> }
+//!         } else {
+//!             rsx! { <span>{"Hidden"}</span> }
+//!         }}
+//!     </div>
+//! }
+//! ```
+//!
+//! Two or more consecutive expressions are batched into a single `.children([...])`
+//! call (stack-allocated array, zero heap allocation):
+//!
+//! ```ignore
+//! rsx! { <div>{"a"}{"b"}{"c"}</div> }
+//! // → div().children(["a", "b", "c"])
+//! ```
+//!
+//! ### For-loop Syntax Sugar
+//!
+//! ```ignore
+//! rsx! {
+//!     <ul>
+//!         {for item in &self.items {
+//!             <li>{item.name.clone()}</li>
+//!         }}
+//!     </ul>
+//! }
+//! // → div().children((&self.items).into_iter().map(|item| {
+//! //       div().child(item.name.clone())
+//! //   }))
+//! ```
+//!
+//! ### Spread Syntax
+//!
+//! ```ignore
+//! rsx! {
+//!     <div>
+//!         {...self.items.iter().map(|i| rsx! { <span>{i}</span> })}
+//!     </div>
+//! }
+//! ```
+//!
+//! ### Conditional Attributes: `when` and `whenSome`
+//!
+//! Apply style transformations based on a runtime condition without leaving compile-time
+//! safety:
+//!
+//! ```ignore
+//! rsx! {
+//!     <button
+//!         class="px-4 py-2 rounded-md"
+//!         when={(is_selected, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))}
+//!         when={(is_disabled, |el| el.opacity(0.5))}
+//!         whenSome={(custom_color, |el, c| el.bg(rgb(c)))}
+//!     >
+//!         {"Button"}
+//!     </button>
+//! }
+//! ```
+//!
+//! ### The `styled` Flag — Semantic Tag Defaults
+//!
+//! Adding `styled` injects sensible default classes for the tag name, applied before
+//! any user-provided attributes:
+//!
+//! ```ignore
+//! rsx! { <h1 styled>{"Title"}</h1> }
+//! // → div().text_3xl().font_bold().child("Title")
+//!
+//! rsx! { <button styled onClick={handler}>{"OK"}</button> }
+//! // → div().cursor_pointer().id("…").on_click(handler).child("OK")
+//! ```
+//!
+//! | Tag | Default classes |
+//! |-----|----------------|
+//! | `h1` | `text-3xl font-bold` |
+//! | `h2` | `text-2xl font-bold` |
+//! | `h3` | `text-xl font-bold` |
+//! | `h4` | `text-lg font-bold` |
+//! | `h5` | `text-base font-bold` |
+//! | `h6` | `text-sm font-bold` |
+//! | `button`, `a` | `cursor-pointer` |
+//! | `input`, `textarea` | `px-2 py-1` |
+//! | `ul`, `ol` | `flex flex-col` |
+//!
+//! ### Attribute Mapping Reference
+//!
+//! camelCase names are automatically converted to snake_case GPUI methods. Attributes
+//! not in this table are passed through unchanged (e.g., `bg={color}` → `.bg(color)`).
+//!
+//! | RSX attribute | GPUI method |
+//! |---------------|-------------|
+//! | `zIndex` | `.z_index()` |
+//! | `opacity` | `.opacity()` |
+//! | `invisible` (flag) | `.visible(false)` |
+//! | `width` / `height` | `.w()` / `.h()` |
+//! | `minWidth` / `maxWidth` | `.min_w()` / `.max_w()` |
+//! | `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
+//! | `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
+//! | `flexBasis` | `.basis()` |
+//! | `flexGrow` / `flexShrink` | `.flex_grow()` / `.flex_shrink()` |
+//! | `flexOrder` | `.order()` |
+//! | `fontSize` | `.font_size()` |
+//! | `lineHeight` | `.line_height()` |
+//! | `fontWeight` | `.font_weight()` |
+//! | `textAlign` | `.text_align()` |
+//! | `textDecoration` | `.text_decoration()` |
+//! | `borderRadius` | `.border_radius()` |
+//! | `borderTop` / `borderBottom` | `.border_t()` / `.border_b()` |
+//! | `borderLeft` / `borderRight` | `.border_l()` / `.border_r()` |
+//! | `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
+//! | `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
+//! | `boxShadow` | `.shadow()` |
+//! | `overflowX` / `overflowY` | `.overflow_x()` / `.overflow_y()` |
+//! | `inset` | `.inset()` |
+//!
+//! ## Auto ID Injection
+//!
+//! Elements that require a stateful identity (event handlers, `tooltip`, `track_focus`)
+//! automatically receive a deterministic `.id()` derived from the element's source
+//! location. The ID is chosen by the following priority:
+//!
+//! 1. **Explicit `id`** — always wins, `key` is ignored.
+//! 2. **`key` present** (and element is stateful) — composite ID at runtime:
+//!    `format!(concat!(file!(), "::{prefix}_{}"), key_expr)`
+//! 3. **No `key`** (and element is stateful) — pure compile-time source-location ID:
+//!    `concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")`
+//! 4. **Not stateful** — no `.id()` injected; `key` is silently ignored.
+//!
+//! ```ignore
+//! // Format (no key): concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")
+//! // Example:         "src/views/counter.rs::__rsx_button_L42C8"
+//! //
+//! // Format (key):    format!(concat!(file!(), "::__rsx_{tag}_L{line}C{col}_{}"), key)
+//! // Example:         "src/views/list.rs::__rsx_li_L55C12_42"
+//! ```
+//!
+//! The source-location ID is stable across incremental rebuilds as long as the
+//! element's position in the file does not change. For IDs that must survive
+//! refactors, use the explicit `id` attribute.
+//!
+//! > **Note on style attributes:** `hover`, `active`, `focus`, and `group` are
+//! > *`Styled` trait* methods and do **not** trigger auto ID injection.
+//! > Only `StatefulInteractiveElement` / `FocusableElement` attributes
+//! > (event handlers, `tooltip`, `track_focus`) require an ID.
+//!
+//! ### Loop safety
+//!
+//! Elements inside `{for ...}` loops share the same source location and would receive
+//! identical auto IDs across iterations. **A compile error is emitted** in this case.
+//! Add `key={expr}` (any `Display` type) to produce a unique ID per iteration:
+//!
+//! ```ignore
+//! // ❌ compile error — all <li> would share the same auto ID
+//! {for item in &self.items { <li onClick={handler}>{item}</li> }}
+//!
+//! // ✅ key produces a unique ID per iteration
+//! {for item in &self.items { <li key={item.id} onClick={handler}>{item}</li> }}
+//! ```
+//!
+//! ## Performance
+//!
+//! - **Compile-time** — All class parsing, color lookup, and attribute mapping happen
+//!   during macro expansion. The generated code is identical to hand-written GPUI.
+//! - **O(1) lookups** — Colors, attributes, and spacing prefixes use `match` statements
+//!   that the compiler turns into jump tables.
+//! - **Zero allocation** — Static classes generate no heap allocation. Dynamic classes
+//!   use `AsRef<str>` (zero-copy for `&str` inputs).
+//! - **Binary size** — Dynamic class helpers use `#[inline(never)]` + LLVM ICF to avoid
+//!   code bloat when multiple `class={expr}` appear in the same component.
+//!
+//! ## Further Reading
+//!
+//! - [Architecture guide (ARCHITECTURE.md)](https://github.com/wsafight/gpui-rsx/blob/main/ARCHITECTURE.md) —
+//!   module design, data flow, extension points
+//! - [Getting started](https://github.com/wsafight/gpui-rsx/blob/main/docs/getting-started.md)
+//! - [API reference](https://github.com/wsafight/gpui-rsx/blob/main/docs/api-reference.md)
+//! - [Best practices](https://github.com/wsafight/gpui-rsx/blob/main/docs/best-practices.md)
+//! - [Changelog](https://github.com/wsafight/gpui-rsx/blob/main/CHANGELOG.md)
 
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
@@ -41,16 +449,58 @@ mod parser;
 use codegen::generate_body;
 use parser::RsxBody;
 
-/// RSX 宏 - 将 HTML-like 语法转换为 GPUI 代码
+/// Transforms JSX-like markup into GPUI method chains at compile time.
 ///
-/// # 语法
+/// # Syntax
 ///
-/// ## 基本元素
-/// ```ignore
-/// rsx! { <div>{"Hello"}</div> }
+/// ```text
+/// rsx! { <tag attr1 attr2={expr} class="…"> {children} </tag> }
+/// rsx! { <tag /> }          — self-closing
+/// rsx! { <> … </> }         — fragment (returns vec![…])
 /// ```
 ///
-/// ## Fragment（多根节点）
+/// # Examples
+///
+/// ## Basic element with static classes
+///
+/// ```ignore
+/// rsx! {
+///     <div class="flex flex-col gap-4 p-4">
+///         <h1 class="text-2xl font-bold">{"Hello"}</h1>
+///     </div>
+/// }
+/// ```
+///
+/// ## Event handling (auto ID injected)
+///
+/// ```ignore
+/// rsx! {
+///     <button
+///         class="bg-blue-500 text-white px-4 py-2 rounded-md"
+///         onClick={cx.listener(|view, _, cx| {
+///             view.count += 1;
+///             cx.notify();
+///         })}
+///     >
+///         {"Click me"}
+///     </button>
+/// }
+/// ```
+///
+/// ## For-loop rendering
+///
+/// ```ignore
+/// rsx! {
+///     <ul>
+///         {for item in &self.items {
+///             <li>{item.name.clone()}</li>
+///         }}
+///     </ul>
+/// }
+/// ```
+///
+/// ## Fragment (multiple root elements)
+///
 /// ```ignore
 /// rsx! {
 ///     <>
@@ -60,61 +510,34 @@ use parser::RsxBody;
 /// }
 /// ```
 ///
-/// ## 属性
+/// ## Conditional styling
+///
 /// ```ignore
 /// rsx! {
 ///     <div
-///         flex
-///         flex_col
-///         gap={px(16.0)}
-///         bg={rgb(0xffffff)}
-///     />
-/// }
-/// ```
-///
-/// ## 嵌套
-/// ```ignore
-/// rsx! {
-///     <div>
-///         <span>{"Item 1"}</span>
-///         <span>{"Item 2"}</span>
+///         class="px-4 py-2 rounded-md"
+///         when={(is_active, |el| el.bg(rgb(0x3b82f6)))}
+///         whenSome={(custom_width, |el, w| el.w(px(w)))}
+///     >
+///         {"Content"}
 ///     </div>
 /// }
 /// ```
 ///
-/// ## 表达式
+/// ## Styled defaults
+///
 /// ```ignore
-/// rsx! {
-///     <div>
-///         {format!("Count: {}", self.count)}
-///         {self.render_child()}
-///     </div>
-/// }
+/// rsx! { <h1 styled>{"Title"}</h1> }
+/// // → div().text_3xl().font_bold().child("Title")
 /// ```
 ///
-/// ## 条件渲染
-/// ```ignore
-/// rsx! {
-///     <div>
-///         {if self.show {
-///             rsx! { <span>{"Visible"}</span> }
-///         } else {
-///             rsx! { <span>{"Hidden"}</span> }
-///         }}
-///     </div>
-/// }
-/// ```
+/// # Notes
 ///
-/// ## For 循环
-/// ```ignore
-/// rsx! {
-///     <ul>
-///         {for item in &self.items {
-///             <li>{item.clone()}</li>
-///         }}
-///     </ul>
-/// }
-/// ```
+/// - **Static `class`**: parsed entirely at compile time, supports all classes.
+/// - **Dynamic `class={expr}`**: runtime match; only ~58 common classes recognised.
+///   Unknown classes are silently ignored. Prefer `when` or static strings.
+/// - **Auto ID**: elements with stateful event handlers receive a source-location-based
+///   ID automatically. Provide an explicit `id` attribute for state-sensitive elements.
 #[proc_macro]
 pub fn rsx(input: TokenStream) -> TokenStream {
     let body = parse_macro_input!(input as RsxBody);
