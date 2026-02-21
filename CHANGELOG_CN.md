@@ -7,6 +7,42 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.3.0] - 2026-02-21
+
+### ♻️ 重构
+
+#### 测试基础设施
+- **消除 `tests/common/mod.rs` 中的重复方法** — `impl MockElement` 原先定义了约 60 个方法，
+  这些方法已由 `impl Styled for MockElement` 提供。直接 `impl` 块现在只保留 `Styled` trait
+  中没有的方法（事件处理器、状态样式方法、条件辅助方法等）。文件从 823 行缩减至 456 行，
+  每个方法保持唯一来源，消除了静默差异的风险。
+
+#### 代码生成器
+- **简化 `runtime.rs` 中 black/white 条目的生成逻辑** — 原先生成 black/white 颜色 match
+  分支的循环在运行时通过 `class_str.starts_with("text-")` / `starts_with("bg-")` 来选择
+  方法标识符。方法名现在直接编码在数据数组中，完全消除了运行时分支：
+  ```rust
+  // 之前：方法 ident 在运行时推断
+  for (class_str, hex) in [("text-black", 0x000000u32), …] {
+      let (method_ident, hex) = if class_str.starts_with("text-") { … };
+  }
+  // 之后：方法 ident 直接编码在数据中
+  for (class_str, method_ident, hex) in [
+      ("text-black", &text_color_ident, 0x000000u32), …
+  ] { … }
+  ```
+
+- **在 `class.rs` 中提取 `is_directional_border(rest)` 辅助函数** — 区分方向性边框类
+  （`border-t`、`border-t-2`）与颜色边框类（`border-red-500`）的逻辑原先内联在
+  `parse_single_class` 中。现在提取为独立的 `fn is_directional_border(rest: &str) -> bool`
+  函数，并附有说明边界情况的文档注释，调用处从 11 行注释+代码缩减为单行可读谓词调用。
+
+### ✅ 测试
+- 全部 287 个测试通过（227 宏测试 + 35 覆盖率测试 + 23 单元测试 + 2 诊断测试）
+- 零回归
+
+---
+
 ## [0.2.2] - 2026-02-18
 
 ### 🚀 性能优化
@@ -192,6 +228,7 @@
 
 ---
 
+[0.3.0]: https://github.com/wsafight/gpui-rsx/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wsafight/gpui-rsx/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wsafight/gpui-rsx/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wsafight/gpui-rsx/compare/v0.1.2...v0.2.0

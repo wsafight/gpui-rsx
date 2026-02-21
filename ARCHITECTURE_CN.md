@@ -66,15 +66,15 @@ GPUI-RSX 是一个为 GPUI UI 框架提供类 JSX 语法的过程宏。它在编
 ```
 src/
 ├── lib.rs                     (~123 行)  - 宏入口点
-├── parser.rs                  (~311 行)  - RSX → AST
-├── diagnostics.rs             (~110 行)  - 错误消息
+├── parser.rs                  (~307 行)  - RSX → AST
+├── diagnostics.rs             (~210 行)  - 错误消息
 └── codegen/
     ├── mod.rs                 (~24 行)   - 模块协调
-    ├── tables.rs              (~421 行)  - O(1) match 查找表
-    ├── class.rs               (~147 行)  - CSS class 解析
+    ├── tables.rs              (~617 行)  - O(1) match 查找表
+    ├── class.rs               (~169 行)  - CSS class 解析
     ├── attribute.rs           (~79 行)   - 属性 → 方法
-    ├── element.rs             (~254 行)  - 元素生成 + 自动 ID
-    └── runtime.rs             (~188 行)  - 动态 class 代码生成
+    ├── element.rs             (~248 行)  - 元素生成 + 自动 ID
+    └── runtime.rs             (~466 行)  - 动态 class 代码生成
 ```
 
 ### 模块职责
@@ -389,21 +389,17 @@ div()
    (iter).into_iter().flat_map(|binding| vec![child1, child2])
    ```
 
-**自动 ID 计数器**：
+**自动 ID 生成**（基于 span，在增量编译中保持稳定）：
 ```rust
-// thread_local 计数器；在单次编译进程中单调递增。
-// 已知限制：增量编译可能改变展开顺序，导致 ID 变化。
-// 依赖 ID 稳定性的元素应显式指定 `id` 属性。
-thread_local! {
-    static AUTO_ID_COUNTER: Cell<usize> = const { Cell::new(0) };
-}
-
-fn next_auto_id(tag: &str) -> String {
-    AUTO_ID_COUNTER.with(|c| {
-        let n = c.get();
-        c.set(n + 1);
-        format!("__rsx_{tag}_{n}")
-    })
+// 利用元素 Ident 的 span（行号 + 列号）推导确定性 ID。
+// 格式：concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")
+// file!() 在用户侧展开，提供完整路径保证跨文件唯一性。
+// 只要元素的源码位置不变，其 ID 就保持不变。
+fn next_auto_id(tag_ident: &syn::Ident) -> TokenStream {
+    let span = tag_ident.span();
+    let loc = span.start();
+    let id_suffix = format!("__rsx_{}_L{}C{}", tag_ident, loc.line, loc.column);
+    quote! { concat!(file!(), "::", #id_suffix) }
 }
 ```
 
@@ -527,16 +523,19 @@ thread_local! {
                │ diagnostic_tests │  2 个编译错误格式测试
                └──────────────────┘
               ┌────────────────────┐
-              │  coverage_tests    │  31 个边界情况/行为测试
+              │  coverage_tests    │  35 个边界情况/行为测试
               └────────────────────┘
             ┌──────────────────────┐
-            │    macro_tests       │  203 个展开正确性测试
+            │    macro_tests       │  227 个展开正确性测试
             └──────────────────────┘
+          ┌────────────────────────┐
+          │   内联单元测试         │  23 个查找表/诊断单元测试
+          └────────────────────────┘
 ```
 
 ### 宏测试 (tests/macro_tests.rs)
 
-**覆盖率**：203 个测试用例
+**覆盖率**：227 个测试用例
 
 **分类**：
 - 元素（29）：标签、嵌套、自闭合、特殊标签
@@ -810,7 +809,7 @@ error[E0599]: no method named `flex_col` found for struct `Div`
 
 **工作流**：
 1. 修改 `src/codegen/` 中的代码
-2. 运行 `cargo test`（全部 236 个测试）
+2. 运行 `cargo test`（全部 287 个测试）
 3. 检查特定测试：`cargo test test_name`
 4. 查看生成代码：`cargo expand --test macro_tests`
 
@@ -887,14 +886,17 @@ rsx! {
 
 ---
 
-**最后更新**：2026-02-18
-**版本**：0.2.1
+**最后更新**：2026-02-21
+**版本**：0.3.0
 **维护者**：@wangshian
 
-### 优化变更记录
+### 变更记录
 
 | 日期 | 文件 | 改动 |
 |------|------|------|
+| 2026-02-21 | `tests/common/mod.rs` | 从 `impl MockElement` 删除约 60 个已由 `impl Styled` 覆盖的重复方法 |
+| 2026-02-21 | `runtime.rs` | black/white 条目：方法名直接编码进数据，移除运行时 `starts_with` 分支 |
+| 2026-02-21 | `class.rs` | 提取 `is_directional_border(rest)` 辅助函数 |
 | 2026-02-18 | `class.rs` | `split_whitespace` → `split_ascii_whitespace` |
 | 2026-02-18 | `class.rs` | 合并 `text_` 前缀处理；删除 `parse_color_class` |
 | 2026-02-18 | `element.rs` | 空元素快速路径移至属性扫描循环之前 |

@@ -66,15 +66,15 @@ GPUI-RSX is a procedural macro that provides JSX-like syntax for the GPUI UI fra
 ```
 src/
 ├── lib.rs                     (~123 lines) - Macro entry point
-├── parser.rs                  (~311 lines) - RSX → AST
-├── diagnostics.rs             (~110 lines) - Error messages
+├── parser.rs                  (~307 lines) - RSX → AST
+├── diagnostics.rs             (~210 lines) - Error messages
 └── codegen/
     ├── mod.rs                 (~24 lines)  - Module orchestration
-    ├── tables.rs              (~421 lines) - O(1) match-based lookup tables
-    ├── class.rs               (~147 lines) - CSS class parsing
+    ├── tables.rs              (~617 lines) - O(1) match-based lookup tables
+    ├── class.rs               (~169 lines) - CSS class parsing
     ├── attribute.rs           (~79 lines)  - Attribute → method
-    ├── element.rs             (~254 lines) - Element generation + auto ID
-    └── runtime.rs             (~188 lines) - Dynamic class code generation
+    ├── element.rs             (~248 lines) - Element generation + auto ID
+    └── runtime.rs             (~466 lines) - Dynamic class code generation
 ```
 
 ### Module Responsibilities
@@ -216,6 +216,22 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
 #### class.rs — Class String Parsing
 
 **Purpose**: Parse Tailwind-style class strings into GPUI method call `TokenStream`s.
+
+**Helper Functions**:
+
+- **`is_directional_border(rest: &str) -> bool`** — Determines whether the part after
+  `border_` prefix refers to a directional border class (falls through to default method
+  call) versus a color border class (generates `.border_color(rgb(...))`):
+  ```rust
+  // Directional: "border-t" → rest = "t" (len == 1)
+  // Directional: "border-t-2" → rest = "t_2" (first byte is direction, second is '_')
+  // Color: "border-red-500" → rest = "red_500" ('r' looks directional but byte[1]='e' ≠ '_')
+  fn is_directional_border(rest: &str) -> bool {
+      let bytes = rest.as_bytes();
+      matches!(bytes.first(), Some(b't' | b'b' | b'l' | b'r' | b'x' | b'y'))
+          && (rest.len() == 1 || bytes.get(1) == Some(&b'_'))
+  }
+  ```
 
 **Key Innovations**:
 
@@ -401,21 +417,17 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
    (iter).into_iter().flat_map(|binding| vec![child1, child2])
    ```
 
-**Auto ID Counter**:
+**Auto ID Generation** (span-based, stable across incremental builds):
 ```rust
-// Thread-local counter; increments monotonically per compile process.
-// Known limitation: incremental builds may change expansion order,
-// producing different IDs. Use explicit `id` for state-sensitive elements.
-thread_local! {
-    static AUTO_ID_COUNTER: Cell<usize> = const { Cell::new(0) };
-}
-
-fn next_auto_id(tag: &str) -> String {
-    AUTO_ID_COUNTER.with(|c| {
-        let n = c.get();
-        c.set(n + 1);
-        format!("__rsx_{tag}_{n}")
-    })
+// Uses the element's Ident span (line + column) to derive a deterministic ID.
+// Format: concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")
+// file!() expands on the user side, providing full path for cross-file uniqueness.
+// As long as the element's source position doesn't change, its ID stays the same.
+fn next_auto_id(tag_ident: &syn::Ident) -> TokenStream {
+    let span = tag_ident.span();
+    let loc = span.start();
+    let id_suffix = format!("__rsx_{}_L{}C{}", tag_ident, loc.line, loc.column);
+    quote! { concat!(file!(), "::", #id_suffix) }
 }
 ```
 
@@ -545,16 +557,19 @@ thread_local! {
                │ diagnostic_tests │  2 compile-error format tests
                └──────────────────┘
               ┌────────────────────┐
-              │  coverage_tests    │  31 edge case / behaviour tests
+              │  coverage_tests    │  35 edge case / behaviour tests
               └────────────────────┘
             ┌──────────────────────┐
-            │    macro_tests       │  203 expansion correctness tests
+            │    macro_tests       │  227 expansion correctness tests
             └──────────────────────┘
+          ┌────────────────────────┐
+          │    unit tests (inline) │  23 lookup table / diagnostic tests
+          └────────────────────────┘
 ```
 
 ### Macro Tests (tests/macro_tests.rs)
 
-**Coverage**: 203 test cases
+**Coverage**: 227 test cases
 
 **Categories**:
 - Elements (29): Tags, nesting, self-closing, special tags
@@ -831,7 +846,7 @@ and is being passed as a method name literally.
 
 **Workflow**:
 1. Modify code in `src/codegen/`
-2. Run `cargo test` (all 236 tests)
+2. Run `cargo test` (all 287 tests)
 3. Check a specific test: `cargo test test_name`
 4. View generated code: `cargo expand --test macro_tests`
 
@@ -910,14 +925,17 @@ requirements, and release procedure.
 
 ---
 
-**Last Updated**: 2026-02-18
-**Version**: 0.2.1
+**Last Updated**: 2026-02-21
+**Version**: 0.3.0
 **Maintainers**: @wangshian
 
-### Optimisation Changelog
+### Changelog
 
 | Date | File | Change |
 |------|------|--------|
+| 2026-02-21 | `tests/common/mod.rs` | Removed ~60 methods from `impl MockElement` already covered by `impl Styled` |
+| 2026-02-21 | `runtime.rs` | Black/white color entries: method name encoded in data, removed runtime `starts_with` |
+| 2026-02-21 | `class.rs` | Extracted `is_directional_border(rest)` helper function |
 | 2026-02-18 | `class.rs` | `split_whitespace` → `split_ascii_whitespace` |
 | 2026-02-18 | `class.rs` | Merged `text_` prefix handling; removed `parse_color_class` |
 | 2026-02-18 | `element.rs` | Moved empty-element fast-path before attribute-scan loop |

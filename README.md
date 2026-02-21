@@ -42,7 +42,7 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 gpui = "0.1"
-gpui-rsx = "0.1"
+gpui-rsx = "0.3"
 ```
 
 ## 🚀 Quick Start
@@ -718,6 +718,25 @@ GPUI-RSX is a **compile-time macro** that expands to the same code as hand-writt
 | Runtime Performance | Baseline | Same |
 | Type Safety | ✅ | ✅ |
 | Compile-time Checking | ✅ | ✅ |
+
+### v0.3.0 Refactoring
+- Eliminated ~60 duplicate method definitions in `tests/common/mod.rs` (823 → 456 lines)
+- Simplified black/white color entry generation in `runtime.rs` (method names encoded in data)
+- Extracted `is_directional_border()` helper in `class.rs` for clearer border logic
+
+### v0.2.2 Optimizations
+
+**Compile-time Performance:**
+- `split_ascii_whitespace` replaces `split_whitespace` in class parsing
+- Unified `text_` prefix handling (single `strip_prefix` call)
+- Early fast-path for empty elements
+- `Vec::with_capacity(attrs * 2 + children)` for class-heavy elements
+
+**Runtime Performance:**
+- `.children([...])` batching threshold lowered 3 → 2
+
+**Binary Size:**
+- `panic = "abort"` in `[profile.release]` removes unwind tables
 
 ### v0.2.1 Optimizations
 

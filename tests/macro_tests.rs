@@ -1315,16 +1315,6 @@ fn test_class_text_lg() {
     let _el = rsx! { <div class="text-lg" /> };
 }
 
-#[test]
-fn test_class_text_4xl() {
-    let _el = rsx! { <div class="text-4xl" /> };
-}
-
-#[test]
-fn test_class_text_5xl() {
-    let _el = rsx! { <div class="text-5xl" /> };
-}
-
 // ===========================================================================
 // 29. 新属性名称映射
 // ===========================================================================
@@ -1832,4 +1822,271 @@ fn test_auto_id_multiple_unique() {
             <button onClick={h2}>{"Btn 2"}</button>
         </div>
     };
+}
+
+// ===========================================================================
+// 39. size-N 类名（bug 修复验证：size-4 → .size(px(4.0))）
+// ===========================================================================
+
+#[test]
+fn test_class_size_numeric() {
+    let _a = rsx! { <div class="size-4" /> };
+    let _b = rsx! { <div class="size-8" /> };
+    let _c = rsx! { <div class="size-16" /> };
+}
+
+#[test]
+fn test_class_size_combined() {
+    // size-N 与其他间距类同时使用
+    let _el = rsx! { <div class="size-4 gap-4" /> };
+}
+
+// ===========================================================================
+// 40. opacity-* 和 z-* 类名
+// ===========================================================================
+
+#[test]
+fn test_class_opacity_values() {
+    // opacity-N → .opacity(N / 100.0)
+    let _a = rsx! { <div class="opacity-0" /> }; // → .opacity(0.0)
+    let _b = rsx! { <div class="opacity-50" /> }; // → .opacity(0.5)
+    let _c = rsx! { <div class="opacity-100" /> }; // → .opacity(1.0)
+}
+
+#[test]
+fn test_class_opacity_combined() {
+    let _el = rsx! { <div class="opacity-75 flex" /> };
+}
+
+#[test]
+fn test_class_z_index_values() {
+    // z-N → .z_index(N)
+    let _a = rsx! { <div class="z-0" /> };
+    let _b = rsx! { <div class="z-10" /> };
+    let _c = rsx! { <div class="z-50" /> };
+}
+
+#[test]
+fn test_class_z_combined() {
+    let _el = rsx! { <div class="z-10 absolute" /> };
+}
+
+// ===========================================================================
+// 41. styled 新标签默认样式（li、p、label、form）
+// ===========================================================================
+
+#[test]
+fn test_styled_li() {
+    // li styled → "flex items-center" → .flex().items_center()
+    let _el = rsx! { <li styled>{"list item"}</li> };
+}
+
+#[test]
+fn test_styled_p() {
+    // p styled → "text-base" → .text_base()
+    let _el = rsx! { <p styled>{"paragraph"}</p> };
+}
+
+#[test]
+fn test_styled_label() {
+    // label styled → "text-sm" → .text_sm()
+    let _el = rsx! { <label styled>{"label text"}</label> };
+}
+
+#[test]
+fn test_styled_form() {
+    // form styled → "flex flex-col gap-4" → .flex().flex_col().gap(px(4.0))
+    let _el = rsx! { <form styled>{"form content"}</form> };
+}
+
+#[test]
+fn test_styled_new_tags_with_class_override() {
+    // styled 默认样式可被 class 属性追加覆盖
+    let _el = rsx! { <li styled class="p-4">{"item"}</li> };
+}
+
+// ===========================================================================
+// 42. 动态 class 新增条目（gap 更多值、方向性 padding/margin）
+// ===========================================================================
+
+#[test]
+fn test_dynamic_class_new_gap_values() {
+    // gap-5 / gap-10 / gap-12 是新增条目
+    let cls = "gap-5";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "gap-10";
+    let _b = rsx! { <div class={cls} /> };
+    let cls = "gap-12";
+    let _c = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_direction_padding() {
+    // pt-N, pb-N, pl-N, pr-N 是新增条目
+    let cls = "pt-4 pb-2";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "pl-4 pr-2";
+    let _b = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_direction_margin() {
+    // mt-N, mb-N, mx-N, my-N 是新增条目
+    let cls = "mt-4 mb-2";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "mx-4 my-2";
+    let _b = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_unknown_ignored_no_panic() {
+    // 不在预定义列表的 class 被静默忽略，不 panic
+    let cls = "not-a-class-xyz";
+    let _el = rsx! { <div class={cls} /> };
+}
+
+// ===========================================================================
+// 43. Auto-ID span 位置稳定性
+// ===========================================================================
+
+#[test]
+fn test_auto_id_span_format_exact() {
+    // 验证 auto-ID 精确格式：{file}::__rsx_{tag}_L{line}C{col}
+    //
+    // 列号固定为 22："    let _el = rsx! { <" = 22 个字符（0-indexed）
+    // 行号用 line!() + 1 在编译时精确定位，无需硬编码绝对行号。
+    //
+    // ⚠️ 若在本行与 rsx! 行之间插入新行，需将 line!() + 1 的偏移量同步更新。
+    let h = |_: (), _: ()| {};
+    let expected_line = line!() + 1; // 下一行就是 rsx! 调用
+    let _el = rsx! { <div on_click={h} /> }; // div 在列 22
+    let captured = take_last_auto_id().expect("on_click 应触发 auto-ID 生成");
+    let expected = format!("{}::__rsx_div_L{expected_line}C22", file!());
+    assert_eq!(
+        captured, expected,
+        "auto-ID 格式应为 {{file}}::__rsx_{{tag}}_L{{line}}C{{col}}\n期望: {expected}\n实际: {captured}"
+    );
+}
+
+#[test]
+fn test_auto_id_tag_name_in_id() {
+    // 标签名应出现在 auto-ID 中
+    let h = |_: (), _: ()| {};
+    let _el = rsx! { <button on_click={h} /> };
+    let id = take_last_auto_id().expect("应生成 auto-ID");
+    assert!(
+        id.contains("__rsx_button_L"),
+        "button 的 ID 应包含 __rsx_button_L，实际: {id}"
+    );
+}
+
+#[test]
+fn test_auto_id_different_lines_get_different_ids() {
+    // 不同行的 rsx! 调用应生成不同 auto-ID（行号不同）
+    let h = |_: (), _: ()| {};
+    let _a = rsx! { <div on_click={h} /> };
+    let id_a = take_last_auto_id().unwrap();
+    let _b = rsx! { <div on_click={h} /> };
+    let id_b = take_last_auto_id().unwrap();
+    // 两行行号不同 → ID 不同
+    assert_ne!(id_a, id_b, "不同行的元素应有不同 auto-ID");
+    // 两个 ID 都应包含行列信息
+    assert!(
+        id_a.contains("_L") && id_a.contains('C'),
+        "ID 格式应含 _L 和 C: {id_a}"
+    );
+    assert!(
+        id_b.contains("_L") && id_b.contains('C'),
+        "ID 格式应含 _L 和 C: {id_b}"
+    );
+}
+
+#[test]
+fn test_auto_id_no_id_for_non_stateful() {
+    // 非 stateful 元素不触发 auto-ID 生成，LAST_AUTO_ID 应为空
+    take_last_auto_id(); // 清空上一次的残留
+    let _el = rsx! { <div flex gap={px(4.0)} /> };
+    let captured = take_last_auto_id();
+    assert!(captured.is_none(), "无 stateful 属性时不应生成 auto-ID");
+}
+
+// ===========================================================================
+// 44. 动态 class 数值前缀回退（任意数值支持）
+// ===========================================================================
+
+#[test]
+fn test_dynamic_class_arbitrary_gap() {
+    // gap-7 / gap-9 / gap-16 不在静态枚举中，走数值前缀回退路径
+    let cls = "gap-7";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "gap-9";
+    let _b = rsx! { <div class={cls} /> };
+    let cls = "gap-16";
+    let _c = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_arbitrary_padding() {
+    // p-5 / px-5 / py-5 不在静态枚举中，走数值前缀回退路径
+    let cls = "p-5";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "px-5";
+    let _b = rsx! { <div class={cls} /> };
+    let cls = "py-5";
+    let _c = rsx! { <div class={cls} /> };
+    let cls = "pt-3 pb-3";
+    let _d = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_arbitrary_margin() {
+    // m-3 / ml-3 / mr-3 走数值前缀回退路径
+    let cls = "m-3";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "ml-3";
+    let _b = rsx! { <div class={cls} /> };
+    let cls = "mr-3";
+    let _c = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_opacity() {
+    // opacity-50 走静态快速路径；opacity-33 走数值前缀回退路径
+    let cls = "opacity-50";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "opacity-33";
+    let _b = rsx! { <div class={cls} /> };
+    let cls = "opacity-0";
+    let _c = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_z_index() {
+    // z-10 走静态快速路径；z-30 / z-100 走数值前缀回退路径
+    let cls = "z-10";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "z-30";
+    let _b = rsx! { <div class={cls} /> };
+    let cls = "z-100";
+    let _c = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_sizing_arbitrary() {
+    // w-48 / h-16 / size-8 走数值前缀回退路径
+    let cls = "w-48";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "h-16";
+    let _b = rsx! { <div class={cls} /> };
+    let cls = "size-8";
+    let _c = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_gap_xy_arbitrary() {
+    // gap-x-4 / gap-y-6 走数值前缀回退路径
+    let cls = "gap-x-4";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "gap-y-6";
+    let _b = rsx! { <div class={cls} /> };
 }

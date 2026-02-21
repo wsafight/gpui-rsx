@@ -289,20 +289,33 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
     match name {
         // 事件处理器（camelCase 和 snake_case 均支持）
         "onClick" | "on_click" => Some("on_click"),
+        "onAuxClick" | "on_aux_click" => Some("on_aux_click"),
         "onMouseDown" | "on_mouse_down" => Some("on_mouse_down"),
         "onMouseUp" | "on_mouse_up" => Some("on_mouse_up"),
         "onMouseMove" | "on_mouse_move" => Some("on_mouse_move"),
         "onMouseDownOut" | "on_mouse_down_out" => Some("on_mouse_down_out"),
         "onMouseUpOut" | "on_mouse_up_out" => Some("on_mouse_up_out"),
+        "onAnyMouseDown" | "on_any_mouse_down" => Some("on_any_mouse_down"),
+        "onAnyMouseUp" | "on_any_mouse_up" => Some("on_any_mouse_up"),
+        "onMousePressure" | "on_mouse_pressure" => Some("on_mouse_pressure"),
         "onKeyDown" | "on_key_down" => Some("on_key_down"),
         "onKeyUp" | "on_key_up" => Some("on_key_up"),
+        "onModifiersChanged" | "on_modifiers_changed" => Some("on_modifiers_changed"),
         "onFocus" | "on_focus" => Some("on_focus"),
         "onBlur" | "on_blur" => Some("on_blur"),
         "onHover" | "on_hover" => Some("on_hover"),
         "onScrollWheel" | "on_scroll_wheel" => Some("on_scroll_wheel"),
         "onDrag" | "on_drag" => Some("on_drag"),
+        "onDragMove" | "on_drag_move" => Some("on_drag_move"),
         "onDrop" | "on_drop" => Some("on_drop"),
         "onAction" | "on_action" => Some("on_action"),
+        // 捕获阶段事件处理器
+        "captureAnyMouseDown" | "capture_any_mouse_down" => Some("capture_any_mouse_down"),
+        "captureAnyMouseUp" | "capture_any_mouse_up" => Some("capture_any_mouse_up"),
+        "captureMousePressure" | "capture_mouse_pressure" => Some("capture_mouse_pressure"),
+        "captureKeyDown" | "capture_key_down" => Some("capture_key_down"),
+        "captureKeyUp" | "capture_key_up" => Some("capture_key_up"),
+        "captureAction" | "capture_action" => Some("capture_action"),
         // 属性名称映射（camelCase → snake_case，仅非恒等映射）
         "zIndex" => Some("z_index"),
         "width" => Some("w"),
@@ -336,6 +349,15 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "boxShadow" => Some("shadow"),
         "overflowX" => Some("overflow_x"),
         "overflowY" => Some("overflow_y"),
+        // Grid 布局属性
+        "gridCols" => Some("grid_cols"),
+        "gridRows" => Some("grid_rows"),
+        "colSpan" => Some("col_span"),
+        "rowSpan" => Some("row_span"),
+        "colStart" => Some("col_start"),
+        "colEnd" => Some("col_end"),
+        "rowStart" => Some("row_start"),
+        "rowEnd" => Some("row_end"),
         _ => None,
     }
 }
@@ -345,12 +367,19 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
 /// 事件处理器和部分交互属性需要 `StatefulInteractiveElement` trait，
 /// 该 trait 要求元素先调用 `.id()`。
 pub(crate) fn is_stateful_attr(name: &str) -> bool {
-    // 事件处理器：snake_case 以 "on_" 开头，或 camelCase 以 "on" 开头且第三字符为大写
+    // 事件处理器：snake_case 以 "on_" 或 "capture_" 开头，
+    // 或 camelCase 以 "on" / "capture" 开头且首字母后紧跟大写字母
     if name.starts_with("on_")
+        || name.starts_with("capture_")
         || (name.starts_with("on")
             && name
                 .as_bytes()
                 .get(2)
+                .is_some_and(|b| b.is_ascii_uppercase()))
+        || (name.starts_with("capture")
+            && name
+                .as_bytes()
+                .get(7)
                 .is_some_and(|b| b.is_ascii_uppercase()))
     {
         return true;
@@ -368,6 +397,8 @@ pub(crate) fn is_stateful_attr(name: &str) -> bool {
 pub(crate) fn lookup_spacing_method(prefix: &str) -> Option<&'static str> {
     match prefix {
         "gap_" => Some("gap"),
+        "gap_x_" => Some("gap_x"),
+        "gap_y_" => Some("gap_y"),
         "p_" => Some("p"),
         "px_" => Some("px"),
         "py_" => Some("py"),
@@ -384,18 +415,34 @@ pub(crate) fn lookup_spacing_method(prefix: &str) -> Option<&'static str> {
         "mr_" => Some("mr"),
         "w_" => Some("w"),
         "h_" => Some("h"),
+        "size_" => Some("size"),
+        "min_w_" => Some("min_w"),
+        "max_w_" => Some("max_w"),
+        "min_h_" => Some("min_h"),
+        "max_h_" => Some("max_h"),
         _ => None,
     }
 }
+
+/// 完整 Tailwind 色系名列表（22 个），供 runtime.rs 和单元测试共享使用。
+///
+/// 单一数据源：修改此处即可同步影响动态 class 运行时匹配表和颜色覆盖率测试。
+pub(crate) const COLOR_FAMILIES: &[&str] = &[
+    "amber", "blue", "cyan", "emerald", "fuchsia", "gray", "green", "indigo", "lime", "neutral",
+    "orange", "pink", "purple", "red", "rose", "sky", "slate", "stone", "teal", "violet", "yellow",
+    "zinc",
+];
+
+/// 完整 Tailwind 色阶列表（11 个），供 runtime.rs 和单元测试共享使用。
+pub(crate) const COLOR_SHADES: &[&str] = &[
+    "50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950",
+];
 
 /// 检查是否是有效的文本大小名称
 ///
 /// 使用 match 替代原 VALID_TEXT_SIZES 数组的 `.contains()` 线性扫描。
 pub(crate) fn is_valid_text_size(size: &str) -> bool {
-    matches!(
-        size,
-        "xs" | "sm" | "base" | "lg" | "xl" | "2xl" | "3xl" | "4xl" | "5xl"
-    )
+    matches!(size, "xs" | "sm" | "base" | "lg" | "xl" | "2xl" | "3xl")
 }
 
 /// 查找标签默认样式（仅当元素带 `styled` 标志时使用）
@@ -415,6 +462,157 @@ pub(crate) fn lookup_tag_default(tag: &str) -> Option<&'static str> {
         "textarea" => Some("px-2 py-1"),
         "ul" => Some("flex flex-col"),
         "ol" => Some("flex flex-col"),
+        "li" => Some("flex items-center"),
+        "p" => Some("text-base"),
+        "label" => Some("text-sm"),
+        "form" => Some("flex flex-col gap-4"),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- lookup_color ---
+
+    #[test]
+    fn color_table_contains_full_tailwind_palette() {
+        // 验证完整 Tailwind 色板：22 色系 × 11 色阶（复用模块级常量，单一数据源）
+        for family in COLOR_FAMILIES {
+            for shade in COLOR_SHADES {
+                let key = format!("{family}_{shade}");
+                assert!(
+                    lookup_color(&key).is_some(),
+                    "缺少颜色: {key}（请在 lookup_color 中补充）"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn color_table_contains_black_and_white() {
+        assert_eq!(lookup_color("black"), Some(0x000000));
+        assert_eq!(lookup_color("white"), Some(0xffffff));
+    }
+
+    #[test]
+    fn color_table_spot_check_values() {
+        // 抽检几个关键颜色值，防止复制粘贴错误
+        assert_eq!(lookup_color("red_500"), Some(0xef4444));
+        assert_eq!(lookup_color("blue_500"), Some(0x3b82f6));
+        assert_eq!(lookup_color("green_500"), Some(0x22c55e));
+        assert_eq!(lookup_color("gray_500"), Some(0x6b7280));
+        assert_eq!(lookup_color("amber_500"), Some(0xf59e0b));
+        assert_eq!(lookup_color("purple_500"), Some(0xa855f7));
+    }
+
+    #[test]
+    fn color_table_unknown_returns_none() {
+        assert_eq!(lookup_color("not_a_color"), None);
+        assert_eq!(lookup_color("red_999"), None);
+        assert_eq!(lookup_color(""), None);
+    }
+
+    // --- lookup_attr_method ---
+
+    #[test]
+    fn attr_method_camel_case_events() {
+        assert_eq!(lookup_attr_method("onClick"), Some("on_click"));
+        assert_eq!(lookup_attr_method("onMouseDown"), Some("on_mouse_down"));
+        assert_eq!(lookup_attr_method("onKeyDown"), Some("on_key_down"));
+        assert_eq!(lookup_attr_method("onFocus"), Some("on_focus"));
+        assert_eq!(lookup_attr_method("onBlur"), Some("on_blur"));
+    }
+
+    #[test]
+    fn attr_method_snake_case_events() {
+        assert_eq!(lookup_attr_method("on_click"), Some("on_click"));
+        assert_eq!(lookup_attr_method("on_mouse_down"), Some("on_mouse_down"));
+        assert_eq!(lookup_attr_method("on_key_down"), Some("on_key_down"));
+    }
+
+    #[test]
+    fn attr_method_dimension_aliases() {
+        assert_eq!(lookup_attr_method("width"), Some("w"));
+        assert_eq!(lookup_attr_method("height"), Some("h"));
+        assert_eq!(lookup_attr_method("minWidth"), Some("min_w"));
+        assert_eq!(lookup_attr_method("maxHeight"), Some("max_h"));
+        assert_eq!(lookup_attr_method("zIndex"), Some("z_index"));
+    }
+
+    #[test]
+    fn attr_method_unknown_returns_none() {
+        assert_eq!(lookup_attr_method("unknown_attr"), None);
+        assert_eq!(lookup_attr_method(""), None);
+    }
+
+    // --- is_stateful_attr ---
+
+    #[test]
+    fn stateful_attr_detects_event_handlers() {
+        assert!(is_stateful_attr("onClick"));
+        assert!(is_stateful_attr("on_click"));
+        assert!(is_stateful_attr("onMouseDown"));
+        assert!(is_stateful_attr("on_mouse_down"));
+    }
+
+    #[test]
+    fn stateful_attr_detects_interactive_attrs() {
+        assert!(is_stateful_attr("hover"));
+        assert!(is_stateful_attr("active"));
+        assert!(is_stateful_attr("focus"));
+        assert!(is_stateful_attr("tooltip"));
+    }
+
+    #[test]
+    fn stateful_attr_ignores_non_stateful() {
+        assert!(!is_stateful_attr("class"));
+        assert!(!is_stateful_attr("id"));
+        assert!(!is_stateful_attr("flex"));
+        assert!(!is_stateful_attr("gap"));
+    }
+
+    // --- lookup_spacing_method ---
+
+    #[test]
+    fn spacing_method_covers_all_directions() {
+        assert_eq!(lookup_spacing_method("gap_"), Some("gap"));
+        assert_eq!(lookup_spacing_method("gap_x_"), Some("gap_x"));
+        assert_eq!(lookup_spacing_method("gap_y_"), Some("gap_y"));
+        assert_eq!(lookup_spacing_method("p_"), Some("p"));
+        assert_eq!(lookup_spacing_method("px_"), Some("px"));
+        assert_eq!(lookup_spacing_method("py_"), Some("py"));
+        assert_eq!(lookup_spacing_method("m_"), Some("m"));
+        assert_eq!(lookup_spacing_method("mx_"), Some("mx"));
+        assert_eq!(lookup_spacing_method("my_"), Some("my"));
+        assert_eq!(lookup_spacing_method("w_"), Some("w"));
+        assert_eq!(lookup_spacing_method("h_"), Some("h"));
+        assert_eq!(lookup_spacing_method("min_w_"), Some("min_w"));
+        assert_eq!(lookup_spacing_method("max_h_"), Some("max_h"));
+    }
+
+    #[test]
+    fn spacing_method_unknown_returns_none() {
+        assert_eq!(lookup_spacing_method("text_"), None);
+        assert_eq!(lookup_spacing_method(""), None);
+    }
+
+    // --- is_valid_text_size ---
+
+    #[test]
+    fn text_size_validates_known_sizes() {
+        for size in ["xs", "sm", "base", "lg", "xl", "2xl", "3xl"] {
+            assert!(is_valid_text_size(size), "应接受文本大小: {size}");
+        }
+    }
+
+    #[test]
+    fn text_size_rejects_unknown() {
+        assert!(!is_valid_text_size("huge"));
+        assert!(!is_valid_text_size("4xl"));
+        assert!(!is_valid_text_size("5xl"));
+        assert!(!is_valid_text_size("6xl"));
+        assert!(!is_valid_text_size(""));
     }
 }

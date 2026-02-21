@@ -7,6 +7,46 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-02-21
+
+### ♻️ Refactoring
+
+#### Test Infrastructure
+- **Eliminated duplicate methods in `tests/common/mod.rs`** — `impl MockElement` previously
+  defined ~60 methods that were already provided by `impl Styled for MockElement`. The direct
+  `impl` block now contains only the methods that are *not* part of the `Styled` trait
+  (event handlers, state-style methods, conditional helpers, etc.). File reduced from 823 to
+  456 lines; a single source of truth per method removes any risk of silent divergence.
+
+#### Code Generator
+- **Simplified black/white entry generation in `runtime.rs`** — The loop that emits
+  black/white color match arms previously used `class_str.starts_with("text-")` /
+  `starts_with("bg-")` at runtime to select the method identifier. The method name is now
+  encoded directly in the data array, eliminating the runtime branch entirely:
+  ```rust
+  // Before: method ident derived at runtime
+  for (class_str, hex) in [("text-black", 0x000000u32), …] {
+      let (method_ident, hex) = if class_str.starts_with("text-") { … };
+  }
+  // After: method ident encoded in data
+  for (class_str, method_ident, hex) in [
+      ("text-black", &text_color_ident, 0x000000u32), …
+  ] { … }
+  ```
+
+- **Extracted `is_directional_border(rest)` in `class.rs`** — The logic distinguishing
+  directional border classes (`border-t`, `border-t-2`) from color border classes
+  (`border-red-500`) was inlined inside `parse_single_class`. It is now a dedicated
+  `fn is_directional_border(rest: &str) -> bool` with its own doc comment explaining the
+  edge cases, reducing the call-site from 11 lines of comment + code to a single readable
+  predicate call.
+
+### ✅ Testing
+- All 287 tests pass (227 macro + 35 coverage + 23 unit + 2 diagnostic)
+- Zero regressions
+
+---
+
 ## [0.2.2] - 2026-02-18
 
 ### 🚀 Performance Optimizations
@@ -208,6 +248,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.3.0]: https://github.com/wsafight/gpui-rsx/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wsafight/gpui-rsx/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/wsafight/gpui-rsx/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/wsafight/gpui-rsx/compare/v0.1.2...v0.2.0

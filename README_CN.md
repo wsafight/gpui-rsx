@@ -42,7 +42,7 @@
 ```toml
 [dependencies]
 gpui = "0.1"
-gpui-rsx = "0.1"
+gpui-rsx = "0.3"
 ```
 
 ## 🚀 快速开始
@@ -715,6 +715,25 @@ GPUI-RSX 是一个**编译时宏**，展开后的代码与手写的 GPUI 代码�
 | 运行时性能 | 基准 | 相同 |
 | 类型安全 | ✅ | ✅ |
 | 编译时检查 | ✅ | ✅ |
+
+### v0.3.0 重构亮点
+- 消除 `tests/common/mod.rs` 中约 60 个重复方法定义（823 → 456 行）
+- 简化 `runtime.rs` black/white 条目生成（方法名直接编码进数据）
+- 在 `class.rs` 中提取 `is_directional_border()` 辅助函数，逻辑更清晰
+
+### v0.2.2 优化亮点
+
+**编译时性能：**
+- class 解析改用 `split_ascii_whitespace`
+- 统一 `text_` 前缀处理（单次 `strip_prefix` 调用）
+- 空元素提前快速路径
+- `Vec::with_capacity(attrs * 2 + children)` 减少重分配
+
+**运行时性能：**
+- `.children([...])` 聚合阈值 3 → 2
+
+**二进制体积：**
+- `[profile.release]` 增加 `panic = "abort"` 移除展开表
 
 ### v0.2.1 优化亮点
 

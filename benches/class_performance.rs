@@ -172,6 +172,15 @@ impl MockElement {
     fn overflow_hidden(self) -> Self {
         self
     }
+    fn overflow_scroll(self) -> Self {
+        self
+    }
+    fn text_xs(self) -> Self {
+        self
+    }
+    fn rounded_sm(self) -> Self {
+        self
+    }
     fn absolute(self) -> Self {
         self
     }
@@ -199,132 +208,186 @@ impl MockElement {
 }
 
 // Styled trait - 动态 class 代码生成需要此 trait
+// 必须与 generate_common_class_matches 生成的所有方法调用保持一致。
 #[allow(dead_code)] // benchmark 中并非所有 trait 方法都被使用
 trait Styled: Sized {
+    // --- flex ---
     fn flex(self) -> Self;
     fn flex_col(self) -> Self;
+    fn flex_col_reverse(self) -> Self;
     fn flex_row(self) -> Self;
+    fn flex_row_reverse(self) -> Self;
     fn flex_1(self) -> Self;
+    fn flex_auto(self) -> Self;
+    fn flex_initial(self) -> Self;
+    fn flex_none(self) -> Self;
     fn flex_wrap(self) -> Self;
-    fn gap(self, val: f32) -> Self;
-    fn gap_2(self) -> Self;
-    fn gap_4(self) -> Self;
-    fn gap_6(self) -> Self;
-    fn p(self, val: f32) -> Self;
-    fn p_2(self) -> Self;
-    fn p_4(self) -> Self;
-    fn px(self, val: f32) -> Self;
-    fn py(self, val: f32) -> Self;
-    fn m(self, val: f32) -> Self;
-    fn m_2(self) -> Self;
-    fn m_4(self) -> Self;
-    fn bg(self, color: u32) -> Self;
-    fn text_color(self, color: u32) -> Self;
-    fn border_color(self, color: u32) -> Self;
-    fn border_1(self) -> Self;
-    fn border_2(self) -> Self;
-    fn rounded_md(self) -> Self;
-    fn rounded_lg(self) -> Self;
-    fn rounded_full(self) -> Self;
+    fn flex_wrap_reverse(self) -> Self;
+    fn flex_nowrap(self) -> Self;
+    fn flex_shrink_0(self) -> Self;
+    // --- layout ---
+    fn block(self) -> Self;
+    fn grid(self) -> Self;
+    fn hidden(self) -> Self;
+    // --- alignment ---
     fn items_center(self) -> Self;
     fn items_start(self) -> Self;
     fn items_end(self) -> Self;
+    fn items_baseline(self) -> Self;
+    fn items_stretch(self) -> Self;
     fn justify_center(self) -> Self;
     fn justify_between(self) -> Self;
     fn justify_start(self) -> Self;
     fn justify_end(self) -> Self;
+    fn justify_around(self) -> Self;
+    fn justify_evenly(self) -> Self;
+    fn content_center(self) -> Self;
+    fn content_start(self) -> Self;
+    fn content_end(self) -> Self;
+    fn content_between(self) -> Self;
+    fn content_around(self) -> Self;
+    fn content_evenly(self) -> Self;
+    fn content_stretch(self) -> Self;
+    // --- spacing ---
+    fn gap(self, val: f32) -> Self;
+    fn gap_x(self, val: f32) -> Self;
+    fn gap_y(self, val: f32) -> Self;
+    fn gap_2(self) -> Self;
+    fn gap_4(self) -> Self;
+    fn gap_6(self) -> Self;
+    fn p(self, val: f32) -> Self;
+    fn px(self, val: f32) -> Self;
+    fn py(self, val: f32) -> Self;
+    fn pt(self, val: f32) -> Self;
+    fn pb(self, val: f32) -> Self;
+    fn pl(self, val: f32) -> Self;
+    fn pr(self, val: f32) -> Self;
+    fn p_2(self) -> Self;
+    fn p_4(self) -> Self;
+    fn m(self, val: f32) -> Self;
+    fn mx(self, val: f32) -> Self;
+    fn my(self, val: f32) -> Self;
+    fn mt(self, val: f32) -> Self;
+    fn mb(self, val: f32) -> Self;
+    fn ml(self, val: f32) -> Self;
+    fn mr(self, val: f32) -> Self;
+    fn m_2(self) -> Self;
+    fn m_4(self) -> Self;
+    // --- sizing ---
     fn w_full(self) -> Self;
     fn h_full(self) -> Self;
     fn size_full(self) -> Self;
+    fn size(self, val: f32) -> Self;
+    fn w(self, val: f32) -> Self;
+    fn h(self, val: f32) -> Self;
+    fn min_w(self, val: f32) -> Self;
+    fn max_w(self, val: f32) -> Self;
+    fn min_h(self, val: f32) -> Self;
+    fn max_h(self, val: f32) -> Self;
+    // --- text size ---
+    fn text_xs(self) -> Self;
     fn text_sm(self) -> Self;
     fn text_base(self) -> Self;
     fn text_lg(self) -> Self;
     fn text_xl(self) -> Self;
     fn text_2xl(self) -> Self;
     fn text_3xl(self) -> Self;
+    // --- text alignment ---
+    fn text_left(self) -> Self;
+    fn text_center(self) -> Self;
+    fn text_right(self) -> Self;
+    // --- text decoration ---
+    fn truncate(self) -> Self;
+    fn text_ellipsis(self) -> Self;
+    fn italic(self) -> Self;
+    fn not_italic(self) -> Self;
+    fn underline(self) -> Self;
+    fn line_through(self) -> Self;
+    // --- font ---
     fn font_bold(self) -> Self;
+    // --- border ---
+    fn border_1(self) -> Self;
+    fn border_2(self) -> Self;
+    fn border_dashed(self) -> Self;
+    fn rounded_sm(self) -> Self;
+    fn rounded_md(self) -> Self;
+    fn rounded_lg(self) -> Self;
+    fn rounded_full(self) -> Self;
+    // --- misc ---
     fn cursor_pointer(self) -> Self;
     fn overflow_hidden(self) -> Self;
+    fn overflow_scroll(self) -> Self;
     fn absolute(self) -> Self;
     fn relative(self) -> Self;
+    // --- color / opacity / z ---
+    fn bg(self, color: u32) -> Self;
+    fn text_color(self, color: u32) -> Self;
+    fn border_color(self, color: u32) -> Self;
+    fn opacity(self, val: f32) -> Self;
+    fn z_index(self, val: i32) -> Self;
+    // --- grid ---
+    fn grid_cols(self, v: u16) -> Self;
+    fn grid_rows(self, v: u16) -> Self;
+    fn col_span(self, v: u16) -> Self;
+    fn col_start(self, v: i16) -> Self;
+    fn col_end(self, v: i16) -> Self;
+    fn row_span(self, v: u16) -> Self;
+    fn row_start(self, v: i16) -> Self;
+    fn row_end(self, v: i16) -> Self;
 }
 
 impl Styled for MockElement {
+    // --- flex ---
     fn flex(self) -> Self {
         self
     }
     fn flex_col(self) -> Self {
         self
     }
+    fn flex_col_reverse(self) -> Self {
+        self
+    }
     fn flex_row(self) -> Self {
+        self
+    }
+    fn flex_row_reverse(self) -> Self {
         self
     }
     fn flex_1(self) -> Self {
         self
     }
+    fn flex_auto(self) -> Self {
+        self
+    }
+    fn flex_initial(self) -> Self {
+        self
+    }
+    fn flex_none(self) -> Self {
+        self
+    }
     fn flex_wrap(self) -> Self {
         self
     }
-    fn gap(self, _: f32) -> Self {
+    fn flex_wrap_reverse(self) -> Self {
         self
     }
-    fn gap_2(self) -> Self {
+    fn flex_nowrap(self) -> Self {
         self
     }
-    fn gap_4(self) -> Self {
+    fn flex_shrink_0(self) -> Self {
         self
     }
-    fn gap_6(self) -> Self {
+    // --- layout ---
+    fn block(self) -> Self {
         self
     }
-    fn p(self, _: f32) -> Self {
+    fn grid(self) -> Self {
         self
     }
-    fn p_2(self) -> Self {
+    fn hidden(self) -> Self {
         self
     }
-    fn p_4(self) -> Self {
-        self
-    }
-    fn px(self, _: f32) -> Self {
-        self
-    }
-    fn py(self, _: f32) -> Self {
-        self
-    }
-    fn m(self, _: f32) -> Self {
-        self
-    }
-    fn m_2(self) -> Self {
-        self
-    }
-    fn m_4(self) -> Self {
-        self
-    }
-    fn bg(self, _: u32) -> Self {
-        self
-    }
-    fn text_color(self, _: u32) -> Self {
-        self
-    }
-    fn border_color(self, _: u32) -> Self {
-        self
-    }
-    fn border_1(self) -> Self {
-        self
-    }
-    fn border_2(self) -> Self {
-        self
-    }
-    fn rounded_md(self) -> Self {
-        self
-    }
-    fn rounded_lg(self) -> Self {
-        self
-    }
-    fn rounded_full(self) -> Self {
-        self
-    }
+    // --- alignment ---
     fn items_center(self) -> Self {
         self
     }
@@ -332,6 +395,12 @@ impl Styled for MockElement {
         self
     }
     fn items_end(self) -> Self {
+        self
+    }
+    fn items_baseline(self) -> Self {
+        self
+    }
+    fn items_stretch(self) -> Self {
         self
     }
     fn justify_center(self) -> Self {
@@ -346,6 +415,107 @@ impl Styled for MockElement {
     fn justify_end(self) -> Self {
         self
     }
+    fn justify_around(self) -> Self {
+        self
+    }
+    fn justify_evenly(self) -> Self {
+        self
+    }
+    fn content_center(self) -> Self {
+        self
+    }
+    fn content_start(self) -> Self {
+        self
+    }
+    fn content_end(self) -> Self {
+        self
+    }
+    fn content_between(self) -> Self {
+        self
+    }
+    fn content_around(self) -> Self {
+        self
+    }
+    fn content_evenly(self) -> Self {
+        self
+    }
+    fn content_stretch(self) -> Self {
+        self
+    }
+    // --- spacing ---
+    fn gap(self, _: f32) -> Self {
+        self
+    }
+    fn gap_x(self, _: f32) -> Self {
+        self
+    }
+    fn gap_y(self, _: f32) -> Self {
+        self
+    }
+    fn gap_2(self) -> Self {
+        self
+    }
+    fn gap_4(self) -> Self {
+        self
+    }
+    fn gap_6(self) -> Self {
+        self
+    }
+    fn p(self, _: f32) -> Self {
+        self
+    }
+    fn px(self, _: f32) -> Self {
+        self
+    }
+    fn py(self, _: f32) -> Self {
+        self
+    }
+    fn pt(self, _: f32) -> Self {
+        self
+    }
+    fn pb(self, _: f32) -> Self {
+        self
+    }
+    fn pl(self, _: f32) -> Self {
+        self
+    }
+    fn pr(self, _: f32) -> Self {
+        self
+    }
+    fn p_2(self) -> Self {
+        self
+    }
+    fn p_4(self) -> Self {
+        self
+    }
+    fn m(self, _: f32) -> Self {
+        self
+    }
+    fn mx(self, _: f32) -> Self {
+        self
+    }
+    fn my(self, _: f32) -> Self {
+        self
+    }
+    fn mt(self, _: f32) -> Self {
+        self
+    }
+    fn mb(self, _: f32) -> Self {
+        self
+    }
+    fn ml(self, _: f32) -> Self {
+        self
+    }
+    fn mr(self, _: f32) -> Self {
+        self
+    }
+    fn m_2(self) -> Self {
+        self
+    }
+    fn m_4(self) -> Self {
+        self
+    }
+    // --- sizing ---
     fn w_full(self) -> Self {
         self
     }
@@ -353,6 +523,31 @@ impl Styled for MockElement {
         self
     }
     fn size_full(self) -> Self {
+        self
+    }
+    fn size(self, _: f32) -> Self {
+        self
+    }
+    fn w(self, _: f32) -> Self {
+        self
+    }
+    fn h(self, _: f32) -> Self {
+        self
+    }
+    fn min_w(self, _: f32) -> Self {
+        self
+    }
+    fn max_w(self, _: f32) -> Self {
+        self
+    }
+    fn min_h(self, _: f32) -> Self {
+        self
+    }
+    fn max_h(self, _: f32) -> Self {
+        self
+    }
+    // --- text size ---
+    fn text_xs(self) -> Self {
         self
     }
     fn text_sm(self) -> Self {
@@ -373,19 +568,116 @@ impl Styled for MockElement {
     fn text_3xl(self) -> Self {
         self
     }
+    // --- text alignment ---
+    fn text_left(self) -> Self {
+        self
+    }
+    fn text_center(self) -> Self {
+        self
+    }
+    fn text_right(self) -> Self {
+        self
+    }
+    // --- text decoration ---
+    fn truncate(self) -> Self {
+        self
+    }
+    fn text_ellipsis(self) -> Self {
+        self
+    }
+    fn italic(self) -> Self {
+        self
+    }
+    fn not_italic(self) -> Self {
+        self
+    }
+    fn underline(self) -> Self {
+        self
+    }
+    fn line_through(self) -> Self {
+        self
+    }
+    // --- font ---
     fn font_bold(self) -> Self {
         self
     }
+    // --- border ---
+    fn border_1(self) -> Self {
+        self
+    }
+    fn border_2(self) -> Self {
+        self
+    }
+    fn border_dashed(self) -> Self {
+        self
+    }
+    fn rounded_sm(self) -> Self {
+        self
+    }
+    fn rounded_md(self) -> Self {
+        self
+    }
+    fn rounded_lg(self) -> Self {
+        self
+    }
+    fn rounded_full(self) -> Self {
+        self
+    }
+    // --- misc ---
     fn cursor_pointer(self) -> Self {
         self
     }
     fn overflow_hidden(self) -> Self {
         self
     }
+    fn overflow_scroll(self) -> Self {
+        self
+    }
     fn absolute(self) -> Self {
         self
     }
     fn relative(self) -> Self {
+        self
+    }
+    // --- color / opacity / z ---
+    fn bg(self, _: u32) -> Self {
+        self
+    }
+    fn text_color(self, _: u32) -> Self {
+        self
+    }
+    fn border_color(self, _: u32) -> Self {
+        self
+    }
+    fn opacity(self, _: f32) -> Self {
+        self
+    }
+    fn z_index(self, _: i32) -> Self {
+        self
+    }
+    // --- grid ---
+    fn grid_cols(self, _: u16) -> Self {
+        self
+    }
+    fn grid_rows(self, _: u16) -> Self {
+        self
+    }
+    fn col_span(self, _: u16) -> Self {
+        self
+    }
+    fn col_start(self, _: i16) -> Self {
+        self
+    }
+    fn col_end(self, _: i16) -> Self {
+        self
+    }
+    fn row_span(self, _: u16) -> Self {
+        self
+    }
+    fn row_start(self, _: i16) -> Self {
+        self
+    }
+    fn row_end(self, _: i16) -> Self {
         self
     }
 }
@@ -552,8 +844,9 @@ fn bench_string_allocation(c: &mut Criterion) {
 
     group.bench_function("separate_children", |b| {
         b.iter(|| {
+            let count_str = black_box(count).to_string();
             let _el = rsx! {
-                <div>{"Count: "}{black_box(count)}</div>
+                <div>{"Count: "}{count_str.as_str()}</div>
             };
         })
     });

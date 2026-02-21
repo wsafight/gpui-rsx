@@ -290,12 +290,9 @@ fn parse_condition_tuple(value: Expr, attr_name: &str) -> Result<(Expr, Expr)> {
     if let Expr::Tuple(tuple) = value {
         if tuple.elems.len() == 2 {
             let mut iter = tuple.elems.into_iter();
-            let first = iter
-                .next()
-                .expect("BUG: iterator should have first element after len() == 2 check");
-            let second = iter
-                .next()
-                .expect("BUG: iterator should have second element after len() == 2 check");
+            // len() == 2 已在上方确认，next() 不可能返回 None
+            let first = iter.next().unwrap();
+            let second = iter.next().unwrap();
             Ok((first, second))
         } else {
             Err(condition_tuple_wrong_count_error(

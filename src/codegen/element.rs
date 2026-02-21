@@ -12,6 +12,7 @@
 //! - 使用 `lookup_tag_default()` 替代 `.iter().find()` 线性查找
 //! - `generate_attr_methods` 直接 push 到调用方 Vec
 //! - 复用 `consecutive_exprs` Vec 避免循环内反复分配
+//! - 自动 ID 基于源码 span 位置（行号 + 列号），增量编译下保持稳定
 
 use super::attribute::generate_attr_methods;
 use super::class::parse_class_string;
@@ -19,20 +20,6 @@ use super::tables::{is_stateful_attr, lookup_tag_default};
 use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use std::cell::Cell;
-
-// 编译期自动 ID 计数器（每次宏展开递增，保证唯一）
-//
-// proc macro 运行在单线程环境中，使用 `thread_local! + Cell` 替代 `AtomicUsize`，
-// 语义更准确且无原子操作开销。
-//
-// 已知限制：增量编译下的 ID 稳定性
-// 计数器在单次编译进程中单调递增。若增量编译只重新处理部分文件，
-// 宏展开顺序可能改变，导致自动生成的 ID 与上次编译不同。
-// 对于依赖 ID 做焦点/状态追踪的元素，建议显式指定 `id` 属性以保证稳定性。
-thread_local! {
-    static AUTO_ID_COUNTER: Cell<usize> = const { Cell::new(0) };
-}
 
 /// 生成 GPUI 代码（入口）
 ///
@@ -131,7 +118,7 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
     let base = if let Some(id_value) = user_id {
         quote! { #tag.id(#id_value) }
     } else if needs_id {
-        let auto_id = next_auto_id(&tag_str);
+        let auto_id = next_auto_id(&element.name);
         quote! { #tag.id(#auto_id) }
     } else {
         tag
@@ -144,10 +131,8 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
         Vec::with_capacity(element.attributes.len() * 2 + element.children.len());
 
     // styled 标志 → 注入标签默认样式（在用户属性之前）
-    if has_styled {
-        if let Some(class_str) = lookup_tag_default(&tag_str) {
-            methods.extend(parse_class_string(class_str));
-        }
+    if has_styled && let Some(class_str) = lookup_tag_default(&tag_str) {
+        methods.extend(parse_class_string(class_str));
     }
 
     // 属性 → 方法调用（直接 push 到 methods，避免中间 Vec 分配）
@@ -240,15 +225,24 @@ fn generate_tag(tag_str: &str, name: &syn::Ident) -> TokenStream {
     }
 }
 
-/// 生成确定性自动 ID 字符串
+/// 生成基于源码位置的稳定自动 ID
 ///
-/// 使用全局计数器 + 标签名生成唯一 ID，替代原先的 SipHash 计算。
-/// 计数器在单次编译过程中保证唯一性，但在增量编译下可能因展开顺序变化而改变。
-/// 若元素的状态追踪依赖稳定 ID，请在 RSX 中显式指定 `id` 属性。
-fn next_auto_id(tag: &str) -> String {
-    AUTO_ID_COUNTER.with(|c| {
-        let n = c.get();
-        c.set(n + 1);
-        format!("__rsx_{tag}_{n}")
-    })
+/// 使用元素 `Ident` 的 span（行号 + 列号）生成 ID，
+/// 格式为 `concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")`。
+///
+/// **稳定性保证**：只要元素在源文件中的位置不变，ID 就不变，
+/// 增量编译不再引起 ID 漂移。改变元素位置（如在上方插入新行）
+/// 会更新 ID，这是符合预期的行为（元素本身确实移动了）。
+///
+/// **唯一性**：`file!()` 在用户代码侧展开，包含完整文件路径，
+/// 配合行列号可跨文件全局唯一。不依赖 nightly API，stable Rust 即可使用。
+///
+/// 若需要跨重构完全稳定的 ID，请在 RSX 中显式指定 `id` 属性。
+fn next_auto_id(tag_ident: &syn::Ident) -> TokenStream {
+    let span = tag_ident.span();
+    let loc = span.start(); // 需要 proc-macro2 的 span-locations 特性
+    let id_suffix = format!("__rsx_{}_L{}C{}", tag_ident, loc.line, loc.column);
+    // concat!(file!(), "::", "...") 在用户侧展开，file!() 包含文件路径，
+    // 消除不同文件中行列号相同导致的跨文件 ID 碰撞。
+    quote! { concat!(file!(), "::", #id_suffix) }
 }

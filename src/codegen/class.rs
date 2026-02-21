@@ -10,7 +10,7 @@
 //! - 间距前缀使用 rfind + match（O(1)）替代线性扫描（O(17)）
 //! - text_ 前缀只做一次 strip_prefix，颜色与文本大小分支合并处理
 //! - 文本大小使用 match 替代 contains 线性查找
-//! - 单遍 `-` → `_` 替换（直接 replace，无需预检 contains）
+//! - 先检查 `contains('-')` 跳过无连字符类的堆分配，含连字符时用 `replace` 做完整替换
 //! - split_ascii_whitespace 替代 split_whitespace（class 名只含 ASCII）
 
 use super::tables::*;
@@ -56,24 +56,15 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
     }
 
     // border-color 类：border-red-500 → .border_color(rgb(0xef4444))
-    if let Some(rest) = method_name.strip_prefix("border_") {
-        // 方向性边框（border-t/b/l/r 及带数值的方向边框）→ fall through 到默认处理
-        let is_directional = matches!(rest, "t" | "b" | "l" | "r")
-            || rest.starts_with("t_")
-            || rest.starts_with("b_")
-            || rest.starts_with("l_")
-            || rest.starts_with("r_")
-            || rest.starts_with("x_")
-            || rest.starts_with("y_");
-
-        if !is_directional {
-            if rest.as_bytes().first().is_some_and(|b| b.is_ascii_digit()) {
-                // 数值边框宽度 border-2, border-4 等
-                let ident = syn::Ident::new(&method_name, Span::call_site());
-                return quote! { .#ident() };
-            } else if let Some(token) = parse_color_with_method(rest, "border_color") {
-                return token;
-            }
+    if let Some(rest) = method_name.strip_prefix("border_")
+        && !is_directional_border(rest)
+    {
+        if rest.as_bytes().first().is_some_and(|b| b.is_ascii_digit()) {
+            // 数值边框宽度 border-2, border-4 等
+            let ident = syn::Ident::new(&method_name, Span::call_site());
+            return quote! { .#ident() };
+        } else if let Some(token) = parse_color_with_method(rest, "border_color") {
+            return token;
         }
     }
 
@@ -93,10 +84,26 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
     }
 
     // bg_ 颜色类：bg-blue-500 → .bg(rgb(...))
-    if let Some(rest) = method_name.strip_prefix("bg_") {
-        if let Some(token) = parse_color_with_method(rest, "bg") {
-            return token;
-        }
+    if let Some(rest) = method_name.strip_prefix("bg_")
+        && let Some(token) = parse_color_with_method(rest, "bg")
+    {
+        return token;
+    }
+
+    // opacity_ 类：opacity-50 → .opacity(0.5)
+    // 注意：GPUI 的 opacity 范围为 0.0–1.0，Tailwind 用 0–100 整数表示
+    if let Some(rest) = method_name.strip_prefix("opacity_")
+        && let Ok(n) = rest.parse::<u8>()
+    {
+        let val = n as f32 / 100.0;
+        return quote! { .opacity(#val) };
+    }
+
+    // z_ 类：z-10 → .z_index(10)
+    if let Some(rest) = method_name.strip_prefix("z_")
+        && let Ok(n) = rest.parse::<i32>()
+    {
+        return quote! { .z_index(#n) };
     }
 
     // 默认：无参方法调用
@@ -120,6 +127,21 @@ fn parse_color_with_method(color: &str, method: &str) -> Option<TokenStream> {
     let hex = lookup_color(color).or_else(|| parse_arbitrary_hex(color))?;
     let ident = syn::Ident::new(method, Span::call_site());
     Some(quote! { .#ident(rgb(#hex)) })
+}
+
+/// 判断 `border_` 之后的部分是否属于方向性边框类（而非颜色类）
+///
+/// 方向性边框（fall through 到默认方法调用）：
+/// - 纯方向：`border-t` → rest = `"t"`（len == 1）
+/// - 方向+数值：`border-t-2` → rest = `"t_2"`（首字节是方向，第二字节是 `_`）
+///
+/// 颜色类（应生成 `.border_color(rgb(...))`）：
+/// - `border-red-500` → rest = `"red_500"`（首字节 `r` 虽在方向集合中，
+///   但第二字节 `e` ≠ `_`，故判定为颜色类）
+fn is_directional_border(rest: &str) -> bool {
+    let bytes = rest.as_bytes();
+    matches!(bytes.first(), Some(b't' | b'b' | b'l' | b'r' | b'x' | b'y'))
+        && (rest.len() == 1 || bytes.get(1) == Some(&b'_'))
 }
 
 /// 解析任意 hex 颜色值：`[#rrggbb]` 或 `[#rgb]`

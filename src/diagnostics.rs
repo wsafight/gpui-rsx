@@ -108,3 +108,103 @@ pub fn condition_tuple_wrong_type_error<T: Spanned>(value: &T, attr_name: &str) 
         ),
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use proc_macro2::Span;
+
+    fn make_ident(name: &str) -> Ident {
+        Ident::new(name, Span::call_site())
+    }
+
+    // --- tag_mismatch_error ---
+
+    #[test]
+    fn tag_mismatch_contains_both_tag_names() {
+        let opening = make_ident("div");
+        let closing = make_ident("span");
+        let err = tag_mismatch_error(&closing, &opening);
+        let msg = err.to_string();
+        assert!(msg.contains("div"), "应包含开启标签名 div");
+        assert!(msg.contains("span"), "应包含关闭标签名 span");
+    }
+
+    #[test]
+    fn tag_mismatch_contains_help_hint() {
+        let opening = make_ident("section");
+        let closing = make_ident("div");
+        let err = tag_mismatch_error(&closing, &opening);
+        let msg = err.to_string();
+        assert!(msg.contains("help:"), "应包含 help 提示");
+        assert!(msg.contains("note:"), "应包含 note 提示");
+    }
+
+    // --- unclosed_tag_error ---
+
+    #[test]
+    fn unclosed_tag_contains_tag_name() {
+        let tag = make_ident("nav");
+        let err = unclosed_tag_error(Span::call_site(), &tag);
+        let msg = err.to_string();
+        assert!(msg.contains("nav"), "应包含未闭合标签名");
+        assert!(msg.contains("help:"), "应包含 help 提示");
+    }
+
+    // --- unclosed_fragment_error ---
+
+    #[test]
+    fn unclosed_fragment_contains_help() {
+        let err = unclosed_fragment_error(Span::call_site());
+        let msg = err.to_string();
+        assert!(msg.contains("</>"), "应提示关闭 Fragment");
+        assert!(msg.contains("help:"), "应包含 help 提示");
+    }
+
+    // --- invalid_child_in_tag_error ---
+
+    #[test]
+    fn invalid_child_in_tag_contains_tag_and_hint() {
+        let tag = make_ident("ul");
+        let err = invalid_child_in_tag_error(Span::call_site(), &tag);
+        let msg = err.to_string();
+        assert!(msg.contains("ul"), "应包含父标签名");
+        assert!(msg.contains("help:"), "应包含 help 提示");
+    }
+
+    // --- for_loop_missing_brace_error ---
+
+    #[test]
+    fn for_loop_missing_brace_has_example() {
+        let err = for_loop_missing_brace_error(Span::call_site());
+        let msg = err.to_string();
+        assert!(msg.contains("for"), "应提及 for 循环");
+        assert!(msg.contains("help:"), "应包含 help 提示");
+    }
+
+    // --- condition_tuple_wrong_count_error ---
+
+    #[test]
+    fn condition_tuple_wrong_count_shows_found_and_expected() {
+        // 用一个简单元组模拟
+        let tokens: proc_macro2::TokenStream = "(a, b, c)".parse().unwrap();
+        let expr: syn::ExprTuple = syn::parse2(tokens).unwrap();
+        let err = condition_tuple_wrong_count_error(&expr, "when", 3);
+        let msg = err.to_string();
+        assert!(msg.contains("when"), "应包含属性名");
+        assert!(msg.contains('3'), "应包含实际元素数");
+        assert!(msg.contains("help:"), "应包含 help 提示");
+    }
+
+    // --- condition_tuple_wrong_type_error ---
+
+    #[test]
+    fn condition_tuple_wrong_type_contains_attr_name() {
+        let tokens: proc_macro2::TokenStream = "true".parse().unwrap();
+        let expr: syn::Expr = syn::parse2(tokens).unwrap();
+        let err = condition_tuple_wrong_type_error(&expr, "whenSome");
+        let msg = err.to_string();
+        assert!(msg.contains("whenSome"), "应包含属性名");
+        assert!(msg.contains("help:"), "应包含 help 提示");
+    }
+}
