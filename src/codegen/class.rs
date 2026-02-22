@@ -106,9 +106,17 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
         return quote! { .z_index(#n) };
     }
 
-    // 默认：无参方法调用
-    let ident = syn::Ident::new(&method_name, Span::call_site());
-    quote! { .#ident() }
+    // 默认：无参方法调用（防御性检查：跳过含非标识符字符的 class，如 "hover:bg-blue-500"）
+    if !method_name.is_empty()
+        && method_name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        let ident = syn::Ident::new(&method_name, Span::call_site());
+        quote! { .#ident() }
+    } else {
+        quote! {}
+    }
 }
 
 /// 统一的颜色解析函数（核心去重逻辑）

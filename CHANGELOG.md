@@ -7,6 +7,82 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-02-22
+
+### 🐛 Fixed
+
+#### `parse_single_class` — panic on Tailwind variant syntax
+- **Defensive guard against non-identifier class names** (`class.rs`) — Classes containing
+  characters that are not alphanumeric or `_` (e.g. `hover:bg-blue-500`, `focus:text-red-500`)
+  previously caused `syn::Ident::new` to panic at compile time. The default branch now validates
+  that `method_name` consists solely of ASCII alphanumeric characters and underscores before
+  constructing an `Ident`; invalid names silently produce an empty `TokenStream` so valid
+  sibling classes in the same `class="…"` string are still applied.
+
+#### `Styled` trait — missing no-arg directional border methods
+- **`border_t`, `border_b`, `border_l`, `border_r` added to `Styled` trait** (`tests/common/mod.rs`)
+  — These four methods were defined only as generic `<T>` inherent methods on `MockElement` to
+  support the `borderTop={val}` attribute form. However, `class="border-t"` (and the other three
+  directions) correctly fell through `is_directional_border` to the default branch and generated
+  `.border_t()` with **no arguments**, which would have failed to compile for any test using the
+  class path. The four methods are now no-arg signatures in the `Styled` trait (matching real GPUI's
+  API) and the generic inherent versions have been removed. The attribute tests were updated to use
+  the flag form (`<div border_t />`), and four new tests (`test_class_border_t/b/l/r`) cover the
+  previously untested code path.
+- **`border-t`, `border-b`, `border-l`, `border-r` added to dynamic class match table** (`runtime.rs`)
+  — These classes were absent from `static_classes`, so `class={expr}` containing e.g. `"border-t"`
+  would silently emit a debug warning and do nothing at runtime. They are now in the pre-compiled
+  match table alongside `border` and `border-2`.
+
+#### `generate_numeric_fallback_code` — redundant `quote!` evaluation per call
+- **Thread-local caching for numeric fallback** (`runtime.rs`) — `generate_numeric_fallback_code`
+  re-executed `quote!` (~40 `if-let` statements) on every call to `generate_dynamic_class_code`,
+  while `generate_common_class_matches` was already cached as a `thread_local` `String`. A new
+  `NUMERIC_FALLBACK_STR` thread-local and `get_cached_numeric_fallback()` function apply the same
+  caching pattern: the `TokenStream` is stringified once and re-parsed per proc-macro bridge
+  invocation, eliminating repeated `quote!` allocation for files with multiple `class={expr}`
+  attributes.
+
+### ✨ Enhanced
+
+#### Dynamic class match table — 8 additional classes
+- **`rounded-none`, `rounded-xl`** — Added to the static match table in `runtime.rs`; these
+  were previously only available in the static-string code path, causing silent no-ops when
+  used in `class={expr}` expressions.
+- **`cursor-default`, `cursor-text`** — Same as above.
+- **`overflow-visible`** — Same as above.
+- **`shadow-sm`, `shadow-md`, `shadow-lg`** — Same as above.
+- The eight methods were simultaneously promoted from `impl MockElement` to the `Styled` trait
+  in `tests/common/mod.rs`, ensuring they are reachable from the generic `E: Styled` bound used
+  in the generated `__rsx_apply_class` helper.
+
+### 📖 Documentation
+
+- **Styled defaults table** (`lib.rs`, `README.md`) — Added missing entries: `li` → `flex items-center`,
+  `p` → `text-base`, `label` → `text-sm`, `form` → `flex flex-col gap-4`. These defaults were
+  already implemented in `tables::lookup_tag_default` but not documented.
+- **Attribute mapping table** (`lib.rs`, `README.md`) — Added missing `roundedTop` → `.rounded_t()`
+  and `roundedBottom` → `.rounded_b()` entries.
+- **Dynamic class description** (`lib.rs`, `README.md`) — Replaced the inaccurate "~58 pre-compiled
+  common classes" language with an accurate description: full Tailwind color palette (22 families ×
+  11 shades × 3 prefixes = 726+ entries), common layout/spacing/typography utilities, and arbitrary
+  numeric values for spacing/sizing/opacity/z-index via prefix fallback.
+- **`overflowX` / `overflowY` method names** (`README.md`) — Fixed incorrect `.overflow_x_hidden()`
+  / `.overflow_y_hidden()` to the actual GPUI methods `.overflow_x()` / `.overflow_y()`.
+- **Text size list** (`README.md`) — Removed unsupported `text-4xl` and `text-5xl` from the
+  supported class patterns (only `xs` through `3xl` are in `is_valid_text_size`).
+- **Dynamic class diagnostic** (`tests/diagnostic_tests.rs`) — Renamed
+  `test_class_dynamic_value` → `test_class_dynamic_value_is_supported` with a corrected
+  commentary noting that `class={expr}` is valid RSX (not a compile error) and generates a
+  runtime match.
+
+### ✅ Testing
+- All 293 tests pass (231 macro + 36 coverage + 24 unit + 2 diagnostic)
+- Added `test_class_with_non_ident_chars_ignored` to `coverage_tests.rs`
+- Added `test_class_border_t/b/l/r` to `macro_tests.rs` (previously untested code path)
+
+---
+
 ## [0.3.1] - 2026-02-21
 
 ### 🐛 Fixed
@@ -298,6 +374,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.3.2]: https://github.com/wsafight/gpui-rsx/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/wsafight/gpui-rsx/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wsafight/gpui-rsx/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wsafight/gpui-rsx/compare/v0.2.1...v0.2.2

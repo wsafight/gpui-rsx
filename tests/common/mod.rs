@@ -116,6 +116,10 @@ pub trait Styled: Sized {
     fn border_1(self) -> Self;
     fn border_2(self) -> Self;
     fn border_dashed(self) -> Self;
+    fn border_t(self) -> Self;
+    fn border_b(self) -> Self;
+    fn border_l(self) -> Self;
+    fn border_r(self) -> Self;
     fn rounded_sm(self) -> Self;
     fn rounded_md(self) -> Self;
     fn rounded_lg(self) -> Self;
@@ -141,6 +145,18 @@ pub trait Styled: Sized {
     fn row_span(self, v: u16) -> Self;
     fn row_start(self, v: i16) -> Self;
     fn row_end(self, v: i16) -> Self;
+    // --- cursor ---
+    fn cursor_default(self) -> Self;
+    fn cursor_text(self) -> Self;
+    // --- shadow ---
+    fn shadow_sm(self) -> Self;
+    fn shadow_md(self) -> Self;
+    fn shadow_lg(self) -> Self;
+    // --- rounded extra ---
+    fn rounded_none(self) -> Self;
+    fn rounded_xl(self) -> Self;
+    // --- overflow ---
+    fn overflow_visible(self) -> Self;
 }
 
 // 模拟 GPUI 构造函数
@@ -252,9 +268,6 @@ impl MockElement {
     pub fn overflow<T>(self, _: T) -> Self {
         self
     }
-    pub fn overflow_visible(self) -> Self {
-        self
-    }
     pub fn overflow_x<T>(self, _: T) -> Self {
         self
     }
@@ -271,14 +284,6 @@ impl MockElement {
         self
     }
     pub fn bottom<T>(self, _: T) -> Self {
-        self
-    }
-
-    // --- 光标（不在 Styled 中）---
-    pub fn cursor_default(self) -> Self {
-        self
-    }
-    pub fn cursor_text(self) -> Self {
         self
     }
 
@@ -455,18 +460,6 @@ impl MockElement {
     pub fn text_decoration<T>(self, _: T) -> Self {
         self
     }
-    pub fn border_t<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn border_b<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn border_l<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn border_r<T>(self, _: T) -> Self {
-        self
-    }
     pub fn rounded_t<T>(self, _: T) -> Self {
         self
     }
@@ -483,23 +476,6 @@ impl MockElement {
         self
     }
     pub fn rounded_br<T>(self, _: T) -> Self {
-        self
-    }
-
-    // --- 阴影 / 圆角预设（不在 Styled 中）---
-    pub fn shadow_sm(self) -> Self {
-        self
-    }
-    pub fn shadow_md(self) -> Self {
-        self
-    }
-    pub fn shadow_lg(self) -> Self {
-        self
-    }
-    pub fn rounded_xl(self) -> Self {
-        self
-    }
-    pub fn rounded_none(self) -> Self {
         self
     }
 
@@ -764,6 +740,18 @@ impl Styled for MockElement {
     fn border_dashed(self) -> Self {
         self
     }
+    fn border_t(self) -> Self {
+        self
+    }
+    fn border_b(self) -> Self {
+        self
+    }
+    fn border_l(self) -> Self {
+        self
+    }
+    fn border_r(self) -> Self {
+        self
+    }
     fn rounded_sm(self) -> Self {
         self
     }
@@ -831,6 +819,34 @@ impl Styled for MockElement {
         self
     }
     fn row_end(self, _: i16) -> Self {
+        self
+    }
+    // --- cursor ---
+    fn cursor_default(self) -> Self {
+        self
+    }
+    fn cursor_text(self) -> Self {
+        self
+    }
+    // --- shadow ---
+    fn shadow_sm(self) -> Self {
+        self
+    }
+    fn shadow_md(self) -> Self {
+        self
+    }
+    fn shadow_lg(self) -> Self {
+        self
+    }
+    // --- rounded extra ---
+    fn rounded_none(self) -> Self {
+        self
+    }
+    fn rounded_xl(self) -> Self {
+        self
+    }
+    // --- overflow ---
+    fn overflow_visible(self) -> Self {
         self
     }
 }

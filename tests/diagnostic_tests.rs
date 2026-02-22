@@ -72,19 +72,13 @@ mod compile_fail_tests {
         */
     }
 
-    /// 验证 class 动态值错误
+    /// 备注：class 属性支持动态表达式（不会产生编译错误）
+    /// class={expr} 会在运行时匹配：全部 Tailwind 色板 + 常用工具类 + 数值前缀回退
+    /// 不在支持列表中的 class（如任意 hex 颜色）在 release 中静默忽略，debug 中打印警告
     #[allow(dead_code)]
-    fn test_class_dynamic_value() {
-        // 这段代码应该产生错误：
-        // "class attribute only supports string literals"
-        // help: "Use individual GPUI attributes like: flex bg={rgb(0xff0000)}"
-        /*
-        use gpui_rsx::rsx;
-        let dynamic_class = "flex";
-        let _el = rsx! {
-            <div class={dynamic_class} />
-        };
-        */
+    fn test_class_dynamic_value_is_supported() {
+        // class={dynamic_class} 是合法的 RSX，会生成运行时 match 代码
+        // 不是编译错误。
     }
 
     /// 验证 when 属性错误数量

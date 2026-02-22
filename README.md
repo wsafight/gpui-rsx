@@ -21,7 +21,7 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
 - 🔁 **For-loop Sugar** - Iterate with `{for item in iter { ... }}`
 - 🔑 **Loop-safe IDs** - `key={expr}` generates unique IDs per iteration; compile error on missing key
 - 🎨 **Full Tailwind Colors** - 242 built-in colors + arbitrary hex values
-- ⚡ **Dynamic Class** - Runtime class switching with automatic fallback
+- ⚡ **Dynamic Class** - Runtime class switching: full Tailwind palette + numeric prefix fallback
 
 ## 📚 Documentation
 
@@ -264,7 +264,7 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 
 **Text:**
 - `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`
-- `text-2xl`, `text-3xl`, `text-4xl`, `text-5xl`
+- `text-2xl`, `text-3xl`
 - `font-bold`
 
 **Border:**
@@ -442,11 +442,9 @@ rsx! {
 }
 ```
 
-#### Dynamic Class (Runtime — Limited)
+#### Dynamic Class (Runtime)
 
 ```rust
-// ⚠️ Only ~58 pre-compiled common classes are supported at runtime.
-// Unknown classes are silently ignored.
 let classes = if is_active { "flex gap-4" } else { "block" };
 rsx! {
     <div class={classes}>
@@ -455,16 +453,18 @@ rsx! {
 }
 ```
 
-> **Important limitation:** When `class` is a runtime expression, only the ~58 pre-compiled
-> common classes (flex, gap-1..gap-8, p-1..p-8, text-xl, rounded-md, etc.) are recognised.
-> Any class not in this list is **silently ignored** at runtime.
+> **Supported at runtime:** full Tailwind color palette (22 families × 11 shades × 3 prefixes =
+> 726+ color entries), common layout/spacing/typography utilities, and arbitrary numeric values for
+> spacing/sizing/opacity/z-index via prefix fallback (e.g. `gap-7`, `p-5`, `opacity-33`, `z-30`).
+> Truly unsupported classes (e.g. arbitrary hex colors) are **silently ignored** in release builds
+> and print a warning in debug builds.
 >
 > **Recommended alternatives** (in priority order):
 > 1. **String literal** (best): `class="flex gap-4"` — compile-time, supports all classes
 > 2. **Conditional literal**: `class={if active { "flex gap-4" } else { "block" }}` — still a literal
 > 3. **Individual attributes**: `<div flex gap_4 />` — compile-time, type-checked
 > 4. **`when` attribute**: `when={(cond, |el| el.flex())}` — compile-time, fully flexible
-> 5. **Dynamic expression**: `class={expr}` — runtime only, ~58 classes supported
+> 5. **Dynamic expression**: `class={expr}` — runtime, arbitrary hex colors not supported
 
 **Common Patterns:**
 
@@ -475,8 +475,8 @@ let button_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 t
 // ✅ when attribute (compile-time, fully flexible)
 rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }
 
-// ⚠️ Dynamic string (only common classes work)
-let classes = format!("flex gap-{}", spacing);  // gap-4 works; gap-32 may not
+// ✅ Dynamic string with numeric prefix (works: any gap-N, p-N, opacity-N, z-N)
+let classes = format!("flex gap-{}", spacing);  // gap-7, gap-32, etc. all work
 ```
 
 ### 11. Attribute Mapping Reference
@@ -508,7 +508,7 @@ camelCase attributes are automatically mapped to GPUI snake_case methods:
 | `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
 | `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
 | `boxShadow` | `.shadow()` |
-| `overflowX` / `overflowY` | `.overflow_x_hidden()` / `.overflow_y_hidden()` |
+| `overflowX` / `overflowY` | `.overflow_x()` / `.overflow_y()` |
 | `inset` | `.inset()` |
 
 Attributes not in this table are passed through as-is (e.g., `bg={color}` → `.bg(color)`).
@@ -588,6 +588,10 @@ Default styles per tag:
 | `button`, `a` | `cursor-pointer` |
 | `input`, `textarea` | `px-2 py-1` |
 | `ul`, `ol` | `flex flex-col` |
+| `li` | `flex items-center` |
+| `p` | `text-base` |
+| `label` | `text-sm` |
+| `form` | `flex flex-col gap-4` |
 
 User attributes are applied after defaults and can override them.
 
@@ -739,6 +743,14 @@ GPUI-RSX is a **compile-time macro** that expands to the same code as hand-writt
 | Runtime Performance | Baseline | Same |
 | Type Safety | ✅ | ✅ |
 | Compile-time Checking | ✅ | ✅ |
+
+### v0.3.2 Fixes & Improvements
+- **Fixed** `parse_single_class` panic on Tailwind variant syntax (`hover:bg-blue-500`): invalid
+  class names are now silently skipped instead of calling `syn::Ident::new` with illegal characters
+- **Added** 8 classes to dynamic match table: `rounded-none`, `rounded-xl`, `cursor-default`,
+  `cursor-text`, `overflow-visible`, `shadow-sm`, `shadow-md`, `shadow-lg`
+- **Docs** styled defaults: added `li`, `p`, `label`, `form` entries; fixed `overflowX`/`overflowY`
+  method names; removed unsupported `text-4xl`/`text-5xl`; updated dynamic class description
 
 ### v0.3.1 Fixes & Features
 - **Fixed** `is_stateful_attr`: `hover`/`active`/`focus`/`group` are `Styled` trait methods and
@@ -924,10 +936,10 @@ rsx! { <div bg={dynamic_color} flex /> }
 // ✅ Conditional styling with `when` (compile-time, fully flexible)
 rsx! { <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} /> }
 
-// ⚠️ Dynamic expression (runtime — only ~58 common classes supported)
+// ✅ Dynamic expression with numeric prefix (runtime — gap-N, p-N, opacity-N, z-N all work)
 let classes = if active { "flex gap-4" } else { "block" };
 rsx! { <div class={classes} /> }
-// Classes not in the pre-compiled list are silently ignored at runtime.
+// Arbitrary hex colors and other exotic utilities are silently ignored at runtime.
 ```
 
 **Tip:** When you need dynamic styling, prefer `when`/`whenSome` or individual value

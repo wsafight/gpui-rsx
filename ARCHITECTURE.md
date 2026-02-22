@@ -955,7 +955,7 @@ requirements, and release procedure.
 ---
 
 **Last Updated**: 2026-02-21
-**Version**: 0.3.1
+**Version**: 0.3.2
 **Maintainers**: @wangshian
 
 ### Changelog

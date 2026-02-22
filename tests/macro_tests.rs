@@ -1649,22 +1649,42 @@ fn test_flex_order_attribute() {
 
 #[test]
 fn test_border_top_attribute() {
-    let _el = rsx! { <div borderTop={px(1.0)} /> };
+    let _el = rsx! { <div border_t /> };
 }
 
 #[test]
 fn test_border_bottom_attribute() {
-    let _el = rsx! { <div borderBottom={px(1.0)} /> };
+    let _el = rsx! { <div border_b /> };
 }
 
 #[test]
 fn test_border_left_attribute() {
-    let _el = rsx! { <div borderLeft={px(1.0)} /> };
+    let _el = rsx! { <div border_l /> };
 }
 
 #[test]
 fn test_border_right_attribute() {
-    let _el = rsx! { <div borderRight={px(1.0)} /> };
+    let _el = rsx! { <div border_r /> };
+}
+
+#[test]
+fn test_class_border_t() {
+    let _el = rsx! { <div class="border-t" /> };
+}
+
+#[test]
+fn test_class_border_b() {
+    let _el = rsx! { <div class="border-b" /> };
+}
+
+#[test]
+fn test_class_border_l() {
+    let _el = rsx! { <div class="border-l" /> };
+}
+
+#[test]
+fn test_class_border_r() {
+    let _el = rsx! { <div class="border-r" /> };
 }
 
 #[test]

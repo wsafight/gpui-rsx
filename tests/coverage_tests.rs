@@ -38,6 +38,13 @@ fn test_class_consecutive_spaces() {
 }
 
 #[test]
+fn test_class_with_non_ident_chars_ignored() {
+    // Tailwind 变体语法（如 "hover:bg-blue-500"）含 ":" 不是合法 Rust 标识符，
+    // 应静默跳过而非 panic，其余有效 class 正常应用。
+    let _el = rsx! { <div class="flex hover:bg-blue-500">{"content"}</div> };
+}
+
+#[test]
 fn test_class_hex_uppercase() {
     // Hex 颜色大写
     let _el = rsx! { <div class="bg-[#FF00FF]">{"Uppercase hex"}</div> };

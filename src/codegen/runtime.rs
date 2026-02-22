@@ -18,9 +18,10 @@ use std::cell::RefCell;
 // 下次调用时旧 handle 变成悬垂引用，导致 "use-after-free" panic。
 //
 // 优化：将所有 match arm 拼接为单个字符串，每次宏调用只做 1 次 parse，
-// 而非对每个 arm 分别 parse（原先每次调用需 ~58 次 parse）。
+// 而非对每个 arm 分别 parse（原先每次调用需数百次 parse）。
 thread_local! {
     static COMMON_CLASS_MATCHES_STR: RefCell<Option<String>> = const { RefCell::new(None) };
+    static NUMERIC_FALLBACK_STR: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
 /// 获取 common class match 表（惰性初始化字符串缓存，每次返回当前 bridge 的新 TokenStream）
@@ -36,6 +37,16 @@ fn get_cached_common_class_matches() -> TokenStream {
         });
         s.parse::<TokenStream>()
             .expect("cached match arms are valid")
+    })
+}
+
+/// 获取数值回退代码（惰性初始化字符串缓存，每次返回当前 bridge 的新 TokenStream）
+fn get_cached_numeric_fallback() -> TokenStream {
+    NUMERIC_FALLBACK_STR.with(|cell| {
+        let mut borrow = cell.borrow_mut();
+        let s = borrow.get_or_insert_with(|| generate_numeric_fallback_code().to_string());
+        s.parse::<TokenStream>()
+            .expect("cached numeric fallback is valid")
     })
 }
 
@@ -91,7 +102,7 @@ fn get_cached_common_class_matches() -> TokenStream {
 /// ```
 pub(crate) fn generate_dynamic_class_code(class_expr: &syn::Expr) -> TokenStream {
     let common_classes = get_cached_common_class_matches();
-    let numeric_fallbacks = generate_numeric_fallback_code();
+    let numeric_fallbacks = get_cached_numeric_fallback();
 
     quote! {
         {
@@ -390,16 +401,29 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
         "border",
         "border-2",
         "border-dashed",
+        "border-t",
+        "border-b",
+        "border-l",
+        "border-r",
+        "rounded-none",
         "rounded-sm",
         "rounded-md",
         "rounded-lg",
+        "rounded-xl",
         "rounded-full",
         // 杂项
         "cursor-pointer",
+        "cursor-default",
+        "cursor-text",
         "overflow-hidden",
         "overflow-scroll",
+        "overflow-visible",
         "absolute",
         "relative",
+        // 阴影
+        "shadow-sm",
+        "shadow-md",
+        "shadow-lg",
         // 透明度常用值（任意数值由数值前缀回退处理）
         "opacity-0",
         "opacity-25",

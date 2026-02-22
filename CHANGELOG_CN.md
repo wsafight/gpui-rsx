@@ -7,6 +7,72 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.3.2] - 2026-02-22
+
+### 🐛 修复
+
+#### `parse_single_class` — Tailwind 变体语法导致的 panic
+- **对非标识符 class 名的防御性检查**（`class.rs`）— 包含非字母数字/下划线字符的 class
+  （如 `hover:bg-blue-500`、`focus:text-red-500`）此前会导致 `syn::Ident::new` 在编译期
+  panic。默认分支现在会在构造 `Ident` 前验证 `method_name` 仅含 ASCII 字母数字和下划线字符；
+  无效 class 名静默产生空 `TokenStream`，同一 `class="…"` 字符串中的有效 class 仍正常应用。
+
+#### `Styled` trait — 缺少方向性边框无参方法
+- **将 `border_t`、`border_b`、`border_l`、`border_r` 加入 `Styled` trait**
+  （`tests/common/mod.rs`）— 这四个方法原本仅以泛型 `<T>` 的固有方法形式存在于 `MockElement`
+  上，用于支持 `borderTop={val}` 属性形式。然而 `class="border-t"`（及其他三个方向）已通过
+  `is_directional_border` 正确回落到默认分支并生成无参的 `.border_t()`，若存在相关测试便会
+  导致编译失败。这四个方法现已作为无参签名（与真实 GPUI API 一致）加入 `Styled` trait，
+  原泛型固有方法已被移除。属性测试改为使用 flag 形式（`<div border_t />`），并新增了四个
+  测试用例（`test_class_border_t/b/l/r`），覆盖此前未被测试的代码路径。
+- **将 `border-t`、`border-b`、`border-l`、`border-r` 加入动态 class match 表**（`runtime.rs`）
+  — 这些 class 原本不在 `static_classes` 中，导致 `class={expr}` 中包含 `"border-t"` 等
+  时，运行时会静默打印警告并什么都不做。现已与 `border`、`border-2` 一同加入预编译 match 表。
+
+#### `generate_numeric_fallback_code` — 每次调用重复执行 `quote!`
+- **数值回退代码的 thread_local 缓存**（`runtime.rs`）— `generate_numeric_fallback_code`
+  在每次调用 `generate_dynamic_class_code` 时都重新执行 `quote!`（约 40 条 `if-let` 语句），
+  而 `generate_common_class_matches` 已通过 `thread_local` 字符串缓存。新增
+  `NUMERIC_FALLBACK_STR` thread_local 和 `get_cached_numeric_fallback()` 函数，应用相同的
+  缓存模式：`TokenStream` 仅序列化一次，每次 proc-macro bridge 调用时重新解析，
+  消除多个 `class={expr}` 属性时的重复 `quote!` 分配开销。
+
+### ✨ 增强
+
+#### 动态 class match 表 — 新增 8 个 class
+- **`rounded-none`、`rounded-xl`** — 加入 `runtime.rs` 静态 match 表；此前仅在静态字符串
+  路径中有效，在 `class={expr}` 表达式中使用时会静默失效。
+- **`cursor-default`、`cursor-text`** — 同上。
+- **`overflow-visible`** — 同上。
+- **`shadow-sm`、`shadow-md`、`shadow-lg`** — 同上。
+- 同步将上述 8 个方法从 `impl MockElement` 提升至 `tests/common/mod.rs` 中的 `Styled` trait，
+  确保生成的 `__rsx_apply_class` 辅助函数的 `E: Styled` 约束可访问这些方法。
+
+### 📖 文档
+
+- **styled 默认样式表**（`lib.rs`、`README.md`）— 补充缺失条目：`li` → `flex items-center`、
+  `p` → `text-base`、`label` → `text-sm`、`form` → `flex flex-col gap-4`。
+  这些默认值已在 `tables::lookup_tag_default` 中实现，但未在文档中体现。
+- **属性映射表**（`lib.rs`、`README.md`）— 补充缺失的 `roundedTop` → `.rounded_t()` 和
+  `roundedBottom` → `.rounded_b()` 条目。
+- **动态 class 说明**（`lib.rs`、`README.md`）— 将不准确的「约 58 个预编译常用 class」
+  表述替换为准确描述：完整 Tailwind 色板（22 色系 × 11 色阶 × 3 前缀 = 726+ 条）、
+  常用布局/间距/文字排版工具类，以及通过前缀回退支持间距/尺寸/透明度/z-index 的任意数值。
+- **`overflowX` / `overflowY` 方法名**（`README.md`）— 修正 `.overflow_x_hidden()` /
+  `.overflow_y_hidden()` 为实际的 GPUI 方法 `.overflow_x()` / `.overflow_y()`。
+- **文本大小列表**（`README.md`）— 从支持的 class 模式中移除不存在的 `text-4xl` 和
+  `text-5xl`（`is_valid_text_size` 仅支持 `xs` 到 `3xl`）。
+- **动态 class 诊断测试**（`tests/diagnostic_tests.rs`）— 将 `test_class_dynamic_value`
+  重命名为 `test_class_dynamic_value_is_supported`，并更正注释：`class={expr}` 是合法的
+  RSX（不是编译错误），会生成运行时 match 代码。
+
+### ✅ 测试
+- 全部 293 个测试通过（231 宏测试 + 36 覆盖率测试 + 24 单元测试 + 2 诊断测试）
+- 在 `coverage_tests.rs` 中新增 `test_class_with_non_ident_chars_ignored`
+- 在 `macro_tests.rs` 中新增 `test_class_border_t/b/l/r`（覆盖此前未被测试的代码路径）
+
+---
+
 ## [0.3.1] - 2026-02-21
 
 ### 🐛 修复
@@ -276,6 +342,7 @@
 
 ---
 
+[0.3.2]: https://github.com/wsafight/gpui-rsx/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/wsafight/gpui-rsx/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wsafight/gpui-rsx/compare/v0.2.2...v0.3.0
 [0.2.2]: https://github.com/wsafight/gpui-rsx/compare/v0.2.1...v0.2.2

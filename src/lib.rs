@@ -51,7 +51,7 @@
 //! | Boolean attributes | `<div flex flex_col />` → `.flex().flex_col()` |
 //! | Value attributes | `<div gap={px(4.0)} />` → `.gap(px(4.0))` |
 //! | `class` (static) | Tailwind-like string, parsed at compile time |
-//! | `class` (dynamic) | Runtime expression, ~58 common classes supported |
+//! | `class` (dynamic) | Runtime expression, full Tailwind palette + common utilities |
 //! | Full color palette | 242 Tailwind colors + arbitrary hex (`bg-[#ff0000]`) |
 //! | Fragments | `<>...</>` — returns `vec![...]` |
 //! | For-loop sugar | `{for item in iter { ... }}` |
@@ -154,8 +154,11 @@
 //! ### The `class` Attribute — Dynamic (Runtime)
 //!
 //! When `class` receives an expression, a runtime match is generated.
-//! **Only ~58 pre-compiled common classes are recognised; unknown classes are silently
-//! ignored.**
+//! Supported classes: all Tailwind colors (22 families × 11 shades × 3 prefixes = 726+
+//! entries), common layout/spacing/typography utilities, and arbitrary numeric values for
+//! spacing/sizing/opacity/z-index via prefix fallback. Truly unsupported classes (e.g.
+//! arbitrary hex colors, unknown utilities) are silently ignored in release and print a
+//! warning in debug builds.
 //!
 //! ```ignore
 //! let active = true;
@@ -175,8 +178,8 @@
 //! // ✅ when attribute — compile-time, fully flexible
 //! rsx! { <div when={(active, |el| el.flex().gap(px(4.0)))} /> }
 //!
-//! // ⚠️ dynamic expression — runtime, ~58 classes only
-//! rsx! { <div class={format!("gap-{}", spacing)} /> }
+//! // ⚠️ dynamic expression — runtime, arbitrary hex colors not supported
+//! rsx! { <div class={format!("gap-{}", spacing)} /> }   // works: numeric prefix fallback
 //! ```
 //!
 //! ### Event Handling
@@ -343,6 +346,10 @@
 //! | `button`, `a` | `cursor-pointer` |
 //! | `input`, `textarea` | `px-2 py-1` |
 //! | `ul`, `ol` | `flex flex-col` |
+//! | `li` | `flex items-center` |
+//! | `p` | `text-base` |
+//! | `label` | `text-sm` |
+//! | `form` | `flex flex-col gap-4` |
 //!
 //! ### Attribute Mapping Reference
 //!
@@ -369,6 +376,7 @@
 //! | `borderRadius` | `.border_radius()` |
 //! | `borderTop` / `borderBottom` | `.border_t()` / `.border_b()` |
 //! | `borderLeft` / `borderRight` | `.border_l()` / `.border_r()` |
+//! | `roundedTop` / `roundedBottom` | `.rounded_t()` / `.rounded_b()` |
 //! | `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
 //! | `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
 //! | `boxShadow` | `.shadow()` |
@@ -388,7 +396,7 @@
 //!    `concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")`
 //! 4. **Not stateful** — no `.id()` injected; `key` is silently ignored.
 //!
-//! ```ignore
+//! ```text
 //! // Format (no key): concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")
 //! // Example:         "src/views/counter.rs::__rsx_button_L42C8"
 //! //
@@ -534,8 +542,10 @@ use parser::RsxBody;
 /// # Notes
 ///
 /// - **Static `class`**: parsed entirely at compile time, supports all classes.
-/// - **Dynamic `class={expr}`**: runtime match; only ~58 common classes recognised.
-///   Unknown classes are silently ignored. Prefer `when` or static strings.
+/// - **Dynamic `class={expr}`**: runtime match; full Tailwind color palette + common
+///   layout/spacing/typography utilities + arbitrary numeric values via prefix fallback.
+///   Truly unsupported classes (e.g. arbitrary hex colors) are silently ignored in
+///   release builds. Prefer `when` or static strings for full coverage.
 /// - **Auto ID**: elements with stateful event handlers receive a source-location-based
 ///   ID automatically. Provide an explicit `id` attribute for state-sensitive elements.
 #[proc_macro]

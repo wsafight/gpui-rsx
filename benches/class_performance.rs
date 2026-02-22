@@ -309,16 +309,29 @@ trait Styled: Sized {
     fn border_1(self) -> Self;
     fn border_2(self) -> Self;
     fn border_dashed(self) -> Self;
+    fn border_t(self) -> Self;
+    fn border_b(self) -> Self;
+    fn border_l(self) -> Self;
+    fn border_r(self) -> Self;
+    fn rounded_none(self) -> Self;
     fn rounded_sm(self) -> Self;
     fn rounded_md(self) -> Self;
     fn rounded_lg(self) -> Self;
+    fn rounded_xl(self) -> Self;
     fn rounded_full(self) -> Self;
     // --- misc ---
     fn cursor_pointer(self) -> Self;
+    fn cursor_default(self) -> Self;
+    fn cursor_text(self) -> Self;
     fn overflow_hidden(self) -> Self;
     fn overflow_scroll(self) -> Self;
+    fn overflow_visible(self) -> Self;
     fn absolute(self) -> Self;
     fn relative(self) -> Self;
+    // --- shadow ---
+    fn shadow_sm(self) -> Self;
+    fn shadow_md(self) -> Self;
+    fn shadow_lg(self) -> Self;
     // --- color / opacity / z ---
     fn bg(self, color: u32) -> Self;
     fn text_color(self, color: u32) -> Self;
@@ -611,6 +624,21 @@ impl Styled for MockElement {
     fn border_dashed(self) -> Self {
         self
     }
+    fn border_t(self) -> Self {
+        self
+    }
+    fn border_b(self) -> Self {
+        self
+    }
+    fn border_l(self) -> Self {
+        self
+    }
+    fn border_r(self) -> Self {
+        self
+    }
+    fn rounded_none(self) -> Self {
+        self
+    }
     fn rounded_sm(self) -> Self {
         self
     }
@@ -620,11 +648,20 @@ impl Styled for MockElement {
     fn rounded_lg(self) -> Self {
         self
     }
+    fn rounded_xl(self) -> Self {
+        self
+    }
     fn rounded_full(self) -> Self {
         self
     }
     // --- misc ---
     fn cursor_pointer(self) -> Self {
+        self
+    }
+    fn cursor_default(self) -> Self {
+        self
+    }
+    fn cursor_text(self) -> Self {
         self
     }
     fn overflow_hidden(self) -> Self {
@@ -633,10 +670,23 @@ impl Styled for MockElement {
     fn overflow_scroll(self) -> Self {
         self
     }
+    fn overflow_visible(self) -> Self {
+        self
+    }
     fn absolute(self) -> Self {
         self
     }
     fn relative(self) -> Self {
+        self
+    }
+    // --- shadow ---
+    fn shadow_sm(self) -> Self {
+        self
+    }
+    fn shadow_md(self) -> Self {
+        self
+    }
+    fn shadow_lg(self) -> Self {
         self
     }
     // --- color / opacity / z ---
