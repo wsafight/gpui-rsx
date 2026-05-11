@@ -29,9 +29,10 @@ pub(crate) fn parse_class_string(class_str: &str) -> impl Iterator<Item = TokenS
 
 /// 解析单个 CSS class 为方法调用
 pub(crate) fn parse_single_class(class: &str) -> TokenStream {
-    // 含 '-' 时分配新 String，不含则零拷贝借用原字符串
-    let method_name: Cow<str> = if class.contains('-') {
-        Cow::Owned(class.replace('-', "_"))
+    // 含 '-' 或 '/' 时分配新 String，不含则零拷贝借用原字符串。
+    // Tailwind fraction classes like `w-1/2` map to GPUI helpers like `w_1_2`.
+    let method_name: Cow<str> = if class.contains(['-', '/']) {
+        Cow::Owned(class.replace(['-', '/'], "_"))
     } else {
         Cow::Borrowed(class)
     };
@@ -59,6 +60,10 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
     // "border-2" → .border_2()
     if method_name == "border" {
         return quote! { .border_1() };
+    }
+
+    if method_name == "no_underline" {
+        return quote! { .text_decoration_none() };
     }
 
     // border-color 类：border-red-500 → .border_color(rgb(0xef4444))
@@ -105,11 +110,11 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
         return quote! { .opacity(#val) };
     }
 
-    // z_ 类：z-10 → .z_index(10)
-    if let Some(rest) = method_name.strip_prefix("z_")
-        && let Ok(n) = rest.parse::<i32>()
+    // line-clamp-3 → .line_clamp(3usize)
+    if let Some(rest) = method_name.strip_prefix("line_clamp_")
+        && let Ok(lines) = rest.parse::<usize>()
     {
-        return quote! { .z_index(#n) };
+        return quote! { .line_clamp(#lines) };
     }
 
     // 默认：无参方法调用（防御性检查：跳过含非标识符字符的 class，如 "hover:bg-blue-500"）

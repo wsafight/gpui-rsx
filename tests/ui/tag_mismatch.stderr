@@ -1,0 +1,7 @@
+error: Closing tag `</span>` does not match opening tag `<div>`. Tags must be properly nested.
+         help: Change the closing tag to `</div>`
+         note: RSX syntax requires matching tags like in HTML/JSX
+ --> tests/ui/tag_mismatch.rs:7:11
+  |
+7 |         </span>
+  |           ^^^^

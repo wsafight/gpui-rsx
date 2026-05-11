@@ -1,0 +1,7 @@
+error: The `when` attribute expects exactly 2 values, found 3.
+         help: Use the format: when={(condition, |el| el.method())}
+         note: The first value is the condition, the second is a closure that modifies the element
+ --> tests/ui/when_wrong_count.rs:5:20
+  |
+5 |         <div when={(true, |el| el, "extra")} />
+  |                    ^^^^^^^^^^^^^^^^^^^^^^^^

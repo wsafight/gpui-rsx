@@ -1,0 +1,10 @@
+error: Element `<li>` inside a for-loop has event handlers but no `id` or `key` attribute.
+         help: Add a `key={unique_value}` attribute so each iteration gets a unique ID:
+                for item in &self.items { <li key={item.id} onClick={...}>...</li> }
+         note: Elements in loops share the same source location, so the auto-generated ID
+               would be identical across iterations, causing GPUI state conflicts.
+               Use `key` for a composite auto-ID, or `id` to supply a fully custom ID.
+  --> tests/ui/for_missing_key.rs:22:18
+   |
+22 |                 <li onClick={handler}>{item}</li>
+   |                  ^^

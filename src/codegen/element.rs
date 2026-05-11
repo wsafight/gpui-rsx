@@ -29,10 +29,10 @@ fn attr_needs_stateful(attr: &RsxAttribute) -> bool {
             if is_stateful_attr(&attr_str) {
                 return true;
             }
-            if let Some(mapped) = lookup_attr_method(&attr_str) {
-                if is_stateful_attr(mapped) {
-                    return true;
-                }
+            if let Some(mapped) = lookup_attr_method(&attr_str)
+                && is_stateful_attr(mapped)
+            {
+                return true;
             }
             if attr_str == "class"
                 && let syn::Expr::Lit(syn::ExprLit {
@@ -50,7 +50,7 @@ fn attr_needs_stateful(attr: &RsxAttribute) -> bool {
         RsxAttribute::Flag(name) => {
             let attr_str = name.to_string();
             is_stateful_attr(&attr_str)
-                || lookup_attr_flag_method(&attr_str).is_some_and(|m| is_stateful_attr(m))
+                || lookup_attr_flag_method(&attr_str).is_some_and(is_stateful_attr)
         }
         _ => false,
     }
@@ -96,10 +96,10 @@ fn generate_node(node: &RsxNode) -> TokenStream {
 
 /// 生成 for 循环的迭代器代码
 ///
-/// 单个子节点 → `.map()`，多个子节点 → `.flat_map()` + `vec![]`
+/// 单个子节点 → `.map()`，多个子节点 → `.flat_map()` + `AnyElement` 数组
 ///
-/// 多子节点使用 `vec![]` 而非数组 `[...]`：数组要求所有元素同类型，
-/// 当 body 中混合不同元素类型时（如 `div()` 和自定义组件）会产生类型错误。
+/// 多子节点使用 `AnyElement` 做类型擦除后放入数组，避免每轮循环分配 `Vec`，
+/// 同时允许循环体内混合不同具体元素类型（如 `div()` 和自定义组件）。
 ///
 /// 安全检查：循环体内所有 stateful 元素（含深层嵌套）都必须提供 `id` 或 `key`，
 /// 否则每次迭代会生成相同的自动 ID，导致 GPUI 状态冲突，因此在此阶段给出编译错误。
@@ -114,7 +114,9 @@ fn generate_for_loop(binding: &syn::Pat, iter: &syn::Expr, body: &[RsxNode]) -> 
         let single = &body_exprs[0];
         quote! { (#iter).into_iter().map(|#binding| #single) }
     } else {
-        quote! { (#iter).into_iter().flat_map(|#binding| vec![#(#body_exprs),*]) }
+        quote! {
+            (#iter).into_iter().flat_map(|#binding| [#((#body_exprs).into_any_element()),*])
+        }
     }
 }
 

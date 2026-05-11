@@ -13,15 +13,15 @@
 ## ✨ 特性
 
 - 🎨 **HTML-like 语法** - 类似 React JSX 的开发体验
-- 🚀 **零运行时开销** - 编译时展开为原生 GPUI 代码
+- 🚀 **静态标记无运行时解析** - 静态 RSX 编译为原生 GPUI builder 调用
 - 📦 **轻量级** - 仅依赖 `syn`, `quote`, `proc-macro2`
 - 🔧 **灵活** - 支持表达式、条件渲染、组件组合
 - 💡 **类型安全** - 完全的编译时检查
 - 🧩 **Fragment 支持** - 使用 `<>...</>` 返回多个根元素
 - 🔁 **For 循环语法糖** - 使用 `{for item in iter { ... }}` 迭代
 - 🔑 **循环安全 ID** - `key={expr}` 为每次迭代生成唯一 ID；缺少 key 时报编译错误
-- 🎨 **完整 Tailwind 色板** - 内置 242 种颜色 + 任意 hex 值
-- ⚡ **动态 Class** - 支持运行时 class 切换：完整 Tailwind 色板 + 数值前缀回退
+- 🎨 **完整 Tailwind 色板** - 22 个色系 × 11 个色阶 + black/white + 任意 hex 值
+- ⚡ **动态 Class** - 支持运行时 class 切换：完整 Tailwind 色板、任意 hex 颜色和数值前缀回退
 
 ## 📚 文档资源
 
@@ -243,12 +243,13 @@ rsx! {
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
-> **注意：** `class` 同时支持静态字符串（编译时处理）和动态表达式（运行时解析）。静态 class 具有零运行时开销。详见 [FAQ Q5](#q5-可以使用动态-class-值吗)。
+> **注意：** `class` 同时支持静态字符串（编译时处理）和动态表达式（运行时解析）。静态 class 会直接展开为 GPUI builder 调用；动态 class 表达式使用一个很小的运行时 matcher。详见 [FAQ Q5](#q5-可以使用动态-class-值吗)。
 
 #### 支持的 class 模式
 
 **布局：**
 - `flex`, `flex-col`, `flex-row`, `flex-wrap`, `flex-1`, `flex-none`, `flex-auto`
+- `flex-grow`, `flex-grow-0`, `flex-shrink`, `flex-shrink-0`
 - `items-center`, `items-start`, `items-end`
 - `justify-center`, `justify-between`
 
@@ -260,12 +261,19 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - 小数值：`p-0.5` → `.p(px(0.5))`
 
 **尺寸：**
-- `w-full`, `h-full`, `size-full`
+- `w-full`, `h-full`, `size-full`, `aspect-square`
+- `w-px`, `h-px`, `w-auto`, `h-auto`, `w-1/2`, `h-1/3`, `size-1/2`
 
 **文本：**
 - `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`
 - `text-2xl`, `text-3xl`
-- `font-bold`
+- `font-bold`, `whitespace-normal`, `whitespace-nowrap`, `line-clamp-*`
+- `text-ellipsis`, `text-ellipsis-start`, `truncate`, `no-underline`
+- `text-decoration-solid`, `text-decoration-wavy`, `text-decoration-0/1/2/4/8`
+
+**对齐：**
+- `content-normal`, `content-center`, `content-start`, `content-end`, `content-between`, `content-around`, `content-evenly`, `content-stretch`
+- `self-start`, `self-end`, `self-flex-start`, `self-flex-end`, `self-center`, `self-baseline`, `self-stretch`
 
 **边框：**
 - `border` → `.border_1()`
@@ -279,9 +287,13 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - 任意 hex：`bg-[#ff0000]`, `text-[#333]`, `border-[#abc]`
 
 **效果：**
-- `shadow-sm`, `shadow-md`, `shadow-lg`
-- `overflow-hidden`, `overflow-scroll`
-- `cursor-pointer`, `cursor-default`, `cursor-text`
+- `shadow-none`, `shadow-2xs`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
+- `overflow-hidden`, `overflow-x-hidden`, `overflow-y-hidden`, `overflow-scroll`
+- `cursor-pointer`, `cursor-default`, `cursor-text`, `cursor-move`, `cursor-grab`, `cursor-not-allowed`，以及 resize cursor 变体
+
+**Grid 定位：**
+- `col-span-*`, `col-start-*`, `col-end-*`, `row-span-*`, `row-start-*`, `row-end-*`
+- `col-span-full`, `col-start-auto`, `col-end-auto`, `row-span-full`, `row-start-auto`, `row-end-auto`
 
 **支持的颜色：** slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose（色阶 50-950）+ white, black
 
@@ -455,17 +467,18 @@ rsx! {
 }
 ```
 
-> **运行时支持范围：** 完整 Tailwind 色板（22 色系 × 11 色阶 × 3 前缀 = 726+ 条颜色分支）、
-> 常用布局/间距/文字排版工具类，以及通过前缀回退支持间距/尺寸/透明度/z-index 的任意数值
-> （如 `gap-7`、`p-5`、`opacity-33`、`z-30`）。真正不受支持的 class（如任意 hex 颜色）
-> 在 release 构建中**静默忽略**，在 debug 构建中打印警告。
+> **运行时支持范围：** 常用布局/间距/文字排版工具类、完整 Tailwind 色板、
+> 任意 hex 颜色（如 `bg-[#ff0000]`、`text-[#f00]`），以及通过前缀回退支持
+> 间距/尺寸/透明度的任意数值（如 `gap-7`、`p-5`、`opacity-33`）。
+> 真正不受支持的 class（如 Tailwind variants 或未知工具类）在 release 构建中**静默忽略**，
+> 在 debug 构建中打印警告。
 >
 > **推荐替代方案**（按优先级排序）：
 > 1. **字符串字面量**（最佳）：`class="flex gap-4"` — 编译期，支持所有 class
 > 2. **条件字面量**：`class={if active { "flex gap-4" } else { "block" }}` — 仍是字面量
 > 3. **独立属性**：`<div flex gap_4 />` — 编译期，类型检查
 > 4. **`when` 属性**：`when={(cond, |el| el.flex())}` — 编译期，完全灵活
-> 5. **动态表达式**：`class={expr}` — 运行时，任意 hex 颜色不支持
+> 5. **动态表达式**：`class={expr}` — 运行时解析器，覆盖范围比静态字面量窄
 
 **常见模式：**
 
@@ -476,8 +489,8 @@ let btn_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 text
 // ✅ when 属性（编译期，完全灵活）
 rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }
 
-// ✅ 含数值的动态字符串（前缀回退：gap-N、p-N、opacity-N、z-N 任意数值均可）
-let classes = format!("flex gap-{}", spacing);  // gap-7、gap-32 等均生效
+// ✅ 含数值前缀和任意 hex 颜色的动态字符串
+let classes = format!("flex gap-{} bg-[#ff0000]", spacing);  // gap-7、gap-32 等均生效
 ```
 
 ### 10. 展开语法
@@ -496,23 +509,18 @@ camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
 
 | RSX 属性 | GPUI 方法 |
 |----------|-----------|
-| `zIndex` | `.z_index()` |
 | `opacity` | `.opacity()` |
-| `visible` | `.visible()` |
-| `invisible`（标志） | `.visible(false)` |
+| `visible` / `invisible` | `.visible()` / `.invisible()` |
 | `width` / `height` | `.w()` / `.h()` |
 | `minWidth` / `maxWidth` | `.min_w()` / `.max_w()` |
 | `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
 | `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
-| `flexBasis` | `.basis()` |
-| `flexGrow` / `flexShrink` | `.flex_grow()` / `.flex_shrink()` |
-| `flexOrder` | `.order()` |
-| `fontSize` | `.font_size()` |
+| `flexBasis` | `.flex_basis()` |
+| `flexGrow` / `flexShrink`（标志） | `.flex_grow()` / `.flex_shrink()` |
+| `fontSize` | `.text_size()` |
 | `lineHeight` | `.line_height()` |
 | `fontWeight` | `.font_weight()` |
 | `textAlign` | `.text_align()` |
-| `textDecoration` | `.text_decoration()` |
-| `borderRadius` | `.border_radius()` |
 | `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
 | `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
 | `border_t` / `border_b` / `border_l` / `border_r`（标志） | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |
@@ -520,10 +528,14 @@ camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
 | `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
 | `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
 | `boxShadow` | `.shadow()` |
-| `overflowX` / `overflowY` | `.overflow_x()` / `.overflow_y()` |
 | `inset` | `.inset()` |
 
 不在此表中的属性将原样透传（如 `bg={color}` → `.bg(color)`）。
+
+> **关于 z 轴：** 最新 GPUI 没有 `z-index` 字段，也没有 `.z_index()` builder。
+> 同一父节点下的叠放顺序由 child 的绘制顺序决定，后面的 sibling 会盖在前面的 sibling 上；
+> 浮层通常用 `absolute`/`relative` 结构或 GPUI 的 overlay / popover / modal 等机制实现。
+> 因此 `z-*` class 和 `zIndex` 属性不会被映射。
 
 ### 12. 使用 `when` 和 `whenSome` 进行条件样式
 
@@ -747,7 +759,7 @@ fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoE
 
 ## 📊 性能
 
-GPUI-RSX 是一个**编译时宏**，展开后的代码与手写的 GPUI 代码完全相同，**零运行时开销**。
+GPUI-RSX 是一个**编译时宏**，静态 RSX 会展开为直接的 GPUI builder 调用。静态标记没有运行时解析器；动态 `class={expr}` 会有意使用一个很小的运行时 matcher。
 
 | 指标 | 传统 GPUI | GPUI-RSX |
 |------|----------|----------|
@@ -759,9 +771,9 @@ GPUI-RSX 是一个**编译时宏**，展开后的代码与手写的 GPUI 代码�
 ### v0.3.2 修复与改进
 - **修复** `parse_single_class` 在 Tailwind 变体语法（如 `hover:bg-blue-500`）上的 panic：
   含非法字符的 class 名现在静默跳过，而非触发 `syn::Ident::new` panic
-- **新增** 8 个动态 class：`rounded-none`、`rounded-xl`、`cursor-default`、`cursor-text`、
-  `overflow-visible`、`shadow-sm`、`shadow-md`、`shadow-lg`
-- **文档** styled 默认表新增 `li`、`p`、`label`、`form`；修正 `overflowX`/`overflowY` 方法名；
+- **新增** 7 个动态 class：`rounded-none`、`rounded-xl`、`cursor-default`、`cursor-text`、
+  `shadow-sm`、`shadow-md`、`shadow-lg`
+- **文档** styled 默认表新增 `li`、`p`、`label`、`form`；同步 GPUI 0.2.2 方法名；
   移除不存在的 `text-4xl`/`text-5xl`；更新动态 class 说明
 
 ### v0.3.1 修复与新增
@@ -948,10 +960,10 @@ rsx! { <div bg={dynamic_color} flex /> }
 // ✅ when 条件样式（编译期，完全灵活）
 rsx! { <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} /> }
 
-// ✅ 含数值的动态表达式（运行时：gap-N、p-N、opacity-N、z-N 任意数值均生效）
+// ✅ 含数值和颜色的动态表达式（运行时：gap-N、p-N、opacity-N、任意 hex 颜色）
 let classes = if active { "flex gap-4" } else { "block" };
 rsx! { <div class={classes} /> }
-// 任意 hex 颜色等不受支持的 class 会被静默忽略。
+// Tailwind variants 或未知工具类会被静默忽略。
 ```
 
 **建议：** 需要动态样式时，优先使用 `when`/`whenSome` 或独立值属性（如 `bg={color}`）——它们是编译期处理，支持所有 GPUI 提供的功能。

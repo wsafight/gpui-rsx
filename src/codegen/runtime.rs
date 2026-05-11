@@ -7,7 +7,7 @@
 
 use super::class::parse_single_class;
 use super::tables::{COLOR_FAMILIES, COLOR_SHADES, lookup_color};
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::TokenStream;
 use quote::quote;
 use std::cell::RefCell;
 
@@ -21,6 +21,7 @@ use std::cell::RefCell;
 // 而非对每个 arm 分别 parse（原先每次调用需数百次 parse）。
 thread_local! {
     static COMMON_CLASS_MATCHES_STR: RefCell<Option<String>> = const { RefCell::new(None) };
+    static COLOR_FALLBACK_STR: RefCell<Option<String>> = const { RefCell::new(None) };
     static NUMERIC_FALLBACK_STR: RefCell<Option<String>> = const { RefCell::new(None) };
 }
 
@@ -37,6 +38,16 @@ fn get_cached_common_class_matches() -> TokenStream {
         });
         s.parse::<TokenStream>()
             .expect("cached match arms are valid")
+    })
+}
+
+/// 获取颜色回退代码（惰性初始化字符串缓存，每次返回当前 bridge 的新 TokenStream）
+fn get_cached_color_fallback() -> TokenStream {
+    COLOR_FALLBACK_STR.with(|cell| {
+        let mut borrow = cell.borrow_mut();
+        let s = borrow.get_or_insert_with(|| generate_color_fallback_code().to_string());
+        s.parse::<TokenStream>()
+            .expect("cached color fallback is valid")
     })
 }
 
@@ -58,16 +69,17 @@ fn get_cached_numeric_fallback() -> TokenStream {
 ///
 /// 动态 class 支持两类解析：
 /// 1. **静态 match 表**（快速路径）：[`generate_common_class_matches`] 中的预编译常用 class
-/// 2. **数值前缀解析**（通用路径）：对间距/尺寸/透明度/层级类，支持任意数值
+/// 2. **颜色前缀解析**：完整 Tailwind 色板 + `[#rgb]` / `[#rrggbb]` arbitrary hex
+/// 3. **数值前缀解析**（通用路径）：对间距/尺寸/透明度类，支持任意数值
 ///    - `gap-7`、`gap-x-3`、`p-5`、`px-7`、`m-3`、`ml-5`、`w-48`、`h-16` 等
-///    - `opacity-33`、`z-30` 等
+///    - `opacity-33` 等
 ///    - 静态 match 未命中时自动回退到此路径，无需扩充预编译列表
-/// 3. **其余 class**（如颜色类 `text-orange-400`、自定义 class）仍需字符串字面量
+/// 4. **其余 class**（如 Tailwind variants、自定义 class）静默忽略
 ///
 /// 推荐方案（按性能从高到低）：
 /// 1. **字符串字面量**（最佳）：`class="flex gap-4"` → 编译期展开，支持所有 class
 /// 2. **条件表达式**（次佳）：`class={if active { "flex" } else { "block" }}`
-/// 3. **动态表达式**：`class={dynamic_str}` → 支持间距/透明度/z-index 的任意数值
+/// 3. **动态表达式**：`class={dynamic_str}` → 支持间距/尺寸/透明度和 arbitrary hex 颜色
 ///
 /// # 代码体积优化
 ///
@@ -102,6 +114,7 @@ fn get_cached_numeric_fallback() -> TokenStream {
 /// ```
 pub(crate) fn generate_dynamic_class_code(class_expr: &syn::Expr) -> TokenStream {
     let common_classes = get_cached_common_class_matches();
+    let color_fallbacks = get_cached_color_fallback();
     let numeric_fallbacks = get_cached_numeric_fallback();
 
     quote! {
@@ -114,8 +127,10 @@ pub(crate) fn generate_dynamic_class_code(class_expr: &syn::Expr) -> TokenStream
                 match class {
                     #common_classes
                     _ => {
+                        // 颜色前缀解析：覆盖完整 Tailwind 色板和 arbitrary hex。
+                        #color_fallbacks
                         // 数值前缀回退：静态 match 未命中时，尝试前缀 + 数值解析
-                        // 覆盖 gap-7、px-5、ml-3、opacity-33、z-30 等任意数值
+                        // 覆盖 gap-7、px-5、ml-3、opacity-33 等任意数值
                         #numeric_fallbacks
                         // 仅在 debug 构建中打印警告，避免 release 中每帧触发 syscall 污染日志
                         #[cfg(debug_assertions)]
@@ -140,6 +155,95 @@ pub(crate) fn generate_dynamic_class_code(class_expr: &syn::Expr) -> TokenStream
             } else {
                 __class_str.split_ascii_whitespace().fold(__el, __rsx_apply_class)
             }
+        }
+    }
+}
+
+/// 生成动态颜色解析回退代码。
+///
+/// 相比为 text/bg/border 三个前缀展开完整色板 match arm，这里只在动态路径中
+/// 解析 `prefix-family-shade`，把展开体积从 700+ 个颜色分支降到 22 个色系分支。
+fn generate_color_fallback_code() -> TokenStream {
+    let shade_arms = COLOR_SHADES.iter().enumerate().map(|(idx, shade)| {
+        quote! { #shade => #idx, }
+    });
+
+    let family_arms = COLOR_FAMILIES.iter().map(|family| {
+        let values = COLOR_SHADES.iter().map(|shade| {
+            let key = format!("{family}_{shade}");
+            lookup_color(&key).expect("COLOR_FAMILIES/COLOR_SHADES must match lookup_color")
+        });
+        quote! {
+            #family => {
+                const VALUES: [u32; 11] = [#(#values),*];
+                Some(VALUES[shade_index])
+            }
+        }
+    });
+
+    quote! {
+        fn __rsx_hex_digit(byte: u8) -> Option<u32> {
+            match byte {
+                b'0'..=b'9' => Some((byte - b'0') as u32),
+                b'a'..=b'f' => Some((byte - b'a' + 10) as u32),
+                b'A'..=b'F' => Some((byte - b'A' + 10) as u32),
+                _ => None,
+            }
+        }
+
+        fn __rsx_parse_hex_color(color: &str) -> Option<u32> {
+            let inner = color.strip_prefix("[#")?.strip_suffix(']')?;
+            let bytes = inner.as_bytes();
+            match bytes.len() {
+                6 => u32::from_str_radix(inner, 16).ok(),
+                3 => {
+                    let r = __rsx_hex_digit(bytes[0])?;
+                    let g = __rsx_hex_digit(bytes[1])?;
+                    let b = __rsx_hex_digit(bytes[2])?;
+                    Some(r << 20 | r << 16 | g << 12 | g << 8 | b << 4 | b)
+                }
+                _ => None,
+            }
+        }
+
+        fn __rsx_parse_named_color(color: &str) -> Option<u32> {
+            if color == "black" {
+                return Some(0x000000);
+            }
+            if color == "white" {
+                return Some(0xffffff);
+            }
+
+            let (family, shade) = color.rsplit_once('-')?;
+            let shade_index = match shade {
+                #(#shade_arms)*
+                _ => return None,
+            };
+
+            match family {
+                #(#family_arms,)*
+                _ => None,
+            }
+        }
+
+        fn __rsx_parse_color(color: &str) -> Option<u32> {
+            __rsx_parse_hex_color(color).or_else(|| __rsx_parse_named_color(color))
+        }
+
+        if let Some(rest) = class.strip_prefix("text-")
+            && let Some(color) = __rsx_parse_color(rest)
+        {
+            return el.text_color(rgb(color));
+        }
+        if let Some(rest) = class.strip_prefix("bg-")
+            && let Some(color) = __rsx_parse_color(rest)
+        {
+            return el.bg(rgb(color));
+        }
+        if let Some(rest) = class.strip_prefix("border-")
+            && let Some(color) = __rsx_parse_color(rest)
+        {
+            return el.border_color(rgb(color));
         }
     }
 }
@@ -234,9 +338,9 @@ fn generate_numeric_fallback_code() -> TokenStream {
         if let Some(rest) = class.strip_prefix("opacity-") {
             if let Ok(n) = rest.parse::<f32>() { return el.opacity(n / 100.0); }
         }
-        // --- z-index: z-10 → z_index(10) ---
-        if let Some(rest) = class.strip_prefix("z-") {
-            if let Ok(n) = rest.parse::<i32>() { return el.z_index(n); }
+        // --- text layout ---
+        if let Some(rest) = class.strip_prefix("line-clamp-") {
+            if let Ok(n) = rest.parse::<usize>() { return el.line_clamp(n); }
         }
         // --- grid layout（优先检查较长前缀避免歧义）---
         if let Some(rest) = class.strip_prefix("col-span-") {
@@ -271,12 +375,6 @@ fn generate_numeric_fallback_code() -> TokenStream {
 /// 返回一个 match arm 列表，每个 arm 匹配一个 class 字符串并应用相应的方法。
 /// 通过 thread_local 缓存，整个编译过程只调用一次。
 ///
-/// # 颜色覆盖
-///
-/// 通过复用编译期 `lookup_color()` 表，自动生成完整 Tailwind 色板的 match 分支：
-/// - 22 色系 × 11 色阶 × 3 前缀（text / bg / border）= 726 条颜色分支
-/// - 加上 black/white 的 6 条 = 共 732 条颜色分支
-/// - 与静态工具类合并后，动态 class 几乎覆盖所有 Tailwind 颜色，大幅减少静默失败
 fn generate_common_class_matches() -> Vec<TokenStream> {
     // 非颜色静态工具类
     let static_classes = [
@@ -290,9 +388,12 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
         "flex-auto",
         "flex-initial",
         "flex-none",
+        "flex-grow",
+        "flex-grow-0",
         "flex-wrap",
         "flex-wrap-reverse",
         "flex-nowrap",
+        "flex-shrink",
         "flex-shrink-0",
         "block",
         "grid",
@@ -309,6 +410,7 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
         "justify-end",
         "justify-around",
         "justify-evenly",
+        "content-normal",
         "content-center",
         "content-start",
         "content-end",
@@ -316,6 +418,13 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
         "content-around",
         "content-evenly",
         "content-stretch",
+        "self-start",
+        "self-end",
+        "self-flex-start",
+        "self-flex-end",
+        "self-center",
+        "self-baseline",
+        "self-stretch",
         // 间距：gap
         "gap-1",
         "gap-2",
@@ -376,6 +485,7 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
         "w-full",
         "h-full",
         "size-full",
+        "aspect-square",
         // 文本大小
         "text-xs",
         "text-sm",
@@ -389,12 +499,23 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
         "text-center",
         "text-right",
         // 文本装饰
+        "whitespace-normal",
+        "whitespace-nowrap",
         "truncate",
         "text-ellipsis",
+        "text-ellipsis-start",
+        "no-underline",
         "italic",
         "not-italic",
         "underline",
         "line-through",
+        "text-decoration-solid",
+        "text-decoration-wavy",
+        "text-decoration-0",
+        "text-decoration-1",
+        "text-decoration-2",
+        "text-decoration-4",
+        "text-decoration-8",
         // 字体
         "font-bold",
         // 边框
@@ -423,74 +544,62 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
         "cursor-pointer",
         "cursor-default",
         "cursor-text",
+        "cursor-move",
+        "cursor-not-allowed",
+        "cursor-context-menu",
+        "cursor-crosshair",
+        "cursor-vertical-text",
+        "cursor-alias",
+        "cursor-copy",
+        "cursor-no-drop",
+        "cursor-grab",
+        "cursor-grabbing",
+        "cursor-ew-resize",
+        "cursor-ns-resize",
+        "cursor-nesw-resize",
+        "cursor-nwse-resize",
+        "cursor-col-resize",
+        "cursor-row-resize",
+        "cursor-n-resize",
+        "cursor-e-resize",
+        "cursor-s-resize",
+        "cursor-w-resize",
         "overflow-hidden",
-        "overflow-visible",
+        "overflow-x-hidden",
+        "overflow-y-hidden",
         "absolute",
         "relative",
         // 阴影
+        "shadow-none",
+        "shadow-2xs",
+        "shadow-xs",
         "shadow-sm",
         "shadow-md",
         "shadow-lg",
+        "shadow-xl",
+        "shadow-2xl",
         // 透明度常用值（任意数值由数值前缀回退处理）
         "opacity-0",
         "opacity-25",
         "opacity-50",
         "opacity-75",
         "opacity-100",
-        // Z 轴层级常用值
-        "z-0",
-        "z-10",
-        "z-20",
-        "z-50",
+        // grid placement
+        "col-span-full",
+        "col-start-auto",
+        "col-end-auto",
+        "row-span-full",
+        "row-start-auto",
+        "row-end-auto",
     ];
 
-    // 22 色系 × 11 色阶 × 3 前缀 + 6 (black/white × 3 前缀)
-    const COLOR_ENTRIES: usize = 22 * 11 * 3 + 6;
-    let mut matches = Vec::with_capacity(static_classes.len() + COLOR_ENTRIES);
+    let mut matches = Vec::with_capacity(static_classes.len());
 
     for class_str in static_classes {
         let method_call = parse_single_class(class_str);
         matches.push(quote! {
             #class_str => el #method_call,
         });
-    }
-
-    // 自动生成完整 Tailwind 颜色 match 分支
-    // 复用 tables::COLOR_FAMILIES / COLOR_SHADES 常量，真正单一数据源：
-    // 新增色系只需修改 tables.rs，runtime.rs 自动同步。
-    let families = COLOR_FAMILIES;
-    let shades = COLOR_SHADES;
-
-    // 复用 Ident，避免每次循环重复创建
-    let text_color_ident = syn::Ident::new("text_color", Span::call_site());
-    let bg_ident = syn::Ident::new("bg", Span::call_site());
-    let border_color_ident = syn::Ident::new("border_color", Span::call_site());
-
-    for family in families {
-        for shade in shades {
-            let color_key = format!("{family}_{shade}");
-            if let Some(hex) = lookup_color(&color_key) {
-                let text_class = format!("text-{family}-{shade}");
-                let bg_class = format!("bg-{family}-{shade}");
-                let border_class = format!("border-{family}-{shade}");
-                matches.push(quote! { #text_class => el.#text_color_ident(rgb(#hex)), });
-                matches.push(quote! { #bg_class => el.#bg_ident(rgb(#hex)), });
-                matches.push(quote! { #border_class => el.#border_color_ident(rgb(#hex)), });
-            }
-        }
-    }
-
-    // black / white（tables.rs 中独立存储，单独生成）
-    // 方法名直接编码在数据中，无需运行时 starts_with 分支判断
-    for (class_str, method_ident, hex) in [
-        ("text-black", &text_color_ident, 0x000000u32),
-        ("text-white", &text_color_ident, 0xffffff_u32),
-        ("bg-black", &bg_ident, 0x000000_u32),
-        ("bg-white", &bg_ident, 0xffffff_u32),
-        ("border-black", &border_color_ident, 0x000000_u32),
-        ("border-white", &border_color_ident, 0xffffff_u32),
-    ] {
-        matches.push(quote! { #class_str => el.#method_ident(rgb(#hex)), });
     }
 
     matches

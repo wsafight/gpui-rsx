@@ -243,7 +243,7 @@ Expands to:
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
-> **Note:** `class` accepts both static strings (compiled at build time) and dynamic expressions (parsed at runtime). Static classes have zero runtime overhead. See [Dynamic Class](#10-dynamic-class-) for details.
+> **Note:** `class` accepts both static strings (compiled at build time) and dynamic expressions (parsed at runtime). Static classes expand directly to GPUI builder calls; dynamic class expressions use a small runtime matcher. See [Dynamic Class](#10-dynamic-class-) for details.
 
 #### Supported class patterns
 
@@ -260,12 +260,19 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - Fractional values: `p-0.5` → `.p(px(0.5))`
 
 **Sizing:**
-- `w-full`, `h-full`, `size-full`
+- `w-full`, `h-full`, `size-full`, `aspect-square`
+- `w-px`, `h-px`, `w-auto`, `h-auto`, `w-1/2`, `h-1/3`, `size-1/2`
 
 **Text:**
 - `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`
 - `text-2xl`, `text-3xl`
-- `font-bold`
+- `font-bold`, `whitespace-normal`, `whitespace-nowrap`, `line-clamp-*`
+- `text-ellipsis`, `text-ellipsis-start`, `truncate`, `no-underline`
+- `text-decoration-solid`, `text-decoration-wavy`, `text-decoration-0/1/2/4/8`
+
+**Alignment:**
+- `content-normal`, `content-center`, `content-start`, `content-end`, `content-between`, `content-around`, `content-evenly`, `content-stretch`
+- `self-start`, `self-end`, `self-flex-start`, `self-flex-end`, `self-center`, `self-baseline`, `self-stretch`
 
 **Border:**
 - `border` → `.border_1()`
@@ -279,9 +286,13 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - Arbitrary hex: `bg-[#ff0000]`, `text-[#333]`, `border-[#abc]`
 
 **Effects:**
-- `shadow-sm`, `shadow-md`, `shadow-lg`
-- `overflow-hidden`, `overflow-scroll`
-- `cursor-pointer`, `cursor-default`, `cursor-text`
+- `shadow-none`, `shadow-2xs`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
+- `overflow-hidden`, `overflow-x-hidden`, `overflow-y-hidden`, `overflow-scroll`
+- `cursor-pointer`, `cursor-default`, `cursor-text`, `cursor-move`, `cursor-grab`, `cursor-not-allowed`, resize cursor variants
+
+**Grid placement:**
+- `col-span-*`, `col-start-*`, `col-end-*`, `row-span-*`, `row-start-*`, `row-end-*`
+- `col-span-full`, `col-start-auto`, `col-end-auto`, `row-span-full`, `row-start-auto`, `row-end-auto`
 
 **Supported colors:** slate, gray, zinc, neutral, stone, red, orange, amber, yellow, lime, green, emerald, teal, cyan, sky, blue, indigo, violet, purple, fuchsia, pink, rose (shades 50-950) + white, black
 
@@ -465,18 +476,18 @@ rsx! {
 }
 ```
 
-> **Supported at runtime:** full Tailwind color palette (22 families × 11 shades × 3 prefixes =
-> 726+ color entries), common layout/spacing/typography utilities, and arbitrary numeric values for
-> spacing/sizing/opacity/z-index via prefix fallback (e.g. `gap-7`, `p-5`, `opacity-33`, `z-30`).
-> Truly unsupported classes (e.g. arbitrary hex colors) are **silently ignored** in release builds
-> and print a warning in debug builds.
+> **Supported at runtime:** common layout/spacing/typography utilities, the full Tailwind color
+> palette, arbitrary hex colors (e.g. `bg-[#ff0000]`, `text-[#f00]`), and arbitrary numeric values
+> for spacing/sizing/opacity via prefix fallback (e.g. `gap-7`, `p-5`, `opacity-33`).
+> Truly unsupported classes (e.g. Tailwind variants or unknown utilities) are **silently ignored**
+> in release builds and print a warning in debug builds.
 >
 > **Recommended alternatives** (in priority order):
 > 1. **String literal** (best): `class="flex gap-4"` — compile-time, supports all classes
 > 2. **Conditional literal**: `class={if active { "flex gap-4" } else { "block" }}` — still a literal
 > 3. **Individual attributes**: `<div flex gap_4 />` — compile-time, type-checked
 > 4. **`when` attribute**: `when={(cond, |el| el.flex())}` — compile-time, fully flexible
-> 5. **Dynamic expression**: `class={expr}` — runtime, arbitrary hex colors not supported
+> 5. **Dynamic expression**: `class={expr}` — runtime parser, narrower coverage than static literals
 
 **Common Patterns:**
 
@@ -487,8 +498,8 @@ let button_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 t
 // ✅ when attribute (compile-time, fully flexible)
 rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }
 
-// ✅ Dynamic string with numeric prefix (works: any gap-N, p-N, opacity-N, z-N)
-let classes = format!("flex gap-{}", spacing);  // gap-7, gap-32, etc. all work
+// ✅ Dynamic string with numeric prefix and arbitrary hex colors
+let classes = format!("flex gap-{} bg-[#ff0000]", spacing);  // gap-7, gap-32, etc. all work
 ```
 
 ### 11. Attribute Mapping Reference
@@ -497,23 +508,18 @@ camelCase attributes are automatically mapped to GPUI snake_case methods:
 
 | RSX Attribute | GPUI Method |
 |---------------|-------------|
-| `zIndex` | `.z_index()` |
 | `opacity` | `.opacity()` |
-| `visible` | `.visible()` |
-| `invisible` (flag) | `.visible(false)` |
+| `visible` / `invisible` | `.visible()` / `.invisible()` |
 | `width` / `height` | `.w()` / `.h()` |
 | `minWidth` / `maxWidth` | `.min_w()` / `.max_w()` |
 | `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
 | `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
-| `flexBasis` | `.basis()` |
-| `flexGrow` / `flexShrink` | `.flex_grow()` / `.flex_shrink()` |
-| `flexOrder` | `.order()` |
-| `fontSize` | `.font_size()` |
+| `flexBasis` | `.flex_basis()` |
+| `flexGrow` / `flexShrink` (flags) | `.flex_grow()` / `.flex_shrink()` |
+| `fontSize` | `.text_size()` |
 | `lineHeight` | `.line_height()` |
 | `fontWeight` | `.font_weight()` |
 | `textAlign` | `.text_align()` |
-| `textDecoration` | `.text_decoration()` |
-| `borderRadius` | `.border_radius()` |
 | `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
 | `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
 | `border_t` / `border_b` / `border_l` / `border_r` (flags) | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |
@@ -521,7 +527,6 @@ camelCase attributes are automatically mapped to GPUI snake_case methods:
 | `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
 | `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
 | `boxShadow` | `.shadow()` |
-| `overflowX` / `overflowY` | `.overflow_x()` / `.overflow_y()` |
 | `inset` | `.inset()` |
 
 Attributes not in this table are passed through as-is (e.g., `bg={color}` → `.bg(color)`).
@@ -748,7 +753,7 @@ fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoE
 
 ## 📊 Performance
 
-GPUI-RSX is a **compile-time macro** that expands to the same code as hand-written GPUI, with **zero runtime overhead**.
+GPUI-RSX is a **compile-time macro** that expands static RSX into direct GPUI builder calls. Static markup has no parser at runtime; dynamic `class={expr}` intentionally uses a small runtime matcher.
 
 | Metric | Traditional GPUI | GPUI-RSX |
 |--------|------------------|----------|
@@ -760,8 +765,8 @@ GPUI-RSX is a **compile-time macro** that expands to the same code as hand-writt
 ### v0.3.2 Fixes & Improvements
 - **Fixed** `parse_single_class` panic on Tailwind variant syntax (`hover:bg-blue-500`): invalid
   class names are now silently skipped instead of calling `syn::Ident::new` with illegal characters
-- **Added** 8 classes to dynamic match table: `rounded-none`, `rounded-xl`, `cursor-default`,
-  `cursor-text`, `overflow-visible`, `shadow-sm`, `shadow-md`, `shadow-lg`
+- **Added** 7 classes to dynamic match table: `rounded-none`, `rounded-xl`, `cursor-default`,
+  `cursor-text`, `shadow-sm`, `shadow-md`, `shadow-lg`
 - **Docs** styled defaults: added `li`, `p`, `label`, `form` entries; fixed `overflowX`/`overflowY`
   method names; removed unsupported `text-4xl`/`text-5xl`; updated dynamic class description
 

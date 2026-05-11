@@ -696,24 +696,10 @@ fn test_opacity_attribute() {
 }
 
 #[test]
-fn test_z_index_attribute() {
-    let _el = rsx! {
-        <div zIndex={10}>{"层级 10"}</div>
-    };
-}
-
-#[test]
 fn test_visible_attribute() {
     let is_shown = true;
     let _el = rsx! {
         <div visible={is_shown}>{"可见内容"}</div>
-    };
-}
-
-#[test]
-fn test_invisible_flag() {
-    let _el = rsx! {
-        <div invisible>{"隐藏内容"}</div>
     };
 }
 
@@ -762,7 +748,6 @@ fn test_combined_common_attributes() {
         <div
             class="flex items-center"
             opacity={0.8}
-            zIndex={100}
             visible={is_visible}
             absolute
             top={px(0.0)}
@@ -785,7 +770,6 @@ fn test_modal_overlay_example() {
             height={px(100.0)}
             bg={rgb(0x000000)}
             opacity={0.5}
-            zIndex={1000}
             visible={is_open}
         >
             {"模态框遮罩"}
@@ -1348,11 +1332,6 @@ fn test_font_weight_attribute() {
 }
 
 #[test]
-fn test_border_radius_attribute() {
-    let _el = rsx! { <div borderRadius={px(8.0)} /> };
-}
-
-#[test]
 fn test_box_shadow_attribute() {
     let _el = rsx! { <div boxShadow={"shadow-lg"} /> };
 }
@@ -1361,16 +1340,6 @@ fn test_box_shadow_attribute() {
 fn test_overflow_attribute() {
     // overflow 不再映射为 overflow_hidden，直接透传
     let _el = rsx! { <div overflow={true} /> };
-}
-
-#[test]
-fn test_overflow_x_attribute() {
-    let _el = rsx! { <div overflowX={true} /> };
-}
-
-#[test]
-fn test_overflow_y_attribute() {
-    let _el = rsx! { <div overflowY={true} /> };
 }
 
 // ===========================================================================
@@ -1542,9 +1511,14 @@ fn test_class_rounded_variants() {
 
 #[test]
 fn test_class_shadow_variants() {
+    let _none = rsx! { <div class="shadow-none" /> };
+    let _2xs = rsx! { <div class="shadow-2xs" /> };
+    let _xs = rsx! { <div class="shadow-xs" /> };
     let _a = rsx! { <div class="shadow-sm" /> };
     let _b = rsx! { <div class="shadow-md" /> };
     let _c = rsx! { <div class="shadow-lg" /> };
+    let _xl = rsx! { <div class="shadow-xl" /> };
+    let _2xl = rsx! { <div class="shadow-2xl" /> };
 }
 
 #[test]
@@ -1555,6 +1529,30 @@ fn test_class_cursor_variants() {
 }
 
 #[test]
+fn test_class_cursor_extra_variants() {
+    let _a = rsx! { <div class="cursor-move" /> };
+    let _b = rsx! { <div class="cursor-not-allowed" /> };
+    let _c = rsx! { <div class="cursor-context-menu" /> };
+    let _d = rsx! { <div class="cursor-crosshair" /> };
+    let _e = rsx! { <div class="cursor-vertical-text" /> };
+    let _f = rsx! { <div class="cursor-alias" /> };
+    let _g = rsx! { <div class="cursor-copy" /> };
+    let _h = rsx! { <div class="cursor-no-drop" /> };
+    let _i = rsx! { <div class="cursor-grab" /> };
+    let _j = rsx! { <div class="cursor-grabbing" /> };
+    let _k = rsx! { <div class="cursor-ew-resize" /> };
+    let _l = rsx! { <div class="cursor-ns-resize" /> };
+    let _m = rsx! { <div class="cursor-nesw-resize" /> };
+    let _n = rsx! { <div class="cursor-nwse-resize" /> };
+    let _o = rsx! { <div class="cursor-col-resize" /> };
+    let _p = rsx! { <div class="cursor-row-resize" /> };
+    let _q = rsx! { <div class="cursor-n-resize" /> };
+    let _r = rsx! { <div class="cursor-e-resize" /> };
+    let _s = rsx! { <div class="cursor-s-resize" /> };
+    let _t = rsx! { <div class="cursor-w-resize" /> };
+}
+
+#[test]
 fn test_class_full_size() {
     let _a = rsx! { <div class="w-full" /> };
     let _b = rsx! { <div class="h-full" /> };
@@ -1562,10 +1560,64 @@ fn test_class_full_size() {
 }
 
 #[test]
+fn test_class_fractional_and_alias_sizes() {
+    let _a = rsx! { <div class="w-1/2 h-1/3" /> };
+    let _b = rsx! { <div class="w-px h-px size-px" /> };
+    let _c = rsx! { <div class="w-auto h-auto" /> };
+    let _d = rsx! { <div class="size-1/2" /> };
+}
+
+#[test]
 fn test_class_flex_variants() {
     let _a = rsx! { <div class="flex-none" /> };
     let _b = rsx! { <div class="flex-auto" /> };
     let _c = rsx! { <div class="flex-1" /> };
+    let _d = rsx! { <div class="flex-grow-0" /> };
+    let _e = rsx! { <div class="flex-grow" /> };
+    let _f = rsx! { <div class="flex-shrink" /> };
+}
+
+#[test]
+fn test_class_gpui_0_2_2_helpers() {
+    let _a = rsx! { <div class="text-ellipsis-start" /> };
+    let _b = rsx! { <div class="aspect-square" /> };
+    let _c = rsx! { <div class="content-normal self-center whitespace-nowrap line-clamp-2" /> };
+    let _d = rsx! { <div class="col-span-full col-start-auto col-end-auto" /> };
+    let _e = rsx! { <div class="row-span-full row-start-auto row-end-auto" /> };
+}
+
+#[test]
+fn test_class_self_alignment_variants() {
+    let _a = rsx! { <div class="self-start" /> };
+    let _b = rsx! { <div class="self-end" /> };
+    let _c = rsx! { <div class="self-flex-start" /> };
+    let _d = rsx! { <div class="self-flex-end" /> };
+    let _e = rsx! { <div class="self-baseline" /> };
+    let _f = rsx! { <div class="self-stretch" /> };
+}
+
+#[test]
+fn test_class_whitespace_variants() {
+    let _a = rsx! { <div class="whitespace-normal" /> };
+    let _b = rsx! { <div class="whitespace-nowrap" /> };
+}
+
+#[test]
+fn test_class_text_decoration_extra_variants() {
+    let _a = rsx! { <div class="no-underline" /> };
+    let _b = rsx! { <div class="text-decoration-solid" /> };
+    let _c = rsx! { <div class="text-decoration-wavy" /> };
+    let _d = rsx! { <div class="text-decoration-0" /> };
+    let _e = rsx! { <div class="text-decoration-1" /> };
+    let _f = rsx! { <div class="text-decoration-2" /> };
+    let _g = rsx! { <div class="text-decoration-4" /> };
+    let _h = rsx! { <div class="text-decoration-8" /> };
+}
+
+#[test]
+fn test_class_overflow_axis_hidden() {
+    let _a = rsx! { <div class="overflow-x-hidden" /> };
+    let _b = rsx! { <div class="overflow-y-hidden" /> };
 }
 
 // ===========================================================================
@@ -1646,18 +1698,13 @@ fn test_flex_basis_attribute() {
 }
 
 #[test]
-fn test_flex_grow_attribute() {
-    let _el = rsx! { <div flexGrow={1.0} /> };
+fn test_flex_grow_flag_attribute() {
+    let _el = rsx! { <div flexGrow /> };
 }
 
 #[test]
-fn test_flex_shrink_attribute() {
-    let _el = rsx! { <div flexShrink={0.0} /> };
-}
-
-#[test]
-fn test_flex_order_attribute() {
-    let _el = rsx! { <div flexOrder={2} /> };
+fn test_flex_shrink_flag_attribute() {
+    let _el = rsx! { <div flexShrink /> };
 }
 
 #[test]
@@ -1733,11 +1780,6 @@ fn test_rounded_bottom_right_attribute() {
 #[test]
 fn test_inset_attribute() {
     let _el = rsx! { <div inset={px(0.0)} /> };
-}
-
-#[test]
-fn test_text_decoration_attribute() {
-    let _el = rsx! { <div textDecoration={"underline"} /> };
 }
 
 // ===========================================================================
@@ -1895,7 +1937,7 @@ fn test_class_size_combined() {
 }
 
 // ===========================================================================
-// 40. opacity-* 和 z-* 类名
+// 40. opacity-* 类名
 // ===========================================================================
 
 #[test]
@@ -1909,19 +1951,6 @@ fn test_class_opacity_values() {
 #[test]
 fn test_class_opacity_combined() {
     let _el = rsx! { <div class="opacity-75 flex" /> };
-}
-
-#[test]
-fn test_class_z_index_values() {
-    // z-N → .z_index(N)
-    let _a = rsx! { <div class="z-0" /> };
-    let _b = rsx! { <div class="z-10" /> };
-    let _c = rsx! { <div class="z-50" /> };
-}
-
-#[test]
-fn test_class_z_combined() {
-    let _el = rsx! { <div class="z-10 absolute" /> };
 }
 
 // ===========================================================================
@@ -1996,6 +2025,21 @@ fn test_dynamic_class_unknown_ignored_no_panic() {
     // 不在预定义列表的 class 被静默忽略，不 panic
     let cls = "not-a-class-xyz";
     let _el = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_arbitrary_hex_colors() {
+    // 动态 class 也支持 arbitrary hex 颜色，和静态 class 路径保持一致。
+    take_rgb_calls();
+
+    let cls = "bg-[#ff0000]";
+    let _a = rsx! { <div class={cls} /> };
+    let cls = "text-[#abc]";
+    let _b = rsx! { <div class={cls} /> };
+    let cls = "border-[#333333]";
+    let _c = rsx! { <div class={cls} /> };
+
+    assert_eq!(take_rgb_calls(), vec![0xff0000, 0xaabbcc, 0x333333]);
 }
 
 // ===========================================================================
@@ -2114,17 +2158,6 @@ fn test_dynamic_class_opacity() {
 }
 
 #[test]
-fn test_dynamic_class_z_index() {
-    // z-10 走静态快速路径；z-30 / z-100 走数值前缀回退路径
-    let cls = "z-10";
-    let _a = rsx! { <div class={cls} /> };
-    let cls = "z-30";
-    let _b = rsx! { <div class={cls} /> };
-    let cls = "z-100";
-    let _c = rsx! { <div class={cls} /> };
-}
-
-#[test]
 fn test_dynamic_class_sizing_arbitrary() {
     // w-48 / h-16 / size-8 走数值前缀回退路径
     let cls = "w-48";
@@ -2142,4 +2175,10 @@ fn test_dynamic_class_gap_xy_arbitrary() {
     let _a = rsx! { <div class={cls} /> };
     let cls = "gap-y-6";
     let _b = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_gpui_styled_helpers() {
+    let cls = "flex-grow flex-shrink content-normal self-center whitespace-nowrap line-clamp-3 col-span-full row-end-auto shadow-xl cursor-grab overflow-x-hidden no-underline";
+    let _el = rsx! { <div class={cls} /> };
 }

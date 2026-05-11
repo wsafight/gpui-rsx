@@ -334,7 +334,6 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "overflowYScroll" => Some("overflow_y_scroll"),
         "scrollbarWidth" => Some("scrollbar_width"),
         "trackScroll" => Some("track_scroll"),
-        "zIndex" => Some("z_index"),
         "width" => Some("w"),
         "height" => Some("h"),
         "minWidth" => Some("min_w"),
@@ -343,16 +342,11 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "maxHeight" => Some("max_h"),
         "gapX" => Some("gap_x"),
         "gapY" => Some("gap_y"),
-        "flexBasis" => Some("basis"),
-        "flexGrow" => Some("flex_grow"),
-        "flexShrink" => Some("flex_shrink"),
-        "flexOrder" => Some("order"),
-        "fontSize" => Some("font_size"),
+        "flexBasis" => Some("flex_basis"),
+        "fontSize" => Some("text_size"),
         "lineHeight" => Some("line_height"),
         "fontWeight" => Some("font_weight"),
         "textAlign" => Some("text_align"),
-        "textDecoration" => Some("text_decoration"),
-        "borderRadius" => Some("border_radius"),
         "borderTop" => Some("border_t"),
         "borderBottom" => Some("border_b"),
         "borderLeft" => Some("border_l"),
@@ -364,8 +358,6 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "roundedBottomLeft" => Some("rounded_bl"),
         "roundedBottomRight" => Some("rounded_br"),
         "boxShadow" => Some("shadow"),
-        "overflowX" => Some("overflow_x"),
-        "overflowY" => Some("overflow_y"),
         // Grid 布局属性
         "gridCols" => Some("grid_cols"),
         "gridRows" => Some("grid_rows"),
@@ -386,6 +378,8 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
 /// GPUI 0.2 的预设宽度方法 `.border_t_1()`。
 pub(crate) fn lookup_attr_flag_method(name: &str) -> Option<&'static str> {
     match name {
+        "flexGrow" => Some("flex_grow"),
+        "flexShrink" => Some("flex_shrink"),
         "border_t" => Some("border_t_1"),
         "border_b" => Some("border_b_1"),
         "border_l" => Some("border_l_1"),
@@ -600,7 +594,10 @@ mod tests {
         assert_eq!(lookup_attr_method("minWidth"), Some("min_w"));
         assert_eq!(lookup_attr_method("maxHeight"), Some("max_h"));
         assert_eq!(lookup_attr_method("trackFocus"), Some("track_focus"));
-        assert_eq!(lookup_attr_method("zIndex"), Some("z_index"));
+        assert_eq!(lookup_attr_method("fontSize"), Some("text_size"));
+        assert_eq!(lookup_attr_method("flexGrow"), None);
+        assert_eq!(lookup_attr_method("flexShrink"), None);
+        assert_eq!(lookup_attr_method("zIndex"), None);
     }
 
     #[test]
@@ -617,6 +614,12 @@ mod tests {
         assert_eq!(lookup_attr_flag_method("border_b"), Some("border_b_1"));
         assert_eq!(lookup_attr_flag_method("border_l"), Some("border_l_1"));
         assert_eq!(lookup_attr_flag_method("border_r"), Some("border_r_1"));
+    }
+
+    #[test]
+    fn attr_flag_method_maps_gpui_flex_flags() {
+        assert_eq!(lookup_attr_flag_method("flexGrow"), Some("flex_grow"));
+        assert_eq!(lookup_attr_flag_method("flexShrink"), Some("flex_shrink"));
     }
 
     #[test]

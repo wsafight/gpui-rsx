@@ -58,7 +58,7 @@
 //! | Spread | `{...iterator}` |
 //! | Conditional | `when` / `whenSome` attributes |
 //! | Styled defaults | `<h1 styled>` injects sensible tag defaults |
-//! | camelCase mapping | `onClick` → `.on_click()`, `zIndex` → `.z_index()` |
+//! | camelCase mapping | `onClick` → `.on_click()`, `fontSize` → `.text_size()` |
 //! | `key` (loop ID) | Composite auto-ID for stateful elements in loops |
 //!
 //! ## Syntax Reference
@@ -153,12 +153,12 @@
 //!
 //! ### The `class` Attribute — Dynamic (Runtime)
 //!
-//! When `class` receives an expression, a runtime match is generated.
-//! Supported classes: all Tailwind colors (22 families × 11 shades × 3 prefixes = 726+
-//! entries), common layout/spacing/typography utilities, and arbitrary numeric values for
-//! spacing/sizing/opacity/z-index via prefix fallback. Truly unsupported classes (e.g.
-//! arbitrary hex colors, unknown utilities) are silently ignored in release and print a
-//! warning in debug builds.
+//! When `class` receives an expression, a runtime matcher is generated.
+//! Supported classes: common layout/spacing/typography utilities, the full Tailwind
+//! color palette, arbitrary hex colors (`bg-[#ff0000]`, `text-[#f00]`), and arbitrary
+//! numeric values for spacing/sizing/opacity via prefix fallback. Truly
+//! unsupported classes (e.g. Tailwind variants, unknown utilities) are silently ignored
+//! in release and print a warning in debug builds.
 //!
 //! ```ignore
 //! let active = true;
@@ -178,8 +178,8 @@
 //! // ✅ when attribute — compile-time, fully flexible
 //! rsx! { <div when={(active, |el| el.flex().gap(px(4.0)))} /> }
 //!
-//! // ⚠️ dynamic expression — runtime, arbitrary hex colors not supported
-//! rsx! { <div class={format!("gap-{}", spacing)} /> }   // works: numeric prefix fallback
+//! // ⚠️ dynamic expression — runtime parser, narrower coverage than static literals
+//! rsx! { <div class={format!("gap-{} bg-[#f00]", spacing)} /> }
 //! ```
 //!
 //! ### Event Handling
@@ -372,22 +372,18 @@
 //!
 //! | RSX attribute | GPUI method |
 //! |---------------|-------------|
-//! | `zIndex` | `.z_index()` |
 //! | `opacity` | `.opacity()` |
-//! | `invisible` (flag) | `.visible(false)` |
+//! | `visible` / `invisible` | `.visible()` / `.invisible()` |
 //! | `width` / `height` | `.w()` / `.h()` |
 //! | `minWidth` / `maxWidth` | `.min_w()` / `.max_w()` |
 //! | `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
 //! | `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
-//! | `flexBasis` | `.basis()` |
-//! | `flexGrow` / `flexShrink` | `.flex_grow()` / `.flex_shrink()` |
-//! | `flexOrder` | `.order()` |
-//! | `fontSize` | `.font_size()` |
+//! | `flexBasis` | `.flex_basis()` |
+//! | `flexGrow` / `flexShrink` (flags) | `.flex_grow()` / `.flex_shrink()` |
+//! | `fontSize` | `.text_size()` |
 //! | `lineHeight` | `.line_height()` |
 //! | `fontWeight` | `.font_weight()` |
 //! | `textAlign` | `.text_align()` |
-//! | `textDecoration` | `.text_decoration()` |
-//! | `borderRadius` | `.border_radius()` |
 //! | `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
 //! | `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
 //! | `border_t` / `border_b` / `border_l` / `border_r` (flags) | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |
@@ -395,7 +391,6 @@
 //! | `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
 //! | `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
 //! | `boxShadow` | `.shadow()` |
-//! | `overflowX` / `overflowY` | `.overflow_x()` / `.overflow_y()` |
 //! | `inset` | `.inset()` |
 //!
 //! ## Auto ID Injection
@@ -559,10 +554,10 @@ use parser::RsxBody;
 /// # Notes
 ///
 /// - **Static `class`**: parsed entirely at compile time, supports all classes.
-/// - **Dynamic `class={expr}`**: runtime match; full Tailwind color palette + common
-///   layout/spacing/typography utilities + arbitrary numeric values via prefix fallback.
-///   Truly unsupported classes (e.g. arbitrary hex colors) are silently ignored in
-///   release builds. Prefer `when` or static strings for full coverage.
+/// - **Dynamic `class={expr}`**: runtime matcher; full Tailwind color palette,
+///   arbitrary hex colors, common layout/spacing/typography utilities, and arbitrary
+///   numeric values via prefix fallback. Truly unsupported classes are silently ignored
+///   in release builds. Prefer `when` or static strings for full coverage.
 /// - **Auto ID**: elements with stateful event handlers receive a source-location-based
 ///   ID automatically. Provide an explicit `id` attribute for state-sensitive elements.
 #[proc_macro]

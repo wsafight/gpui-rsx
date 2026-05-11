@@ -427,14 +427,28 @@ fn test_for_loop_tuple_destructuring() {
 
 #[test]
 fn test_for_loop_multiple_body_nodes() {
-    // for 循环体内有 2 个子节点时触发 flat_map 路径（generate_for_loop 中 body_exprs.len() > 1）
-    // 生成：(items).into_iter().flat_map(|item| vec![child1, child2])
+    // for 循环体内有 2 个子节点时触发 flat_map 路径；
+    // 多子节点会先转成 AnyElement 数组，避免每轮分配 Vec。
     let items = ["a", "b", "c"];
     let _el = rsx! {
         <ul>
             {for item in items {
                 <li>{"label"}</li>
                 <li>{item}</li>
+            }}
+        </ul>
+    };
+}
+
+#[test]
+fn test_for_loop_multiple_body_nodes_mixed_types() {
+    // 多子节点循环体允许混合不同具体元素类型，靠 AnyElement 统一输出类型。
+    let items = ["a", "b", "c"];
+    let _el = rsx! {
+        <ul>
+            {for item in items {
+                <li>{item}</li>
+                <MyComponent />
             }}
         </ul>
     };

@@ -25,10 +25,7 @@ pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStre
         RsxAttribute::Value { name, .. } if name == "id" || name == "key" => {}
 
         RsxAttribute::Flag(name) => {
-            if name == "invisible" {
-                // invisible 标志特殊处理 → .visible(false)
-                out.push(quote! { .visible(false) });
-            } else if name != "styled" {
+            if name != "styled" {
                 let name_str = name.to_string();
                 if let Some(mapped) = lookup_attr_flag_method(&name_str) {
                     let method_ident = syn::Ident::new(mapped, name.span());
@@ -57,6 +54,11 @@ pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStre
                 // 情况 2：动态表达式 → 生成运行时解析代码
                 let dynamic_code = generate_dynamic_class_code(value);
                 out.push(quote! { .map(|__el| #dynamic_code) });
+                return;
+            }
+
+            if name == "visible" {
+                out.push(quote! { .when(#value, |__el| __el.visible()).when(!(#value), |__el| __el.invisible()) });
                 return;
             }
 
