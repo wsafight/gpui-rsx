@@ -18,16 +18,33 @@ use crate::parser::RsxAttribute;
 use proc_macro2::TokenStream;
 use quote::quote;
 
+/// 属性生成阶段可复用的扫描结果，避免同一属性名或静态 class 字符串重复分配。
+#[derive(Clone, Copy, Default)]
+pub(crate) struct AttrHints<'a> {
+    pub(crate) name: Option<&'a str>,
+    pub(crate) static_class: Option<&'a str>,
+}
+
 /// 生成属性的方法链片段，直接 push 到 `out`（避免中间 Vec 分配）
-pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStream>) {
+pub(crate) fn generate_attr_methods(
+    attr: &RsxAttribute,
+    hints: AttrHints<'_>,
+    out: &mut Vec<TokenStream>,
+) {
     match attr {
         // id / key 已在 generate_element 中处理，跳过避免重复生成方法调用
         RsxAttribute::Value { name, .. } if name == "id" || name == "key" => {}
 
         RsxAttribute::Flag(name) => {
             if name != "styled" {
-                let name_str = name.to_string();
-                if let Some(mapped) = lookup_attr_flag_method(&name_str) {
+                let name_storage;
+                let name_str = if let Some(name) = hints.name {
+                    name
+                } else {
+                    name_storage = name.to_string();
+                    &name_storage
+                };
+                if let Some(mapped) = lookup_attr_flag_method(name_str) {
                     let method_ident = syn::Ident::new(mapped, name.span());
                     out.push(quote! { .#method_ident() });
                     return;
@@ -41,6 +58,11 @@ pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStre
             // class 属性 → 展开为多个样式方法（静态）或运行时解析（动态）
             if name == "class" {
                 // 情况 1：字符串字面量 → 编译期解析（最优性能）
+                if let Some(s) = hints.static_class {
+                    out.extend(parse_class_string(s));
+                    return;
+                }
+
                 if let syn::Expr::Lit(syn::ExprLit {
                     lit: syn::Lit::Str(lit_str),
                     ..
@@ -63,8 +85,14 @@ pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStre
             }
 
             // 使用 match-based 查找替代原先的双重线性扫描
-            let name_str = name.to_string();
-            if let Some(mapped) = lookup_attr_method(&name_str) {
+            let name_storage;
+            let name_str = if let Some(name) = hints.name {
+                name
+            } else {
+                name_storage = name.to_string();
+                &name_storage
+            };
+            if let Some(mapped) = lookup_attr_method(name_str) {
                 let method_ident = syn::Ident::new(mapped, name.span());
                 if is_multi_arg_method(mapped)
                     && let syn::Expr::Tuple(tuple) = value

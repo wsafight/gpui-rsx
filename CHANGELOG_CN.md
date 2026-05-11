@@ -7,6 +7,15 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.4.2] - 2026-05-12
+
+### 变更
+
+- 在代码生成阶段复用属性扫描结果，避免重复分配属性名和静态 class 字符串。
+- 将 for 循环 key 校验并入递归代码生成流程，移除生成前的额外遍历，同时保留循环安全
+  auto-ID 诊断。
+- 保持 styled 默认 class 位于用户属性之前，同时以单次遍历生成用户属性方法链。
+
 ## [0.4.0] - 2026-05-11
 
 ### 变更
@@ -358,6 +367,7 @@
 
 ---
 
+[0.4.2]: https://github.com/wsafight/gpui-rsx/compare/v0.4.1...v0.4.2
 [0.4.0]: https://github.com/wsafight/gpui-rsx/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/wsafight/gpui-rsx/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/wsafight/gpui-rsx/compare/v0.3.0...v0.3.1

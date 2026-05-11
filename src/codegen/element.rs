@@ -14,50 +14,83 @@
 //! - 每个子节点独立生成 `.child()` 调用，避免数组类型统一约束
 //! - 自动 ID 基于源码 span 位置（行号 + 列号），增量编译下保持稳定
 
-use super::attribute::generate_attr_methods;
+use super::attribute::{AttrHints, generate_attr_methods};
 use super::class::parse_class_string;
 use super::tables::{
-    is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_attr_method,
-    lookup_tag_default,
+    is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
 };
 use crate::diagnostics::for_loop_missing_key_error;
 
-fn attr_needs_stateful(attr: &RsxAttribute) -> bool {
-    match attr {
-        RsxAttribute::Value { name, value } => {
-            let attr_str = name.to_string();
-            if is_stateful_attr(&attr_str) {
-                return true;
-            }
-            if let Some(mapped) = lookup_attr_method(&attr_str)
-                && is_stateful_attr(mapped)
-            {
-                return true;
-            }
-            if attr_str == "class"
-                && let syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(lit_str),
-                    ..
-                }) = value
-            {
-                return lit_str
-                    .value()
-                    .split_ascii_whitespace()
-                    .any(is_stateful_class);
-            }
-            false
+#[derive(Default)]
+struct AttrAnalysis {
+    name: Option<String>,
+    static_class: Option<String>,
+    needs_id: bool,
+}
+
+impl AttrAnalysis {
+    fn hints(&self) -> AttrHints<'_> {
+        AttrHints {
+            name: self.name.as_deref(),
+            static_class: self.static_class.as_deref(),
         }
-        RsxAttribute::Flag(name) => {
-            let attr_str = name.to_string();
-            is_stateful_attr(&attr_str)
-                || lookup_attr_flag_method(&attr_str).is_some_and(is_stateful_attr)
-        }
-        _ => false,
     }
 }
+
+fn analyze_attr(attr: &RsxAttribute) -> AttrAnalysis {
+    match attr {
+        RsxAttribute::Value { name, value } if name == "id" || name == "key" => {
+            AttrAnalysis::default()
+        }
+        RsxAttribute::Value { name, value } if name == "class" => {
+            let static_class = if let syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Str(lit_str),
+                ..
+            }) = value
+            {
+                Some(lit_str.value())
+            } else {
+                None
+            };
+            let needs_id = static_class
+                .as_deref()
+                .is_some_and(|s| s.split_ascii_whitespace().any(is_stateful_class));
+
+            AttrAnalysis {
+                static_class,
+                needs_id,
+                ..AttrAnalysis::default()
+            }
+        }
+        RsxAttribute::Value { name, .. } => {
+            let name = name.to_string();
+            let needs_id = is_stateful_attr(&name);
+            AttrAnalysis {
+                name: Some(name),
+                needs_id,
+                ..AttrAnalysis::default()
+            }
+        }
+        RsxAttribute::Flag(name) if name == "styled" => AttrAnalysis::default(),
+        RsxAttribute::Flag(name) => {
+            let name = name.to_string();
+            let needs_id = is_stateful_attr(&name)
+                || lookup_attr_flag_method(&name).is_some_and(is_stateful_attr);
+            AttrAnalysis {
+                name: Some(name),
+                needs_id,
+                ..AttrAnalysis::default()
+            }
+        }
+        _ => AttrAnalysis::default(),
+    }
+}
+
 use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
+
+type CodegenResult = Result<TokenStream, TokenStream>;
 
 /// 生成 GPUI 代码（入口）
 ///
@@ -67,12 +100,19 @@ use quote::{ToTokens, quote};
 /// - 单个元素：返回实现 `IntoElement` 的表达式
 /// - Fragment：返回 `Vec<impl IntoElement>`
 pub fn generate_body(body: &RsxBody) -> TokenStream {
+    generate_body_checked(body).unwrap_or_else(|err| err)
+}
+
+fn generate_body_checked(body: &RsxBody) -> CodegenResult {
     match body {
-        RsxBody::Single(element) => generate_element(element),
+        RsxBody::Single(element) => generate_element_checked(element, false),
         RsxBody::Fragment(children) => {
-            let child_exprs: Vec<TokenStream> = children.iter().map(generate_node).collect();
+            let child_exprs: Vec<TokenStream> = children
+                .iter()
+                .map(|node| generate_node_checked(node, false))
+                .collect::<Result<_, _>>()?;
             // Fragment 保持 vec![] —— 返回类型是用户可见 API
-            quote! { vec![#(#child_exprs),*] }
+            Ok(quote! { vec![#(#child_exprs),*] })
         }
     }
 }
@@ -80,17 +120,17 @@ pub fn generate_body(body: &RsxBody) -> TokenStream {
 /// 生成单个子节点的代码
 ///
 /// 确保生成的代码具有正确的类型推断，支持 IntoElement trait
-fn generate_node(node: &RsxNode) -> TokenStream {
+fn generate_node_checked(node: &RsxNode, require_loop_key: bool) -> CodegenResult {
     match node {
-        RsxNode::Element(elem) => generate_element(elem),
+        RsxNode::Element(elem) => generate_element_checked(elem, require_loop_key),
         // 表达式会被自动推断类型，GPUI 的 .child() 接受 impl IntoElement
-        RsxNode::Expr(expr) => expr.to_token_stream(),
-        RsxNode::Spread(expr) => expr.to_token_stream(),
+        RsxNode::Expr(expr) => Ok(expr.to_token_stream()),
+        RsxNode::Spread(expr) => Ok(expr.to_token_stream()),
         RsxNode::For {
             binding,
             iter,
             body,
-        } => generate_for_loop(binding, iter, body),
+        } => generate_for_loop_checked(binding, iter, body),
     }
 }
 
@@ -103,57 +143,23 @@ fn generate_node(node: &RsxNode) -> TokenStream {
 ///
 /// 安全检查：循环体内所有 stateful 元素（含深层嵌套）都必须提供 `id` 或 `key`，
 /// 否则每次迭代会生成相同的自动 ID，导致 GPUI 状态冲突，因此在此阶段给出编译错误。
-fn generate_for_loop(binding: &syn::Pat, iter: &syn::Expr, body: &[RsxNode]) -> TokenStream {
-    // 在生成代码之前先做安全检查
-    if let Some(bad_tag) = find_stateful_without_key(body) {
-        return for_loop_missing_key_error(bad_tag).to_compile_error();
-    }
-
-    let body_exprs: Vec<TokenStream> = body.iter().map(generate_node).collect();
+fn generate_for_loop_checked(
+    binding: &syn::Pat,
+    iter: &syn::Expr,
+    body: &[RsxNode],
+) -> CodegenResult {
+    let body_exprs: Vec<TokenStream> = body
+        .iter()
+        .map(|node| generate_node_checked(node, true))
+        .collect::<Result<_, _>>()?;
     if body_exprs.len() == 1 {
         let single = &body_exprs[0];
-        quote! { (#iter).into_iter().map(|#binding| #single) }
+        Ok(quote! { (#iter).into_iter().map(|#binding| #single) })
     } else {
-        quote! {
+        Ok(quote! {
             (#iter).into_iter().flat_map(|#binding| [#((#body_exprs).into_any_element()),*])
-        }
+        })
     }
-}
-
-/// 递归查找循环体内有 stateful 属性但未提供 `id` 或 `key` 的元素
-///
-/// 返回第一个违规元素的标签 Ident（用于 span 定位），没有则返回 `None`。
-/// 不递归进入嵌套 `RsxNode::For`——那些会在各自的 `generate_for_loop` 调用中检查。
-fn find_stateful_without_key(nodes: &[RsxNode]) -> Option<&syn::Ident> {
-    for node in nodes {
-        if let RsxNode::Element(elem) = node {
-            let mut has_id = false;
-            let mut has_key = false;
-            let mut needs_id = false;
-
-            for attr in &elem.attributes {
-                match attr {
-                    RsxAttribute::Value { name, .. } if name == "id" => has_id = true,
-                    RsxAttribute::Value { name, .. } if name == "key" => has_key = true,
-                    _ => {
-                        if !needs_id {
-                            needs_id = attr_needs_stateful(attr);
-                        }
-                    }
-                }
-            }
-
-            if needs_id && !has_id && !has_key {
-                return Some(&elem.name);
-            }
-
-            // 递归检查子元素（跳过嵌套 For，它们有自己的检查）
-            if let Some(ident) = find_stateful_without_key(&elem.children) {
-                return Some(ident);
-            }
-        }
-    }
-    None
 }
 
 /// 生成单个元素的代码
@@ -164,22 +170,29 @@ fn find_stateful_without_key(nodes: &[RsxNode]) -> Option<&syn::Ident> {
 /// 方法链模式的优势：
 /// - 与 GPUI 惯用写法一致
 /// - 正确处理 `Div` → `Stateful<Div>` 的类型变换（`.id()` 后类型改变）
-pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
+fn generate_element_checked(element: &RsxElement, require_loop_key: bool) -> CodegenResult {
     // 缓存标签名字符串，避免多次 to_string() 堆分配
     let tag_str = element.name.to_string();
 
     // 快速路径：无属性且无子节点时，跳过所有扫描直接返回基础标签
     if element.attributes.is_empty() && element.children.is_empty() {
-        return generate_tag(&tag_str, &element.name);
+        return Ok(generate_tag(&tag_str, &element.name));
     }
 
-    // 单次遍历提取所有需要的信息
+    // 单次遍历提取所有需要的信息，同时生成用户属性方法。
     let mut user_id = None;
     let mut user_key = None;
     let mut has_styled = false;
     let mut needs_id = false;
 
+    // 预分配方法链容量：
+    // - 每个属性乘以 2（class 属性平均展开 3-4 个方法，其余属性 1 个）
+    // - 加上子节点数
+    let mut methods: Vec<TokenStream> =
+        Vec::with_capacity(element.attributes.len() * 2 + element.children.len());
+
     for attr in &element.attributes {
+        let analysis = analyze_attr(attr);
         match attr {
             RsxAttribute::Value { name, value } if name == "id" => {
                 user_id = Some(value);
@@ -191,11 +204,16 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
                 has_styled = true;
             }
             _ => {
-                if !needs_id {
-                    needs_id = attr_needs_stateful(attr);
+                if !needs_id && analysis.needs_id {
+                    needs_id = true;
                 }
             }
         }
+        generate_attr_methods(attr, analysis.hints(), &mut methods);
+    }
+
+    if require_loop_key && needs_id && user_id.is_none() && user_key.is_none() {
+        return Err(for_loop_missing_key_error(&element.name).to_compile_error());
     }
 
     // 生成基础元素和 id：
@@ -218,37 +236,33 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
         tag
     };
 
-    // 预分配方法链容量：
-    // - 每个属性乘以 2（class 属性平均展开 3-4 个方法，其余属性 1 个）
-    // - 加上子节点数
-    let mut methods: Vec<TokenStream> =
-        Vec::with_capacity(element.attributes.len() * 2 + element.children.len());
-
     // styled 标志 → 注入标签默认样式（在用户属性之前）
-    if has_styled && let Some(class_str) = lookup_tag_default(&tag_str) {
-        methods.extend(parse_class_string(class_str));
-    }
-
-    // 属性 → 方法调用（直接 push 到 methods，避免中间 Vec 分配）
-    for attr in &element.attributes {
-        generate_attr_methods(attr, &mut methods);
-    }
+    let default_methods: Vec<TokenStream> =
+        if has_styled && let Some(class_str) = lookup_tag_default(&tag_str) {
+            parse_class_string(class_str).collect()
+        } else {
+            Vec::new()
+        };
 
     // 子节点 → .child() / .children() 调用（含聚合优化）
-    generate_children_methods(&element.children, &mut methods);
+    generate_children_methods(&element.children, require_loop_key, &mut methods)?;
 
-    quote! { #base #(#methods)* }
+    Ok(quote! { #base #(#default_methods)* #(#methods)* })
 }
 
 /// 生成子节点的方法链片段
-fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream>) {
+fn generate_children_methods(
+    children: &[RsxNode],
+    require_loop_key: bool,
+    methods: &mut Vec<TokenStream>,
+) -> Result<(), TokenStream> {
     for node in children {
         match node {
             RsxNode::Expr(expr) => {
                 methods.push(quote! { .child(#expr) });
             }
             RsxNode::Element(elem) => {
-                let child_expr = generate_element(elem);
+                let child_expr = generate_element_checked(elem, require_loop_key)?;
                 methods.push(quote! { .child(#child_expr) });
             }
             RsxNode::Spread(expr) => {
@@ -259,11 +273,12 @@ fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream
                 iter,
                 body,
             } => {
-                let for_expr = generate_for_loop(binding, iter, body);
+                let for_expr = generate_for_loop_checked(binding, iter, body)?;
                 methods.push(quote! { .children(#for_expr) });
             }
         }
     }
+    Ok(())
 }
 
 /// HTML 标签 → `div()`，特殊标签 → 同名函数，自定义组件 → 同名函数调用
