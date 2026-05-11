@@ -7,6 +7,22 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.4.0] - 2026-05-11
+
+### 变更
+
+- 将 GPUI 兼容性文档和示例更新到 GPUI 0.2。
+- 更新事件和交互属性映射以匹配 GPUI 0.2 方法签名，包括多参数鼠标和拖拽 API。
+
+### 修复
+
+- 修复 GPUI 0.2 方向性边框 flag 的预设宽度方法生成
+  （`border_t` → `.border_t_1()` 及其他方向）。
+- 保留 `border_t={px(1.0)}` 等方向性边框带值属性为 `.border_t(value)`，
+  避免错误映射到预设宽度方法。
+- 避免为连续表达式子节点生成 `.children([...])`，使混合子节点类型能够正确编译。
+- 更新 GPUI 0.2 stateful 交互方法和静态 overflow scroll class 的自动 ID 检测。
+
 ## [0.3.2] - 2026-02-22
 
 ### 🐛 修复
@@ -342,6 +358,7 @@
 
 ---
 
+[0.4.0]: https://github.com/wsafight/gpui-rsx/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/wsafight/gpui-rsx/compare/v0.3.1...v0.3.2
 [0.3.1]: https://github.com/wsafight/gpui-rsx/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/wsafight/gpui-rsx/compare/v0.2.2...v0.3.0

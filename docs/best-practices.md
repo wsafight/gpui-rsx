@@ -31,7 +31,7 @@ impl MyView {
         }
     }
 
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
             <div>
                 {self.render_header()}
@@ -119,7 +119,7 @@ fn render_list(&self, items: &[Item]) -> impl IntoElement {
 Group related state changes:
 
 ```rust
-onClick={cx.listener(|view, _, cx| {
+onClick={cx.listener(|view, _, _window, cx| {
     // Batch multiple updates
     view.count += 1;
     view.last_update = now();
@@ -195,7 +195,7 @@ For complex logic, extract handlers:
 
 ```rust
 impl MyView {
-    fn handle_submit(&mut self, cx: &mut ViewContext<Self>) {
+    fn handle_submit(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         if self.validate() {
             self.submit_data(cx);
             cx.notify();
@@ -215,12 +215,12 @@ rsx! {
 
 ```rust
 impl MyView {
-    fn handle_increment_click(&mut self, cx: &mut ViewContext<Self>) {
+    fn handle_increment_click(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         self.count += 1;
         cx.notify();
     }
 
-    fn handle_reset_click(&mut self, cx: &mut ViewContext<Self>) {
+    fn handle_reset_click(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
         self.count = 0;
         cx.notify();
     }
@@ -232,7 +232,7 @@ impl MyView {
 **Don't:**
 
 ```rust
-<button onClick={cx.listener(|view, _, cx| {
+<button onClick={cx.listener(|view, _, _window, cx| {
     // 20 lines of complex logic
     view.data.iter_mut().for_each(|item| {
         // more complex operations
@@ -362,7 +362,7 @@ fn render_content(&self) -> impl IntoElement {
 
 ```rust
 impl MyView {
-    fn load_data(&mut self, cx: &mut ViewContext<Self>) {
+    fn load_data(&mut self, cx: &mut Context<Self>) {
         match self.try_load() {
             Ok(data) => {
                 self.data = Some(data);
@@ -476,7 +476,7 @@ fn render_striped_list(&self, items: &[String]) -> impl IntoElement {
 ### Loading States
 
 ```rust
-fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
     match &self.state {
         LoadState::Initial => rsx! {
             <button onClick={cx.listener(Self::start_load)}>
@@ -529,7 +529,7 @@ fn render_with_modal(&self) -> impl IntoElement {
 ```rust
 <div
     class="relative"
-    onHover={cx.listener(|view, _, cx| {
+    onHover={cx.listener(|view, _, _window, cx| {
         view.show_tooltip = true;
         cx.notify();
     })}

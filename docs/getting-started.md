@@ -8,8 +8,8 @@ Add GPUI-RSX to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-gpui = "0.1"  # or your GPUI version
-gpui-rsx = "0.1"
+gpui = "0.2"  # or your GPUI version
+gpui-rsx = "0.4"
 ```
 
 ## Basic Usage
@@ -27,7 +27,7 @@ The simplest RSX creates a div:
 
 ```rust
 impl Render for MyView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
             <div>"Hello, GPUI!"</div>
         }
@@ -126,7 +126,7 @@ Event handlers use camelCase or snake_case:
 ```rust
 rsx! {
     <button
-        onClick={cx.listener(|view, _event, cx| {
+        onClick={cx.listener(|view, _event, _window, cx| {
             view.count += 1;
             cx.notify();
         })}
@@ -219,7 +219,7 @@ struct CounterView {
 }
 
 impl Render for CounterView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
             <div class="flex flex-col gap-4 p-8 bg-gray-100">
                 <h1 class="text-3xl font-bold">"Counter App"</h1>
@@ -231,7 +231,7 @@ impl Render for CounterView {
                 <div class="flex gap-2">
                     <button
                         class="px-4 py-2 bg-blue-500 text-white rounded-md cursor-pointer"
-                        onClick={cx.listener(|view, _, cx| {
+                        onClick={cx.listener(|view, _, _window, cx| {
                             view.count += 1;
                             cx.notify();
                         })}
@@ -241,7 +241,7 @@ impl Render for CounterView {
 
                     <button
                         class="px-4 py-2 bg-red-500 text-white rounded-md cursor-pointer"
-                        onClick={cx.listener(|view, _, cx| {
+                        onClick={cx.listener(|view, _, _window, cx| {
                             view.count = view.count.saturating_sub(1);
                             cx.notify();
                         })}

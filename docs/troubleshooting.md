@@ -203,12 +203,12 @@ Use references in loops:
 1. **Forgot to return from render:**
    ```rust
    // ✗ Wrong
-   fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+   fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
        rsx! { <div>"Content"</div> };  // Note the semicolon
    }
 
    // ✓ Correct
-   fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+   fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
        rsx! { <div>"Content"</div> }  // No semicolon
    }
    ```
@@ -216,13 +216,13 @@ Use references in loops:
 2. **Missing `cx.notify()` after state changes:**
    ```rust
    // ✗ Wrong
-   fn handle_click(&mut self, cx: &mut ViewContext<Self>) {
+   fn handle_click(&mut self, cx: &mut Context<Self>) {
        self.count += 1;
        // Missing cx.notify()
    }
 
    // ✓ Correct
-   fn handle_click(&mut self, cx: &mut ViewContext<Self>) {
+   fn handle_click(&mut self, cx: &mut Context<Self>) {
        self.count += 1;
        cx.notify();  // Trigger re-render
    }
@@ -267,7 +267,7 @@ Use references in loops:
 3. **Handler signature is incorrect:**
    ```rust
    // ✓ Correct
-   onClick={cx.listener(|view, _event, cx| {
+   onClick={cx.listener(|view, _event, _window, cx| {
        view.handle_click(cx);
    })}
    ```
@@ -457,7 +457,7 @@ Ensure compatible versions:
 
 ```toml
 [dependencies]
-gpui-rsx = "0.1"
+gpui-rsx = "0.4"
 syn = { version = "2.0", features = ["full"] }
 ```
 

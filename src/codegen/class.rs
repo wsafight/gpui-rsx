@@ -48,6 +48,12 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
         }
     }
 
+    // GPUI 0.2 的方向性 border 无参宽度方法带 `_1` 后缀。
+    if let Some(method) = lookup_directional_border_method(&method_name) {
+        let ident = syn::Ident::new(method, Span::call_site());
+        return quote! { .#ident() };
+    }
+
     // border 特殊处理：
     // "border" (纯) → .border_1()（GPUI 没有无参 .border()）
     // "border-2" → .border_2()
@@ -150,6 +156,18 @@ fn is_directional_border(rest: &str) -> bool {
     let bytes = rest.as_bytes();
     matches!(bytes.first(), Some(b't' | b'b' | b'l' | b'r' | b'x' | b'y'))
         && (rest.len() == 1 || bytes.get(1) == Some(&b'_'))
+}
+
+fn lookup_directional_border_method(class: &str) -> Option<&'static str> {
+    match class {
+        "border_t" => Some("border_t_1"),
+        "border_b" => Some("border_b_1"),
+        "border_l" => Some("border_l_1"),
+        "border_r" => Some("border_r_1"),
+        "border_x" => Some("border_x_1"),
+        "border_y" => Some("border_y_1"),
+        _ => None,
+    }
 }
 
 /// 解析任意 hex 颜色值：`[#rrggbb]` 或 `[#rgb]`

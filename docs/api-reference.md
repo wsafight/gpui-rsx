@@ -165,6 +165,8 @@ Shades: `50`, `100`, `200`, `300`, `400`, `500`, `600`, `700`, `800`, `900`, `95
 
 - `border` → `.border_1()`
 - `border-N` → `.border_N()`
+- `border-t`, `border-b`, `border-l`, `border-r` → `.border_t_1()`, `.border_b_1()`, `.border_l_1()`, `.border_r_1()`
+- `border-x`, `border-y`, `border-t-2`, etc. → directional GPUI border width methods
 - `rounded-md` → `.rounded_md()`
 - `rounded-lg` → `.rounded_lg()`
 
@@ -180,8 +182,11 @@ CamelCase JSX-style names map to snake_case Rust methods:
 | `fontSize` | `font_size` |
 | `lineHeight` | `line_height` |
 | `borderRadius` | `border_radius` |
+| `trackFocus` | `track_focus` |
 | `flexBasis` | `basis` |
 | `flexGrow` | `flex_grow` |
+| `overflowScroll` | `overflow_scroll` |
+| `trackScroll` | `track_scroll` |
 
 ### Event Handlers
 
@@ -190,23 +195,37 @@ CamelCase JSX-style names map to snake_case Rust methods:
 | JSX Name | Rust Method |
 |----------|-------------|
 | `onClick` | `on_click` |
-| `onMouseDown` | `on_mouse_down` |
-| `onMouseUp` | `on_mouse_up` |
+| `onMouseDown` | `on_mouse_down(button, handler)` |
+| `onMouseUp` | `on_mouse_up(button, handler)` |
 | `onMouseMove` | `on_mouse_move` |
+| `onMouseDownOut` | `on_mouse_down_out` |
+| `onMouseUpOut` | `on_mouse_up_out(button, handler)` |
+| `onAnyMouseDown` | `on_any_mouse_down` |
+| `onAnyMouseUp` | `on_any_mouse_up` |
 | `onKeyDown` | `on_key_down` |
 | `onKeyUp` | `on_key_up` |
-| `onFocus` | `on_focus` |
-| `onBlur` | `on_blur` |
+| `onModifiersChanged` | `on_modifiers_changed` |
 | `onHover` | `on_hover` |
 | `onScrollWheel` | `on_scroll_wheel` |
-| `onDrag` | `on_drag` |
+| `onDrag` | `on_drag(value, constructor)` |
+| `onDragMove` | `on_drag_move` |
 | `onDrop` | `on_drop` |
+| `onAction` | `on_action` |
+| `onBoxedAction` | `on_boxed_action(action, handler)` |
+| `captureAnyMouseDown` | `capture_any_mouse_down` |
+| `captureAnyMouseUp` | `capture_any_mouse_up` |
+| `captureKeyDown` | `capture_key_down` |
+| `captureKeyUp` | `capture_key_up` |
+| `captureAction` | `capture_action` |
+
+Multi-argument GPUI methods use tuple syntax in RSX:
+`onMouseDown={(MouseButton::Left, handler)}` and `onDrag={(value, constructor)}`.
 
 #### Event Handler Syntax
 
 ```rust
 <button
-    onClick={cx.listener(|view, event, cx| {
+    onClick={cx.listener(|view, event, _window, cx| {
         // handle click
     })}
 >
@@ -375,8 +394,10 @@ div().id("__rsx_div_HASH").on_click(handler)
 
 Attributes triggering auto-ID:
 - `onClick`, `on_click`
-- `hover`, `active`, `focus`
-- `tooltip`, `group`, `track_focus`
+- `onHover`, `onDrag`
+- `tooltip`, `focusable`, `active`, `groupActive`
+- `overflowScroll`, `overflowXScroll`, `overflowYScroll`, `trackScroll`
+- Static classes `overflow-scroll`, `overflow-x-scroll`, `overflow-y-scroll`
 
 ### Explicit IDs
 
@@ -432,7 +453,7 @@ rsx! {
         <button
             class="px-4 py-2 bg-blue-500 text-white rounded cursor-pointer"
             when={(self.is_valid(), |el| el.bg(rgb(0x00aa00)))}
-            onClick={cx.listener(|view, _, cx| {
+            onClick={cx.listener(|view, _, _window, cx| {
                 view.submit_form(cx);
             })}
         >

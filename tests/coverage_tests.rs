@@ -131,8 +131,8 @@ fn test_auto_id_with_multiple_stateful_attrs() {
 #[test]
 fn test_auto_id_all_stateful_attributes() {
     let h = |_: (), _: ()| {};
-    // 真正需要 auto ID 的属性：事件处理器（on_click）、tooltip、track_focus。
-    // hover / active / focus / group 是 Styled trait 方法，不需要 ID，
+    // 真正需要 auto ID 的属性：on_click/on_hover/on_drag、tooltip、focusable 等。
+    // hover / focus / group 是 Styled trait 方法，不需要 ID，
     // 但可以和 stateful 元素共存（元素因 on_click 已获得 ID）。
     let _el = rsx! {
         <div
@@ -142,7 +142,8 @@ fn test_auto_id_all_stateful_attributes() {
             focus={|el| el}
             tooltip={"tip"}
             group={"group1"}
-            track_focus
+            focusable
+            overflow_scroll
         >
             {"All stateful attrs"}
         </div>

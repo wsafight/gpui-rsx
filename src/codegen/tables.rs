@@ -289,7 +289,6 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
     match name {
         // 事件处理器（camelCase 和 snake_case 均支持）
         "onClick" | "on_click" => Some("on_click"),
-        "onAuxClick" | "on_aux_click" => Some("on_aux_click"),
         "onMouseDown" | "on_mouse_down" => Some("on_mouse_down"),
         "onMouseUp" | "on_mouse_up" => Some("on_mouse_up"),
         "onMouseMove" | "on_mouse_move" => Some("on_mouse_move"),
@@ -297,26 +296,44 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "onMouseUpOut" | "on_mouse_up_out" => Some("on_mouse_up_out"),
         "onAnyMouseDown" | "on_any_mouse_down" => Some("on_any_mouse_down"),
         "onAnyMouseUp" | "on_any_mouse_up" => Some("on_any_mouse_up"),
-        "onMousePressure" | "on_mouse_pressure" => Some("on_mouse_pressure"),
         "onKeyDown" | "on_key_down" => Some("on_key_down"),
         "onKeyUp" | "on_key_up" => Some("on_key_up"),
         "onModifiersChanged" | "on_modifiers_changed" => Some("on_modifiers_changed"),
-        "onFocus" | "on_focus" => Some("on_focus"),
-        "onBlur" | "on_blur" => Some("on_blur"),
         "onHover" | "on_hover" => Some("on_hover"),
         "onScrollWheel" | "on_scroll_wheel" => Some("on_scroll_wheel"),
         "onDrag" | "on_drag" => Some("on_drag"),
         "onDragMove" | "on_drag_move" => Some("on_drag_move"),
         "onDrop" | "on_drop" => Some("on_drop"),
         "onAction" | "on_action" => Some("on_action"),
+        "onBoxedAction" | "on_boxed_action" => Some("on_boxed_action"),
         // 捕获阶段事件处理器
         "captureAnyMouseDown" | "capture_any_mouse_down" => Some("capture_any_mouse_down"),
         "captureAnyMouseUp" | "capture_any_mouse_up" => Some("capture_any_mouse_up"),
-        "captureMousePressure" | "capture_mouse_pressure" => Some("capture_mouse_pressure"),
         "captureKeyDown" | "capture_key_down" => Some("capture_key_down"),
         "captureKeyUp" | "capture_key_up" => Some("capture_key_up"),
         "captureAction" | "capture_action" => Some("capture_action"),
         // 属性名称映射（camelCase → snake_case，仅非恒等映射）
+        "blockMouseExceptScroll" => Some("block_mouse_except_scroll"),
+        "canDrop" => Some("can_drop"),
+        "debugSelector" => Some("debug_selector"),
+        "dragOver" => Some("drag_over"),
+        "groupActive" => Some("group_active"),
+        "groupDragOver" => Some("group_drag_over"),
+        "groupHover" => Some("group_hover"),
+        "inFocus" => Some("in_focus"),
+        "keyContext" => Some("key_context"),
+        "tabGroup" => Some("tab_group"),
+        "tabIndex" => Some("tab_index"),
+        "tabStop" => Some("tab_stop"),
+        "trackFocus" => Some("track_focus"),
+        "windowControlArea" => Some("window_control_area"),
+        "anchorScroll" => Some("anchor_scroll"),
+        "hoverableTooltip" => Some("hoverable_tooltip"),
+        "overflowScroll" => Some("overflow_scroll"),
+        "overflowXScroll" => Some("overflow_x_scroll"),
+        "overflowYScroll" => Some("overflow_y_scroll"),
+        "scrollbarWidth" => Some("scrollbar_width"),
+        "trackScroll" => Some("track_scroll"),
         "zIndex" => Some("z_index"),
         "width" => Some("w"),
         "height" => Some("h"),
@@ -362,32 +379,77 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
     }
 }
 
+/// 查找 flag 属性的 GPUI 方法名。
+///
+/// 绝大多数 flag 属性可直接复用 value 属性映射；方向性 border 是例外：
+/// `border_t={value}` 应调用 `.border_t(value)`，而 `border_t` flag 应调用
+/// GPUI 0.2 的预设宽度方法 `.border_t_1()`。
+pub(crate) fn lookup_attr_flag_method(name: &str) -> Option<&'static str> {
+    match name {
+        "border_t" => Some("border_t_1"),
+        "border_b" => Some("border_b_1"),
+        "border_l" => Some("border_l_1"),
+        "border_r" => Some("border_r_1"),
+        "border_x" => Some("border_x_1"),
+        "border_y" => Some("border_y_1"),
+        _ => lookup_attr_method(name),
+    }
+}
+
 /// 检查属性是否需要 stateful element（需要 `.id()`）
 ///
-/// 事件处理器和部分交互属性需要 `StatefulInteractiveElement` trait，
-/// 该 trait 要求元素先调用 `.id()`。
+/// GPUI 0.2 将大多数事件放在 `InteractiveElement` 上，不要求 stateful ID。
+/// 只有 `StatefulInteractiveElement` 方法需要先调用 `.id()`。
 pub(crate) fn is_stateful_attr(name: &str) -> bool {
-    // 事件处理器：snake_case 以 "on_" 或 "capture_" 开头，
-    // 或 camelCase 以 "on" / "capture" 开头且首字母后紧跟大写字母
-    if name.starts_with("on_")
-        || name.starts_with("capture_")
-        || (name.starts_with("on")
-            && name
-                .as_bytes()
-                .get(2)
-                .is_some_and(|b| b.is_ascii_uppercase()))
-        || (name.starts_with("capture")
-            && name
-                .as_bytes()
-                .get(7)
-                .is_some_and(|b| b.is_ascii_uppercase()))
-    {
-        return true;
+    if let Some(method) = lookup_attr_method(name) {
+        return is_stateful_method(method);
     }
-    // 其他真正需要 StatefulInteractiveElement / FocusableElement 的属性。
-    // 注意：hover / active / focus / group 是 Styled trait 的样式方法（接受
-    // StyleRefinement），不需要 .id()，因此不列入此处。
-    matches!(name, "tooltip" | "track_focus")
+
+    is_stateful_method(name)
+}
+
+pub(crate) fn is_stateful_method(method: &str) -> bool {
+    // `active` here is StatefulInteractiveElement::active (takes closure), not Styled::active.
+    // hover/focus/group are Styled trait methods that don't need .id().
+    matches!(
+        method,
+        "active"
+            | "anchor_scroll"
+            | "focusable"
+            | "group_active"
+            | "hoverable_tooltip"
+            | "on_click"
+            | "on_drag"
+            | "on_hover"
+            | "overflow_scroll"
+            | "overflow_x_scroll"
+            | "overflow_y_scroll"
+            | "scrollbar_width"
+            | "tooltip"
+            | "track_scroll"
+    )
+}
+
+pub(crate) fn is_multi_arg_method(method: &str) -> bool {
+    matches!(
+        method,
+        "group_active"
+            | "group_drag_over"
+            | "group_hover"
+            | "on_boxed_action"
+            | "on_drag"
+            | "on_mouse_down"
+            | "on_mouse_up"
+            | "on_mouse_up_out"
+    )
+}
+
+/// 检查静态 class 是否会调用 `StatefulInteractiveElement` 方法。
+pub(crate) fn is_stateful_class(class: &str) -> bool {
+    matches!(
+        class,
+        "overflow-scroll" | "overflow-x-scroll" | "overflow-y-scroll"
+    )
 }
 
 /// 查找间距/尺寸 class 前缀对应的 GPUI 方法名
@@ -520,8 +582,8 @@ mod tests {
         assert_eq!(lookup_attr_method("onClick"), Some("on_click"));
         assert_eq!(lookup_attr_method("onMouseDown"), Some("on_mouse_down"));
         assert_eq!(lookup_attr_method("onKeyDown"), Some("on_key_down"));
-        assert_eq!(lookup_attr_method("onFocus"), Some("on_focus"));
-        assert_eq!(lookup_attr_method("onBlur"), Some("on_blur"));
+        assert_eq!(lookup_attr_method("onDragMove"), Some("on_drag_move"));
+        assert_eq!(lookup_attr_method("onBoxedAction"), Some("on_boxed_action"));
     }
 
     #[test]
@@ -537,11 +599,31 @@ mod tests {
         assert_eq!(lookup_attr_method("height"), Some("h"));
         assert_eq!(lookup_attr_method("minWidth"), Some("min_w"));
         assert_eq!(lookup_attr_method("maxHeight"), Some("max_h"));
+        assert_eq!(lookup_attr_method("trackFocus"), Some("track_focus"));
         assert_eq!(lookup_attr_method("zIndex"), Some("z_index"));
     }
 
     #[test]
+    fn attr_method_keeps_directional_border_value_methods() {
+        assert_eq!(lookup_attr_method("border_t"), None);
+        assert_eq!(lookup_attr_method("border_b"), None);
+        assert_eq!(lookup_attr_method("border_l"), None);
+        assert_eq!(lookup_attr_method("border_r"), None);
+    }
+
+    #[test]
+    fn attr_flag_method_maps_directional_border_width_flags() {
+        assert_eq!(lookup_attr_flag_method("border_t"), Some("border_t_1"));
+        assert_eq!(lookup_attr_flag_method("border_b"), Some("border_b_1"));
+        assert_eq!(lookup_attr_flag_method("border_l"), Some("border_l_1"));
+        assert_eq!(lookup_attr_flag_method("border_r"), Some("border_r_1"));
+    }
+
+    #[test]
     fn attr_method_unknown_returns_none() {
+        assert_eq!(lookup_attr_method("onAuxClick"), None);
+        assert_eq!(lookup_attr_method("onFocus"), None);
+        assert_eq!(lookup_attr_method("onMousePressure"), None);
         assert_eq!(lookup_attr_method("unknown_attr"), None);
         assert_eq!(lookup_attr_method(""), None);
     }
@@ -552,28 +634,32 @@ mod tests {
     fn stateful_attr_detects_event_handlers() {
         assert!(is_stateful_attr("onClick"));
         assert!(is_stateful_attr("on_click"));
-        assert!(is_stateful_attr("onMouseDown"));
-        assert!(is_stateful_attr("on_mouse_down"));
+        assert!(is_stateful_attr("onDrag"));
+        assert!(is_stateful_attr("on_hover"));
     }
 
     #[test]
     fn stateful_attr_detects_interactive_attrs() {
-        // tooltip 和 track_focus 才是真正需要 ID 的交互属性
+        // StatefulInteractiveElement 方法需要 ID。
+        assert!(is_stateful_attr("active"));
+        assert!(is_stateful_attr("focusable"));
+        assert!(is_stateful_attr("overflow_scroll"));
         assert!(is_stateful_attr("tooltip"));
-        assert!(is_stateful_attr("track_focus"));
+        assert!(is_stateful_attr("track_scroll"));
     }
 
     #[test]
     fn stateful_attr_ignores_styled_trait_methods() {
-        // hover / active / focus / group 是 Styled trait 的样式方法，不需要 ID
+        // hover / focus / group 是 Styled trait 的样式方法，不需要 ID
         assert!(!is_stateful_attr("hover"));
-        assert!(!is_stateful_attr("active"));
         assert!(!is_stateful_attr("focus"));
         assert!(!is_stateful_attr("group"));
     }
 
     #[test]
     fn stateful_attr_ignores_non_stateful() {
+        assert!(!is_stateful_attr("onMouseDown"));
+        assert!(!is_stateful_attr("captureKeyDown"));
         assert!(!is_stateful_attr("class"));
         assert!(!is_stateful_attr("id"));
         assert!(!is_stateful_attr("flex"));

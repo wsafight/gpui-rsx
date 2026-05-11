@@ -13,7 +13,7 @@
 
 use super::class::parse_class_string;
 use super::runtime::generate_dynamic_class_code;
-use super::tables::lookup_attr_method;
+use super::tables::{is_multi_arg_method, lookup_attr_flag_method, lookup_attr_method};
 use crate::parser::RsxAttribute;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -29,6 +29,12 @@ pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStre
                 // invisible 标志特殊处理 → .visible(false)
                 out.push(quote! { .visible(false) });
             } else if name != "styled" {
+                let name_str = name.to_string();
+                if let Some(mapped) = lookup_attr_flag_method(&name_str) {
+                    let method_ident = syn::Ident::new(mapped, name.span());
+                    out.push(quote! { .#method_ident() });
+                    return;
+                }
                 // styled 标志已在 generate_element 中处理，不生成 .styled()
                 out.push(quote! { .#name() });
             }
@@ -58,7 +64,14 @@ pub(crate) fn generate_attr_methods(attr: &RsxAttribute, out: &mut Vec<TokenStre
             let name_str = name.to_string();
             if let Some(mapped) = lookup_attr_method(&name_str) {
                 let method_ident = syn::Ident::new(mapped, name.span());
-                out.push(quote! { .#method_ident(#value) });
+                if is_multi_arg_method(mapped)
+                    && let syn::Expr::Tuple(tuple) = value
+                {
+                    let args = &tuple.elems;
+                    out.push(quote! { .#method_ident(#args) });
+                } else {
+                    out.push(quote! { .#method_ident(#value) });
+                }
                 return;
             }
 

@@ -56,7 +56,7 @@ rsx! {
 **Before (Manual GPUI):**
 ```rust
 button()
-    .on_click(cx.listener(|view, _event, cx| {
+    .on_click(cx.listener(|view, _event, _window, cx| {
         view.count += 1;
         cx.notify();
     }))
@@ -66,7 +66,7 @@ button()
 **After (GPUI-RSX):**
 ```rust
 rsx! {
-    <button onClick={cx.listener(|view, _event, cx| {
+    <button onClick={cx.listener(|view, _event, _window, cx| {
         view.count += 1;
         cx.notify();
     })}>
@@ -249,7 +249,7 @@ rsx! {
 2. **Optional: Update Cargo.toml:**
    ```toml
    [dependencies]
-   gpui-rsx = "0.1.2"
+   gpui-rsx = "0.4"
    ```
 
 3. **Optional: Simplify code with better type inference:**
@@ -272,7 +272,7 @@ You can mix RSX and manual GPUI:
 
 ```rust
 impl Render for MyView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
             <div>
                 {self.legacy_method()}  // Manual GPUI

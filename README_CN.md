@@ -42,8 +42,8 @@
 
 ```toml
 [dependencies]
-gpui = "0.1"
-gpui-rsx = "0.3"
+gpui = "0.2"
+gpui-rsx = "0.4"
 ```
 
 ## 🚀 快速开始
@@ -59,7 +59,7 @@ struct CounterView {
 }
 
 impl Render for CounterView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
             <div class="flex flex-col gap-4 p-4">
                 <h1>{format!("Count: {}", self.count)}</h1>
@@ -70,7 +70,7 @@ impl Render for CounterView {
                         px_4
                         py_2
                         rounded_md
-                        onClick={cx.listener(|view, _, cx| {
+                        onClick={cx.listener(|view, _, _window, cx| {
                             view.count += 1;
                             cx.notify();
                         })}
@@ -83,7 +83,7 @@ impl Render for CounterView {
                         px_4
                         py_2
                         rounded_md
-                        onClick={cx.listener(|view, _, cx| {
+                        onClick={cx.listener(|view, _, _window, cx| {
                             view.count -= 1;
                             cx.notify();
                         })}
@@ -97,9 +97,9 @@ impl Render for CounterView {
 }
 
 fn main() {
-    App::new().run(|cx: &mut AppContext| {
-        cx.open_window(WindowOptions::default(), |cx| {
-            cx.new_view(|_cx| CounterView { count: 0 })
+    Application::new().run(|cx: &mut App| {
+        cx.open_window(WindowOptions::default(), |_, cx| {
+            cx.new(|_cx| CounterView { count: 0 })
         });
     });
 }
@@ -110,7 +110,7 @@ fn main() {
 #### ❌ 传统 GPUI 写法（繁琐）
 
 ```rust
-fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
     div()
         .flex()
         .flex_col()
@@ -133,7 +133,7 @@ fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
                         .px_4()
                         .py_2()
                         .rounded_md()
-                        .on_click(cx.listener(|view, _, cx| {
+                        .on_click(cx.listener(|view, _, _window, cx| {
                             view.count += 1;
                             cx.notify();
                         }))
@@ -146,7 +146,7 @@ fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
                         .px_4()
                         .py_2()
                         .rounded_md()
-                        .on_click(cx.listener(|view, _, cx| {
+                        .on_click(cx.listener(|view, _, _window, cx| {
                             view.count -= 1;
                             cx.notify();
                         }))
@@ -289,7 +289,7 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 
 ```rust
 rsx! {
-    <button onClick={cx.listener(|view, _, cx| {
+    <button onClick={cx.listener(|view, _, _window, cx| {
         println!("clicked");
     })}>
         {"Click me"}
@@ -302,20 +302,31 @@ rsx! {
 | 事件 | 方法 |
 |------|------|
 | `onClick` / `on_click` | `.on_click(handler)` |
-| `onMouseDown` / `on_mouse_down` | `.on_mouse_down(handler)` |
-| `onMouseUp` / `on_mouse_up` | `.on_mouse_up(handler)` |
+| `onMouseDown` / `on_mouse_down` | `.on_mouse_down(button, handler)` |
+| `onMouseUp` / `on_mouse_up` | `.on_mouse_up(button, handler)` |
 | `onMouseMove` / `on_mouse_move` | `.on_mouse_move(handler)` |
 | `onMouseDownOut` / `on_mouse_down_out` | `.on_mouse_down_out(handler)` |
-| `onMouseUpOut` / `on_mouse_up_out` | `.on_mouse_up_out(handler)` |
+| `onMouseUpOut` / `on_mouse_up_out` | `.on_mouse_up_out(button, handler)` |
+| `onAnyMouseDown` / `on_any_mouse_down` | `.on_any_mouse_down(handler)` |
+| `onAnyMouseUp` / `on_any_mouse_up` | `.on_any_mouse_up(handler)` |
 | `onKeyDown` / `on_key_down` | `.on_key_down(handler)` |
 | `onKeyUp` / `on_key_up` | `.on_key_up(handler)` |
-| `onFocus` / `on_focus` | `.on_focus(handler)` |
-| `onBlur` / `on_blur` | `.on_blur(handler)` |
+| `onModifiersChanged` / `on_modifiers_changed` | `.on_modifiers_changed(handler)` |
 | `onHover` / `on_hover` | `.on_hover(handler)` |
 | `onScrollWheel` / `on_scroll_wheel` | `.on_scroll_wheel(handler)` |
-| `onDrag` / `on_drag` | `.on_drag(handler)` |
+| `onDrag` / `on_drag` | `.on_drag(value, constructor)` |
+| `onDragMove` / `on_drag_move` | `.on_drag_move(handler)` |
 | `onDrop` / `on_drop` | `.on_drop(handler)` |
 | `onAction` / `on_action` | `.on_action(handler)` |
+| `onBoxedAction` / `on_boxed_action` | `.on_boxed_action(action, handler)` |
+| `captureAnyMouseDown` / `capture_any_mouse_down` | `.capture_any_mouse_down(handler)` |
+| `captureAnyMouseUp` / `capture_any_mouse_up` | `.capture_any_mouse_up(handler)` |
+| `captureKeyDown` / `capture_key_down` | `.capture_key_down(handler)` |
+| `captureKeyUp` / `capture_key_up` | `.capture_key_up(handler)` |
+| `captureAction` / `capture_action` | `.capture_action(handler)` |
+
+多参数 GPUI 方法在 RSX 中使用 tuple 语法：
+`onMouseDown={(MouseButton::Left, handler)}`、`onDrag={(value, constructor)}`。
 
 ### 6. 嵌套元素
 
@@ -387,7 +398,8 @@ div().children((&self.items).into_iter().map(|item| {
 
 #### 循环安全 — `key` 属性
 
-for 循环内有 stateful 属性（事件处理器、`tooltip`、`track_focus`）的元素**必须**提供
+for 循环内有 stateful 属性（`onClick`、`onHover`、`onDrag`、`tooltip`、
+`focusable`、`overflowScroll`、`trackScroll` 或 `overflow-scroll`）的元素**必须**提供
 `id` 或 `key`，否则宏会报编译错误：
 
 ```rust
@@ -501,8 +513,9 @@ camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
 | `textAlign` | `.text_align()` |
 | `textDecoration` | `.text_decoration()` |
 | `borderRadius` | `.border_radius()` |
-| `borderTop` / `borderBottom` | `.border_t()` / `.border_b()` |
-| `borderLeft` / `borderRight` | `.border_l()` / `.border_r()` |
+| `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
+| `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
+| `border_t` / `border_b` / `border_l` / `border_r`（标志） | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |
 | `roundedTop` / `roundedBottom` | `.rounded_t()` / `.rounded_b()` |
 | `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
 | `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
@@ -614,7 +627,7 @@ struct Todo {
 }
 
 impl Render for TodoApp {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
             <div class="flex flex-col gap-4 p-4">
                 <h1 class="text-2xl font-bold">
@@ -628,7 +641,7 @@ impl Render for TodoApp {
                     />
                     <button
                         class="bg-blue-500 text-white px-4 py-2 rounded-md"
-                        onClick={cx.listener(|view, _, cx| {
+                        onClick={cx.listener(|view, _, _window, cx| {
                             view.add_todo();
                             cx.notify();
                         })}
@@ -688,7 +701,7 @@ fn render_card(&self, title: &str, content: &str) -> impl IntoElement {
     }
 }
 
-fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
     rsx! {
         <div>
             {self.render_card("Title 1", "Content 1")}
@@ -717,7 +730,7 @@ rsx! {
 ### 动态样式
 
 ```rust
-fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
     let bg_color = if self.is_active {
         rgb(0x3b82f6)
     } else {
@@ -830,7 +843,7 @@ cargo expand --lib
 
 ```rust
 // ✅ 推荐：拆分为多个方法
-fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
     rsx! {
         <div>
             {self.render_header()}

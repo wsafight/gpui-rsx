@@ -205,6 +205,17 @@ fn test_multiple_expr_children() {
     };
 }
 
+#[test]
+fn test_multiple_expr_children_different_types() {
+    let _el = rsx! {
+        <div>
+            {String::from("hello")}
+            {"world"}
+            {42_i32}
+        </div>
+    };
+}
+
 // ===========================================================================
 // 6. 条件渲染
 // ===========================================================================
@@ -377,13 +388,13 @@ fn test_on_click_camel() {
 #[test]
 fn test_on_mouse_down_camel() {
     let h = |_: (), _: ()| {};
-    let _el = rsx! { <div onMouseDown={h} /> };
+    let _el = rsx! { <div onMouseDown={(MouseButton::Left, h)} /> };
 }
 
 #[test]
 fn test_on_mouse_up_camel() {
     let h = |_: (), _: ()| {};
-    let _el = rsx! { <div onMouseUp={h} /> };
+    let _el = rsx! { <div onMouseUp={(MouseButton::Left, h)} /> };
 }
 
 #[test]
@@ -404,18 +415,6 @@ fn test_on_key_up_camel() {
     let _el = rsx! { <div onKeyUp={h} /> };
 }
 
-#[test]
-fn test_on_focus_camel() {
-    let h = |_: (), _: ()| {};
-    let _el = rsx! { <div onFocus={h} /> };
-}
-
-#[test]
-fn test_on_blur_camel() {
-    let h = |_: (), _: ()| {};
-    let _el = rsx! { <div onBlur={h} /> };
-}
-
 // ===========================================================================
 // 13. 事件处理器 — snake_case
 // ===========================================================================
@@ -429,7 +428,7 @@ fn test_on_click_snake() {
 #[test]
 fn test_on_mouse_down_snake() {
     let h = |_: (), _: ()| {};
-    let _el = rsx! { <div on_mouse_down={h} /> };
+    let _el = rsx! { <div on_mouse_down={(MouseButton::Right, h)} /> };
 }
 
 #[test]
@@ -480,7 +479,18 @@ fn test_multiple_on_click_unique_ids() {
 fn test_on_mouse_down_no_auto_id() {
     let h = |_: (), _: ()| {};
     // onMouseDown 不需要 StatefulInteractiveElement，不生成 .id()
-    let _el = rsx! { <div onMouseDown={h} /> };
+    let _el = rsx! { <div onMouseDown={(MouseButton::Left, h)} /> };
+}
+
+#[test]
+fn test_track_focus_camel_case_no_auto_id() {
+    take_last_auto_id();
+    let _el = rsx! { <div trackFocus={|_: (), _: ()| {}} /> };
+    let captured = take_last_auto_id();
+    assert!(
+        captured.is_none(),
+        "trackFocus 映射到 InteractiveElement::track_focus，不应生成 auto-ID"
+    );
 }
 
 // ===========================================================================
@@ -1159,9 +1169,9 @@ fn test_tooltip_auto_id() {
 }
 
 #[test]
-fn test_track_focus_auto_id() {
+fn test_focusable_auto_id() {
     let _el = rsx! {
-        <div track_focus>
+        <div focusable>
             {"Tracked focus"}
         </div>
     };
@@ -1186,7 +1196,8 @@ fn test_on_scroll_wheel_event() {
 #[test]
 fn test_on_drag_event() {
     let h = |_: (), _: ()| {};
-    let _el = rsx! { <div onDrag={h} /> };
+    let drag = ();
+    let _el = rsx! { <div onDrag={(drag, h)} /> };
 }
 
 #[test]
@@ -1225,13 +1236,15 @@ fn test_on_hover_event_snake_auto_id() {
 fn test_on_drag_event_auto_id() {
     let h = |_: (), _: ()| {};
     // onDrag 事件应该自动注入 .id()
-    let _el = rsx! { <div onDrag={h}>{"Drag me"}</div> };
+    let drag = ();
+    let _el = rsx! { <div onDrag={(drag, h)}>{"Drag me"}</div> };
 }
 
 #[test]
 fn test_on_drag_event_snake_auto_id() {
     let h = |_: (), _: ()| {};
-    let _el = rsx! { <div on_drag={h}>{"Drag me"}</div> };
+    let drag = ();
+    let _el = rsx! { <div on_drag={(drag, h)}>{"Drag me"}</div> };
 }
 
 #[test]
@@ -1668,6 +1681,26 @@ fn test_border_right_attribute() {
 }
 
 #[test]
+fn test_border_top_value_attribute() {
+    let _el = rsx! { <div border_t={px(1.0)} /> };
+}
+
+#[test]
+fn test_border_bottom_value_attribute() {
+    let _el = rsx! { <div border_b={px(1.0)} /> };
+}
+
+#[test]
+fn test_border_left_value_attribute() {
+    let _el = rsx! { <div border_l={px(1.0)} /> };
+}
+
+#[test]
+fn test_border_right_value_attribute() {
+    let _el = rsx! { <div border_r={px(1.0)} /> };
+}
+
+#[test]
 fn test_class_border_t() {
     let _el = rsx! { <div class="border-t" /> };
 }
@@ -1726,13 +1759,13 @@ fn test_on_mouse_down_out_snake() {
 #[test]
 fn test_on_mouse_up_out_camel() {
     let h = |_: (), _: ()| {};
-    let _el = rsx! { <div onMouseUpOut={h} /> };
+    let _el = rsx! { <div onMouseUpOut={(MouseButton::Left, h)} /> };
 }
 
 #[test]
 fn test_on_mouse_up_out_snake() {
     let h = |_: (), _: ()| {};
-    let _el = rsx! { <div on_mouse_up_out={h} /> };
+    let _el = rsx! { <div on_mouse_up_out={(MouseButton::Left, h)} /> };
 }
 
 // ===========================================================================

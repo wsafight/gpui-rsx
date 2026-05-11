@@ -23,6 +23,12 @@ pub fn take_last_auto_id() -> Option<String> {
 #[derive(Debug)]
 pub struct MockElement;
 
+#[derive(Clone, Copy, Debug)]
+pub enum MouseButton {
+    Left,
+    Right,
+}
+
 /// Styled trait，用于动态 class 的运行时解析
 pub trait Styled: Sized {
     // --- flex ---
@@ -116,10 +122,18 @@ pub trait Styled: Sized {
     fn border_1(self) -> Self;
     fn border_2(self) -> Self;
     fn border_dashed(self) -> Self;
-    fn border_t(self) -> Self;
-    fn border_b(self) -> Self;
-    fn border_l(self) -> Self;
-    fn border_r(self) -> Self;
+    fn border_t_1(self) -> Self;
+    fn border_b_1(self) -> Self;
+    fn border_l_1(self) -> Self;
+    fn border_r_1(self) -> Self;
+    fn border_x_1(self) -> Self;
+    fn border_y_1(self) -> Self;
+    fn border_t_2(self) -> Self;
+    fn border_b_2(self) -> Self;
+    fn border_l_2(self) -> Self;
+    fn border_r_2(self) -> Self;
+    fn border_x_2(self) -> Self;
+    fn border_y_2(self) -> Self;
     fn rounded_sm(self) -> Self;
     fn rounded_md(self) -> Self;
     fn rounded_lg(self) -> Self;
@@ -127,7 +141,6 @@ pub trait Styled: Sized {
     // --- misc ---
     fn cursor_pointer(self) -> Self;
     fn overflow_hidden(self) -> Self;
-    fn overflow_scroll(self) -> Self;
     fn absolute(self) -> Self;
     fn relative(self) -> Self;
     // --- color / opacity / z ---
@@ -263,6 +276,18 @@ impl MockElement {
     pub fn border_4(self) -> Self {
         self
     }
+    pub fn border_t<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn border_b<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn border_l<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn border_r<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 定位（不在 Styled 中）---
     pub fn overflow<T>(self, _: T) -> Self {
@@ -296,13 +321,10 @@ impl MockElement {
     pub fn on_click<T>(self, _: T) -> Self {
         self
     }
-    pub fn on_aux_click<T>(self, _: T) -> Self {
+    pub fn on_mouse_down<T, U>(self, _: T, _: U) -> Self {
         self
     }
-    pub fn on_mouse_down<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_mouse_up<T>(self, _: T) -> Self {
+    pub fn on_mouse_up<T, U>(self, _: T, _: U) -> Self {
         self
     }
     pub fn on_mouse_move<T>(self, _: T) -> Self {
@@ -311,16 +333,13 @@ impl MockElement {
     pub fn on_mouse_down_out<T>(self, _: T) -> Self {
         self
     }
-    pub fn on_mouse_up_out<T>(self, _: T) -> Self {
+    pub fn on_mouse_up_out<T, U>(self, _: T, _: U) -> Self {
         self
     }
     pub fn on_any_mouse_down<T>(self, _: T) -> Self {
         self
     }
     pub fn on_any_mouse_up<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_mouse_pressure<T>(self, _: T) -> Self {
         self
     }
     pub fn on_key_down<T>(self, _: T) -> Self {
@@ -332,19 +351,13 @@ impl MockElement {
     pub fn on_modifiers_changed<T>(self, _: T) -> Self {
         self
     }
-    pub fn on_focus<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_blur<T>(self, _: T) -> Self {
-        self
-    }
     pub fn on_hover<T>(self, _: T) -> Self {
         self
     }
     pub fn on_scroll_wheel<T>(self, _: T) -> Self {
         self
     }
-    pub fn on_drag<T>(self, _: T) -> Self {
+    pub fn on_drag<T, U>(self, _: T, _: U) -> Self {
         self
     }
     pub fn on_drag_move<T>(self, _: T) -> Self {
@@ -356,14 +369,14 @@ impl MockElement {
     pub fn on_action<T>(self, _: T) -> Self {
         self
     }
+    pub fn on_boxed_action<T, U>(self, _: T, _: U) -> Self {
+        self
+    }
     // --- 捕获阶段事件 ---
     pub fn capture_any_mouse_down<T>(self, _: T) -> Self {
         self
     }
     pub fn capture_any_mouse_up<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn capture_mouse_pressure<T>(self, _: T) -> Self {
         self
     }
     pub fn capture_key_down<T>(self, _: T) -> Self {
@@ -392,7 +405,34 @@ impl MockElement {
     pub fn group<T>(self, _: T) -> Self {
         self
     }
-    pub fn track_focus(self) -> Self {
+    pub fn track_focus<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn hoverable_tooltip<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn overflow_scroll(self) -> Self {
+        self
+    }
+    pub fn overflow_x_scroll(self) -> Self {
+        self
+    }
+    pub fn overflow_y_scroll(self) -> Self {
+        self
+    }
+    pub fn scrollbar_width<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn group_active<F: FnOnce(Self) -> Self>(self, _f: F) -> Self {
+        self
+    }
+    pub fn anchor_scroll<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn focusable(self) -> Self {
+        self
+    }
+    pub fn track_scroll<T>(self, _: T) -> Self {
         self
     }
 
@@ -740,16 +780,40 @@ impl Styled for MockElement {
     fn border_dashed(self) -> Self {
         self
     }
-    fn border_t(self) -> Self {
+    fn border_t_1(self) -> Self {
         self
     }
-    fn border_b(self) -> Self {
+    fn border_b_1(self) -> Self {
         self
     }
-    fn border_l(self) -> Self {
+    fn border_l_1(self) -> Self {
         self
     }
-    fn border_r(self) -> Self {
+    fn border_r_1(self) -> Self {
+        self
+    }
+    fn border_x_1(self) -> Self {
+        self
+    }
+    fn border_y_1(self) -> Self {
+        self
+    }
+    fn border_t_2(self) -> Self {
+        self
+    }
+    fn border_b_2(self) -> Self {
+        self
+    }
+    fn border_l_2(self) -> Self {
+        self
+    }
+    fn border_r_2(self) -> Self {
+        self
+    }
+    fn border_x_2(self) -> Self {
+        self
+    }
+    fn border_y_2(self) -> Self {
         self
     }
     fn rounded_sm(self) -> Self {
@@ -769,9 +833,6 @@ impl Styled for MockElement {
         self
     }
     fn overflow_hidden(self) -> Self {
-        self
-    }
-    fn overflow_scroll(self) -> Self {
         self
     }
     fn absolute(self) -> Self {

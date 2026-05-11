@@ -11,13 +11,50 @@
 //! - 使用 match-based `is_stateful_attr()` 替代双重线性扫描
 //! - 使用 `lookup_tag_default()` 替代 `.iter().find()` 线性查找
 //! - `generate_attr_methods` 直接 push 到调用方 Vec
-//! - 复用 `consecutive_exprs` Vec 避免循环内反复分配
+//! - 每个子节点独立生成 `.child()` 调用，避免数组类型统一约束
 //! - 自动 ID 基于源码 span 位置（行号 + 列号），增量编译下保持稳定
 
 use super::attribute::generate_attr_methods;
 use super::class::parse_class_string;
-use super::tables::{is_stateful_attr, lookup_tag_default};
+use super::tables::{
+    is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_attr_method,
+    lookup_tag_default,
+};
 use crate::diagnostics::for_loop_missing_key_error;
+
+fn attr_needs_stateful(attr: &RsxAttribute) -> bool {
+    match attr {
+        RsxAttribute::Value { name, value } => {
+            let attr_str = name.to_string();
+            if is_stateful_attr(&attr_str) {
+                return true;
+            }
+            if let Some(mapped) = lookup_attr_method(&attr_str) {
+                if is_stateful_attr(mapped) {
+                    return true;
+                }
+            }
+            if attr_str == "class"
+                && let syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(lit_str),
+                    ..
+                }) = value
+            {
+                return lit_str
+                    .value()
+                    .split_ascii_whitespace()
+                    .any(is_stateful_class);
+            }
+            false
+        }
+        RsxAttribute::Flag(name) => {
+            let attr_str = name.to_string();
+            is_stateful_attr(&attr_str)
+                || lookup_attr_flag_method(&attr_str).is_some_and(|m| is_stateful_attr(m))
+        }
+        _ => false,
+    }
+}
 use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
@@ -96,12 +133,11 @@ fn find_stateful_without_key(nodes: &[RsxNode]) -> Option<&syn::Ident> {
                 match attr {
                     RsxAttribute::Value { name, .. } if name == "id" => has_id = true,
                     RsxAttribute::Value { name, .. } if name == "key" => has_key = true,
-                    RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
+                    _ => {
                         if !needs_id {
-                            needs_id = is_stateful_attr(&name.to_string());
+                            needs_id = attr_needs_stateful(attr);
                         }
                     }
-                    _ => {}
                 }
             }
 
@@ -152,14 +188,11 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
             RsxAttribute::Flag(name) if name == "styled" => {
                 has_styled = true;
             }
-            RsxAttribute::Value { name, .. } | RsxAttribute::Flag(name) => {
+            _ => {
                 if !needs_id {
-                    // 缓存属性名字符串，避免循环内重复 to_string()
-                    let attr_str = name.to_string();
-                    needs_id = is_stateful_attr(&attr_str);
+                    needs_id = attr_needs_stateful(attr);
                 }
             }
-            _ => {}
         }
     }
 
@@ -206,61 +239,27 @@ pub(crate) fn generate_element(element: &RsxElement) -> TokenStream {
 }
 
 /// 生成子节点的方法链片段
-///
-/// 当连续 2+ 个 Expr 子节点时，合并为单个 `.children([...])` 调用。
-/// 数组字面量是栈分配，比多次 `.child()` 调用减少方法 dispatch 次数。
-/// `consecutive_exprs` 在循环外分配，每轮用 `.clear()` 复用，减少堆分配。
 fn generate_children_methods(children: &[RsxNode], methods: &mut Vec<TokenStream>) {
-    let mut i = 0;
-    let mut consecutive_exprs: Vec<TokenStream> = Vec::with_capacity(4);
-
-    while i < children.len() {
-        // 收集连续的 Expr 子节点（复用 Vec）
-        consecutive_exprs.clear();
-        while i < children.len() {
-            if let RsxNode::Expr(expr) = &children[i] {
-                consecutive_exprs.push(expr.to_token_stream());
-                i += 1;
-            } else {
-                break;
-            }
-        }
-
-        // 2 个及以上连续 Expr → .children([...])，用数组（栈分配）替代多次 .child()
-        if consecutive_exprs.len() >= 2 {
-            methods.push(quote! { .children([#(#consecutive_exprs),*]) });
-        } else {
-            for expr in &consecutive_exprs {
+    for node in children {
+        match node {
+            RsxNode::Expr(expr) => {
                 methods.push(quote! { .child(#expr) });
             }
-        }
-
-        // 处理非 Expr 节点
-        if i < children.len() {
-            match &children[i] {
-                RsxNode::Element(elem) => {
-                    let child_expr = generate_element(elem);
-                    methods.push(quote! { .child(#child_expr) });
-                }
-                RsxNode::Spread(expr) => {
-                    methods.push(quote! { .children(#expr) });
-                }
-                RsxNode::For {
-                    binding,
-                    iter,
-                    body,
-                } => {
-                    let for_expr = generate_for_loop(binding, iter, body);
-                    methods.push(quote! { .children(#for_expr) });
-                }
-                RsxNode::Expr(_) => {
-                    // Expr 节点应该已在上面的 consecutive_exprs 循环中处理
-                    unreachable!(
-                        "BUG in gpui-rsx codegen: Expr node should have been consumed above"
-                    )
-                }
+            RsxNode::Element(elem) => {
+                let child_expr = generate_element(elem);
+                methods.push(quote! { .child(#child_expr) });
             }
-            i += 1;
+            RsxNode::Spread(expr) => {
+                methods.push(quote! { .children(#expr) });
+            }
+            RsxNode::For {
+                binding,
+                iter,
+                body,
+            } => {
+                let for_expr = generate_for_loop(binding, iter, body);
+                methods.push(quote! { .children(#for_expr) });
+            }
         }
     }
 }

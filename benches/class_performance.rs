@@ -4,8 +4,10 @@
 //!
 //! 运行：`cargo bench`
 
-use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use gpui_rsx::rsx;
+use std::hint::black_box;
+
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
 // Mock GPUI 类型（与 tests/macro_tests.rs 相同）
 #[derive(Debug)]
@@ -309,10 +311,18 @@ trait Styled: Sized {
     fn border_1(self) -> Self;
     fn border_2(self) -> Self;
     fn border_dashed(self) -> Self;
-    fn border_t(self) -> Self;
-    fn border_b(self) -> Self;
-    fn border_l(self) -> Self;
-    fn border_r(self) -> Self;
+    fn border_t_1(self) -> Self;
+    fn border_b_1(self) -> Self;
+    fn border_l_1(self) -> Self;
+    fn border_r_1(self) -> Self;
+    fn border_x_1(self) -> Self;
+    fn border_y_1(self) -> Self;
+    fn border_t_2(self) -> Self;
+    fn border_b_2(self) -> Self;
+    fn border_l_2(self) -> Self;
+    fn border_r_2(self) -> Self;
+    fn border_x_2(self) -> Self;
+    fn border_y_2(self) -> Self;
     fn rounded_none(self) -> Self;
     fn rounded_sm(self) -> Self;
     fn rounded_md(self) -> Self;
@@ -624,16 +634,40 @@ impl Styled for MockElement {
     fn border_dashed(self) -> Self {
         self
     }
-    fn border_t(self) -> Self {
+    fn border_t_1(self) -> Self {
         self
     }
-    fn border_b(self) -> Self {
+    fn border_b_1(self) -> Self {
         self
     }
-    fn border_l(self) -> Self {
+    fn border_l_1(self) -> Self {
         self
     }
-    fn border_r(self) -> Self {
+    fn border_r_1(self) -> Self {
+        self
+    }
+    fn border_x_1(self) -> Self {
+        self
+    }
+    fn border_y_1(self) -> Self {
+        self
+    }
+    fn border_t_2(self) -> Self {
+        self
+    }
+    fn border_b_2(self) -> Self {
+        self
+    }
+    fn border_l_2(self) -> Self {
+        self
+    }
+    fn border_r_2(self) -> Self {
+        self
+    }
+    fn border_x_2(self) -> Self {
+        self
+    }
+    fn border_y_2(self) -> Self {
         self
     }
     fn rounded_none(self) -> Self {

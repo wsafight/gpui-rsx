@@ -23,7 +23,7 @@
 //!         div()
 //!             .cursor_pointer()
 //!             .id("btn")
-//!             .on_click(cx.listener(|_, _, cx| cx.notify()))
+//!             .on_click(cx.listener(|_, _, _window, cx| cx.notify()))
 //!             .child("Click me"),
 //!     )
 //!
@@ -33,7 +33,7 @@
 //!         <h1 class="text-xl font-bold">{"Hello GPUI"}</h1>
 //!         <button
 //!             cursor_pointer
-//!             onClick={cx.listener(|_, _, cx| cx.notify())}
+//!             onClick={cx.listener(|_, _, _window, cx| cx.notify())}
 //!         >
 //!             {"Click me"}
 //!         </button>
@@ -189,7 +189,7 @@
 //!
 //! ```ignore
 //! rsx! {
-//!     <button onClick={cx.listener(|view, _, cx| {
+//!     <button onClick={cx.listener(|view, _, _window, cx| {
 //!         view.count += 1;
 //!         cx.notify();
 //!     })}>
@@ -205,7 +205,8 @@
 //! becomes a `.key()` method call on the GPUI element.
 //!
 //! **`key` only takes effect when the element already needs an `.id()`** (i.e. it
-//! carries an event handler, `tooltip`, `track_focus`, or another stateful attribute).
+//! carries `onClick`, `onHover`, `onDrag`, `tooltip`, `focusable`, `overflowScroll`,
+//! `trackScroll`, or another attribute that requires a stateful element).
 //! On elements without any stateful attributes, `key` is silently ignored and no
 //! `.id()` is injected — the element stays a plain `Div`.
 //!
@@ -242,18 +243,31 @@
 //! | Attribute | GPUI method |
 //! |-----------|-------------|
 //! | `onClick` / `on_click` | `.on_click(h)` |
-//! | `onMouseDown` / `on_mouse_down` | `.on_mouse_down(h)` |
-//! | `onMouseUp` / `on_mouse_up` | `.on_mouse_up(h)` |
+//! | `onMouseDown` / `on_mouse_down` | `.on_mouse_down(button, h)` |
+//! | `onMouseUp` / `on_mouse_up` | `.on_mouse_up(button, h)` |
 //! | `onMouseMove` / `on_mouse_move` | `.on_mouse_move(h)` |
+//! | `onMouseDownOut` / `on_mouse_down_out` | `.on_mouse_down_out(h)` |
+//! | `onMouseUpOut` / `on_mouse_up_out` | `.on_mouse_up_out(button, h)` |
+//! | `onAnyMouseDown` / `on_any_mouse_down` | `.on_any_mouse_down(h)` |
+//! | `onAnyMouseUp` / `on_any_mouse_up` | `.on_any_mouse_up(h)` |
 //! | `onKeyDown` / `on_key_down` | `.on_key_down(h)` |
 //! | `onKeyUp` / `on_key_up` | `.on_key_up(h)` |
-//! | `onFocus` / `on_focus` | `.on_focus(h)` |
-//! | `onBlur` / `on_blur` | `.on_blur(h)` |
+//! | `onModifiersChanged` / `on_modifiers_changed` | `.on_modifiers_changed(h)` |
 //! | `onHover` / `on_hover` | `.on_hover(h)` |
 //! | `onScrollWheel` / `on_scroll_wheel` | `.on_scroll_wheel(h)` |
-//! | `onDrag` / `on_drag` | `.on_drag(h)` |
+//! | `onDrag` / `on_drag` | `.on_drag(value, constructor)` |
+//! | `onDragMove` / `on_drag_move` | `.on_drag_move(h)` |
 //! | `onDrop` / `on_drop` | `.on_drop(h)` |
 //! | `onAction` / `on_action` | `.on_action(h)` |
+//! | `onBoxedAction` / `on_boxed_action` | `.on_boxed_action(action, h)` |
+//! | `captureAnyMouseDown` / `capture_any_mouse_down` | `.capture_any_mouse_down(h)` |
+//! | `captureAnyMouseUp` / `capture_any_mouse_up` | `.capture_any_mouse_up(h)` |
+//! | `captureKeyDown` / `capture_key_down` | `.capture_key_down(h)` |
+//! | `captureKeyUp` / `capture_key_up` | `.capture_key_up(h)` |
+//! | `captureAction` / `capture_action` | `.capture_action(h)` |
+//!
+//! Multi-argument GPUI methods use tuple syntax in RSX, e.g.
+//! `onMouseDown={(MouseButton::Left, handler)}`.
 //!
 //! ### Expressions and Children
 //!
@@ -374,8 +388,9 @@
 //! | `textAlign` | `.text_align()` |
 //! | `textDecoration` | `.text_decoration()` |
 //! | `borderRadius` | `.border_radius()` |
-//! | `borderTop` / `borderBottom` | `.border_t()` / `.border_b()` |
-//! | `borderLeft` / `borderRight` | `.border_l()` / `.border_r()` |
+//! | `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
+//! | `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
+//! | `border_t` / `border_b` / `border_l` / `border_r` (flags) | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |
 //! | `roundedTop` / `roundedBottom` | `.rounded_t()` / `.rounded_b()` |
 //! | `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
 //! | `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
@@ -385,7 +400,8 @@
 //!
 //! ## Auto ID Injection
 //!
-//! Elements that require a stateful identity (event handlers, `tooltip`, `track_focus`)
+//! Elements that require a stateful identity (`onClick`, `onHover`, `onDrag`, `tooltip`,
+//! `focusable`, `overflowScroll`, `trackScroll`, and static `overflow-scroll` classes)
 //! automatically receive a deterministic `.id()` derived from the element's source
 //! location. The ID is chosen by the following priority:
 //!
@@ -411,7 +427,8 @@
 //! > **Note on style attributes:** `hover`, `active`, `focus`, and `group` are
 //! > *`Styled` trait* methods and do **not** trigger auto ID injection.
 //! > Only `StatefulInteractiveElement` / `FocusableElement` attributes
-//! > (event handlers, `tooltip`, `track_focus`) require an ID.
+//! > (`onClick`, `onHover`, `onDrag`, `tooltip`, `focusable`, `overflowScroll`,
+//! > `trackScroll`, etc.) require an ID.
 //!
 //! ### Loop safety
 //!
@@ -485,7 +502,7 @@ use parser::RsxBody;
 /// rsx! {
 ///     <button
 ///         class="bg-blue-500 text-white px-4 py-2 rounded-md"
-///         onClick={cx.listener(|view, _, cx| {
+///         onClick={cx.listener(|view, _, _window, cx| {
 ///             view.count += 1;
 ///             cx.notify();
 ///         })}
