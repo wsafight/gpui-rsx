@@ -18,7 +18,7 @@
 //!     .gap(px(16.0))
 //!     .p(px(16.0))
 //!     .bg(rgb(0x3b82f6))
-//!     .child(div().text_xl().font_bold().child("Hello GPUI"))
+//!     .child(div().text_xl().font_weight(FontWeight::BOLD).child("Hello GPUI"))
 //!     .child(
 //!         div()
 //!             .cursor_pointer()
@@ -50,9 +50,10 @@
 //! | HTML-like tags | `<div>`, `<span>`, `<button>`, … → all map to `div()` |
 //! | Boolean attributes | `<div flex flex_col />` → `.flex().flex_col()` |
 //! | Value attributes | `<div gap={px(4.0)} />` → `.gap(px(4.0))` |
-//! | `class` (static) | Tailwind-like string, parsed at compile time |
-//! | `class` (dynamic) | Runtime expression, full Tailwind palette + common utilities |
-//! | Full color palette | 242 Tailwind colors + arbitrary hex (`bg-[#ff0000]`) |
+//! | `class` (static) | Tailwind-like subset, parsed at compile time |
+//! | `class` (dynamic) | Runtime expression with colors, sizing, spacing, and common utilities |
+//! | Full color palette | 242 Tailwind colors + arbitrary hex/RGB/RGBA (`bg-[#ff0000]`) |
+//! | Desktop sizing | `w-[280px]`, `w-[37.5%]`, `w-6/24`, `min-w-0` |
 //! | Fragments | `<>...</>` — returns `vec![...]` |
 //! | For-loop sugar | `{for item in iter { ... }}` |
 //! | Spread | `{...iterator}` |
@@ -107,8 +108,8 @@
 //!
 //! ### The `class` Attribute — Static (Compile-time, Recommended)
 //!
-//! A Tailwind-inspired string that expands to method calls at compile time.
-//! **All Tailwind utilities are supported; there is no runtime cost:**
+//! A Tailwind-inspired subset that expands to method calls at compile time.
+//! It maps directly to GPUI APIs and is not a full Tailwind CSS engine.
 //!
 //! ```ignore
 //! rsx! { <div class="flex flex-col gap-4 p-4 bg-blue-500 text-white rounded-md" /> }
@@ -119,7 +120,7 @@
 //! #### Supported class patterns
 //!
 //! **Layout:** `flex`, `flex-col`, `flex-row`, `flex-1`, `flex-wrap`, `flex-none`,
-//! `block`, `grid`, `hidden`, `absolute`, `relative`
+//! `min-w-0`, `min-h-0`, `block`, `grid`, `hidden`, `absolute`, `relative`
 //!
 //! **Alignment:** `items-center`, `items-start`, `items-end`, `justify-center`,
 //! `justify-between`, `justify-start`, `justify-end`, `justify-around`,
@@ -127,12 +128,15 @@
 //!
 //! **Spacing** (numeric value → `px(n.0)`):
 //! `gap-4` → `.gap(px(4.0))`, `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`,
-//! `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, fractional `p-0.5` → `.p(px(0.5))`
+//! `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, arbitrary lengths such as `gap-[14px]`
+//! and `mx-[1.25rem]`
 //!
-//! **Sizing:** `w-full`, `h-full`, `size-full`, `w-64`, `h-32`
+//! **Sizing:** `w-full`, `h-full`, `size-full`, `w-64`, `h-32`, `w-[280px]`,
+//! `w-[18rem]`, `w-[37.5%]`, `w-6/24`
 //!
 //! **Text:** `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`, `text-2xl`,
-//! `text-3xl`, `font-bold`, `italic`, `underline`, `truncate`, `text-left`, `text-center`
+//! `text-3xl`, `font-thin` through `font-black`, `italic`, `underline`, `truncate`,
+//! `text-left`, `text-center`
 //!
 //! **Border:** `border` → `.border_1()`, `border-2`, `rounded-sm`, `rounded-md`,
 //! `rounded-lg`, `rounded-xl`, `rounded-full`, `rounded-none`
@@ -147,16 +151,19 @@
 //! `indigo`, `violet`, `purple`, `fuchsia`, `pink`, `rose` (shades 50–950) +
 //! `black`, `white`
 //!
-//! **Arbitrary hex (6-digit and 3-digit):**
+//! **Arbitrary colors:**
 //! `bg-[#ff0000]` → `.bg(rgb(0xff0000))`,
-//! `text-[#f00]` → `.text_color(rgb(0xff0000))`
+//! `text-[#f00]` → `.text_color(rgb(0xff0000))`,
+//! `border-[#11223344]` → `.border_color(rgba(0x11223344))`,
+//! `bg-[rgb(15,23,42)]`, `text-[rgba(15,23,42,0.8)]`
 //!
 //! ### The `class` Attribute — Dynamic (Runtime)
 //!
 //! When `class` receives an expression, a runtime matcher is generated.
 //! Supported classes: common layout/spacing/typography utilities, the full Tailwind
-//! color palette, arbitrary hex colors (`bg-[#ff0000]`, `text-[#f00]`), and arbitrary
-//! numeric values for spacing/sizing/opacity via prefix fallback. Truly
+//! color palette, arbitrary colors (`bg-[#ff0000]`, `text-[#f00]`,
+//! `bg-[rgba(15,23,42,0.8)]`), arbitrary lengths (`w-[280px]`, `gap-[14px]`),
+//! fraction sizing (`w-6/24`), and numeric values for spacing/sizing/opacity via prefix fallback. Truly
 //! unsupported classes (e.g. Tailwind variants, unknown utilities) are silently ignored
 //! in release and print a warning in debug builds.
 //!
@@ -168,7 +175,7 @@
 //! Prefer static strings or the `when` attribute instead:
 //!
 //! ```ignore
-//! // ✅ static literal — compile-time, all classes work
+//! // static literal — compile-time, documented subset
 //! rsx! { <div class="flex gap-4" /> }
 //!
 //! // ✅ conditional literal — still static
@@ -178,7 +185,7 @@
 //! // ✅ when attribute — compile-time, fully flexible
 //! rsx! { <div when={(active, |el| el.flex().gap(px(4.0)))} /> }
 //!
-//! // ⚠️ dynamic expression — runtime parser, narrower coverage than static literals
+//! // Dynamic expression — runtime parser, narrower coverage than static literals
 //! rsx! { <div class={format!("gap-{} bg-[#f00]", spacing)} /> }
 //! ```
 //!
@@ -343,7 +350,7 @@
 //!
 //! ```ignore
 //! rsx! { <h1 styled>{"Title"}</h1> }
-//! // → div().text_3xl().font_bold().child("Title")
+//! // → div().text_3xl().font_weight(FontWeight::BOLD).child("Title")
 //!
 //! rsx! { <button styled onClick={handler}>{"OK"}</button> }
 //! // → div().cursor_pointer().id("…").on_click(handler).child("OK")
@@ -466,7 +473,8 @@ mod codegen;
 mod diagnostics;
 mod parser;
 
-use codegen::generate_body;
+use codegen::class::ClassMode;
+use codegen::element::{generate_body_expansion_preview, generate_body_with_mode};
 use parser::RsxBody;
 
 /// Transforms JSX-like markup into GPUI method chains at compile time.
@@ -548,21 +556,55 @@ use parser::RsxBody;
 ///
 /// ```ignore
 /// rsx! { <h1 styled>{"Title"}</h1> }
-/// // → div().text_3xl().font_bold().child("Title")
+/// // → div().text_3xl().font_weight(FontWeight::BOLD).child("Title")
 /// ```
 ///
 /// # Notes
 ///
-/// - **Static `class`**: parsed entirely at compile time, supports all classes.
+/// - **Static `class`**: parsed entirely at compile time, supports the documented Tailwind-like subset.
 /// - **Dynamic `class={expr}`**: runtime matcher; full Tailwind color palette,
-///   arbitrary hex colors, common layout/spacing/typography utilities, and arbitrary
-///   numeric values via prefix fallback. Truly unsupported classes are silently ignored
+///   arbitrary colors, common layout/spacing/typography utilities, arbitrary
+///   lengths, fraction sizing, and numeric values via prefix fallback. Truly unsupported classes are silently ignored
 ///   in release builds. Prefer `when` or static strings for full coverage.
 /// - **Auto ID**: elements with stateful event handlers receive a source-location-based
 ///   ID automatically. Provide an explicit `id` attribute for state-sensitive elements.
 #[proc_macro]
 pub fn rsx(input: TokenStream) -> TokenStream {
     let body = parse_macro_input!(input as RsxBody);
-    let code = generate_body(&body);
+    let code = generate_body_with_mode(&body, ClassMode::Permissive);
+    TokenStream::from(code)
+}
+
+/// Transforms RSX into GPUI method chains and rejects unsupported static classes.
+///
+/// Static unknown classes emit a compile error instead of being ignored or falling through
+/// to a GPUI method name. Dynamic unknown classes panic when evaluated.
+#[proc_macro]
+pub fn rsx_strict(input: TokenStream) -> TokenStream {
+    let body = parse_macro_input!(input as RsxBody);
+    let code = generate_body_with_mode(&body, ClassMode::Strict);
+    TokenStream::from(code)
+}
+
+/// Transforms RSX using the default permissive class handling.
+///
+/// This is equivalent to [`rsx!`], and exists as an explicit opt-in when codebases
+/// also use [`rsx_strict!`].
+#[proc_macro]
+pub fn rsx_permissive(input: TokenStream) -> TokenStream {
+    let body = parse_macro_input!(input as RsxBody);
+    let code = generate_body_with_mode(&body, ClassMode::Permissive);
+    TokenStream::from(code)
+}
+
+/// Returns a string preview of the generated GPUI method chain.
+///
+/// This macro is intended for debugging generated code. It does not type-check the
+/// generated GPUI expression because it returns a `&'static str`.
+#[proc_macro]
+pub fn rsx_expand(input: TokenStream) -> TokenStream {
+    let body = parse_macro_input!(input as RsxBody);
+    let preview = generate_body_expansion_preview(&body, ClassMode::Permissive);
+    let code = quote::quote! { #preview };
     TokenStream::from(code)
 }

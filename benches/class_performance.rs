@@ -13,6 +13,47 @@ use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 #[derive(Debug)]
 struct MockElement;
 
+#[derive(Clone, Copy, Debug)]
+struct FontWeight;
+
+impl FontWeight {
+    const THIN: FontWeight = FontWeight;
+    const EXTRA_LIGHT: FontWeight = FontWeight;
+    const LIGHT: FontWeight = FontWeight;
+    const NORMAL: FontWeight = FontWeight;
+    const MEDIUM: FontWeight = FontWeight;
+    const SEMIBOLD: FontWeight = FontWeight;
+    const BOLD: FontWeight = FontWeight;
+    const EXTRA_BOLD: FontWeight = FontWeight;
+    const BLACK: FontWeight = FontWeight;
+}
+
+#[derive(Clone, Copy, Debug)]
+enum AlignItems {
+    FlexStart,
+    FlexEnd,
+    Center,
+    Baseline,
+    Stretch,
+}
+
+type JustifyContent = AlignContent;
+
+#[derive(Clone, Copy, Debug)]
+enum AlignContent {
+    Stretch,
+    SpaceEvenly,
+}
+
+#[derive(Default, Debug)]
+struct StyleRefinement {
+    align_items: Option<AlignItems>,
+    align_self: Option<AlignItems>,
+    justify_content: Option<JustifyContent>,
+    align_content: Option<AlignContent>,
+    flex_grow: Option<f32>,
+}
+
 fn div() -> MockElement {
     MockElement
 }
@@ -20,8 +61,17 @@ fn div() -> MockElement {
 fn rgb(_hex: u32) -> u32 {
     0
 }
+fn rgba(_hex: u32) -> u32 {
+    0
+}
 
 fn px(_val: f32) -> f32 {
+    0.0
+}
+fn rems(_val: f32) -> f32 {
+    0.0
+}
+fn relative(_val: f32) -> f32 {
     0.0
 }
 
@@ -159,6 +209,9 @@ impl MockElement {
     fn font_bold(self) -> Self {
         self
     }
+    fn font_weight<T>(self, _: T) -> Self {
+        self
+    }
     fn border(self) -> Self {
         self
     }
@@ -207,12 +260,20 @@ impl MockElement {
     {
         f(self)
     }
+    fn debug(self) -> Self {
+        self
+    }
+    fn style(&mut self) -> &mut StyleRefinement {
+        Box::leak(Box::new(StyleRefinement::default()))
+    }
 }
 
 // Styled trait - 动态 class 代码生成需要此 trait
 // 必须与 generate_common_class_matches 生成的所有方法调用保持一致。
 #[allow(dead_code)] // benchmark 中并非所有 trait 方法都被使用
 trait Styled: Sized {
+    fn style(&mut self) -> &mut StyleRefinement;
+
     // --- flex ---
     fn flex(self) -> Self;
     fn flex_col(self) -> Self;
@@ -341,6 +402,7 @@ trait Styled: Sized {
     fn text_decoration_8(self) -> Self;
     // --- font ---
     fn font_bold(self) -> Self;
+    fn font_weight<T>(self, weight: T) -> Self;
     // --- border ---
     fn border_1(self) -> Self;
     fn border_2(self) -> Self;
@@ -402,10 +464,11 @@ trait Styled: Sized {
     fn cursor_e_resize(self) -> Self;
     fn cursor_s_resize(self) -> Self;
     fn cursor_w_resize(self) -> Self;
+    fn debug(self) -> Self;
     // --- color / opacity ---
-    fn bg(self, color: u32) -> Self;
-    fn text_color(self, color: u32) -> Self;
-    fn border_color(self, color: u32) -> Self;
+    fn bg<T>(self, color: T) -> Self;
+    fn text_color<T>(self, color: T) -> Self;
+    fn border_color<T>(self, color: T) -> Self;
     fn opacity(self, val: f32) -> Self;
     // --- grid ---
     fn grid_cols(self, v: u16) -> Self;
@@ -425,6 +488,10 @@ trait Styled: Sized {
 }
 
 impl Styled for MockElement {
+    fn style(&mut self) -> &mut StyleRefinement {
+        Box::leak(Box::new(StyleRefinement::default()))
+    }
+
     // --- flex ---
     fn flex(self) -> Self {
         self
@@ -791,6 +858,9 @@ impl Styled for MockElement {
     fn font_bold(self) -> Self {
         self
     }
+    fn font_weight<T>(self, _: T) -> Self {
+        self
+    }
     // --- border ---
     fn border_1(self) -> Self {
         self
@@ -966,14 +1036,17 @@ impl Styled for MockElement {
     fn cursor_w_resize(self) -> Self {
         self
     }
+    fn debug(self) -> Self {
+        self
+    }
     // --- color / opacity ---
-    fn bg(self, _: u32) -> Self {
+    fn bg<T>(self, _: T) -> Self {
         self
     }
-    fn text_color(self, _: u32) -> Self {
+    fn text_color<T>(self, _: T) -> Self {
         self
     }
-    fn border_color(self, _: u32) -> Self {
+    fn border_color<T>(self, _: T) -> Self {
         self
     }
     fn opacity(self, _: f32) -> Self {

@@ -1,0 +1,7 @@
+error: Unsupported font weight class `font-heavy`. Supported font weight classes: font-thin, font-extralight, font-light, font-normal, font-medium, font-semibold, font-bold, font-extrabold, font-black.
+ --> tests/ui/unsupported_font_weight.rs:8:15
+  |
+8 |     let _el = rsx_strict! { <div class="font-heavy" /> };
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `rsx_strict` (in Nightly builds, run with -Z macro-backtrace for more info)

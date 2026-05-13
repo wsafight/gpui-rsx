@@ -19,6 +19,3 @@ pub(crate) mod class;
 pub(crate) mod element;
 pub(crate) mod runtime;
 pub(crate) mod tables;
-
-// 重新导出公共 API
-pub use element::generate_body;

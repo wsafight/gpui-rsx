@@ -11,8 +11,8 @@
 //! - 使用 match-based `lookup_attr_method()` 替代双重线性扫描
 //! - 直接 push 到调用方 Vec，避免中间 Vec 分配
 
-use super::class::parse_class_string;
-use super::runtime::generate_dynamic_class_code;
+use super::class::{ClassMode, parse_class_string_with_mode};
+use super::runtime::generate_dynamic_class_code_with_mode;
 use super::tables::{is_multi_arg_method, lookup_attr_flag_method, lookup_attr_method};
 use crate::parser::RsxAttribute;
 use proc_macro2::TokenStream;
@@ -25,11 +25,11 @@ pub(crate) struct AttrHints<'a> {
     pub(crate) static_class: Option<&'a str>,
 }
 
-/// 生成属性的方法链片段，直接 push 到 `out`（避免中间 Vec 分配）
-pub(crate) fn generate_attr_methods(
+pub(crate) fn generate_attr_methods_with_mode(
     attr: &RsxAttribute,
     hints: AttrHints<'_>,
     out: &mut Vec<TokenStream>,
+    mode: ClassMode,
 ) {
     match attr {
         // id / key 已在 generate_element 中处理，跳过避免重复生成方法调用
@@ -59,7 +59,7 @@ pub(crate) fn generate_attr_methods(
             if name == "class" {
                 // 情况 1：字符串字面量 → 编译期解析（最优性能）
                 if let Some(s) = hints.static_class {
-                    out.extend(parse_class_string(s));
+                    out.extend(parse_class_string_with_mode(s, mode));
                     return;
                 }
 
@@ -69,12 +69,12 @@ pub(crate) fn generate_attr_methods(
                 }) = value
                 {
                     let s = lit_str.value();
-                    out.extend(parse_class_string(&s));
+                    out.extend(parse_class_string_with_mode(&s, mode));
                     return;
                 }
 
                 // 情况 2：动态表达式 → 生成运行时解析代码
-                let dynamic_code = generate_dynamic_class_code(value);
+                let dynamic_code = generate_dynamic_class_code_with_mode(value, mode);
                 out.push(quote! { .map(|__el| #dynamic_code) });
                 return;
             }

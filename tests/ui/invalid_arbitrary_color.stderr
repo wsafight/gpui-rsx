@@ -1,0 +1,7 @@
+error: Invalid color class `bg-[rgb(256,23,42)]`. Expected #rgb, #rrggbb, #rrggbbaa, rgb(r,g,b), or rgba(r,g,b,a).
+ --> tests/ui/invalid_arbitrary_color.rs:8:15
+  |
+8 |     let _el = rsx! { <div class="bg-[rgb(256,23,42)]" /> };
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `rsx` (in Nightly builds, run with -Z macro-backtrace for more info)

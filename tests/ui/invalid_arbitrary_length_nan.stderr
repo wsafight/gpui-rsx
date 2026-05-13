@@ -1,0 +1,7 @@
+error: Invalid length class `w-[NaNpx]`. Expected a numeric value with px, rem, or %, for example `w-[280px]`.
+ --> tests/ui/invalid_arbitrary_length_nan.rs:8:15
+  |
+8 |     let _el = rsx! { <div class="w-[NaNpx]" /> };
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `rsx` (in Nightly builds, run with -Z macro-backtrace for more info)

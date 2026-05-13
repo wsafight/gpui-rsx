@@ -1,0 +1,7 @@
+error: Invalid spacing class `gap-[10%]`. Percentage values are only supported for sizing classes such as `w-*` and `h-*`.
+ --> tests/ui/invalid_spacing_percent.rs:8:15
+  |
+8 |     let _el = rsx! { <div class="gap-[10%]" /> };
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `rsx` (in Nightly builds, run with -Z macro-backtrace for more info)

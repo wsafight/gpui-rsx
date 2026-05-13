@@ -12,6 +12,14 @@ use std::cell::RefCell;
 thread_local! {
     pub static LAST_AUTO_ID: RefCell<Option<String>> = const { RefCell::new(None) };
     pub static RGB_CALLS: RefCell<Vec<u32>> = const { RefCell::new(Vec::new()) };
+    pub static RGBA_CALLS: RefCell<Vec<u32>> = const { RefCell::new(Vec::new()) };
+    pub static BORDER_CALLS: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
+    pub static FONT_WEIGHT_CALLS: RefCell<Vec<f32>> = const { RefCell::new(Vec::new()) };
+    pub static LENGTH_CALLS: RefCell<Vec<(&'static str, f32)>> = const { RefCell::new(Vec::new()) };
+}
+
+pub fn take_border_calls() -> Vec<&'static str> {
+    BORDER_CALLS.with(|c| c.borrow_mut().drain(..).collect())
 }
 
 /// 返回最近捕获的 auto-ID，并清空缓存。
@@ -24,6 +32,21 @@ pub fn take_rgb_calls() -> Vec<u32> {
     RGB_CALLS.with(|c| c.borrow_mut().drain(..).collect())
 }
 
+/// 返回测试期间捕获的 rgba() 入参，并清空缓存。
+pub fn take_rgba_calls() -> Vec<u32> {
+    RGBA_CALLS.with(|c| c.borrow_mut().drain(..).collect())
+}
+
+/// 返回测试期间捕获的 font_weight() 入参，并清空缓存。
+pub fn take_font_weight_calls() -> Vec<f32> {
+    FONT_WEIGHT_CALLS.with(|c| c.borrow_mut().drain(..).collect())
+}
+
+/// 返回测试期间捕获的长度 helper 入参，并清空缓存。
+pub fn take_length_calls() -> Vec<(&'static str, f32)> {
+    LENGTH_CALLS.with(|c| c.borrow_mut().drain(..).collect())
+}
+
 /// Mock Element，模拟 GPUI 的 Div / Stateful<Div>。
 /// 所有 builder 方法返回 Self 以支持方法链。
 #[derive(Debug)]
@@ -31,6 +54,69 @@ pub struct MockElement;
 
 #[derive(Debug)]
 pub struct AnyElement;
+
+#[derive(Clone, Copy, Debug)]
+pub struct FontWeight(pub f32);
+
+impl FontWeight {
+    pub const THIN: FontWeight = FontWeight(100.0);
+    pub const EXTRA_LIGHT: FontWeight = FontWeight(200.0);
+    pub const LIGHT: FontWeight = FontWeight(300.0);
+    pub const NORMAL: FontWeight = FontWeight(400.0);
+    pub const MEDIUM: FontWeight = FontWeight(500.0);
+    pub const SEMIBOLD: FontWeight = FontWeight(600.0);
+    pub const BOLD: FontWeight = FontWeight(700.0);
+    pub const EXTRA_BOLD: FontWeight = FontWeight(800.0);
+    pub const BLACK: FontWeight = FontWeight(900.0);
+}
+
+impl From<i32> for FontWeight {
+    fn from(value: i32) -> Self {
+        Self(value as f32)
+    }
+}
+
+impl From<f32> for FontWeight {
+    fn from(value: f32) -> Self {
+        Self(value)
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub enum AlignItems {
+    Start,
+    End,
+    FlexStart,
+    FlexEnd,
+    Center,
+    Baseline,
+    Stretch,
+}
+
+pub type JustifyContent = AlignContent;
+
+#[derive(Clone, Copy, Debug)]
+pub enum AlignContent {
+    Start,
+    End,
+    FlexStart,
+    FlexEnd,
+    Center,
+    Stretch,
+    SpaceBetween,
+    SpaceEvenly,
+    SpaceAround,
+}
+
+#[derive(Default, Debug)]
+pub struct StyleRefinement {
+    pub align_items: Option<AlignItems>,
+    pub align_self: Option<AlignItems>,
+    pub justify_content: Option<JustifyContent>,
+    pub align_content: Option<AlignContent>,
+    pub flex_grow: Option<f32>,
+    pub debug: Option<bool>,
+}
 
 /// Minimal stand-in for GPUI's IntoElement trait.
 pub trait IntoElement: Sized {
@@ -54,6 +140,8 @@ pub enum MouseButton {
 
 /// Styled trait，用于动态 class 的运行时解析
 pub trait Styled: Sized {
+    fn style(&mut self) -> &mut StyleRefinement;
+
     // --- flex ---
     fn flex(self) -> Self;
     fn flex_col(self) -> Self;
@@ -175,6 +263,9 @@ pub trait Styled: Sized {
     fn text_decoration_8(self) -> Self;
     // --- font ---
     fn font_bold(self) -> Self;
+    fn font_weight<T>(self, v: T) -> Self
+    where
+        T: Into<FontWeight>;
     // --- border ---
     fn border_1(self) -> Self;
     fn border_2(self) -> Self;
@@ -245,6 +336,7 @@ pub trait Styled: Sized {
     fn cursor_e_resize(self) -> Self;
     fn cursor_s_resize(self) -> Self;
     fn cursor_w_resize(self) -> Self;
+    fn debug(self) -> Self;
     // --- shadow ---
     fn shadow_none(self) -> Self;
     fn shadow_2xs(self) -> Self;
@@ -280,7 +372,23 @@ pub fn rgb(hex: u32) -> u32 {
     RGB_CALLS.with(|c| c.borrow_mut().push(hex));
     hex
 }
-pub fn px(_val: f32) -> f32 {
+pub fn rgba(hex: u32) -> u32 {
+    RGBA_CALLS.with(|c| c.borrow_mut().push(hex));
+    hex
+}
+pub fn px(val: f32) -> f32 {
+    LENGTH_CALLS.with(|c| c.borrow_mut().push(("px", val)));
+    val
+}
+pub fn rems(val: f32) -> f32 {
+    LENGTH_CALLS.with(|c| c.borrow_mut().push(("rems", val)));
+    val
+}
+pub fn relative(val: f32) -> f32 {
+    LENGTH_CALLS.with(|c| c.borrow_mut().push(("relative", val)));
+    val
+}
+pub fn auto() -> f32 {
     0.0
 }
 
@@ -534,7 +642,14 @@ impl MockElement {
     pub fn line_height<T>(self, _: T) -> Self {
         self
     }
-    pub fn font_weight<T>(self, _: T) -> Self {
+    pub fn font_weight<T>(self, weight: T) -> Self
+    where
+        T: Into<FontWeight>,
+    {
+        FONT_WEIGHT_CALLS.with(|c| c.borrow_mut().push(weight.into().0));
+        self
+    }
+    pub fn font_display(self) -> Self {
         self
     }
     pub fn text_align<T>(self, _: T) -> Self {
@@ -575,6 +690,14 @@ impl MockElement {
         f(self)
     }
 
+    pub fn style(&mut self) -> &mut StyleRefinement {
+        Box::leak(Box::new(StyleRefinement::default()))
+    }
+
+    pub fn debug(self) -> Self {
+        self
+    }
+
     // --- 新增属性映射（不在 Styled 中）---
     pub fn flex_basis<T>(self, _: T) -> Self {
         self
@@ -609,6 +732,10 @@ impl MockElement {
 
 // Styled trait 实现 — 供动态 class 运行时 match 表使用
 impl Styled for MockElement {
+    fn style(&mut self) -> &mut StyleRefinement {
+        Box::leak(Box::new(StyleRefinement::default()))
+    }
+
     // --- flex ---
     fn flex(self) -> Self {
         self
@@ -954,6 +1081,13 @@ impl Styled for MockElement {
     fn font_bold(self) -> Self {
         self
     }
+    fn font_weight<T>(self, weight: T) -> Self
+    where
+        T: Into<FontWeight>,
+    {
+        FONT_WEIGHT_CALLS.with(|c| c.borrow_mut().push(weight.into().0));
+        self
+    }
     // --- border ---
     fn border_1(self) -> Self {
         self
@@ -965,21 +1099,27 @@ impl Styled for MockElement {
         self
     }
     fn border_t_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_t_1"));
         self
     }
     fn border_b_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_b_1"));
         self
     }
     fn border_l_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_l_1"));
         self
     }
     fn border_r_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_r_1"));
         self
     }
     fn border_x_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_x_1"));
         self
     }
     fn border_y_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_y_1"));
         self
     }
     fn border_t_2(self) -> Self {
@@ -1152,6 +1292,9 @@ impl Styled for MockElement {
         self
     }
     fn cursor_w_resize(self) -> Self {
+        self
+    }
+    fn debug(self) -> Self {
         self
     }
     // --- shadow ---

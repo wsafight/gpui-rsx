@@ -5,7 +5,7 @@
 //!
 //! 优化：使用 thread_local 缓存 match 表，避免多个动态 class 重复生成相同 TokenStream。
 
-use super::class::parse_single_class;
+use super::class::{ClassMode, parse_single_class_with_mode};
 use super::tables::{COLOR_FAMILIES, COLOR_SHADES, lookup_color};
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -112,10 +112,34 @@ fn get_cached_numeric_fallback() -> TokenStream {
 ///     }
 /// }
 /// ```
-pub(crate) fn generate_dynamic_class_code(class_expr: &syn::Expr) -> TokenStream {
+pub(crate) fn generate_dynamic_class_code_with_mode(
+    class_expr: &syn::Expr,
+    mode: ClassMode,
+) -> TokenStream {
     let common_classes = get_cached_common_class_matches();
     let color_fallbacks = get_cached_color_fallback();
     let numeric_fallbacks = get_cached_numeric_fallback();
+    let unknown_fallback = match mode {
+        ClassMode::Permissive => quote! {
+            // 仅在 debug 构建中打印警告，避免 release 中每帧触发 syscall 污染日志
+            #[cfg(debug_assertions)]
+            if !class.is_empty() {
+                eprintln!(
+                    "[gpui-rsx] warning: 动态 class {:?} 被忽略（不支持的 class 类型）\n  \
+                     提示：改用字符串字面量 class=\"{}\" 可支持所有 class",
+                    class, class
+                );
+            }
+            el
+        },
+        ClassMode::Strict => quote! {
+            panic!(
+                "[gpui-rsx] unsupported dynamic class {:?} in strict mode. \
+                 Use rsx! or rsx_permissive! to ignore unsupported dynamic classes.",
+                class
+            );
+        },
+    };
 
     quote! {
         {
@@ -132,16 +156,7 @@ pub(crate) fn generate_dynamic_class_code(class_expr: &syn::Expr) -> TokenStream
                         // 数值前缀回退：静态 match 未命中时，尝试前缀 + 数值解析
                         // 覆盖 gap-7、px-5、ml-3、opacity-33 等任意数值
                         #numeric_fallbacks
-                        // 仅在 debug 构建中打印警告，避免 release 中每帧触发 syscall 污染日志
-                        #[cfg(debug_assertions)]
-                        if !class.is_empty() {
-                            eprintln!(
-                                "[gpui-rsx] warning: 动态 class {:?} 被忽略（不支持的 class 类型）\n  \
-                                 提示：改用字符串字面量 class=\"{}\" 可支持所有 class",
-                                class, class
-                            );
-                        }
-                        el
+                        #unknown_fallback
                     }
                 }
             }
@@ -195,7 +210,16 @@ fn generate_color_fallback_code() -> TokenStream {
             let inner = color.strip_prefix("[#")?.strip_suffix(']')?;
             let bytes = inner.as_bytes();
             match bytes.len() {
+                8 => u32::from_str_radix(inner, 16).ok(),
                 6 => u32::from_str_radix(inner, 16).ok(),
+                4 => {
+                    let r = __rsx_hex_digit(bytes[0])?;
+                    let g = __rsx_hex_digit(bytes[1])?;
+                    let b = __rsx_hex_digit(bytes[2])?;
+                    let a = __rsx_hex_digit(bytes[3])?;
+                    let expand = |n: u32| (n << 4) | n;
+                    Some(expand(r) << 24 | expand(g) << 16 | expand(b) << 8 | expand(a))
+                }
                 3 => {
                     let r = __rsx_hex_digit(bytes[0])?;
                     let g = __rsx_hex_digit(bytes[1])?;
@@ -204,6 +228,50 @@ fn generate_color_fallback_code() -> TokenStream {
                 }
                 _ => None,
             }
+        }
+
+        fn __rsx_parse_u8_component(raw: &str) -> Option<u8> {
+            raw.trim().parse::<u8>().ok()
+        }
+
+        fn __rsx_parse_alpha_component(raw: &str) -> Option<u8> {
+            let value = raw.trim().parse::<f32>().ok()?;
+            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
+                return None;
+            }
+            Some((value * 255.0).round() as u8)
+        }
+
+        fn __rsx_parse_color_function(color: &str) -> Option<(u32, bool)> {
+            let inner = color.strip_prefix('[')?.strip_suffix(']')?;
+
+            if let Some(args) = inner.strip_prefix("rgb(").and_then(|s| s.strip_suffix(')')) {
+                let mut parts = args.split(',');
+                let r = __rsx_parse_u8_component(parts.next()?)?;
+                let g = __rsx_parse_u8_component(parts.next()?)?;
+                let b = __rsx_parse_u8_component(parts.next()?)?;
+                if parts.next().is_some() {
+                    return None;
+                }
+                return Some((((r as u32) << 16) | ((g as u32) << 8) | b as u32, false));
+            }
+
+            if let Some(args) = inner.strip_prefix("rgba(").and_then(|s| s.strip_suffix(')')) {
+                let mut parts = args.split(',');
+                let r = __rsx_parse_u8_component(parts.next()?)?;
+                let g = __rsx_parse_u8_component(parts.next()?)?;
+                let b = __rsx_parse_u8_component(parts.next()?)?;
+                let a = __rsx_parse_alpha_component(parts.next()?)?;
+                if parts.next().is_some() {
+                    return None;
+                }
+                return Some((
+                    ((r as u32) << 24) | ((g as u32) << 16) | ((b as u32) << 8) | a as u32,
+                    true,
+                ));
+            }
+
+            None
         }
 
         fn __rsx_parse_named_color(color: &str) -> Option<u32> {
@@ -226,23 +294,38 @@ fn generate_color_fallback_code() -> TokenStream {
             }
         }
 
-        fn __rsx_parse_color(color: &str) -> Option<u32> {
-            __rsx_parse_hex_color(color).or_else(|| __rsx_parse_named_color(color))
+        fn __rsx_parse_color(color: &str) -> Option<(u32, bool)> {
+            if let Some(hex) = __rsx_parse_hex_color(color) {
+                let hex_inner = color.strip_prefix("[#")?.strip_suffix(']')?;
+                let is_rgba = hex_inner.len() == 8 || hex_inner.len() == 4;
+                return Some((hex, is_rgba));
+            }
+            __rsx_parse_color_function(color)
+                .or_else(|| __rsx_parse_named_color(color).map(|color| (color, false)))
         }
 
         if let Some(rest) = class.strip_prefix("text-")
-            && let Some(color) = __rsx_parse_color(rest)
+            && let Some((color, is_rgba)) = __rsx_parse_color(rest)
         {
+            if is_rgba {
+                return el.text_color(rgba(color));
+            }
             return el.text_color(rgb(color));
         }
         if let Some(rest) = class.strip_prefix("bg-")
-            && let Some(color) = __rsx_parse_color(rest)
+            && let Some((color, is_rgba)) = __rsx_parse_color(rest)
         {
+            if is_rgba {
+                return el.bg(rgba(color));
+            }
             return el.bg(rgb(color));
         }
         if let Some(rest) = class.strip_prefix("border-")
-            && let Some(color) = __rsx_parse_color(rest)
+            && let Some((color, is_rgba)) = __rsx_parse_color(rest)
         {
+            if is_rgba {
+                return el.border_color(rgba(color));
+            }
             return el.border_color(rgb(color));
         }
     }
@@ -258,85 +341,346 @@ fn generate_color_fallback_code() -> TokenStream {
 /// 自然回退到 `gap-x-` 分支，无需额外排序。
 fn generate_numeric_fallback_code() -> TokenStream {
     quote! {
+        trait __RsxFiniteFloat {
+            fn __rsx_finite(self) -> Result<f32, ()>;
+        }
+
+        impl __RsxFiniteFloat for Result<f32, std::num::ParseFloatError> {
+            fn __rsx_finite(self) -> Result<f32, ()> {
+                match self {
+                    Ok(n) if n.is_finite() => Ok(n),
+                    _ => Err(()),
+                }
+            }
+        }
+
         // --- gap ---
         if let Some(rest) = class.strip_prefix("gap-x-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.gap_x(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap_x(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap_x(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.gap_x(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("gap-y-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.gap_y(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap_y(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap_y(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.gap_y(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("gap-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.gap(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.gap(px(n)); }
         }
         // --- padding ---
         if let Some(rest) = class.strip_prefix("px-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.px(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.px(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.px(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.px(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("py-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.py(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.py(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.py(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.py(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("pt-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.pt(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pt(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pt(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.pt(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("pb-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.pb(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pb(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pb(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.pb(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("pl-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.pl(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pl(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pl(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.pl(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("pr-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.pr(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pr(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pr(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.pr(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("p-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.p(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.p(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.p(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.p(px(n)); }
         }
         // --- margin ---
         if let Some(rest) = class.strip_prefix("mx-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.mx(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mx(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mx(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.mx(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("my-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.my(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.my(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.my(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.my(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("mt-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.mt(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mt(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mt(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.mt(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("mb-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.mb(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mb(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mb(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.mb(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("ml-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.ml(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.ml(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.ml(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.ml(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("mr-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.mr(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mr(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mr(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.mr(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("m-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.m(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.m(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.m(rems(n)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.m(px(n)); }
         }
         // --- sizing ---
         if let Some(rest) = class.strip_prefix("min-w-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.min_w(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_w(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_w(rems(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix('%') {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_w(relative(n / 100.0)); }
+                }
+            }
+            if let Some((num, den)) = rest.split_once('/') {
+                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
+                    if den > 0.0 { return el.min_w(relative(num / den)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.min_w(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("max-w-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.max_w(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_w(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_w(rems(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix('%') {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_w(relative(n / 100.0)); }
+                }
+            }
+            if let Some((num, den)) = rest.split_once('/') {
+                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
+                    if den > 0.0 { return el.max_w(relative(num / den)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.max_w(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("min-h-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.min_h(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_h(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_h(rems(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix('%') {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_h(relative(n / 100.0)); }
+                }
+            }
+            if let Some((num, den)) = rest.split_once('/') {
+                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
+                    if den > 0.0 { return el.min_h(relative(num / den)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.min_h(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("max-h-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.max_h(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_h(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_h(rems(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix('%') {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_h(relative(n / 100.0)); }
+                }
+            }
+            if let Some((num, den)) = rest.split_once('/') {
+                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
+                    if den > 0.0 { return el.max_h(relative(num / den)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.max_h(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("size-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.size(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.size(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.size(rems(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix('%') {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.size(relative(n / 100.0)); }
+                }
+            }
+            if let Some((num, den)) = rest.split_once('/') {
+                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
+                    if den > 0.0 { return el.size(relative(num / den)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.size(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("w-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.w(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.w(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.w(rems(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix('%') {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.w(relative(n / 100.0)); }
+                }
+            }
+            if let Some((num, den)) = rest.split_once('/') {
+                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
+                    if den > 0.0 { return el.w(relative(num / den)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.w(px(n)); }
         }
         if let Some(rest) = class.strip_prefix("h-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.h(px(n)); }
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.h(px(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.h(rems(n)); }
+                }
+                if let Some(raw) = inner.strip_suffix('%') {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.h(relative(n / 100.0)); }
+                }
+            }
+            if let Some((num, den)) = rest.split_once('/') {
+                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
+                    if den > 0.0 { return el.h(relative(num / den)); }
+                }
+            }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.h(px(n)); }
         }
         // --- opacity: opacity-50 → 0.50 ---
         if let Some(rest) = class.strip_prefix("opacity-") {
-            if let Ok(n) = rest.parse::<f32>() { return el.opacity(n / 100.0); }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.opacity(n / 100.0); }
         }
         // --- text layout ---
         if let Some(rest) = class.strip_prefix("line-clamp-") {
@@ -517,7 +861,15 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
         "text-decoration-4",
         "text-decoration-8",
         // 字体
+        "font-thin",
+        "font-extralight",
+        "font-light",
+        "font-normal",
+        "font-medium",
+        "font-semibold",
         "font-bold",
+        "font-extrabold",
+        "font-black",
         // 边框
         "border",
         "border-2",
@@ -564,6 +916,7 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
         "cursor-e-resize",
         "cursor-s-resize",
         "cursor-w-resize",
+        "debug-outline",
         "overflow-hidden",
         "overflow-x-hidden",
         "overflow-y-hidden",
@@ -596,11 +949,95 @@ fn generate_common_class_matches() -> Vec<TokenStream> {
     let mut matches = Vec::with_capacity(static_classes.len());
 
     for class_str in static_classes {
-        let method_call = parse_single_class(class_str);
+        let method_call = parse_dynamic_common_class(class_str);
         matches.push(quote! {
-            #class_str => el #method_call,
+            #class_str => #method_call,
         });
     }
 
     matches
+}
+
+fn parse_dynamic_common_class(class: &str) -> TokenStream {
+    match class {
+        "debug-outline" => quote! {
+            {
+                #[cfg(debug_assertions)]
+                {
+                    el.debug()
+                }
+                #[cfg(not(debug_assertions))]
+                {
+                    el
+                }
+            }
+        },
+        "flex-grow-0" => quote! {
+            {
+                let mut el = el;
+                el.style().flex_grow = Some(0.0);
+                el
+            }
+        },
+        "items-stretch" => quote! {
+            {
+                let mut el = el;
+                el.style().align_items = Some(AlignItems::Stretch);
+                el
+            }
+        },
+        "content-stretch" => quote! {
+            {
+                let mut el = el;
+                el.style().align_content = Some(AlignContent::Stretch);
+                el
+            }
+        },
+        "justify-evenly" => quote! {
+            {
+                let mut el = el;
+                el.style().justify_content = Some(JustifyContent::SpaceEvenly);
+                el
+            }
+        },
+        "self-start" | "self-flex-start" => quote! {
+            {
+                let mut el = el;
+                el.style().align_self = Some(AlignItems::FlexStart);
+                el
+            }
+        },
+        "self-end" | "self-flex-end" => quote! {
+            {
+                let mut el = el;
+                el.style().align_self = Some(AlignItems::FlexEnd);
+                el
+            }
+        },
+        "self-center" => quote! {
+            {
+                let mut el = el;
+                el.style().align_self = Some(AlignItems::Center);
+                el
+            }
+        },
+        "self-baseline" => quote! {
+            {
+                let mut el = el;
+                el.style().align_self = Some(AlignItems::Baseline);
+                el
+            }
+        },
+        "self-stretch" => quote! {
+            {
+                let mut el = el;
+                el.style().align_self = Some(AlignItems::Stretch);
+                el
+            }
+        },
+        _ => {
+            let method_call = parse_single_class_with_mode(class, ClassMode::Permissive);
+            quote! { el #method_call }
+        }
+    }
 }

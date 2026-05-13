@@ -6,7 +6,15 @@ Complete reference for GPUI-RSX syntax and features.
 
 ```rust
 rsx! { /* RSX content */ }
+rsx_strict! { /* RSX content */ }
+rsx_permissive! { /* RSX content */ }
+rsx_expand! { /* RSX content */ }
 ```
+
+- `rsx!` is the default permissive macro.
+- `rsx_strict!` rejects unsupported static classes and panics on unsupported dynamic classes when evaluated.
+- `rsx_permissive!` is an explicit alias for the default permissive class handling.
+- `rsx_expand!` returns a string preview of the generated GPUI method chain for debugging.
 
 ## Elements
 
@@ -83,11 +91,20 @@ div()
 
 ### Class Attribute
 
-String literal with space-separated class names:
+String literal with space-separated class names. GPUI-RSX implements a Tailwind-like subset that maps to GPUI APIs; it is not a full Tailwind CSS engine.
 
 ```rust
 <div class="flex flex-col gap-4 p-4" />
 ```
+
+Dynamic expressions use a generated runtime matcher:
+
+```rust
+let classes = if active { "flex gap-4" } else { "block" };
+rsx! { <div class={classes} /> }
+```
+
+Runtime class support includes common layout/spacing/typography utilities, the full color palette, arbitrary colors, arbitrary spacing/sizing lengths, fraction sizing, and opacity. Unknown dynamic classes are ignored in permissive mode and panic in strict mode.
 
 #### Supported Class Patterns
 
@@ -96,7 +113,10 @@ String literal with space-separated class names:
 - `flex` → `.flex()`
 - `flex-col` → `.flex_col()`
 - `flex-row` → `.flex_row()`
+- `flex-1`, `flex-auto`, `flex-none`, `flex-grow`, `flex-grow-0`, `flex-shrink`, `flex-shrink-0`
+- `min-w-0`, `min-h-0`
 - `grid` → `.grid()`
+- `debug-outline` → debug border in debug builds, no-op in release builds
 
 ##### Spacing
 
@@ -115,11 +135,26 @@ String literal with space-separated class names:
 - `mb-N` → `.mb(px(N))`
 - `ml-N` → `.ml(px(N))`
 - `mr-N` → `.mr(px(N))`
+- `gap-[14px]` → `.gap(px(14.0))`
+- `gap-x-[0.75rem]` → `.gap_x(rems(0.75))`
+- `p-[18px]`, `mx-[1.25rem]`, etc.
+
+Percentage spacing such as `gap-[10%]` and `p-[10%]` is rejected because GPUI spacing APIs use definite lengths.
 
 ##### Sizing
 
 - `w-N` → `.w(px(N))`
 - `h-N` → `.h(px(N))`
+- `size-N` → `.size(px(N))`
+- `w-full`, `h-full`, `size-full`
+- `w-auto`, `h-auto`
+- `w-[280px]` → `.w(px(280.0))`
+- `w-[18rem]` → `.w(rems(18.0))`
+- `w-[37.5%]` → `.w(relative(0.375))`
+- `min-w-[280px]`, `max-w-[32rem]`, `min-h-[48px]`, `max-h-[80%]`
+- `w-6/24`, `h-1/2`, `size-3/4` → relative fraction sizing
+
+Numeric sizing keeps GPUI-RSX's established pixel semantics: `w-64` means `.w(px(64.0))`, not Tailwind's `16rem` spacing scale.
 
 ##### Colors
 
@@ -134,9 +169,12 @@ Examples:
 - `text-red-600` → `.text_color(rgb(0xdc2626))`
 - `border-gray-300` → `.border_color(rgb(0xd1d5db))`
 
-Arbitrary hex colors:
+Arbitrary colors:
 - `bg-[#ff0000]` → `.bg(rgb(0xff0000))`
 - `text-[#a1b]` → `.text_color(rgb(0xaa11bb))`
+- `border-[#11223344]` → `.border_color(rgba(0x11223344))`
+- `bg-[rgb(15,23,42)]` → `.bg(rgb(0x0f172a))`
+- `text-[rgba(15,23,42,0.8)]` → `.text_color(rgba(0x0f172acc))`
 
 Supported color families:
 - `slate`, `gray`, `zinc`, `neutral`, `stone`
@@ -156,9 +194,15 @@ Shades: `50`, `100`, `200`, `300`, `400`, `500`, `600`, `700`, `800`, `900`, `95
 - `text-xl` → `.text_xl()`
 - `text-2xl` → `.text_2xl()`
 - `text-3xl` → `.text_3xl()`
-- `text-4xl` → `.text_4xl()`
-- `text-5xl` → `.text_5xl()`
-- `font-bold` → `.font_bold()`
+- `font-thin` → `.font_weight(FontWeight::THIN)`
+- `font-extralight` → `.font_weight(FontWeight::EXTRA_LIGHT)`
+- `font-light` → `.font_weight(FontWeight::LIGHT)`
+- `font-normal` → `.font_weight(FontWeight::NORMAL)`
+- `font-medium` → `.font_weight(FontWeight::MEDIUM)`
+- `font-semibold` → `.font_weight(FontWeight::SEMIBOLD)`
+- `font-bold` → `.font_weight(FontWeight::BOLD)`
+- `font-extrabold` → `.font_weight(FontWeight::EXTRA_BOLD)`
+- `font-black` → `.font_weight(FontWeight::BLACK)`
 - `text-center` → `.text_center()`
 
 ##### Borders
@@ -170,23 +214,30 @@ Shades: `50`, `100`, `200`, `300`, `400`, `500`, `600`, `700`, `800`, `900`, `95
 - `rounded-md` → `.rounded_md()`
 - `rounded-lg` → `.rounded_lg()`
 
+##### Alignment
+
+- `items-start`, `items-center`, `items-end`, `items-baseline`, `items-stretch`
+- `justify-start`, `justify-center`, `justify-end`, `justify-between`, `justify-around`, `justify-evenly`
+- `content-normal`, `content-start`, `content-center`, `content-end`, `content-between`, `content-around`, `content-evenly`, `content-stretch`
+- `self-start`, `self-end`, `self-flex-start`, `self-flex-end`, `self-center`, `self-baseline`, `self-stretch`
+
 ### Attribute Name Mapping
 
 CamelCase JSX-style names map to snake_case Rust methods:
 
 | JSX Name | Rust Method |
 |----------|-------------|
-| `zIndex` | `z_index` |
 | `minWidth` | `min_w` |
 | `maxHeight` | `max_h` |
-| `fontSize` | `font_size` |
+| `fontSize` | `text_size` |
 | `lineHeight` | `line_height` |
-| `borderRadius` | `border_radius` |
 | `trackFocus` | `track_focus` |
-| `flexBasis` | `basis` |
+| `flexBasis` | `flex_basis` |
 | `flexGrow` | `flex_grow` |
 | `overflowScroll` | `overflow_scroll` |
 | `trackScroll` | `track_scroll` |
+
+`zIndex` is not mapped because GPUI 0.2 has no `z_index` builder; sibling paint order and overlay/popover APIs should be used instead.
 
 ### Event Handlers
 
@@ -408,6 +459,28 @@ Override auto-generated IDs:
 ```
 
 ## Examples
+
+### Desktop Three-Column Layout
+
+```rust
+rsx! {
+    <div class="flex h-full w-full bg-zinc-100">
+        <nav class="w-[72px] min-w-[72px] bg-zinc-950" />
+
+        <aside class="w-[280px] min-w-[280px] border-r border-zinc-200 bg-white">
+            "Projects"
+        </aside>
+
+        <main class="flex-1 min-w-0 p-[18px]">
+            "Conversation, plans, diff, and results"
+        </main>
+
+        <aside class="w-6/24 min-w-[320px] max-w-[460px] border-l border-zinc-200 bg-white">
+            "Execution trace"
+        </aside>
+    </div>
+}
+```
 
 ### Complex Layout
 

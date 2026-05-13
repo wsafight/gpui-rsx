@@ -1568,6 +1568,40 @@ fn test_class_fractional_and_alias_sizes() {
 }
 
 #[test]
+fn test_class_arbitrary_length_px_rem_percent() {
+    let _el = rsx! {
+        <div class="w-[280px] min-w-[280px] max-w-[32rem] h-[50%] p-[18px] gap-[0.75rem]" />
+    };
+}
+
+#[test]
+fn test_class_fractional_size_arbitrary_denominator() {
+    let _el = rsx! { <div class="w-6/24 h-3/12 size-1/24 min-w-6/24 max-w-18/24" /> };
+}
+
+#[test]
+fn test_class_numeric_sizes_keep_px_semantics() {
+    // P0 must not reinterpret existing numeric classes as Tailwind rem scale.
+    let _el = rsx! { <div class="w-64 h-12 p-4 gap-3" /> };
+}
+
+#[test]
+fn test_class_font_weight_mapping_gpui_0_2() {
+    take_font_weight_calls();
+
+    let _el = rsx! {
+        <div class="font-thin font-extralight font-light font-normal font-medium font-semibold font-bold font-extrabold font-black" />
+    };
+
+    assert_eq!(
+        take_font_weight_calls(),
+        vec![
+            100.0, 200.0, 300.0, 400.0, 500.0, 600.0, 700.0, 800.0, 900.0
+        ]
+    );
+}
+
+#[test]
 fn test_class_flex_variants() {
     let _a = rsx! { <div class="flex-none" /> };
     let _b = rsx! { <div class="flex-auto" /> };
@@ -1676,6 +1710,35 @@ fn test_class_arbitrary_hex_short() {
 fn test_class_arbitrary_hex_border() {
     // border-[#ff0000] → .border_color(rgb(0xff0000))
     let _el = rsx! { <div class="border-[#ff0000]" /> };
+}
+
+#[test]
+fn test_class_arbitrary_rgba_hex_colors() {
+    take_rgba_calls();
+
+    let _a = rsx! { <div class="bg-[#11223344]" /> };
+    let _b = rsx! { <div class="text-[#abcdef80]" /> };
+    let _c = rsx! { <div class="border-[#0102037f]" /> };
+
+    assert_eq!(take_rgba_calls(), vec![0x11223344, 0xabcdef80, 0x0102037f]);
+}
+
+#[test]
+fn test_class_arbitrary_rgb_function_colors() {
+    take_rgb_calls();
+    take_rgba_calls();
+
+    let _a = rsx! { <div class="bg-[rgb(15,23,42)]" /> };
+    let _b = rsx! { <div class="text-[rgb(255,255,255)]" /> };
+    let _c = rsx! { <div class="border-[rgba(15,23,42,0.8)]" /> };
+
+    assert_eq!(take_rgb_calls(), vec![0x0f172a, 0xffffff]);
+    assert_eq!(take_rgba_calls(), vec![0x0f172acc]);
+}
+
+#[test]
+fn test_class_debug_outline() {
+    let _el = rsx! { <div class="debug-outline" /> };
 }
 
 // ===========================================================================
@@ -2031,6 +2094,7 @@ fn test_dynamic_class_unknown_ignored_no_panic() {
 fn test_dynamic_class_arbitrary_hex_colors() {
     // 动态 class 也支持 arbitrary hex 颜色，和静态 class 路径保持一致。
     take_rgb_calls();
+    take_rgba_calls();
 
     let cls = "bg-[#ff0000]";
     let _a = rsx! { <div class={cls} /> };
@@ -2038,8 +2102,18 @@ fn test_dynamic_class_arbitrary_hex_colors() {
     let _b = rsx! { <div class={cls} /> };
     let cls = "border-[#333333]";
     let _c = rsx! { <div class={cls} /> };
+    let cls = "bg-[#11223344]";
+    let _d = rsx! { <div class={cls} /> };
+    let cls = "text-[rgba(15,23,42,0.8)]";
+    let _e = rsx! { <div class={cls} /> };
+    let cls = "border-[rgb(1,2,3)]";
+    let _f = rsx! { <div class={cls} /> };
 
-    assert_eq!(take_rgb_calls(), vec![0xff0000, 0xaabbcc, 0x333333]);
+    assert_eq!(
+        take_rgb_calls(),
+        vec![0xff0000, 0xaabbcc, 0x333333, 0x010203]
+    );
+    assert_eq!(take_rgba_calls(), vec![0x11223344, 0x0f172acc]);
 }
 
 // ===========================================================================
@@ -2169,6 +2243,32 @@ fn test_dynamic_class_sizing_arbitrary() {
 }
 
 #[test]
+fn test_dynamic_class_arbitrary_lengths() {
+    let cls = "w-[280px] h-[50%] min-w-6/24 max-w-[32rem] gap-[14px] gap-x-[0.75rem] m-[18px] mx-[1.25rem]";
+    let _el = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_font_extralight_mapping() {
+    take_font_weight_calls();
+
+    let cls = "font-extralight";
+    let _el = rsx! { <div class={cls} /> };
+
+    assert_eq!(take_font_weight_calls(), vec![200.0]);
+}
+
+#[test]
+fn test_dynamic_class_rejects_non_finite_numeric_values() {
+    take_length_calls();
+
+    let cls = "w-[NaNpx] h-[inf%] gap-NaN p-[infrem] w-NaN/1 h-1/-2";
+    let _el = rsx! { <div class={cls} /> };
+
+    assert_eq!(take_length_calls(), Vec::<(&'static str, f32)>::new());
+}
+
+#[test]
 fn test_dynamic_class_gap_xy_arbitrary() {
     // gap-x-4 / gap-y-6 走数值前缀回退路径
     let cls = "gap-x-4";
@@ -2179,6 +2279,61 @@ fn test_dynamic_class_gap_xy_arbitrary() {
 
 #[test]
 fn test_dynamic_class_gpui_styled_helpers() {
-    let cls = "flex-grow flex-shrink content-normal self-center whitespace-nowrap line-clamp-3 col-span-full row-end-auto shadow-xl cursor-grab overflow-x-hidden no-underline";
+    let cls = "flex-grow flex-shrink content-normal self-center whitespace-nowrap line-clamp-3 col-span-full row-end-auto shadow-xl cursor-grab overflow-x-hidden no-underline debug-outline";
     let _el = rsx! { <div class={cls} /> };
+}
+
+#[test]
+fn test_dynamic_class_directional_border() {
+    // Bug: static path maps `border-t` → .border_t_1(), dynamic path drops it.
+    // After fix, both paths must accept `border-t` / `border-b` / `border-l` /
+    // `border-r` / `border-x` / `border-y` in dynamic class expressions.
+    common::take_border_calls();
+
+    let cls = "border-t border-b border-l border-r border-x border-y";
+    let _el = rsx! { <div class={cls} /> };
+
+    let calls = common::take_border_calls();
+    assert!(
+        calls.contains(&"border_t_1"),
+        "dynamic class `border-t` should map to .border_t_1(), got {:?}",
+        calls
+    );
+    assert!(
+        calls.contains(&"border_b_1"),
+        "dynamic class `border-b` should map to .border_b_1(), got {:?}",
+        calls
+    );
+    assert!(
+        calls.contains(&"border_l_1"),
+        "dynamic class `border-l` should map to .border_l_1(), got {:?}",
+        calls
+    );
+    assert!(
+        calls.contains(&"border_r_1"),
+        "dynamic class `border-r` should map to .border_r_1(), got {:?}",
+        calls
+    );
+    assert!(
+        calls.contains(&"border_x_1"),
+        "dynamic class `border-x` should map to .border_x_1(), got {:?}",
+        calls
+    );
+    assert!(
+        calls.contains(&"border_y_1"),
+        "dynamic class `border-y` should map to .border_y_1(), got {:?}",
+        calls
+    );
+}
+
+#[test]
+fn test_rsx_expand_preview_contains_generated_code() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <div class="flex w-[280px] bg-[rgba(15,23,42,0.8)]" />
+    };
+
+    assert!(expanded.contains("flex"));
+    assert!(expanded.contains("w"));
+    assert!(expanded.contains("280"));
+    assert!(expanded.contains("rgba"));
 }

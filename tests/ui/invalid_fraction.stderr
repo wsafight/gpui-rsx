@@ -1,0 +1,7 @@
+error: Invalid fraction `w-6/0`: denominator must be greater than 0.
+ --> tests/ui/invalid_fraction.rs:8:15
+  |
+8 |     let _el = rsx! { <div class="w-6/0" /> };
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `rsx` (in Nightly builds, run with -Z macro-backtrace for more info)

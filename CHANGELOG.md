@@ -7,6 +7,31 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.3] - 2026-05-14
+
+### Added
+
+- Added `rsx_strict!`, `rsx_permissive!`, and `rsx_expand!` macros for stricter class
+  validation, explicit permissive mode, and generated-code previews.
+- Added arbitrary length support for spacing and sizing classes, including `px`, `rem`,
+  percentages for sizing, and fraction sizing such as `w-6/24`.
+- Added arbitrary RGB/RGBA color support and GPUI 0.2 font weight mappings.
+
+### Changed
+
+- Improved dynamic class handling for arbitrary colors, lengths, fraction sizing,
+  `debug-outline`, and GPUI 0.2 compatibility helpers.
+- Preserved permissive handling for unknown static classes while making `rsx_strict!`
+  report unsupported classes clearly.
+
+### Fixed
+
+- Fixed dynamic `font-extralight` support so it maps to `FontWeight::EXTRA_LIGHT`.
+- Rejected non-finite numeric class values such as `NaN` and `inf` before they can be
+  passed to GPUI length helpers.
+- Fixed dynamic directional border class handling and several invalid arbitrary-value
+  diagnostics.
+
 ## [0.4.2] - 2026-05-12
 
 ### Changed
@@ -404,6 +429,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[0.4.3]: https://github.com/wsafight/gpui-rsx/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/wsafight/gpui-rsx/compare/v0.4.1...v0.4.2
 [0.4.0]: https://github.com/wsafight/gpui-rsx/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/wsafight/gpui-rsx/compare/v0.3.1...v0.3.2

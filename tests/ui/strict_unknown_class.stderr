@@ -1,0 +1,7 @@
+error: Unsupported class `hover:bg-blue-500` in strict mode. Use `rsx!` or `rsx_permissive!` to keep unsupported classes ignored, or replace this with a supported GPUI class or attribute.
+ --> tests/ui/strict_unknown_class.rs:8:15
+  |
+8 |     let _el = rsx_strict! { <div class="hover:bg-blue-500" /> };
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `rsx_strict` (in Nightly builds, run with -Z macro-backtrace for more info)

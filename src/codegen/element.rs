@@ -14,8 +14,8 @@
 //! - 每个子节点独立生成 `.child()` 调用，避免数组类型统一约束
 //! - 自动 ID 基于源码 span 位置（行号 + 列号），增量编译下保持稳定
 
-use super::attribute::{AttrHints, generate_attr_methods};
-use super::class::parse_class_string;
+use super::attribute::{AttrHints, generate_attr_methods_with_mode};
+use super::class::{ClassMode, parse_class_string_with_mode};
 use super::tables::{
     is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
 };
@@ -99,17 +99,21 @@ type CodegenResult = Result<TokenStream, TokenStream>;
 /// # 返回值
 /// - 单个元素：返回实现 `IntoElement` 的表达式
 /// - Fragment：返回 `Vec<impl IntoElement>`
-pub fn generate_body(body: &RsxBody) -> TokenStream {
-    generate_body_checked(body).unwrap_or_else(|err| err)
+pub fn generate_body_with_mode(body: &RsxBody, mode: ClassMode) -> TokenStream {
+    generate_body_checked(body, mode).unwrap_or_else(|err| err)
 }
 
-fn generate_body_checked(body: &RsxBody) -> CodegenResult {
+pub fn generate_body_expansion_preview(body: &RsxBody, mode: ClassMode) -> String {
+    generate_body_with_mode(body, mode).to_string()
+}
+
+fn generate_body_checked(body: &RsxBody, mode: ClassMode) -> CodegenResult {
     match body {
-        RsxBody::Single(element) => generate_element_checked(element, false),
+        RsxBody::Single(element) => generate_element_checked(element, false, mode),
         RsxBody::Fragment(children) => {
             let child_exprs: Vec<TokenStream> = children
                 .iter()
-                .map(|node| generate_node_checked(node, false))
+                .map(|node| generate_node_checked(node, false, mode))
                 .collect::<Result<_, _>>()?;
             // Fragment 保持 vec![] —— 返回类型是用户可见 API
             Ok(quote! { vec![#(#child_exprs),*] })
@@ -120,9 +124,9 @@ fn generate_body_checked(body: &RsxBody) -> CodegenResult {
 /// 生成单个子节点的代码
 ///
 /// 确保生成的代码具有正确的类型推断，支持 IntoElement trait
-fn generate_node_checked(node: &RsxNode, require_loop_key: bool) -> CodegenResult {
+fn generate_node_checked(node: &RsxNode, require_loop_key: bool, mode: ClassMode) -> CodegenResult {
     match node {
-        RsxNode::Element(elem) => generate_element_checked(elem, require_loop_key),
+        RsxNode::Element(elem) => generate_element_checked(elem, require_loop_key, mode),
         // 表达式会被自动推断类型，GPUI 的 .child() 接受 impl IntoElement
         RsxNode::Expr(expr) => Ok(expr.to_token_stream()),
         RsxNode::Spread(expr) => Ok(expr.to_token_stream()),
@@ -130,7 +134,7 @@ fn generate_node_checked(node: &RsxNode, require_loop_key: bool) -> CodegenResul
             binding,
             iter,
             body,
-        } => generate_for_loop_checked(binding, iter, body),
+        } => generate_for_loop_checked(binding, iter, body, mode),
     }
 }
 
@@ -147,10 +151,11 @@ fn generate_for_loop_checked(
     binding: &syn::Pat,
     iter: &syn::Expr,
     body: &[RsxNode],
+    mode: ClassMode,
 ) -> CodegenResult {
     let body_exprs: Vec<TokenStream> = body
         .iter()
-        .map(|node| generate_node_checked(node, true))
+        .map(|node| generate_node_checked(node, true, mode))
         .collect::<Result<_, _>>()?;
     if body_exprs.len() == 1 {
         let single = &body_exprs[0];
@@ -170,7 +175,11 @@ fn generate_for_loop_checked(
 /// 方法链模式的优势：
 /// - 与 GPUI 惯用写法一致
 /// - 正确处理 `Div` → `Stateful<Div>` 的类型变换（`.id()` 后类型改变）
-fn generate_element_checked(element: &RsxElement, require_loop_key: bool) -> CodegenResult {
+fn generate_element_checked(
+    element: &RsxElement,
+    require_loop_key: bool,
+    mode: ClassMode,
+) -> CodegenResult {
     // 缓存标签名字符串，避免多次 to_string() 堆分配
     let tag_str = element.name.to_string();
 
@@ -207,9 +216,9 @@ fn generate_element_checked(element: &RsxElement, require_loop_key: bool) -> Cod
                 if !needs_id && analysis.needs_id {
                     needs_id = true;
                 }
+                generate_attr_methods_with_mode(attr, analysis.hints(), &mut methods, mode);
             }
         }
-        generate_attr_methods(attr, analysis.hints(), &mut methods);
     }
 
     if require_loop_key && needs_id && user_id.is_none() && user_key.is_none() {
@@ -239,13 +248,13 @@ fn generate_element_checked(element: &RsxElement, require_loop_key: bool) -> Cod
     // styled 标志 → 注入标签默认样式（在用户属性之前）
     let default_methods: Vec<TokenStream> =
         if has_styled && let Some(class_str) = lookup_tag_default(&tag_str) {
-            parse_class_string(class_str).collect()
+            parse_class_string_with_mode(class_str, mode).collect()
         } else {
             Vec::new()
         };
 
     // 子节点 → .child() / .children() 调用（含聚合优化）
-    generate_children_methods(&element.children, require_loop_key, &mut methods)?;
+    generate_children_methods(&element.children, require_loop_key, &mut methods, mode)?;
 
     Ok(quote! { #base #(#default_methods)* #(#methods)* })
 }
@@ -255,6 +264,7 @@ fn generate_children_methods(
     children: &[RsxNode],
     require_loop_key: bool,
     methods: &mut Vec<TokenStream>,
+    mode: ClassMode,
 ) -> Result<(), TokenStream> {
     for node in children {
         match node {
@@ -262,7 +272,7 @@ fn generate_children_methods(
                 methods.push(quote! { .child(#expr) });
             }
             RsxNode::Element(elem) => {
-                let child_expr = generate_element_checked(elem, require_loop_key)?;
+                let child_expr = generate_element_checked(elem, require_loop_key, mode)?;
                 methods.push(quote! { .child(#child_expr) });
             }
             RsxNode::Spread(expr) => {
@@ -273,7 +283,7 @@ fn generate_children_methods(
                 iter,
                 body,
             } => {
-                let for_expr = generate_for_loop_checked(binding, iter, body)?;
+                let for_expr = generate_for_loop_checked(binding, iter, body, mode)?;
                 methods.push(quote! { .children(#for_expr) });
             }
         }

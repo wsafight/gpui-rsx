@@ -20,8 +20,10 @@
 - 🧩 **Fragment 支持** - 使用 `<>...</>` 返回多个根元素
 - 🔁 **For 循环语法糖** - 使用 `{for item in iter { ... }}` 迭代
 - 🔑 **循环安全 ID** - `key={expr}` 为每次迭代生成唯一 ID；缺少 key 时报编译错误
-- 🎨 **完整 Tailwind 色板** - 22 个色系 × 11 个色阶 + black/white + 任意 hex 值
-- ⚡ **动态 Class** - 支持运行时 class 切换：完整 Tailwind 色板、任意 hex 颜色和数值前缀回退
+- 🎨 **完整 Tailwind 色板** - 22 个色系 × 11 个色阶 + black/white + 任意 hex/RGB/RGBA 值
+- 📐 **桌面布局工具类** - 支持任意长度、百分比和分数尺寸，适合面板和分栏布局
+- ⚡ **动态 Class** - 支持运行时 class 切换：颜色、尺寸、间距和数值前缀回退
+- 🔍 **诊断与预览** - strict/permissive 宏、可读错误和 `rsx_expand!`
 
 ## 📚 文档资源
 
@@ -119,7 +121,7 @@ fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoE
         .child(
             div()
                 .text_xl()
-                .font_bold()
+                .font_weight(FontWeight::BOLD)
                 .child(format!("Count: {}", self.count))
         )
         .child(
@@ -243,31 +245,35 @@ rsx! {
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
-> **注意：** `class` 同时支持静态字符串（编译时处理）和动态表达式（运行时解析）。静态 class 会直接展开为 GPUI builder 调用；动态 class 表达式使用一个很小的运行时 matcher。详见 [FAQ Q5](#q5-可以使用动态-class-值吗)。
+> **注意：** `class` 同时支持静态字符串（编译时处理）和动态表达式（运行时解析）。GPUI-RSX 实现的是 Tailwind-like 子集，不是完整 Tailwind CSS 引擎。静态 class 会直接展开为 GPUI builder 调用；动态 class 表达式使用一个很小的运行时 matcher。详见 [FAQ Q5](#q5-可以使用动态-class-值吗)。
 
 #### 支持的 class 模式
 
 **布局：**
 - `flex`, `flex-col`, `flex-row`, `flex-wrap`, `flex-1`, `flex-none`, `flex-auto`
 - `flex-grow`, `flex-grow-0`, `flex-shrink`, `flex-shrink-0`
-- `items-center`, `items-start`, `items-end`
-- `justify-center`, `justify-between`
+- `min-w-0`, `min-h-0`, `items-center`, `items-start`, `items-end`, `items-stretch`
+- `justify-center`, `justify-between`, `justify-around`, `justify-evenly`
 
 **间距**（数值自动转为 `px(n)`）：
 - `gap-4` → `.gap(px(4.0))`
 - `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`
 - `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, `ml-4`, `mr-4`
-- `w-64`, `h-32`
-- 小数值：`p-0.5` → `.p(px(0.5))`
+- 任意间距：`gap-[14px]`, `gap-x-[0.75rem]`, `p-[18px]`, `mx-[1.25rem]`
+- `gap-[10%]` 这类百分比间距会报错，因为 GPUI 间距使用 definite length
 
 **尺寸：**
+- 数值尺寸保持项目原有语义：`w-64` → `.w(px(64.0))`, `h-32` → `.h(px(32.0))`
 - `w-full`, `h-full`, `size-full`, `aspect-square`
 - `w-px`, `h-px`, `w-auto`, `h-auto`, `w-1/2`, `h-1/3`, `size-1/2`
+- 任意尺寸：`w-[280px]`, `w-[18rem]`, `w-[37.5%]`, `min-w-[280px]`, `max-w-[32rem]`
+- 任意分母的分数尺寸：`w-6/24`, `min-w-1/3`, `size-3/4`
 
 **文本：**
 - `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`
 - `text-2xl`, `text-3xl`
-- `font-bold`, `whitespace-normal`, `whitespace-nowrap`, `line-clamp-*`
+- `font-thin`, `font-extralight`, `font-light`, `font-normal`, `font-medium`, `font-semibold`, `font-bold`, `font-extrabold`, `font-black`
+- `whitespace-normal`, `whitespace-nowrap`, `line-clamp-*`
 - `text-ellipsis`, `text-ellipsis-start`, `truncate`, `no-underline`
 - `text-decoration-solid`, `text-decoration-wavy`, `text-decoration-0/1/2/4/8`
 
@@ -284,12 +290,13 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - `text-red-500` → `.text_color(rgb(0xef4444))`
 - `bg-blue-600` → `.bg(rgb(0x2563eb))`
 - `border-green-500` → `.border_color(rgb(0x22c55e))`
-- 任意 hex：`bg-[#ff0000]`, `text-[#333]`, `border-[#abc]`
+- 任意颜色：`bg-[#ff0000]`, `text-[#333]`, `border-[#11223344]`, `bg-[rgb(15,23,42)]`, `text-[rgba(15,23,42,0.8)]`
 
 **效果：**
 - `shadow-none`, `shadow-2xs`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
 - `overflow-hidden`, `overflow-x-hidden`, `overflow-y-hidden`, `overflow-scroll`
 - `cursor-pointer`, `cursor-default`, `cursor-text`, `cursor-move`, `cursor-grab`, `cursor-not-allowed`，以及 resize cursor 变体
+- `debug-outline` 在 debug 构建中启用 GPUI 调试边框，在 release 构建中为空操作
 
 **Grid 定位：**
 - `col-span-*`, `col-start-*`, `col-end-*`, `row-span-*`, `row-start-*`, `row-end-*`
@@ -448,7 +455,7 @@ GPUI-RSX 同时支持静态和动态 `class` 属性。
 #### 静态 Class（编译期——推荐）
 
 ```rust
-// ✅ 最佳性能 - 编译时解析，支持所有 class
+// ✅ 最佳性能 - 编译时解析，支持文档列出的子集
 rsx! {
     <div class="flex gap-4 bg-blue-500">
         {"静态样式"}
@@ -468,13 +475,14 @@ rsx! {
 ```
 
 > **运行时支持范围：** 常用布局/间距/文字排版工具类、完整 Tailwind 色板、
-> 任意 hex 颜色（如 `bg-[#ff0000]`、`text-[#f00]`），以及通过前缀回退支持
-> 间距/尺寸/透明度的任意数值（如 `gap-7`、`p-5`、`opacity-33`）。
+> 任意颜色（如 `bg-[#ff0000]`、`text-[#f00]`、`bg-[rgba(15,23,42,0.8)]`）、
+> 任意间距和尺寸长度（如 `w-[280px]`、`h-[50%]`、`gap-[14px]`、`mx-[1.25rem]`）、
+> 分数尺寸（如 `w-6/24`），以及数值前缀回退（如 `gap-7`、`p-5`、`opacity-33`）。
 > 真正不受支持的 class（如 Tailwind variants 或未知工具类）在 release 构建中**静默忽略**，
 > 在 debug 构建中打印警告。
 >
 > **推荐替代方案**（按优先级排序）：
-> 1. **字符串字面量**（最佳）：`class="flex gap-4"` — 编译期，支持所有 class
+> 1. **字符串字面量**（最佳）：`class="flex gap-4"` — 编译期，支持文档列出的子集
 > 2. **条件字面量**：`class={if active { "flex gap-4" } else { "block" }}` — 仍是字面量
 > 3. **独立属性**：`<div flex gap_4 />` — 编译期，类型检查
 > 4. **`when` 属性**：`when={(cond, |el| el.flex())}` — 编译期，完全灵活
@@ -483,17 +491,59 @@ rsx! {
 **常见模式：**
 
 ```rust
-// ✅ 条件字面量（编译期，所有 class 均可用）
+// ✅ 条件字面量（编译期，支持文档列出的子集）
 let btn_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 text-black" };
 
 // ✅ when 属性（编译期，完全灵活）
 rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }
 
-// ✅ 含数值前缀和任意 hex 颜色的动态字符串
+// ✅ 含数值前缀和任意颜色的动态字符串
 let classes = format!("flex gap-{} bg-[#ff0000]", spacing);  // gap-7、gap-32 等均生效
 ```
 
-### 10. 展开语法
+### 10. 宏模式与展开预览
+
+`rsx!` 默认是 permissive 模式：无法安全解析的不支持静态 class 会被忽略，而非法 arbitrary value 会报编译错误。使用 `rsx_strict!` 可以拒绝不支持的静态 class：
+
+```rust
+use gpui_rsx::{rsx_expand, rsx_permissive, rsx_strict};
+
+rsx_strict! { <div class="flex w-[280px]" /> }
+rsx_permissive! { <div class="hover:bg-blue-500 flex" /> }
+
+let preview = rsx_expand! {
+    <div class="flex w-[280px] bg-[rgba(15,23,42,0.8)]" />
+};
+assert!(preview.contains("rgba"));
+```
+
+strict 模式下，动态 class 在运行时遇到不支持的 token 会 panic。`rsx_expand!` 返回字符串预览用于调试，不会对生成的 GPUI 表达式做类型检查。
+
+### 11. 桌面三栏布局
+
+```rust
+rsx! {
+    <div class="flex h-full w-full bg-zinc-100">
+        <nav class="w-[72px] min-w-[72px] bg-zinc-950" />
+
+        <aside class="w-[280px] min-w-[280px] border-r border-zinc-200 bg-white">
+            {"项目与任务"}
+        </aside>
+
+        <main class="flex-1 min-w-0 p-[18px]">
+            {"对话、计划、diff 和完成页"}
+        </main>
+
+        <aside class="w-6/24 min-w-[320px] max-w-[460px] border-l border-zinc-200 bg-white">
+            {"执行轨迹"}
+        </aside>
+    </div>
+}
+```
+
+`min-w-0` 对桌面分栏布局很重要，它允许中间区域收缩，而不是把固定侧栏挤出窗口。
+
+### 12. 展开语法
 
 ```rust
 rsx! {
@@ -503,7 +553,7 @@ rsx! {
 }
 ```
 
-### 11. 属性映射参考
+### 13. 属性映射参考
 
 camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
 
@@ -537,7 +587,7 @@ camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
 > 浮层通常用 `absolute`/`relative` 结构或 GPUI 的 overlay / popover / modal 等机制实现。
 > 因此 `z-*` class 和 `zIndex` 属性不会被映射。
 
-### 12. 使用 `when` 和 `whenSome` 进行条件样式
+### 14. 使用 `when` 和 `whenSome` 进行条件样式
 
 #### when - 根据条件应用样式
 
@@ -585,14 +635,14 @@ rsx! {
 }
 ```
 
-### 13. styled 标志（默认标签样式）
+### 15. styled 标志（默认标签样式）
 
 `styled` 标志会根据标签名注入合理的默认样式：
 
 ```rust
 rsx! {
     <h1 styled>{"标题"}</h1>
-    // 展开为: div().text_3xl().font_bold().child("标题")
+    // 展开为: div().text_3xl().font_weight(FontWeight::BOLD).child("标题")
 
     <button styled>{"点击"}</button>
     // 展开为: div().cursor_pointer().child("点击")
@@ -936,7 +986,13 @@ rsx! {
 
 ### Q3: 宏展开后的代码是什么样的？
 
-使用 `cargo expand` 查看：
+使用 `rsx_expand!` 查看局部字符串预览，或用 `cargo expand` 查看完整 crate 展开：
+
+```rust
+let preview = gpui_rsx::rsx_expand! {
+    <div class="flex w-[280px] bg-[rgba(15,23,42,0.8)]" />
+};
+```
 
 ```bash
 cargo expand --lib
@@ -951,7 +1007,7 @@ cargo expand --lib
 可以，但有重要限制：
 
 ```rust
-// ✅ 静态字面量（编译期，支持所有 class——推荐）
+// ✅ 静态字面量（编译期，支持文档列出的子集——推荐）
 rsx! { <div class="flex gap-4" /> }
 
 // ✅ 独立属性（编译期，类型检查）
@@ -960,10 +1016,10 @@ rsx! { <div bg={dynamic_color} flex /> }
 // ✅ when 条件样式（编译期，完全灵活）
 rsx! { <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} /> }
 
-// ✅ 含数值和颜色的动态表达式（运行时：gap-N、p-N、opacity-N、任意 hex 颜色）
+// ✅ 含数值、任意长度和任意颜色的动态表达式
 let classes = if active { "flex gap-4" } else { "block" };
 rsx! { <div class={classes} /> }
-// Tailwind variants 或未知工具类会被静默忽略。
+// Tailwind variants 或未知工具类在 permissive 模式中会被忽略。
 ```
 
 **建议：** 需要动态样式时，优先使用 `when`/`whenSome` 或独立值属性（如 `bg={color}`）——它们是编译期处理，支持所有 GPUI 提供的功能。

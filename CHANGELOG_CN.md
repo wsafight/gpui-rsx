@@ -7,6 +7,28 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [0.4.3] - 2026-05-14
+
+### 新增
+
+- 新增 `rsx_strict!`、`rsx_permissive!` 和 `rsx_expand!` 宏，用于更严格的 class
+  校验、显式 permissive 模式和生成代码预览。
+- 新增 spacing 和 sizing class 的任意长度支持，包括 `px`、`rem`、sizing 百分比，以及
+  `w-6/24` 等分数尺寸。
+- 新增任意 RGB/RGBA 颜色支持和 GPUI 0.2 字重映射。
+
+### 变更
+
+- 改进动态 class 对任意颜色、任意长度、分数尺寸、`debug-outline` 和 GPUI 0.2 兼容
+  helper 的处理。
+- 保留未知静态 class 在 permissive 模式下的兼容处理，同时让 `rsx_strict!` 清晰报告不支持的 class。
+
+### 修复
+
+- 修复动态 `font-extralight` 支持，使其正确映射到 `FontWeight::EXTRA_LIGHT`。
+- 拒绝 `NaN` 和 `inf` 等非有限数值 class，避免传入 GPUI 长度 helper。
+- 修复动态方向性边框 class 处理，并完善多种非法任意值诊断。
+
 ## [0.4.2] - 2026-05-12
 
 ### 变更
@@ -367,6 +389,7 @@
 
 ---
 
+[0.4.3]: https://github.com/wsafight/gpui-rsx/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/wsafight/gpui-rsx/compare/v0.4.1...v0.4.2
 [0.4.0]: https://github.com/wsafight/gpui-rsx/compare/v0.3.2...v0.4.0
 [0.3.2]: https://github.com/wsafight/gpui-rsx/compare/v0.3.1...v0.3.2
