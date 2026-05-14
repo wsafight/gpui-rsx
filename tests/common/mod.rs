@@ -16,6 +16,7 @@ thread_local! {
     pub static BORDER_CALLS: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
     pub static FONT_WEIGHT_CALLS: RefCell<Vec<f32>> = const { RefCell::new(Vec::new()) };
     pub static LENGTH_CALLS: RefCell<Vec<(&'static str, f32)>> = const { RefCell::new(Vec::new()) };
+    pub static INTEGER_CALLS: RefCell<Vec<(&'static str, i32)>> = const { RefCell::new(Vec::new()) };
 }
 
 pub fn take_border_calls() -> Vec<&'static str> {
@@ -45,6 +46,11 @@ pub fn take_font_weight_calls() -> Vec<f32> {
 /// 返回测试期间捕获的长度 helper 入参，并清空缓存。
 pub fn take_length_calls() -> Vec<(&'static str, f32)> {
     LENGTH_CALLS.with(|c| c.borrow_mut().drain(..).collect())
+}
+
+/// 返回测试期间捕获的整数 helper 入参，并清空缓存。
+pub fn take_integer_calls() -> Vec<(&'static str, i32)> {
+    INTEGER_CALLS.with(|c| c.borrow_mut().drain(..).collect())
 }
 
 /// Mock Element，模拟 GPUI 的 Div / Stateful<Div>。
@@ -1038,7 +1044,8 @@ impl Styled for MockElement {
     fn text_ellipsis_start(self) -> Self {
         self
     }
-    fn line_clamp(self, _: usize) -> Self {
+    fn line_clamp(self, lines: usize) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("line_clamp", lines as i32)));
         self
     }
     fn italic(self) -> Self {
@@ -1185,43 +1192,51 @@ impl Styled for MockElement {
         self
     }
     // --- grid ---
-    fn grid_cols(self, _: u16) -> Self {
+    fn grid_cols(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_cols", v as i32)));
         self
     }
-    fn grid_rows(self, _: u16) -> Self {
+    fn grid_rows(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_rows", v as i32)));
         self
     }
-    fn col_span(self, _: u16) -> Self {
+    fn col_span(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("col_span", v as i32)));
         self
     }
     fn col_span_full(self) -> Self {
         self
     }
-    fn col_start(self, _: i16) -> Self {
+    fn col_start(self, v: i16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("col_start", v as i32)));
         self
     }
     fn col_start_auto(self) -> Self {
         self
     }
-    fn col_end(self, _: i16) -> Self {
+    fn col_end(self, v: i16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("col_end", v as i32)));
         self
     }
     fn col_end_auto(self) -> Self {
         self
     }
-    fn row_span(self, _: u16) -> Self {
+    fn row_span(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_span", v as i32)));
         self
     }
     fn row_span_full(self) -> Self {
         self
     }
-    fn row_start(self, _: i16) -> Self {
+    fn row_start(self, v: i16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_start", v as i32)));
         self
     }
     fn row_start_auto(self) -> Self {
         self
     }
-    fn row_end(self, _: i16) -> Self {
+    fn row_end(self, v: i16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_end", v as i32)));
         self
     }
     fn row_end_auto(self) -> Self {

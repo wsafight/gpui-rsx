@@ -1057,6 +1057,89 @@ mod tests {
         assert_eq!(lookup_spacing_method(""), None);
     }
 
+    // --- shared length class specs ---
+
+    #[test]
+    fn split_length_class_prefers_long_prefixes() {
+        assert_eq!(
+            split_length_class("min-w-[280px]"),
+            Some(("min_w", "[280px]", LengthClassFamily::Sizing))
+        );
+        assert_eq!(
+            split_length_class("max-h-1/2"),
+            Some(("max_h", "1/2", LengthClassFamily::Sizing))
+        );
+        assert_eq!(
+            split_length_class("gap-x-[1rem]"),
+            Some(("gap_x", "[1rem]", LengthClassFamily::Spacing))
+        );
+        assert_eq!(
+            split_length_class("gap-y-4"),
+            Some(("gap_y", "4", LengthClassFamily::Spacing))
+        );
+    }
+
+    #[test]
+    fn split_length_class_separates_sizing_and_spacing_rules() {
+        assert_eq!(
+            split_length_class("w-[50%]"),
+            Some(("w", "[50%]", LengthClassFamily::Sizing))
+        );
+        assert_eq!(
+            split_length_class("size-1/2"),
+            Some(("size", "1/2", LengthClassFamily::Sizing))
+        );
+        assert_eq!(
+            split_length_class("p-[8px]"),
+            Some(("p", "[8px]", LengthClassFamily::Spacing))
+        );
+        assert_eq!(
+            split_length_class("m-1/2"),
+            Some(("m", "1/2", LengthClassFamily::Spacing))
+        );
+        assert_eq!(split_length_class("line-clamp-3"), None);
+    }
+
+    #[test]
+    fn length_class_family_capabilities_match_tailwind_subset() {
+        assert!(LengthClassFamily::Sizing.allows_percent());
+        assert!(LengthClassFamily::Sizing.allows_fraction());
+        assert!(!LengthClassFamily::Spacing.allows_percent());
+        assert!(!LengthClassFamily::Spacing.allows_fraction());
+    }
+
+    // --- common class support metadata ---
+
+    #[test]
+    fn common_class_metadata_distinguishes_strict_and_dynamic_support() {
+        assert!(is_supported_common_no_arg_class("flex"));
+        assert!(is_supported_common_no_arg_class("overflow-scroll"));
+        assert!(!is_supported_common_no_arg_class("gap-4"));
+        assert!(!is_supported_common_no_arg_class("font-bold"));
+        assert!(!is_supported_common_no_arg_class("not-a-class"));
+
+        let dynamic = dynamic_common_classes().collect::<Vec<_>>();
+        assert!(dynamic.contains(&"flex"));
+        assert!(dynamic.contains(&"gap-4"));
+        assert!(dynamic.contains(&"font-bold"));
+        assert!(!dynamic.contains(&"overflow-scroll"));
+        assert!(!dynamic.contains(&"overflow-x-scroll"));
+        assert!(!dynamic.contains(&"overflow-y-scroll"));
+    }
+
+    #[test]
+    fn common_class_metadata_has_no_duplicate_names() {
+        for (index, entry) in COMMON_CLASS_SUPPORT.iter().enumerate() {
+            assert!(
+                !COMMON_CLASS_SUPPORT[..index]
+                    .iter()
+                    .any(|prev| prev.name == entry.name),
+                "duplicate common class metadata entry: {}",
+                entry.name
+            );
+        }
+    }
+
     // --- is_valid_text_size ---
 
     #[test]

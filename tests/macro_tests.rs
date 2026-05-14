@@ -1500,6 +1500,11 @@ fn test_class_overflow_scroll() {
 }
 
 #[test]
+fn test_strict_class_overflow_scroll_is_supported_static_stateful_class() {
+    let _el = gpui_rsx::rsx_strict! { <div class="overflow-scroll" /> };
+}
+
+#[test]
 fn test_class_rounded_variants() {
     let _a = rsx! { <div class="rounded-sm" /> };
     let _b = rsx! { <div class="rounded-md" /> };
@@ -2187,6 +2192,8 @@ fn test_auto_id_no_id_for_non_stateful() {
 
 #[test]
 fn test_dynamic_class_arbitrary_gap() {
+    take_length_calls();
+
     // gap-7 / gap-9 / gap-16 不在静态枚举中，走数值前缀回退路径
     let cls = "gap-7";
     let _a = rsx! { <div class={cls} /> };
@@ -2194,10 +2201,17 @@ fn test_dynamic_class_arbitrary_gap() {
     let _b = rsx! { <div class={cls} /> };
     let cls = "gap-16";
     let _c = rsx! { <div class={cls} /> };
+
+    assert_eq!(
+        take_length_calls(),
+        vec![("px", 7.0), ("px", 9.0), ("px", 16.0)]
+    );
 }
 
 #[test]
 fn test_dynamic_class_arbitrary_padding() {
+    take_length_calls();
+
     // p-5 / px-5 / py-5 不在静态枚举中，走数值前缀回退路径
     let cls = "p-5";
     let _a = rsx! { <div class={cls} /> };
@@ -2207,10 +2221,23 @@ fn test_dynamic_class_arbitrary_padding() {
     let _c = rsx! { <div class={cls} /> };
     let cls = "pt-3 pb-3";
     let _d = rsx! { <div class={cls} /> };
+
+    assert_eq!(
+        take_length_calls(),
+        vec![
+            ("px", 5.0),
+            ("px", 5.0),
+            ("px", 5.0),
+            ("px", 3.0),
+            ("px", 3.0)
+        ]
+    );
 }
 
 #[test]
 fn test_dynamic_class_arbitrary_margin() {
+    take_length_calls();
+
     // m-3 / ml-3 / mr-3 走数值前缀回退路径
     let cls = "m-3";
     let _a = rsx! { <div class={cls} /> };
@@ -2218,6 +2245,11 @@ fn test_dynamic_class_arbitrary_margin() {
     let _b = rsx! { <div class={cls} /> };
     let cls = "mr-3";
     let _c = rsx! { <div class={cls} /> };
+
+    assert_eq!(
+        take_length_calls(),
+        vec![("px", 3.0), ("px", 3.0), ("px", 3.0)]
+    );
 }
 
 #[test]
@@ -2233,6 +2265,8 @@ fn test_dynamic_class_opacity() {
 
 #[test]
 fn test_dynamic_class_sizing_arbitrary() {
+    take_length_calls();
+
     // w-48 / h-16 / size-8 走数值前缀回退路径
     let cls = "w-48";
     let _a = rsx! { <div class={cls} /> };
@@ -2240,12 +2274,33 @@ fn test_dynamic_class_sizing_arbitrary() {
     let _b = rsx! { <div class={cls} /> };
     let cls = "size-8";
     let _c = rsx! { <div class={cls} /> };
+
+    assert_eq!(
+        take_length_calls(),
+        vec![("px", 48.0), ("px", 16.0), ("px", 8.0)]
+    );
 }
 
 #[test]
 fn test_dynamic_class_arbitrary_lengths() {
+    take_length_calls();
+
     let cls = "w-[280px] h-[50%] min-w-6/24 max-w-[32rem] gap-[14px] gap-x-[0.75rem] m-[18px] mx-[1.25rem]";
     let _el = rsx! { <div class={cls} /> };
+
+    assert_eq!(
+        take_length_calls(),
+        vec![
+            ("px", 280.0),
+            ("relative", 0.5),
+            ("relative", 0.25),
+            ("rems", 32.0),
+            ("px", 14.0),
+            ("rems", 0.75),
+            ("px", 18.0),
+            ("rems", 1.25)
+        ]
+    );
 }
 
 #[test]
@@ -2256,6 +2311,32 @@ fn test_dynamic_class_ignores_invalid_arbitrary_lengths() {
     let _el = rsx! { <div class={cls} /> };
 
     assert_eq!(take_length_calls(), Vec::<(&'static str, f32)>::new());
+}
+
+#[test]
+fn test_dynamic_class_keeps_valid_lengths_when_neighbors_are_invalid() {
+    take_length_calls();
+
+    let cls = "gap-[10%] gap-[14px] p-[10%] p-[4px] w-[bad] h-[25%]";
+    let _el = rsx! { <div class={cls} /> };
+
+    assert_eq!(
+        take_length_calls(),
+        vec![("px", 14.0), ("px", 4.0), ("relative", 0.25)]
+    );
+}
+
+#[test]
+fn test_dynamic_class_spacing_rejects_fraction_while_sizing_accepts_it() {
+    take_length_calls();
+
+    let cls = "m-1/2 w-1/2 size-3/4 h-1/0 max-w-2/4";
+    let _el = rsx! { <div class={cls} /> };
+
+    assert_eq!(
+        take_length_calls(),
+        vec![("relative", 0.5), ("relative", 0.75), ("relative", 0.5)]
+    );
 }
 
 #[test]
@@ -2280,17 +2361,77 @@ fn test_dynamic_class_rejects_non_finite_numeric_values() {
 
 #[test]
 fn test_dynamic_class_gap_xy_arbitrary() {
+    take_length_calls();
+
     // gap-x-4 / gap-y-6 走数值前缀回退路径
     let cls = "gap-x-4";
     let _a = rsx! { <div class={cls} /> };
     let cls = "gap-y-6";
     let _b = rsx! { <div class={cls} /> };
+
+    assert_eq!(take_length_calls(), vec![("px", 4.0), ("px", 6.0)]);
 }
 
 #[test]
 fn test_dynamic_class_gpui_styled_helpers() {
+    take_integer_calls();
+
     let cls = "flex-grow flex-shrink content-normal self-center whitespace-nowrap line-clamp-3 col-span-full row-end-auto shadow-xl cursor-grab overflow-x-hidden no-underline debug-outline";
     let _el = rsx! { <div class={cls} /> };
+
+    assert_eq!(take_integer_calls(), vec![("line_clamp", 3)]);
+}
+
+#[test]
+fn test_dynamic_class_integer_fallbacks() {
+    take_integer_calls();
+
+    let cls = "line-clamp-4 grid-cols-12 grid-rows-3 col-span-2 row-span-5 col-start--1 col-end-4 row-start--2 row-end-6";
+    let _el = rsx! { <div class={cls} /> };
+
+    assert_eq!(
+        take_integer_calls(),
+        vec![
+            ("line_clamp", 4),
+            ("grid_cols", 12),
+            ("grid_rows", 3),
+            ("col_span", 2),
+            ("row_span", 5),
+            ("col_start", -1),
+            ("col_end", 4),
+            ("row_start", -2),
+            ("row_end", 6)
+        ]
+    );
+}
+
+#[test]
+fn test_dynamic_class_integer_fallbacks_ignore_invalid_values() {
+    take_integer_calls();
+
+    let cls = "line-clamp--1 grid-cols-70000 col-span--2 row-span-abc col-start-abc row-end-40000 line-clamp-3";
+    let _el = rsx! { <div class={cls} /> };
+
+    assert_eq!(take_integer_calls(), vec![("line_clamp", 3)]);
+}
+
+#[test]
+fn test_strict_dynamic_class_supports_shared_fast_path_entries() {
+    take_font_weight_calls();
+    take_length_calls();
+
+    let cls = "flex font-bold gap-4";
+    let _el = gpui_rsx::rsx_strict! { <div class={cls} /> };
+
+    assert_eq!(take_font_weight_calls(), vec![700.0]);
+    assert_eq!(take_length_calls(), vec![("px", 4.0)]);
+}
+
+#[test]
+#[should_panic(expected = "unsupported dynamic class")]
+fn test_strict_dynamic_class_rejects_strict_only_overflow_scroll() {
+    let cls = "overflow-scroll";
+    let _el = gpui_rsx::rsx_strict! { <div class={cls} /> };
 }
 
 #[test]
