@@ -346,7 +346,11 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "fontSize" => Some("text_size"),
         "lineHeight" => Some("line_height"),
         "fontWeight" => Some("font_weight"),
+        "fontFamily" => Some("font_family"),
         "textAlign" => Some("text_align"),
+        "textColor" => Some("text_color"),
+        "backgroundColor" => Some("bg"),
+        "borderColor" => Some("border_color"),
         "borderTop" => Some("border_t"),
         "borderBottom" => Some("border_b"),
         "borderLeft" => Some("border_l"),
@@ -958,6 +962,10 @@ mod tests {
         assert_eq!(lookup_attr_method("maxHeight"), Some("max_h"));
         assert_eq!(lookup_attr_method("trackFocus"), Some("track_focus"));
         assert_eq!(lookup_attr_method("fontSize"), Some("text_size"));
+        assert_eq!(lookup_attr_method("fontFamily"), Some("font_family"));
+        assert_eq!(lookup_attr_method("textColor"), Some("text_color"));
+        assert_eq!(lookup_attr_method("backgroundColor"), Some("bg"));
+        assert_eq!(lookup_attr_method("borderColor"), Some("border_color"));
         assert_eq!(lookup_attr_method("flexGrow"), None);
         assert_eq!(lookup_attr_method("flexShrink"), None);
         assert_eq!(lookup_attr_method("zIndex"), None);

@@ -86,7 +86,7 @@ fn analyze_attr(attr: &RsxAttribute) -> AttrAnalysis {
     }
 }
 
-use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
+use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxElementName, RsxNode};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 
@@ -191,6 +191,7 @@ fn generate_element_checked(
     // 单次遍历提取所有需要的信息，同时生成用户属性方法。
     let mut user_id = None;
     let mut user_key = None;
+    let mut base_expr = None;
     let mut has_styled = false;
     let mut needs_id = false;
 
@@ -209,6 +210,9 @@ fn generate_element_checked(
             RsxAttribute::Value { name, value } if name == "key" => {
                 user_key = Some(value);
             }
+            RsxAttribute::Value { name, value } if name == "base" => {
+                base_expr = Some(value);
+            }
             RsxAttribute::Flag(name) if name == "styled" => {
                 has_styled = true;
             }
@@ -222,7 +226,7 @@ fn generate_element_checked(
     }
 
     if require_loop_key && needs_id && user_id.is_none() && user_key.is_none() {
-        return Err(for_loop_missing_key_error(&element.name).to_compile_error());
+        return Err(for_loop_missing_key_error(&element.name.path, &tag_str).to_compile_error());
     }
 
     // 生成基础元素和 id：
@@ -230,7 +234,11 @@ fn generate_element_checked(
     //  2. 需要 id + key 存在   → 自动 ID 前缀 + key（运行时拼接，保证循环内唯一）
     //  3. 需要 id，无 key       → 纯源码位置的自动 ID
     //  4. 不需要 id            → 不注入（key 在此情况下静默忽略）
-    let tag = generate_tag(&tag_str, &element.name);
+    let tag = if let Some(base) = base_expr {
+        quote! { #base }
+    } else {
+        generate_tag(&tag_str, &element.name)
+    };
     let base = if let Some(id_value) = user_id {
         quote! { #tag.id(#id_value) }
     } else if needs_id {
@@ -294,7 +302,13 @@ fn generate_children_methods(
 /// HTML 标签 → `div()`，特殊标签 → 同名函数，自定义组件 → 同名函数调用
 ///
 /// 接受预缓存的 `tag_str` 避免重复 `to_string()`
-fn generate_tag(tag_str: &str, name: &syn::Ident) -> TokenStream {
+fn generate_tag(tag_str: &str, name: &RsxElementName) -> TokenStream {
+    if name.as_single_ident().is_none() {
+        let path = &name.path;
+        return quote! { #path() };
+    }
+
+    let path = &name.path;
     match tag_str {
         // 特殊标签：保留为同名函数调用
         "svg" => quote! { svg() },
@@ -306,7 +320,7 @@ fn generate_tag(tag_str: &str, name: &syn::Ident) -> TokenStream {
         | "textarea" | "select" | "form" | "ul" | "ol" | "li" => {
             quote! { div() }
         }
-        _ => quote! { #name() },
+        _ => quote! { #path() },
     }
 }
 
@@ -319,10 +333,10 @@ fn generate_tag(tag_str: &str, name: &syn::Ident) -> TokenStream {
 ///
 /// 若需要跨重构完全稳定的 ID，请使用 `id` 属性；
 /// 若在循环内使用，请改用 `key` 属性。
-fn make_auto_id(tag_ident: &syn::Ident) -> TokenStream {
-    let span = tag_ident.span();
+fn make_auto_id(tag_name: &RsxElementName) -> TokenStream {
+    let span = tag_name.span();
     let loc = span.start(); // 需要 proc-macro2 的 span-locations 特性
-    let id_suffix = format!("__rsx_{}_L{}C{}", tag_ident, loc.line, loc.column);
+    let id_suffix = format!("__rsx_{}_L{}C{}", tag_name, loc.line, loc.column);
     quote! { concat!(file!(), "::", #id_suffix) }
 }
 
@@ -333,12 +347,12 @@ fn make_auto_id(tag_ident: &syn::Ident) -> TokenStream {
 /// `concat!(file!(), ...)` 在编译期求值（零开销），`key_expr` 在运行时拼接，
 /// 使同一循环迭代内的每个元素获得唯一 ID。
 /// `key_expr` 需实现 `std::fmt::Display`（数字、字符串、自定义类型均可）。
-fn make_keyed_auto_id(tag_ident: &syn::Ident, key_expr: &syn::Expr) -> TokenStream {
-    let span = tag_ident.span();
+fn make_keyed_auto_id(tag_name: &RsxElementName, key_expr: &syn::Expr) -> TokenStream {
+    let span = tag_name.span();
     let loc = span.start();
     // 编译期常量前缀，包含文件路径 + 源码位置，格式如：
     //   "src/views/list.rs::__rsx_li_L42C8_"
-    let prefix_suffix = format!("::__rsx_{}_L{}C{}_", tag_ident, loc.line, loc.column);
+    let prefix_suffix = format!("::__rsx_{}_L{}C{}_", tag_name, loc.line, loc.column);
     // 运行时将 key 追加到前缀后，生成如：
     //   "src/views/list.rs::__rsx_li_L42C8_item_42"
     quote! { format!(concat!(file!(), #prefix_suffix, "{}"), #key_expr) }

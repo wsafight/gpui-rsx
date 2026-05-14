@@ -32,8 +32,8 @@ pub(crate) fn generate_attr_methods_with_mode(
     mode: ClassMode,
 ) {
     match attr {
-        // id / key 已在 generate_element 中处理，跳过避免重复生成方法调用
-        RsxAttribute::Value { name, .. } if name == "id" || name == "key" => {}
+        // id / key / base 已在 generate_element 中处理，跳过避免重复生成方法调用
+        RsxAttribute::Value { name, .. } if name == "id" || name == "key" || name == "base" => {}
 
         RsxAttribute::Flag(name) => {
             if name != "styled" {
@@ -117,6 +117,16 @@ pub(crate) fn generate_attr_methods_with_mode(
         // when_some 条件渲染
         RsxAttribute::WhenSome { option, closure } => {
             out.push(quote! { .when_some(#option, #closure) });
+        }
+
+        // whenClass 条件样式，仅支持静态 class 字符串。
+        RsxAttribute::WhenClass {
+            condition,
+            class_lit,
+        } => {
+            let class_str = class_lit.value();
+            let class_methods: Vec<_> = parse_class_string_with_mode(&class_str, mode).collect();
+            out.push(quote! { .when(#condition, |__el| __el #(#class_methods)* ) });
         }
     }
 }

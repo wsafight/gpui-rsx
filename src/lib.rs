@@ -60,6 +60,7 @@
 //! | Conditional | `when` / `whenSome` attributes |
 //! | Styled defaults | `<h1 styled>` injects sensible tag defaults |
 //! | camelCase mapping | `onClick` → `.on_click()`, `fontSize` → `.text_size()` |
+//! | Custom constructors | `base={Button::new("id")}` starts a component method chain |
 //! | `key` (loop ID) | Composite auto-ID for stateful elements in loops |
 //!
 //! ## Syntax Reference
@@ -104,6 +105,22 @@
 //! ```ignore
 //! rsx! { <div gap={px(16.0)} bg={rgb(0x3b82f6)} opacity={0.8} /> }
 //! // → div().gap(px(16.0)).bg(rgb(0x3b82f6)).opacity(0.8)
+//! ```
+//!
+//! ### Custom Constructor with `base`
+//!
+//! `base={expr}` replaces the constructor inferred from the tag name, then the remaining
+//! attributes continue as a normal method chain:
+//!
+//! ```ignore
+//! rsx! { <Button base={Button::new("save")} label={"Save"} small /> }
+//! // → Button::new("save").label("Save").small()
+//! ```
+//!
+//! Path-qualified tags are supported for module-scoped components:
+//!
+//! ```ignore
+//! rsx! { <ui::TaskCard base={ui::TaskCard::new(task.id)} title={task.title.clone()} /> }
 //! ```
 //!
 //! ### The `class` Attribute — Static (Compile-time, Recommended)
@@ -337,11 +354,15 @@
 //!         when={(is_selected, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))}
 //!         when={(is_disabled, |el| el.opacity(0.5))}
 //!         whenSome={(custom_color, |el, c| el.bg(rgb(c)))}
+//!         whenClass={(is_focused, "border-blue-500 bg-blue-50")}
 //!     >
 //!         {"Button"}
 //!     </button>
 //! }
 //! ```
+//!
+//! `whenClass` only accepts string literal classes and rejects stateful classes such as
+//! `overflow-scroll`; use `when` for those explicit GPUI method calls.
 //!
 //! ### The `styled` Flag — Semantic Tag Defaults
 //!
@@ -390,7 +411,11 @@
 //! | `fontSize` | `.text_size()` |
 //! | `lineHeight` | `.line_height()` |
 //! | `fontWeight` | `.font_weight()` |
+//! | `fontFamily` | `.font_family()` |
 //! | `textAlign` | `.text_align()` |
+//! | `textColor` | `.text_color()` |
+//! | `backgroundColor` | `.bg()` |
+//! | `borderColor` | `.border_color()` |
 //! | `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
 //! | `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
 //! | `border_t` / `border_b` / `border_l` / `border_r` (flags) | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |

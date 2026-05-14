@@ -1,0 +1,7 @@
+error: Unsupported stateful class `overflow-scroll` in `whenClass`.
+         help: Use `when` with an explicit closure for stateful classes
+         note: Stateful classes like `overflow-scroll` require element ID semantics that `whenClass` cannot provide
+ --> tests/ui/when_class_stateful.rs:5:47
+  |
+5 |     let _el = rsx! { <div whenClass={(active, "overflow-scroll")} /> };
+  |                                               ^^^^^^^^^^^^^^^^^

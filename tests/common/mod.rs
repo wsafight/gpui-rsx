@@ -269,6 +269,7 @@ pub trait Styled: Sized {
     fn text_decoration_8(self) -> Self;
     // --- font ---
     fn font_bold(self) -> Self;
+    fn font_family<T>(self, v: T) -> Self;
     fn font_weight<T>(self, v: T) -> Self
     where
         T: Into<FontWeight>;
@@ -646,6 +647,9 @@ impl MockElement {
         self
     }
     pub fn line_height<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn font_family<T>(self, _: T) -> Self {
         self
     }
     pub fn font_weight<T>(self, weight: T) -> Self
@@ -1086,6 +1090,9 @@ impl Styled for MockElement {
     }
     // --- font ---
     fn font_bold(self) -> Self {
+        self
+    }
+    fn font_family<T>(self, _: T) -> Self {
         self
     }
     fn font_weight<T>(self, weight: T) -> Self

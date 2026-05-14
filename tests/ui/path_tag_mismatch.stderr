@@ -1,0 +1,7 @@
+error: Closing tag `</ui::OtherCard>` does not match opening tag `<ui::TaskCard>`. Tags must be properly nested.
+         help: Change the closing tag to `</ui::TaskCard>`
+         note: RSX syntax requires matching tags like in HTML/JSX
+  --> tests/ui/path_tag_mismatch.rs:15:11
+   |
+15 |         </ui::OtherCard>
+   |           ^^

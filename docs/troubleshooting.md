@@ -457,7 +457,7 @@ Ensure compatible versions:
 
 ```toml
 [dependencies]
-gpui-rsx = "0.4"
+gpui-rsx = "0.5"
 syn = { version = "2.0", features = ["full"] }
 ```
 

@@ -89,6 +89,55 @@ div()
     .w(px(200.0))
 ```
 
+### Base Attribute
+
+`base={expr}` replaces the default constructor inferred from the tag name, then the remaining attributes continue as a normal method chain:
+
+```rust
+rsx! {
+    <Button
+        base={Button::new("save")}
+        label={"Save"}
+        small
+    />
+}
+```
+
+Generates:
+
+```rust
+Button::new("save").label("Save").small()
+```
+
+The `base` attribute is macro-only and does not generate `.base(...)`.
+
+Path-qualified tags are supported. A tag such as `<ui::TaskCard />` defaults to `ui::TaskCard()`, and `base={...}` still takes precedence when present:
+
+```rust
+rsx! {
+    <ui::TaskCard
+        base={ui::TaskCard::new(task.id)}
+        title={task.title.clone()}
+    />
+}
+```
+
+For `gpui-component` builders, import the component traits explicitly and use `base` for constructors:
+
+```rust
+use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_component::Sizable as _;
+
+rsx! {
+    <Button
+        base={Button::new("save")}
+        label={"Save"}
+        small
+        primary
+    />
+}
+```
+
 ### Class Attribute
 
 String literal with space-separated class names. GPUI-RSX implements a Tailwind-like subset that maps to GPUI APIs; it is not a full Tailwind CSS engine.
@@ -105,6 +154,15 @@ rsx! { <div class={classes} /> }
 ```
 
 Runtime class support includes common layout/spacing/typography utilities, the full color palette, arbitrary colors, arbitrary spacing/sizing lengths, fraction sizing, and opacity. Unknown dynamic classes are ignored in permissive mode and panic in strict mode.
+
+| Capability | Static `class="..."` | Dynamic `class={expr}` |
+|------------|----------------------|-------------------------|
+| Layout, spacing, sizing | Supported | Supported subset |
+| Colors and opacity | Supported | Supported |
+| Arbitrary lengths/colors | Supported | Supported |
+| Fraction sizing | Supported | Supported |
+| Stateful scroll classes | Supported with auto ID | Not supported |
+| Unknown Tailwind variants | Ignored in permissive, error in strict | Ignored in permissive, panic in strict |
 
 #### Supported Class Patterns
 
@@ -231,6 +289,10 @@ CamelCase JSX-style names map to snake_case Rust methods:
 | `maxHeight` | `max_h` |
 | `fontSize` | `text_size` |
 | `lineHeight` | `line_height` |
+| `fontFamily` | `font_family` |
+| `textColor` | `text_color` |
+| `backgroundColor` | `bg` |
+| `borderColor` | `border_color` |
 | `trackFocus` | `track_focus` |
 | `flexBasis` | `flex_basis` |
 | `flexGrow` | `flex_grow` |
@@ -315,6 +377,20 @@ Apply styling when Option is Some:
     "Content"
 </div>
 ```
+
+#### `whenClass` Attribute
+
+Apply static classes when a condition is true:
+
+```rust
+<div
+    class="flex px-2"
+    whenClass={(active, "bg-neutral-900 text-white")}
+    whenClass={(!active, "text-neutral-600")}
+/>
+```
+
+Generates conditional method chains using `.when(...)`. The class value must be a string literal, and stateful classes such as `overflow-scroll` are rejected so ID-sensitive behavior stays explicit.
 
 ### Special Flags
 
@@ -421,6 +497,17 @@ rsx! {
 ```
 
 Returns `Vec<impl IntoElement>`.
+
+All Fragment children must have the same concrete type. For mixed root items, wrap them in a parent element or erase each item explicitly:
+
+```rust
+rsx! {
+    <>
+        {div().into_any_element()}
+        {Button::new("save").into_any_element()}
+    </>
+}
+```
 
 ## Type System
 

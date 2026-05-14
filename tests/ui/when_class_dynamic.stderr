@@ -1,0 +1,7 @@
+error: The `whenClass` attribute expects a string literal as its second tuple value.
+         help: Use the format: whenClass={(condition, "bg-blue-500 text-white")}
+         note: Dynamic class strings are not supported by `whenClass`; use `when` for dynamic styling.
+ --> tests/ui/when_class_dynamic.rs:6:47
+  |
+6 |     let _el = rsx! { <div whenClass={(active, classes)} /> };
+  |                                               ^^^^^^^

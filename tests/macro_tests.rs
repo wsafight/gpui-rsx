@@ -8,6 +8,31 @@ mod common;
 use common::*;
 use gpui_rsx::rsx;
 
+mod ui {
+    use super::MockElement;
+
+    #[allow(non_snake_case)]
+    pub fn TaskCard() -> MockElement {
+        MockElement
+    }
+
+    pub struct TaskCardBuilder;
+
+    impl TaskCardBuilder {
+        pub fn new(_: u64) -> Self {
+            Self
+        }
+
+        pub fn title(self, _: String) -> Self {
+            self
+        }
+
+        pub fn compact(self) -> Self {
+            self
+        }
+    }
+}
+
 // ===========================================================================
 // 1. 基础元素
 // ===========================================================================
@@ -111,6 +136,78 @@ fn test_custom_component_with_children() {
 #[test]
 fn test_custom_component_with_attrs() {
     let _el = rsx! { <MyComponent flex bg={rgb(0xff0000)} /> };
+}
+
+#[test]
+fn test_custom_component_base_attribute_uses_custom_builder() {
+    struct Button;
+
+    impl Button {
+        fn new(_: &str) -> Self {
+            Self
+        }
+
+        fn label(self, _: &str) -> Self {
+            self
+        }
+
+        fn small(self) -> Self {
+            self
+        }
+
+        fn primary(self) -> Self {
+            self
+        }
+    }
+
+    let _el = rsx! {
+        <Button
+            base={Button::new("save")}
+            label={"保存"}
+            small
+            primary
+        />
+    };
+}
+
+#[test]
+fn test_path_component_self_closing() {
+    let _el = rsx! { <ui::TaskCard flex /> };
+}
+
+#[test]
+fn test_path_component_with_children() {
+    let _el = rsx! {
+        <ui::TaskCard>
+            {"content"}
+        </ui::TaskCard>
+    };
+}
+
+#[test]
+fn test_path_component_with_base_attribute() {
+    let task_id = 42_u64;
+    let title = String::from("Task");
+
+    let _el = rsx! {
+        <ui::TaskCard
+            base={ui::TaskCardBuilder::new(task_id)}
+            title={title.clone()}
+            compact
+        />
+    };
+}
+
+#[test]
+fn test_path_component_auto_id_with_stateful_attr() {
+    take_last_auto_id();
+
+    let _el = rsx! {
+        <ui::TaskCard onClick={|_: &mut MockElement| {}} />
+    };
+
+    let id = take_last_auto_id().expect("path component with stateful attr should get auto id");
+    assert!(id.contains("__rsx_ui::TaskCard_"));
 }
 
 // ===========================================================================
@@ -884,6 +981,26 @@ fn test_multiple_when_on_same_element() {
 }
 
 #[test]
+fn test_when_class_static_literal() {
+    let active = true;
+    let _el = rsx! {
+        <div whenClass={(active, "bg-neutral-900 text-white px-2")} />
+    };
+}
+
+#[test]
+fn test_multiple_when_class_attributes() {
+    let active = true;
+    let _el = rsx! {
+        <div
+            class="flex"
+            whenClass={(active, "bg-neutral-900 text-white")}
+            whenClass={(!active, "text-neutral-600")}
+        />
+    };
+}
+
+#[test]
 fn test_when_with_class_and_other_attrs() {
     let has_shadow = true;
     let _el = rsx! {
@@ -1332,6 +1449,18 @@ fn test_font_weight_attribute() {
 }
 
 #[test]
+fn test_common_jsx_style_attribute_aliases() {
+    let _el = rsx! {
+        <div
+            fontFamily={"Inter"}
+            textColor={rgb(0x111827)}
+            backgroundColor={rgb(0xffffff)}
+            borderColor={rgb(0xe5e7eb)}
+        />
+    };
+}
+
+#[test]
 fn test_box_shadow_attribute() {
     let _el = rsx! { <div boxShadow={"shadow-lg"} /> };
 }
@@ -1458,6 +1587,16 @@ fn test_fragment_with_attrs() {
         <>
             <div flex>{"item 1"}</div>
             <div flex_col>{"item 2"}</div>
+        </>
+    };
+}
+
+#[test]
+fn test_fragment_mixed_types_with_explicit_any_elements() {
+    let _els: Vec<AnyElement> = rsx! {
+        <>
+            {div().into_any_element()}
+            {ui::TaskCard().into_any_element()}
         </>
     };
 }
@@ -2487,4 +2626,38 @@ fn test_rsx_expand_preview_contains_generated_code() {
     assert!(expanded.contains("w"));
     assert!(expanded.contains("280"));
     assert!(expanded.contains("rgba"));
+}
+
+#[test]
+fn test_rsx_expand_preview_uses_base_attribute() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <Button base={Button::new("save")} label={"保存"} small />
+    };
+    let compact = expanded.replace(' ', "");
+
+    assert!(compact.contains("Button::new(\"save\").label(\"保存\").small()"));
+    assert!(!compact.contains(".base("));
+}
+
+#[test]
+fn test_rsx_expand_preview_uses_path_tag_constructor() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <ui::TaskCard flex />
+    };
+    let compact = expanded.replace(' ', "");
+
+    assert!(compact.contains("ui::TaskCard().flex()"));
+}
+
+#[test]
+fn test_rsx_expand_preview_uses_when_class() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <div whenClass={(active, "bg-neutral-900 text-white")} />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+
+    assert!(
+        compact
+            .contains(".when(active,|__el|__el.bg(rgb(1513239u32)).text_color(rgb(16777215u32)))")
+    );
 }

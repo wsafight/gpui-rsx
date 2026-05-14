@@ -1,0 +1,7 @@
+error: The `whenClass` attribute expects exactly 2 values, found 3.
+         help: Use the format: whenClass={(condition, "bg-blue-500 text-white")}
+         note: The first value is the condition, the second is a static class string
+ --> tests/ui/when_class_wrong_count.rs:5:38
+  |
+5 |     let _el = rsx! { <div whenClass={(active, "text-white", "bg-blue-500")} /> };
+  |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

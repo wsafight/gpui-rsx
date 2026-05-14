@@ -9,7 +9,7 @@ Add GPUI-RSX to your `Cargo.toml`:
 ```toml
 [dependencies]
 gpui = "0.2"  # or your GPUI version
-gpui-rsx = "0.4"
+gpui-rsx = "0.5"
 ```
 
 ## Basic Usage

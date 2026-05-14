@@ -45,7 +45,7 @@
 ```toml
 [dependencies]
 gpui = "0.2"
-gpui-rsx = "0.4"
+gpui-rsx = "0.5"
 ```
 
 ## 🚀 快速开始
@@ -519,6 +519,17 @@ assert!(preview.contains("rgba"));
 
 strict 模式下，动态 class 在运行时遇到不支持的 token 会 panic。`rsx_expand!` 返回字符串预览用于调试，不会对生成的 GPUI 表达式做类型检查。
 
+动态 class 能力边界：
+
+| 能力 | 静态 `class="..."` | 动态 `class={expr}` |
+|------|--------------------|---------------------|
+| 布局、间距、尺寸 | 支持 | 支持子集 |
+| 颜色和透明度 | 支持 | 支持 |
+| 任意长度/颜色 | 支持 | 支持 |
+| 分数尺寸 | 支持 | 支持 |
+| stateful scroll class | 支持并自动注入 ID | 不支持 |
+| 未知 Tailwind variant | permissive 忽略，strict 报错 | permissive 忽略，strict panic |
+
 ### 11. 桌面三栏布局
 
 ```rust
@@ -570,7 +581,11 @@ camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
 | `fontSize` | `.text_size()` |
 | `lineHeight` | `.line_height()` |
 | `fontWeight` | `.font_weight()` |
+| `fontFamily` | `.font_family()` |
 | `textAlign` | `.text_align()` |
+| `textColor` | `.text_color()` |
+| `backgroundColor` | `.bg()` |
+| `borderColor` | `.border_color()` |
 | `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
 | `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
 | `border_t` / `border_b` / `border_l` / `border_r`（标志） | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |
@@ -619,6 +634,20 @@ rsx! {
     </div>
 }
 ```
+
+#### whenClass - 根据条件应用静态 class
+
+```rust
+rsx! {
+    <div
+        class="flex px-2"
+        whenClass={(active, "bg-neutral-900 text-white")}
+        whenClass={(!active, "text-neutral-600")}
+    />
+}
+```
+
+`whenClass` 只接受字符串字面量。`overflow-scroll` 这类需要 stateful ID 的 class 会被拒绝；需要 ID 敏感的 GPUI 方法时，请使用 `when={(cond, |el| el.overflow_scroll())}`。
 
 #### 多个条件
 
@@ -770,6 +799,50 @@ fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoE
             {self.render_card("Title 2", "Content 2")}
         </div>
     }
+}
+```
+
+### Builder 构造组件
+
+当组件需要自定义构造函数，而不是默认的 `<Tag />` 展开为 `Tag()` 时，使用 `base={expr}`：
+
+```rust
+rsx! {
+    <Button
+        base={Button::new("continue")}
+        label={"继续"}
+        small
+        primary
+    />
+}
+```
+
+这会展开为 `Button::new("continue").label("继续").small().primary()`。`base` 属性由宏消费，不会生成 `.base(...)`。
+
+支持路径型组件 tag，适合组件放在模块里的场景：
+
+```rust
+rsx! {
+    <ui::TaskCard
+        base={ui::TaskCard::new(task.id)}
+        title={task.title.clone()}
+    />
+}
+```
+
+混用 `gpui-component` 时，保持 import 显式，并用 `base` 表达需要 ID 或自定义参数的构造函数：
+
+```rust
+use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_component::Sizable as _;
+
+rsx! {
+    <Button
+        base={Button::new("continue")}
+        label={"继续"}
+        small
+        primary
+    />
 }
 ```
 
@@ -953,7 +1026,7 @@ rsx! {
 
 // ✅ 推荐：扁平化结构
 rsx! {
-    <div class="container">
+    <div class="flex flex-col gap-4">
         {"Content"}
     </div>
 }
@@ -1023,6 +1096,30 @@ rsx! { <div class={classes} /> }
 ```
 
 **建议：** 需要动态样式时，优先使用 `when`/`whenSome` 或独立值属性（如 `bg={color}`）——它们是编译期处理，支持所有 GPUI 提供的功能。
+
+### Q6: 如何在 Fragment 中混合不同元素类型？
+
+`rsx!` 的 Fragment 返回 `Vec<impl IntoElement>`，因此多个根节点需要是同一个具体类型。多数场景更推荐用父元素包起来：
+
+```rust
+rsx! {
+    <div>
+        <div />
+        {Button::new("save")}
+    </div>
+}
+```
+
+如果确实需要 Fragment，可以显式做类型擦除：
+
+```rust
+rsx! {
+    <>
+        {div().into_any_element()}
+        {Button::new("save").into_any_element()}
+    </>
+}
+```
 
 ## 🤝 贡献
 

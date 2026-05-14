@@ -249,7 +249,7 @@ rsx! {
 2. **Optional: Update Cargo.toml:**
    ```toml
    [dependencies]
-   gpui-rsx = "0.4"
+   gpui-rsx = "0.5"
    ```
 
 3. **Optional: Simplify code with better type inference:**

@@ -1,0 +1,7 @@
+error: Unsupported JSX-style attribute `whiteSpace`.
+         help: use class="whitespace-nowrap" or flag attribute `whitespace_nowrap`
+         note: GPUI exposes whitespace as dedicated flag methods instead of a string-valued property
+ --> tests/ui/unsupported_whitespace_attr.rs:4:27
+  |
+4 |     let _el = rsx! { <div whiteSpace={"nowrap"} /> };
+  |                           ^^^^^^^^^^

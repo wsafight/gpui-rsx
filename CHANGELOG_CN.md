@@ -9,6 +9,28 @@
 
 ## [未发布]
 
+## [0.5.0] - 2026-05-14
+
+### 新增
+
+- 新增路径型组件标签支持，例如 `<ui::TaskCard />`，包括闭合标签匹配校验和
+  stateful 路径组件的自动 ID 生成。
+- 新增宏专用 `base={expr}` 支持，可让组件方法链从自定义构造函数或 builder 开始，
+  而不是默认的标签构造函数。
+- 新增 `whenClass={(condition, "class string")}`，用于按条件应用静态 class。
+- 新增 `fontFamily`、`textColor`、`backgroundColor` 和 `borderColor` 的 camelCase 属性别名。
+
+### 变更
+
+- 改进 `whenClass`、路径标签不匹配、for 循环 key 和不支持的 `whiteSpace` 属性诊断，
+  提供更精确的 span 和可操作提示。
+- 在 README 和 API 文档中补充动态 class 能力边界、builder 构造组件、路径型标签和
+  Fragment 混合元素类型指导。
+
+### 移除
+
+- 移除过时的独立 `gpui-rsx-optimization.md` 文档。
+
 ## [0.4.4] - 2026-05-14
 
 ### 变更

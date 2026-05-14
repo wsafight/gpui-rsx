@@ -45,7 +45,7 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 gpui = "0.2"
-gpui-rsx = "0.4"
+gpui-rsx = "0.5"
 ```
 
 ## 🚀 Quick Start
@@ -528,6 +528,17 @@ assert!(preview.contains("rgba"));
 
 Strict dynamic classes panic when an unsupported runtime token is evaluated. `rsx_expand!` returns a string preview for debugging and does not type-check the generated GPUI expression.
 
+Dynamic class capability summary:
+
+| Capability | Static `class="..."` | Dynamic `class={expr}` |
+|------------|----------------------|-------------------------|
+| Layout, spacing, sizing | Supported | Supported subset |
+| Colors and opacity | Supported | Supported |
+| Arbitrary lengths/colors | Supported | Supported |
+| Fraction sizing | Supported | Supported |
+| Stateful scroll classes | Supported with auto ID | Not supported |
+| Unknown Tailwind variants | Ignored in permissive, error in strict | Ignored in permissive, panic in strict |
+
 ### 12. Desktop Three-Column Layout
 
 ```rust
@@ -569,7 +580,11 @@ camelCase attributes are automatically mapped to GPUI snake_case methods:
 | `fontSize` | `.text_size()` |
 | `lineHeight` | `.line_height()` |
 | `fontWeight` | `.font_weight()` |
+| `fontFamily` | `.font_family()` |
 | `textAlign` | `.text_align()` |
+| `textColor` | `.text_color()` |
+| `backgroundColor` | `.bg()` |
+| `borderColor` | `.border_color()` |
 | `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
 | `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
 | `border_t` / `border_b` / `border_l` / `border_r` (flags) | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |
@@ -613,6 +628,20 @@ rsx! {
     </div>
 }
 ```
+
+#### whenClass - Apply static classes based on condition
+
+```rust
+rsx! {
+    <div
+        class="flex px-2"
+        whenClass={(active, "bg-neutral-900 text-white")}
+        whenClass={(!active, "text-neutral-600")}
+    />
+}
+```
+
+`whenClass` only accepts string literals. Stateful classes such as `overflow-scroll` are rejected; use `when={(cond, |el| el.overflow_scroll())}` when ID-sensitive GPUI methods are needed.
 
 #### Multiple conditions
 
@@ -764,6 +793,50 @@ fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoE
             {self.render_card("Title 2", "Content 2")}
         </div>
     }
+}
+```
+
+### Builder-backed Components
+
+Use `base={expr}` when a component needs a custom constructor instead of the default `<Tag />` to `Tag()` expansion:
+
+```rust
+rsx! {
+    <Button
+        base={Button::new("continue")}
+        label={"Continue"}
+        small
+        primary
+    />
+}
+```
+
+This expands to `Button::new("continue").label("Continue").small().primary()`. The `base` attribute is consumed by the macro and does not generate `.base(...)`.
+
+Path-qualified component tags are supported, which is useful when components live in modules:
+
+```rust
+rsx! {
+    <ui::TaskCard
+        base={ui::TaskCard::new(task.id)}
+        title={task.title.clone()}
+    />
+}
+```
+
+For `gpui-component`, keep imports explicit and use `base` for constructors that need IDs or custom arguments:
+
+```rust
+use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_component::Sizable as _;
+
+rsx! {
+    <Button
+        base={Button::new("continue")}
+        label={"Continue"}
+        small
+        primary
+    />
 }
 ```
 
@@ -947,7 +1020,7 @@ rsx! {
 
 // ✅ Recommended: Flatten structure
 rsx! {
-    <div class="container">
+    <div class="flex flex-col gap-4">
         {"Content"}
     </div>
 }
@@ -1018,6 +1091,30 @@ rsx! { <div class={classes} /> }
 
 **Tip:** When you need dynamic styling, prefer `when`/`whenSome` or individual value
 attributes (`bg={color}`) — they are compile-time and support everything GPUI offers.
+
+### Q6: How do I mix different element types in a Fragment?
+
+`rsx!` fragments return `Vec<impl IntoElement>`, so all root items need the same concrete type. Prefer wrapping mixed children in a parent element:
+
+```rust
+rsx! {
+    <div>
+        <div />
+        {Button::new("save")}
+    </div>
+}
+```
+
+If you really need a Fragment, erase the mixed items explicitly:
+
+```rust
+rsx! {
+    <>
+        {div().into_any_element()}
+        {Button::new("save").into_any_element()}
+    </>
+}
+```
 
 ## 🤝 Contributing
 

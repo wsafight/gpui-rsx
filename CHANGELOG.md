@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-05-14
+
+### Added
+
+- Added path-qualified component tags such as `<ui::TaskCard />`, including matching closing
+  tag validation and auto-ID generation for stateful path components.
+- Added macro-only `base={expr}` support so component method chains can start from custom
+  constructors or builders instead of the default tag constructor.
+- Added `whenClass={(condition, "class string")}` for conditional static class application.
+- Added camelCase aliases for `fontFamily`, `textColor`, `backgroundColor`, and `borderColor`.
+
+### Changed
+
+- Improved `whenClass`, path tag mismatch, for-loop key, and unsupported `whiteSpace`
+  diagnostics with more precise spans and actionable hints.
+- Documented dynamic class capability boundaries, builder-backed components, path tags, and
+  mixed fragment element guidance across the README and API docs.
+
+### Removed
+
+- Removed the stale standalone `gpui-rsx-optimization.md` document.
+
 ## [0.4.4] - 2026-05-14
 
 ### Changed

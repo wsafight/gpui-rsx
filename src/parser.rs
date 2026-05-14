@@ -2,10 +2,15 @@
 //!
 //! 解析类似 JSX 的语法结构
 
+use crate::codegen::tables::is_stateful_class;
 use crate::diagnostics::*;
+use proc_macro2::{Span, TokenStream};
+use quote::ToTokens;
+use std::fmt;
 use syn::{
     Expr, ExprLit, Ident, Lit, Pat, Result, Token,
     parse::{Parse, ParseStream},
+    spanned::Spanned,
     token,
 };
 
@@ -23,9 +28,57 @@ pub enum RsxBody {
 ///
 /// 表示一个 HTML-like 元素，如 `<div class="container">...</div>`
 pub struct RsxElement {
-    pub name: Ident,
+    pub name: RsxElementName,
     pub attributes: Vec<RsxAttribute>,
     pub children: Vec<RsxNode>,
+}
+
+/// RSX 元素名，支持单段 tag（`div`、`Button`）和路径型 tag（`ui::TaskCard`）。
+pub struct RsxElementName {
+    pub path: syn::Path,
+}
+
+impl RsxElementName {
+    fn parse(input: ParseStream) -> Result<Self> {
+        Ok(Self {
+            path: input.call(syn::Path::parse_mod_style)?,
+        })
+    }
+
+    pub fn as_single_ident(&self) -> Option<&Ident> {
+        (self.path.leading_colon.is_none() && self.path.segments.len() == 1)
+            .then(|| &self.path.segments[0].ident)
+    }
+
+    pub fn span(&self) -> Span {
+        self.path.span()
+    }
+
+    fn display_name(&self) -> String {
+        let mut out = String::new();
+        if self.path.leading_colon.is_some() {
+            out.push_str("::");
+        }
+        for (index, segment) in self.path.segments.iter().enumerate() {
+            if index > 0 {
+                out.push_str("::");
+            }
+            out.push_str(&segment.ident.to_string());
+        }
+        out
+    }
+}
+
+impl fmt::Display for RsxElementName {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.display_name())
+    }
+}
+
+impl ToTokens for RsxElementName {
+    fn to_tokens(&self, tokens: &mut TokenStream) {
+        self.path.to_tokens(tokens);
+    }
 }
 
 /// RSX 属性
@@ -40,6 +93,11 @@ pub enum RsxAttribute {
     When { condition: Expr, closure: Expr },
     /// when_some 条件渲染，如 `whenSome={(option, |this, value| ...)}`
     WhenSome { option: Expr, closure: Expr },
+    /// whenClass 条件 class，如 `whenClass={(active, "bg-blue-500 text-white")}`
+    WhenClass {
+        condition: Expr,
+        class_lit: syn::LitStr,
+    },
 }
 
 /// RSX 节点
@@ -89,7 +147,7 @@ impl Parse for RsxElement {
     fn parse(input: ParseStream) -> Result<Self> {
         // 解析开始标签 <tag
         input.parse::<Token![<]>()?;
-        let name: Ident = input.parse()?;
+        let name = RsxElementName::parse(input)?;
 
         // 解析属性（预分配容量，典型元素有 3-8 个属性）
         let mut attributes = Vec::with_capacity(4);
@@ -112,7 +170,9 @@ impl Parse for RsxElement {
                 };
 
                 // 特殊处理 when 和 whenSome 属性（直接比较 Ident，避免 to_string() 分配）
-                if attr_name == "when" {
+                if attr_name == "whiteSpace" {
+                    return Err(unsupported_jsx_attribute_error(&attr_name));
+                } else if attr_name == "when" {
                     let (first, second) = parse_condition_tuple(value, "when")?;
                     attributes.push(RsxAttribute::When {
                         condition: first,
@@ -124,6 +184,13 @@ impl Parse for RsxElement {
                         option: first,
                         closure: second,
                     });
+                } else if attr_name == "whenClass" {
+                    let (condition, class_expr) = parse_condition_tuple(value, "whenClass")?;
+                    let class_lit = parse_when_class_lit(class_expr)?;
+                    attributes.push(RsxAttribute::WhenClass {
+                        condition,
+                        class_lit,
+                    });
                 } else {
                     attributes.push(RsxAttribute::Value {
                         name: attr_name,
@@ -132,6 +199,9 @@ impl Parse for RsxElement {
                 }
             } else {
                 // 布尔属性: name
+                if attr_name == "whiteSpace" {
+                    return Err(unsupported_jsx_attribute_error(&attr_name));
+                }
                 attributes.push(RsxAttribute::Flag(attr_name));
             }
         }
@@ -155,12 +225,18 @@ impl Parse for RsxElement {
             // 解析闭合标签 </tag>
             input.parse::<Token![<]>()?;
             input.parse::<Token![/]>()?;
-            let closing_name: Ident = input.parse()?;
+            let closing_name = RsxElementName::parse(input)?;
             input.parse::<Token![>]>()?;
 
             // 验证标签名称匹配
-            if name != closing_name {
-                return Err(tag_mismatch_error(&closing_name, &name));
+            let opening_display = name.to_string();
+            let closing_display = closing_name.to_string();
+            if opening_display != closing_display {
+                return Err(tag_mismatch_error(
+                    &closing_name.path,
+                    &closing_display,
+                    &opening_display,
+                ));
             }
 
             children
@@ -178,7 +254,10 @@ impl Parse for RsxElement {
 ///
 /// `parent_name` 为 None 时表示 Fragment 上下文，
 /// 为 Some 时表示某个命名元素的子节点。
-fn parse_children(input: ParseStream, parent_name: Option<&Ident>) -> Result<Vec<RsxNode>> {
+fn parse_children(
+    input: ParseStream,
+    parent_name: Option<&RsxElementName>,
+) -> Result<Vec<RsxNode>> {
     let mut children = Vec::with_capacity(4);
 
     loop {
@@ -190,7 +269,7 @@ fn parse_children(input: ParseStream, parent_name: Option<&Ident>) -> Result<Vec
         // 检查是否已经没有内容了
         if input.is_empty() {
             return Err(match parent_name {
-                Some(name) => unclosed_tag_error(input.span(), name),
+                Some(name) => unclosed_tag_error(input.span(), &name.to_string()),
                 None => unclosed_fragment_error(input.span()),
             });
         }
@@ -199,7 +278,7 @@ fn parse_children(input: ParseStream, parent_name: Option<&Ident>) -> Result<Vec
             children.push(node);
         } else {
             return Err(match parent_name {
-                Some(name) => invalid_child_in_tag_error(input.span(), name),
+                Some(name) => invalid_child_in_tag_error(input.span(), &name.to_string()),
                 None => invalid_child_in_fragment_error(input.span()),
             });
         }
@@ -303,5 +382,24 @@ fn parse_condition_tuple(value: Expr, attr_name: &str) -> Result<(Expr, Expr)> {
         }
     } else {
         Err(condition_tuple_wrong_type_error(&value, attr_name))
+    }
+}
+
+fn parse_when_class_lit(value: Expr) -> Result<syn::LitStr> {
+    if let Expr::Lit(ExprLit {
+        lit: Lit::Str(lit_str),
+        ..
+    }) = value
+    {
+        if let Some(class) = lit_str
+            .value()
+            .split_ascii_whitespace()
+            .find(|c| is_stateful_class(c))
+        {
+            return Err(when_class_stateful_error(&lit_str, class));
+        }
+        Ok(lit_str)
+    } else {
+        Err(when_class_string_literal_error(&value))
     }
 }
