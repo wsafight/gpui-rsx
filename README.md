@@ -844,7 +844,7 @@ GPUI-RSX is a **compile-time macro** that expands static RSX into direct GPUI bu
 - `.children([...])` batching threshold lowered 3 → 2
 
 **Binary Size:**
-- `panic = "abort"` in `[profile.release]` removes unwind tables
+- Applications may opt into `panic = "abort"` in their own release profile to remove unwind tables
 
 ### v0.2.1 Optimizations
 

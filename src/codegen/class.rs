@@ -165,7 +165,7 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
         return quote! { .line_clamp(#lines) };
     }
 
-    if mode.is_strict() && !is_supported_no_arg_class(class) {
+    if mode.is_strict() && !is_supported_common_no_arg_class(class) {
         return compile_error(unsupported_class_message(class));
     }
 
@@ -274,10 +274,51 @@ fn parse_font_weight_class(class: &str, mode: ClassMode) -> Option<TokenStream> 
 }
 
 #[derive(Clone, Copy)]
-enum LengthKind {
+pub(crate) enum LengthKind {
     Px(f32),
     Rem(f32),
     Relative(f32),
+}
+
+impl LengthKind {
+    pub(crate) fn parse_arbitrary(class: &str, value: &str) -> Result<Self, String> {
+        if let Some(raw) = value.strip_suffix("px") {
+            return parse_length_number(raw)
+                .map(Self::Px)
+                .ok_or_else(|| invalid_length_value_message(class));
+        }
+        if let Some(raw) = value.strip_suffix("rem") {
+            return parse_length_number(raw)
+                .map(Self::Rem)
+                .ok_or_else(|| invalid_length_value_message(class));
+        }
+        if let Some(raw) = value.strip_suffix('%') {
+            return parse_length_number(raw)
+                .map(|n| Self::Relative(n / 100.0))
+                .ok_or_else(|| invalid_length_value_message(class));
+        }
+
+        Err(invalid_length_value_message(class))
+    }
+
+    pub(crate) fn parse_fraction(class: &str, value: &str) -> Result<Self, String> {
+        let (numerator, denominator) = value.split_once('/').ok_or_else(|| {
+            format!("Invalid fraction `{class}`: expected numerator/denominator.")
+        })?;
+
+        let numerator = parse_length_number(numerator)
+            .ok_or_else(|| format!("Invalid fraction `{class}`: numerator must be a number."))?;
+        let denominator = parse_length_number(denominator)
+            .ok_or_else(|| format!("Invalid fraction `{class}`: denominator must be a number."))?;
+
+        if denominator <= 0.0 {
+            return Err(format!(
+                "Invalid fraction `{class}`: denominator must be greater than 0."
+            ));
+        }
+
+        Ok(Self::Relative(numerator / denominator))
+    }
 }
 
 fn parse_arbitrary_length_class(class: &str) -> Option<TokenStream> {
@@ -293,12 +334,12 @@ fn parse_arbitrary_length_class(class: &str) -> Option<TokenStream> {
         )));
     };
 
-    let length = match parse_arbitrary_length_value(class, inner) {
+    let length = match LengthKind::parse_arbitrary(class, inner) {
         Ok(length) => length,
         Err(msg) => return Some(compile_error(msg)),
     };
 
-    if matches!(length, LengthKind::Relative(_)) && !family.allows_percent {
+    if matches!(length, LengthKind::Relative(_)) && !family.allows_percent() {
         return Some(compile_error(format!(
             "Invalid spacing class `{class}`. Percentage values are only supported for sizing \
              classes such as `w-*` and `h-*`."
@@ -314,114 +355,19 @@ fn parse_fraction_length_class(class: &str) -> Option<TokenStream> {
         return None;
     }
 
-    if !family.allows_fraction {
+    if !family.allows_fraction() {
         return Some(compile_error(format!(
             "Invalid fraction `{class}`: fractions are only supported for sizing classes."
         )));
     }
 
-    let (numerator, denominator) = value.split_once('/')?;
-
-    let numerator = match parse_length_number(numerator) {
-        Some(n) => n,
-        None => {
-            return Some(compile_error(format!(
-                "Invalid fraction `{class}`: numerator must be a number."
-            )));
-        }
-    };
-    let denominator = match parse_length_number(denominator) {
-        Some(n) => n,
-        None => {
-            return Some(compile_error(format!(
-                "Invalid fraction `{class}`: denominator must be a number."
-            )));
-        }
-    };
-
-    if denominator <= 0.0 {
-        return Some(compile_error(format!(
-            "Invalid fraction `{class}`: denominator must be greater than 0."
-        )));
+    match LengthKind::parse_fraction(class, value) {
+        Ok(length) => Some(length_method_call(method, length)),
+        Err(msg) => Some(compile_error(msg)),
     }
-
-    Some(length_method_call(
-        method,
-        LengthKind::Relative(numerator / denominator),
-    ))
 }
 
-#[derive(Clone, Copy)]
-struct LengthFamily {
-    allows_percent: bool,
-    allows_fraction: bool,
-}
-
-fn split_length_class(class: &str) -> Option<(&'static str, &str, LengthFamily)> {
-    const SIZING: LengthFamily = LengthFamily {
-        allows_percent: true,
-        allows_fraction: true,
-    };
-    const SPACING: LengthFamily = LengthFamily {
-        allows_percent: false,
-        allows_fraction: false,
-    };
-
-    for (prefix, method, family) in [
-        ("min-w-", "min_w", SIZING),
-        ("max-w-", "max_w", SIZING),
-        ("min-h-", "min_h", SIZING),
-        ("max-h-", "max_h", SIZING),
-        ("gap-x-", "gap_x", SPACING),
-        ("gap-y-", "gap_y", SPACING),
-        ("size-", "size", SIZING),
-        ("gap-", "gap", SPACING),
-        ("px-", "px", SPACING),
-        ("py-", "py", SPACING),
-        ("pt-", "pt", SPACING),
-        ("pb-", "pb", SPACING),
-        ("pl-", "pl", SPACING),
-        ("pr-", "pr", SPACING),
-        ("mx-", "mx", SPACING),
-        ("my-", "my", SPACING),
-        ("mt-", "mt", SPACING),
-        ("mb-", "mb", SPACING),
-        ("ml-", "ml", SPACING),
-        ("mr-", "mr", SPACING),
-        ("w-", "w", SIZING),
-        ("h-", "h", SIZING),
-        ("p-", "p", SPACING),
-        ("m-", "m", SPACING),
-    ] {
-        if let Some(value) = class.strip_prefix(prefix) {
-            return Some((method, value, family));
-        }
-    }
-
-    None
-}
-
-fn parse_arbitrary_length_value(class: &str, value: &str) -> Result<LengthKind, String> {
-    if let Some(raw) = value.strip_suffix("px") {
-        return parse_length_number(raw)
-            .map(LengthKind::Px)
-            .ok_or_else(|| invalid_length_value_message(class));
-    }
-    if let Some(raw) = value.strip_suffix("rem") {
-        return parse_length_number(raw)
-            .map(LengthKind::Rem)
-            .ok_or_else(|| invalid_length_value_message(class));
-    }
-    if let Some(raw) = value.strip_suffix('%') {
-        return parse_length_number(raw)
-            .map(|n| LengthKind::Relative(n / 100.0))
-            .ok_or_else(|| invalid_length_value_message(class));
-    }
-
-    Err(invalid_length_value_message(class))
-}
-
-fn parse_length_number(raw: &str) -> Option<f32> {
+pub(crate) fn parse_length_number(raw: &str) -> Option<f32> {
     if raw.is_empty() {
         return None;
     }
@@ -429,7 +375,7 @@ fn parse_length_number(raw: &str) -> Option<f32> {
     value.is_finite().then_some(value)
 }
 
-fn invalid_length_value_message(class: &str) -> String {
+pub(crate) fn invalid_length_value_message(class: &str) -> String {
     format!(
         "Invalid length class `{class}`. Expected a numeric value with px, rem, or %, \
          for example `w-[280px]`."
@@ -629,159 +575,5 @@ fn unsupported_class_message(class: &str) -> String {
     format!(
         "Unsupported class `{class}` in strict mode. Use `rsx!` or `rsx_permissive!` to keep \
          unsupported classes ignored, or replace this with a supported GPUI class or attribute."
-    )
-}
-
-fn is_supported_no_arg_class(class: &str) -> bool {
-    matches!(
-        class,
-        "absolute"
-            | "aspect-square"
-            | "block"
-            | "border"
-            | "border-2"
-            | "border-b"
-            | "border-b-2"
-            | "border-dashed"
-            | "border-l"
-            | "border-l-2"
-            | "border-r"
-            | "border-r-2"
-            | "border-t"
-            | "border-t-2"
-            | "border-x"
-            | "border-x-2"
-            | "border-y"
-            | "border-y-2"
-            | "col-end-auto"
-            | "col-span-full"
-            | "col-start-auto"
-            | "content-around"
-            | "content-between"
-            | "content-center"
-            | "content-end"
-            | "content-evenly"
-            | "content-normal"
-            | "content-start"
-            | "content-stretch"
-            | "cursor-alias"
-            | "cursor-col-resize"
-            | "cursor-context-menu"
-            | "cursor-copy"
-            | "cursor-crosshair"
-            | "cursor-default"
-            | "cursor-e-resize"
-            | "cursor-ew-resize"
-            | "cursor-grab"
-            | "cursor-grabbing"
-            | "cursor-move"
-            | "cursor-n-resize"
-            | "cursor-nesw-resize"
-            | "cursor-no-drop"
-            | "cursor-not-allowed"
-            | "cursor-ns-resize"
-            | "cursor-nwse-resize"
-            | "cursor-pointer"
-            | "cursor-row-resize"
-            | "cursor-s-resize"
-            | "cursor-text"
-            | "cursor-vertical-text"
-            | "cursor-w-resize"
-            | "debug-outline"
-            | "flex"
-            | "flex-1"
-            | "flex-auto"
-            | "flex-col"
-            | "flex-col-reverse"
-            | "flex-grow"
-            | "flex-grow-0"
-            | "flex-initial"
-            | "flex-none"
-            | "flex-nowrap"
-            | "flex-row"
-            | "flex-row-reverse"
-            | "flex-shrink"
-            | "flex-shrink-0"
-            | "flex-wrap"
-            | "flex-wrap-reverse"
-            | "grid"
-            | "h-auto"
-            | "h-full"
-            | "h-px"
-            | "hidden"
-            | "italic"
-            | "items-baseline"
-            | "items-center"
-            | "items-end"
-            | "items-start"
-            | "items-stretch"
-            | "justify-around"
-            | "justify-between"
-            | "justify-center"
-            | "justify-end"
-            | "justify-evenly"
-            | "justify-start"
-            | "line-through"
-            | "no-underline"
-            | "not-italic"
-            | "overflow-hidden"
-            | "overflow-scroll"
-            | "overflow-x-hidden"
-            | "overflow-x-scroll"
-            | "overflow-y-hidden"
-            | "overflow-y-scroll"
-            | "relative"
-            | "rounded-full"
-            | "rounded-lg"
-            | "rounded-md"
-            | "rounded-none"
-            | "rounded-sm"
-            | "rounded-xl"
-            | "row-end-auto"
-            | "row-span-full"
-            | "row-start-auto"
-            | "self-baseline"
-            | "self-center"
-            | "self-end"
-            | "self-flex-end"
-            | "self-flex-start"
-            | "self-start"
-            | "self-stretch"
-            | "shadow-2xl"
-            | "shadow-2xs"
-            | "shadow-lg"
-            | "shadow-md"
-            | "shadow-none"
-            | "shadow-sm"
-            | "shadow-xl"
-            | "shadow-xs"
-            | "size-full"
-            | "size-px"
-            | "text-2xl"
-            | "text-3xl"
-            | "text-base"
-            | "text-center"
-            | "text-decoration-0"
-            | "text-decoration-1"
-            | "text-decoration-2"
-            | "text-decoration-4"
-            | "text-decoration-8"
-            | "text-decoration-solid"
-            | "text-decoration-wavy"
-            | "text-ellipsis"
-            | "text-ellipsis-start"
-            | "text-left"
-            | "text-lg"
-            | "text-right"
-            | "text-sm"
-            | "text-xl"
-            | "text-xs"
-            | "truncate"
-            | "underline"
-            | "w-auto"
-            | "w-full"
-            | "w-px"
-            | "whitespace-normal"
-            | "whitespace-nowrap"
     )
 }

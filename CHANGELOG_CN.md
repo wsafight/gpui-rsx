@@ -7,6 +7,16 @@
 格式基于 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.0.0/)，
 项目遵循 [语义化版本](https://semver.org/lang/zh-CN/spec/v2.0.0.html)。
 
+## [未发布]
+
+### 变更
+
+- 统一 common class 支持元数据，使 strict class 校验和动态 class 快速路径共享单一数据源，
+  同时保留动态 stateful class 行为。
+- 将动态数值 class fallback 生成改为复用共享长度前缀元数据。
+- 移除 crate 级 release profile 覆盖，让应用和 workspace 自行控制 LTO、codegen units 和
+  panic 策略。
+
 ## [0.4.3] - 2026-05-14
 
 ### 新增
@@ -228,8 +238,8 @@
   可在保持相同栈占用的前提下减少方法分派次数。
 
 #### 二进制体积
-- **`[profile.release]` 增加 `panic = "abort"`** - proc-macro 二进制不需要栈展开。启用
-  `panic = "abort"` 可从编译产物中移除展开表，减小二进制体积并降低宿主端编译时的加载开销。
+- **release 构建可选 `panic = "abort"`** - 应用可在自己的 release profile 中启用
+  `panic = "abort"`，在适合其 workspace 的前提下移除展开表。
 
 ### ✅ 测试
 - 全部 236 个测试通过（203 宏测试 + 31 覆盖率测试 + 2 诊断测试）

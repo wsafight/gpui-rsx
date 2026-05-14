@@ -7,6 +7,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Consolidated common class support metadata so strict class validation and dynamic class fast
+  paths share one source of truth while preserving dynamic-stateful class behavior.
+- Refactored dynamic numeric class fallback generation to use shared length-prefix metadata.
+- Removed crate-level release profile overrides so applications and workspaces keep control over
+  LTO, codegen units, and panic strategy.
+
 ## [0.4.3] - 2026-05-14
 
 ### Added
@@ -255,9 +265,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   conservative; 2 reduces method dispatch count while keeping the same stack footprint.
 
 #### Binary Size
-- **`panic = "abort"` in `[profile.release]`** - proc-macro binaries never need stack
-  unwinding. Enabling `panic = "abort"` removes unwind tables from the compiled binary,
-  reducing its size and load time during host-side compilation.
+- **Optional `panic = "abort"` for release builds** - applications may enable
+  `panic = "abort"` in their own release profile to remove unwind tables when that tradeoff
+  fits their workspace.
 
 ### ✅ Testing
 - All 236 tests pass (203 macro + 31 coverage + 2 diagnostic)

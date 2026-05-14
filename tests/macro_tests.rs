@@ -2249,6 +2249,16 @@ fn test_dynamic_class_arbitrary_lengths() {
 }
 
 #[test]
+fn test_dynamic_class_ignores_invalid_arbitrary_lengths() {
+    take_length_calls();
+
+    let cls = "gap-[10%] p-[10%] w-[bad] w-1/0 m-1/2";
+    let _el = rsx! { <div class={cls} /> };
+
+    assert_eq!(take_length_calls(), Vec::<(&'static str, f32)>::new());
+}
+
+#[test]
 fn test_dynamic_class_font_extralight_mapping() {
     take_font_weight_calls();
 

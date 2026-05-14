@@ -6,8 +6,10 @@
 //! 优化：使用 thread_local 缓存 match 表，避免多个动态 class 重复生成相同 TokenStream。
 
 use super::class::{ClassMode, parse_single_class_with_mode};
-use super::tables::{COLOR_FAMILIES, COLOR_SHADES, lookup_color};
-use proc_macro2::TokenStream;
+use super::tables::{
+    COLOR_FAMILIES, COLOR_SHADES, LENGTH_CLASS_SPECS, dynamic_common_classes, lookup_color,
+};
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::cell::RefCell;
 
@@ -340,6 +342,27 @@ fn generate_color_fallback_code() -> TokenStream {
 /// `gap-x-4` 的 `strip_prefix("gap-")` 得 `"x-4"`，`parse::<f32>()` 失败，
 /// 自然回退到 `gap-x-` 分支，无需额外排序。
 fn generate_numeric_fallback_code() -> TokenStream {
+    let length_fallbacks = LENGTH_CLASS_SPECS.iter().map(generate_length_fallback);
+    let usize_fallbacks = [("line-clamp-", "line_clamp")]
+        .into_iter()
+        .map(|(prefix, method)| generate_integer_fallback(prefix, method, "usize"));
+    let u16_fallbacks = [
+        ("col-span-", "col_span"),
+        ("row-span-", "row_span"),
+        ("grid-cols-", "grid_cols"),
+        ("grid-rows-", "grid_rows"),
+    ]
+    .into_iter()
+    .map(|(prefix, method)| generate_integer_fallback(prefix, method, "u16"));
+    let i16_fallbacks = [
+        ("col-start-", "col_start"),
+        ("col-end-", "col_end"),
+        ("row-start-", "row_start"),
+        ("row-end-", "row_end"),
+    ]
+    .into_iter()
+    .map(|(prefix, method)| generate_integer_fallback(prefix, method, "i16"));
+
     quote! {
         trait __RsxFiniteFloat {
             fn __rsx_finite(self) -> Result<f32, ()>;
@@ -354,362 +377,80 @@ fn generate_numeric_fallback_code() -> TokenStream {
             }
         }
 
-        // --- gap ---
-        if let Some(rest) = class.strip_prefix("gap-x-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap_x(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap_x(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.gap_x(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("gap-y-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap_y(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap_y(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.gap_y(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("gap-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.gap(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.gap(px(n)); }
-        }
-        // --- padding ---
-        if let Some(rest) = class.strip_prefix("px-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.px(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.px(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.px(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("py-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.py(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.py(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.py(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("pt-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pt(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pt(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.pt(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("pb-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pb(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pb(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.pb(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("pl-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pl(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pl(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.pl(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("pr-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pr(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.pr(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.pr(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("p-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.p(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.p(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.p(px(n)); }
-        }
-        // --- margin ---
-        if let Some(rest) = class.strip_prefix("mx-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mx(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mx(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.mx(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("my-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.my(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.my(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.my(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("mt-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mt(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mt(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.mt(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("mb-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mb(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mb(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.mb(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("ml-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.ml(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.ml(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.ml(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("mr-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mr(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.mr(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.mr(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("m-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.m(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.m(rems(n)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.m(px(n)); }
-        }
-        // --- sizing ---
-        if let Some(rest) = class.strip_prefix("min-w-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_w(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_w(rems(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix('%') {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_w(relative(n / 100.0)); }
-                }
-            }
-            if let Some((num, den)) = rest.split_once('/') {
-                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
-                    if den > 0.0 { return el.min_w(relative(num / den)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.min_w(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("max-w-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_w(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_w(rems(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix('%') {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_w(relative(n / 100.0)); }
-                }
-            }
-            if let Some((num, den)) = rest.split_once('/') {
-                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
-                    if den > 0.0 { return el.max_w(relative(num / den)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.max_w(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("min-h-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_h(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_h(rems(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix('%') {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.min_h(relative(n / 100.0)); }
-                }
-            }
-            if let Some((num, den)) = rest.split_once('/') {
-                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
-                    if den > 0.0 { return el.min_h(relative(num / den)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.min_h(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("max-h-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_h(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_h(rems(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix('%') {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.max_h(relative(n / 100.0)); }
-                }
-            }
-            if let Some((num, den)) = rest.split_once('/') {
-                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
-                    if den > 0.0 { return el.max_h(relative(num / den)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.max_h(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("size-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.size(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.size(rems(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix('%') {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.size(relative(n / 100.0)); }
-                }
-            }
-            if let Some((num, den)) = rest.split_once('/') {
-                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
-                    if den > 0.0 { return el.size(relative(num / den)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.size(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("w-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.w(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.w(rems(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix('%') {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.w(relative(n / 100.0)); }
-                }
-            }
-            if let Some((num, den)) = rest.split_once('/') {
-                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
-                    if den > 0.0 { return el.w(relative(num / den)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.w(px(n)); }
-        }
-        if let Some(rest) = class.strip_prefix("h-") {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.h(px(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.h(rems(n)); }
-                }
-                if let Some(raw) = inner.strip_suffix('%') {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.h(relative(n / 100.0)); }
-                }
-            }
-            if let Some((num, den)) = rest.split_once('/') {
-                if let (Ok(num), Ok(den)) = (num.parse::<f32>().__rsx_finite(), den.parse::<f32>().__rsx_finite()) {
-                    if den > 0.0 { return el.h(relative(num / den)); }
-                }
-            }
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.h(px(n)); }
-        }
+        #(#length_fallbacks)*
         // --- opacity: opacity-50 → 0.50 ---
         if let Some(rest) = class.strip_prefix("opacity-") {
             if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.opacity(n / 100.0); }
         }
-        // --- text layout ---
-        if let Some(rest) = class.strip_prefix("line-clamp-") {
-            if let Ok(n) = rest.parse::<usize>() { return el.line_clamp(n); }
+        #(#usize_fallbacks)*
+        #(#u16_fallbacks)*
+        #(#i16_fallbacks)*
+    }
+}
+
+fn generate_length_fallback(spec: &super::tables::LengthClassSpec) -> TokenStream {
+    let prefix = spec.prefix;
+    let method = syn::Ident::new(spec.method, Span::call_site());
+    let percent = if spec.family.allows_percent() {
+        quote! {
+            if let Some(raw) = inner.strip_suffix('%') {
+                if let Ok(n) = raw.parse::<f32>().__rsx_finite() {
+                    return el.#method(relative(n / 100.0));
+                }
+            }
         }
-        // --- grid layout（优先检查较长前缀避免歧义）---
-        if let Some(rest) = class.strip_prefix("col-span-") {
-            if let Ok(n) = rest.parse::<u16>() { return el.col_span(n); }
+    } else {
+        quote! {}
+    };
+    let fraction = if spec.family.allows_fraction() {
+        quote! {
+            if let Some((num, den)) = rest.split_once('/') {
+                if let (Ok(num), Ok(den)) = (
+                    num.parse::<f32>().__rsx_finite(),
+                    den.parse::<f32>().__rsx_finite(),
+                ) {
+                    if den > 0.0 {
+                        return el.#method(relative(num / den));
+                    }
+                }
+            }
         }
-        if let Some(rest) = class.strip_prefix("col-start-") {
-            if let Ok(n) = rest.parse::<i16>() { return el.col_start(n); }
+    } else {
+        quote! {}
+    };
+
+    quote! {
+        if let Some(rest) = class.strip_prefix(#prefix) {
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() {
+                        return el.#method(px(n));
+                    }
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() {
+                        return el.#method(rems(n));
+                    }
+                }
+                #percent
+            }
+            #fraction
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() {
+                return el.#method(px(n));
+            }
         }
-        if let Some(rest) = class.strip_prefix("col-end-") {
-            if let Ok(n) = rest.parse::<i16>() { return el.col_end(n); }
-        }
-        if let Some(rest) = class.strip_prefix("row-span-") {
-            if let Ok(n) = rest.parse::<u16>() { return el.row_span(n); }
-        }
-        if let Some(rest) = class.strip_prefix("row-start-") {
-            if let Ok(n) = rest.parse::<i16>() { return el.row_start(n); }
-        }
-        if let Some(rest) = class.strip_prefix("row-end-") {
-            if let Ok(n) = rest.parse::<i16>() { return el.row_end(n); }
-        }
-        if let Some(rest) = class.strip_prefix("grid-cols-") {
-            if let Ok(n) = rest.parse::<u16>() { return el.grid_cols(n); }
-        }
-        if let Some(rest) = class.strip_prefix("grid-rows-") {
-            if let Ok(n) = rest.parse::<u16>() { return el.grid_rows(n); }
+    }
+}
+
+fn generate_integer_fallback(prefix: &'static str, method: &'static str, ty: &str) -> TokenStream {
+    let method = syn::Ident::new(method, Span::call_site());
+    let ty: TokenStream = ty.parse().expect("integer fallback type is valid");
+
+    quote! {
+        if let Some(rest) = class.strip_prefix(#prefix) {
+            if let Ok(n) = rest.parse::<#ty>() {
+                return el.#method(n);
+            }
         }
     }
 }
@@ -720,235 +461,9 @@ fn generate_numeric_fallback_code() -> TokenStream {
 /// 通过 thread_local 缓存，整个编译过程只调用一次。
 ///
 fn generate_common_class_matches() -> Vec<TokenStream> {
-    // 非颜色静态工具类
-    let static_classes = [
-        // 布局
-        "flex",
-        "flex-col",
-        "flex-col-reverse",
-        "flex-row",
-        "flex-row-reverse",
-        "flex-1",
-        "flex-auto",
-        "flex-initial",
-        "flex-none",
-        "flex-grow",
-        "flex-grow-0",
-        "flex-wrap",
-        "flex-wrap-reverse",
-        "flex-nowrap",
-        "flex-shrink",
-        "flex-shrink-0",
-        "block",
-        "grid",
-        "hidden",
-        // 对齐
-        "items-center",
-        "items-start",
-        "items-end",
-        "items-baseline",
-        "items-stretch",
-        "justify-center",
-        "justify-between",
-        "justify-start",
-        "justify-end",
-        "justify-around",
-        "justify-evenly",
-        "content-normal",
-        "content-center",
-        "content-start",
-        "content-end",
-        "content-between",
-        "content-around",
-        "content-evenly",
-        "content-stretch",
-        "self-start",
-        "self-end",
-        "self-flex-start",
-        "self-flex-end",
-        "self-center",
-        "self-baseline",
-        "self-stretch",
-        // 间距：gap
-        "gap-1",
-        "gap-2",
-        "gap-3",
-        "gap-4",
-        "gap-5",
-        "gap-6",
-        "gap-8",
-        "gap-10",
-        "gap-12",
-        // 间距：padding
-        "p-1",
-        "p-2",
-        "p-3",
-        "p-4",
-        "p-5",
-        "p-6",
-        "p-8",
-        "px-1",
-        "px-2",
-        "px-3",
-        "px-4",
-        "px-6",
-        "py-1",
-        "py-2",
-        "py-3",
-        "py-4",
-        "py-6",
-        "pt-1",
-        "pt-2",
-        "pt-4",
-        "pt-6",
-        "pb-1",
-        "pb-2",
-        "pb-4",
-        "pb-6",
-        "pl-2",
-        "pl-4",
-        "pr-2",
-        "pr-4",
-        // 间距：margin
-        "m-1",
-        "m-2",
-        "m-4",
-        "mx-1",
-        "mx-2",
-        "mx-4",
-        "my-1",
-        "my-2",
-        "my-4",
-        "mt-1",
-        "mt-2",
-        "mt-4",
-        "mb-1",
-        "mb-2",
-        "mb-4",
-        // 尺寸
-        "w-full",
-        "h-full",
-        "size-full",
-        "aspect-square",
-        // 文本大小
-        "text-xs",
-        "text-sm",
-        "text-base",
-        "text-lg",
-        "text-xl",
-        "text-2xl",
-        "text-3xl",
-        // 文本对齐
-        "text-left",
-        "text-center",
-        "text-right",
-        // 文本装饰
-        "whitespace-normal",
-        "whitespace-nowrap",
-        "truncate",
-        "text-ellipsis",
-        "text-ellipsis-start",
-        "no-underline",
-        "italic",
-        "not-italic",
-        "underline",
-        "line-through",
-        "text-decoration-solid",
-        "text-decoration-wavy",
-        "text-decoration-0",
-        "text-decoration-1",
-        "text-decoration-2",
-        "text-decoration-4",
-        "text-decoration-8",
-        // 字体
-        "font-thin",
-        "font-extralight",
-        "font-light",
-        "font-normal",
-        "font-medium",
-        "font-semibold",
-        "font-bold",
-        "font-extrabold",
-        "font-black",
-        // 边框
-        "border",
-        "border-2",
-        "border-dashed",
-        "border-t",
-        "border-b",
-        "border-l",
-        "border-r",
-        "border-x",
-        "border-y",
-        "border-t-2",
-        "border-b-2",
-        "border-l-2",
-        "border-r-2",
-        "border-x-2",
-        "border-y-2",
-        "rounded-none",
-        "rounded-sm",
-        "rounded-md",
-        "rounded-lg",
-        "rounded-xl",
-        "rounded-full",
-        // 杂项
-        "cursor-pointer",
-        "cursor-default",
-        "cursor-text",
-        "cursor-move",
-        "cursor-not-allowed",
-        "cursor-context-menu",
-        "cursor-crosshair",
-        "cursor-vertical-text",
-        "cursor-alias",
-        "cursor-copy",
-        "cursor-no-drop",
-        "cursor-grab",
-        "cursor-grabbing",
-        "cursor-ew-resize",
-        "cursor-ns-resize",
-        "cursor-nesw-resize",
-        "cursor-nwse-resize",
-        "cursor-col-resize",
-        "cursor-row-resize",
-        "cursor-n-resize",
-        "cursor-e-resize",
-        "cursor-s-resize",
-        "cursor-w-resize",
-        "debug-outline",
-        "overflow-hidden",
-        "overflow-x-hidden",
-        "overflow-y-hidden",
-        "absolute",
-        "relative",
-        // 阴影
-        "shadow-none",
-        "shadow-2xs",
-        "shadow-xs",
-        "shadow-sm",
-        "shadow-md",
-        "shadow-lg",
-        "shadow-xl",
-        "shadow-2xl",
-        // 透明度常用值（任意数值由数值前缀回退处理）
-        "opacity-0",
-        "opacity-25",
-        "opacity-50",
-        "opacity-75",
-        "opacity-100",
-        // grid placement
-        "col-span-full",
-        "col-start-auto",
-        "col-end-auto",
-        "row-span-full",
-        "row-start-auto",
-        "row-end-auto",
-    ];
+    let mut matches = Vec::new();
 
-    let mut matches = Vec::with_capacity(static_classes.len());
-
-    for class_str in static_classes {
+    for class_str in dynamic_common_classes() {
         let method_call = parse_dynamic_common_class(class_str);
         matches.push(quote! {
             #class_str => #method_call,

@@ -493,6 +493,369 @@ pub(crate) const COLOR_SHADES: &[&str] = &[
     "50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950",
 ];
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum LengthClassFamily {
+    Sizing,
+    Spacing,
+}
+
+impl LengthClassFamily {
+    pub(crate) const fn allows_percent(self) -> bool {
+        matches!(self, Self::Sizing)
+    }
+
+    pub(crate) const fn allows_fraction(self) -> bool {
+        matches!(self, Self::Sizing)
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct LengthClassSpec {
+    pub(crate) prefix: &'static str,
+    pub(crate) method: &'static str,
+    pub(crate) family: LengthClassFamily,
+}
+
+impl LengthClassSpec {
+    const fn sizing(prefix: &'static str, method: &'static str) -> Self {
+        Self {
+            prefix,
+            method,
+            family: LengthClassFamily::Sizing,
+        }
+    }
+
+    const fn spacing(prefix: &'static str, method: &'static str) -> Self {
+        Self {
+            prefix,
+            method,
+            family: LengthClassFamily::Spacing,
+        }
+    }
+}
+
+/// Shared length-family table for static and dynamic class parsing.
+///
+/// Order matters: longer prefixes such as `min-w-` and `gap-x-` must be checked before
+/// shorter prefixes like `w-` and `gap-`.
+pub(crate) const LENGTH_CLASS_SPECS: &[LengthClassSpec] = &[
+    LengthClassSpec::sizing("min-w-", "min_w"),
+    LengthClassSpec::sizing("max-w-", "max_w"),
+    LengthClassSpec::sizing("min-h-", "min_h"),
+    LengthClassSpec::sizing("max-h-", "max_h"),
+    LengthClassSpec::spacing("gap-x-", "gap_x"),
+    LengthClassSpec::spacing("gap-y-", "gap_y"),
+    LengthClassSpec::sizing("size-", "size"),
+    LengthClassSpec::spacing("gap-", "gap"),
+    LengthClassSpec::spacing("px-", "px"),
+    LengthClassSpec::spacing("py-", "py"),
+    LengthClassSpec::spacing("pt-", "pt"),
+    LengthClassSpec::spacing("pb-", "pb"),
+    LengthClassSpec::spacing("pl-", "pl"),
+    LengthClassSpec::spacing("pr-", "pr"),
+    LengthClassSpec::spacing("mx-", "mx"),
+    LengthClassSpec::spacing("my-", "my"),
+    LengthClassSpec::spacing("mt-", "mt"),
+    LengthClassSpec::spacing("mb-", "mb"),
+    LengthClassSpec::spacing("ml-", "ml"),
+    LengthClassSpec::spacing("mr-", "mr"),
+    LengthClassSpec::sizing("w-", "w"),
+    LengthClassSpec::sizing("h-", "h"),
+    LengthClassSpec::spacing("p-", "p"),
+    LengthClassSpec::spacing("m-", "m"),
+];
+
+pub(crate) fn split_length_class(class: &str) -> Option<(&'static str, &str, LengthClassFamily)> {
+    for spec in LENGTH_CLASS_SPECS {
+        if let Some(value) = class.strip_prefix(spec.prefix) {
+            return Some((spec.method, value, spec.family));
+        }
+    }
+
+    None
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) struct CommonClassSupport {
+    name: &'static str,
+    strict_no_arg: bool,
+    dynamic_fast_path: bool,
+}
+
+impl CommonClassSupport {
+    const fn both(name: &'static str) -> Self {
+        Self {
+            name,
+            strict_no_arg: true,
+            dynamic_fast_path: true,
+        }
+    }
+
+    const fn strict_only(name: &'static str) -> Self {
+        Self {
+            name,
+            strict_no_arg: true,
+            dynamic_fast_path: false,
+        }
+    }
+
+    const fn dynamic_only(name: &'static str) -> Self {
+        Self {
+            name,
+            strict_no_arg: false,
+            dynamic_fast_path: true,
+        }
+    }
+}
+
+/// Shared support table for literal strict validation and dynamic class fast paths.
+///
+/// `dynamic_fast_path` intentionally stays false for static classes that need auto-ID
+/// analysis (`overflow-scroll` variants) or that were not previously supported by the
+/// dynamic matcher. Numeric and font entries are dynamic-only because static parsing handles
+/// them before strict no-arg validation.
+pub(crate) const COMMON_CLASS_SUPPORT: &[CommonClassSupport] = &[
+    // Layout
+    CommonClassSupport::both("flex"),
+    CommonClassSupport::both("flex-col"),
+    CommonClassSupport::both("flex-col-reverse"),
+    CommonClassSupport::both("flex-row"),
+    CommonClassSupport::both("flex-row-reverse"),
+    CommonClassSupport::both("flex-1"),
+    CommonClassSupport::both("flex-auto"),
+    CommonClassSupport::both("flex-initial"),
+    CommonClassSupport::both("flex-none"),
+    CommonClassSupport::both("flex-grow"),
+    CommonClassSupport::both("flex-grow-0"),
+    CommonClassSupport::both("flex-wrap"),
+    CommonClassSupport::both("flex-wrap-reverse"),
+    CommonClassSupport::both("flex-nowrap"),
+    CommonClassSupport::both("flex-shrink"),
+    CommonClassSupport::both("flex-shrink-0"),
+    CommonClassSupport::both("block"),
+    CommonClassSupport::both("grid"),
+    CommonClassSupport::both("hidden"),
+    CommonClassSupport::both("absolute"),
+    CommonClassSupport::both("relative"),
+    // Alignment
+    CommonClassSupport::both("items-center"),
+    CommonClassSupport::both("items-start"),
+    CommonClassSupport::both("items-end"),
+    CommonClassSupport::both("items-baseline"),
+    CommonClassSupport::both("items-stretch"),
+    CommonClassSupport::both("justify-center"),
+    CommonClassSupport::both("justify-between"),
+    CommonClassSupport::both("justify-start"),
+    CommonClassSupport::both("justify-end"),
+    CommonClassSupport::both("justify-around"),
+    CommonClassSupport::both("justify-evenly"),
+    CommonClassSupport::both("content-normal"),
+    CommonClassSupport::both("content-center"),
+    CommonClassSupport::both("content-start"),
+    CommonClassSupport::both("content-end"),
+    CommonClassSupport::both("content-between"),
+    CommonClassSupport::both("content-around"),
+    CommonClassSupport::both("content-evenly"),
+    CommonClassSupport::both("content-stretch"),
+    CommonClassSupport::both("self-start"),
+    CommonClassSupport::both("self-end"),
+    CommonClassSupport::both("self-flex-start"),
+    CommonClassSupport::both("self-flex-end"),
+    CommonClassSupport::both("self-center"),
+    CommonClassSupport::both("self-baseline"),
+    CommonClassSupport::both("self-stretch"),
+    // Dynamic spacing fast paths. Arbitrary values and additional numeric values use fallback.
+    CommonClassSupport::dynamic_only("gap-1"),
+    CommonClassSupport::dynamic_only("gap-2"),
+    CommonClassSupport::dynamic_only("gap-3"),
+    CommonClassSupport::dynamic_only("gap-4"),
+    CommonClassSupport::dynamic_only("gap-5"),
+    CommonClassSupport::dynamic_only("gap-6"),
+    CommonClassSupport::dynamic_only("gap-8"),
+    CommonClassSupport::dynamic_only("gap-10"),
+    CommonClassSupport::dynamic_only("gap-12"),
+    CommonClassSupport::dynamic_only("p-1"),
+    CommonClassSupport::dynamic_only("p-2"),
+    CommonClassSupport::dynamic_only("p-3"),
+    CommonClassSupport::dynamic_only("p-4"),
+    CommonClassSupport::dynamic_only("p-5"),
+    CommonClassSupport::dynamic_only("p-6"),
+    CommonClassSupport::dynamic_only("p-8"),
+    CommonClassSupport::dynamic_only("px-1"),
+    CommonClassSupport::dynamic_only("px-2"),
+    CommonClassSupport::dynamic_only("px-3"),
+    CommonClassSupport::dynamic_only("px-4"),
+    CommonClassSupport::dynamic_only("px-6"),
+    CommonClassSupport::dynamic_only("py-1"),
+    CommonClassSupport::dynamic_only("py-2"),
+    CommonClassSupport::dynamic_only("py-3"),
+    CommonClassSupport::dynamic_only("py-4"),
+    CommonClassSupport::dynamic_only("py-6"),
+    CommonClassSupport::dynamic_only("pt-1"),
+    CommonClassSupport::dynamic_only("pt-2"),
+    CommonClassSupport::dynamic_only("pt-4"),
+    CommonClassSupport::dynamic_only("pt-6"),
+    CommonClassSupport::dynamic_only("pb-1"),
+    CommonClassSupport::dynamic_only("pb-2"),
+    CommonClassSupport::dynamic_only("pb-4"),
+    CommonClassSupport::dynamic_only("pb-6"),
+    CommonClassSupport::dynamic_only("pl-2"),
+    CommonClassSupport::dynamic_only("pl-4"),
+    CommonClassSupport::dynamic_only("pr-2"),
+    CommonClassSupport::dynamic_only("pr-4"),
+    CommonClassSupport::dynamic_only("m-1"),
+    CommonClassSupport::dynamic_only("m-2"),
+    CommonClassSupport::dynamic_only("m-4"),
+    CommonClassSupport::dynamic_only("mx-1"),
+    CommonClassSupport::dynamic_only("mx-2"),
+    CommonClassSupport::dynamic_only("mx-4"),
+    CommonClassSupport::dynamic_only("my-1"),
+    CommonClassSupport::dynamic_only("my-2"),
+    CommonClassSupport::dynamic_only("my-4"),
+    CommonClassSupport::dynamic_only("mt-1"),
+    CommonClassSupport::dynamic_only("mt-2"),
+    CommonClassSupport::dynamic_only("mt-4"),
+    CommonClassSupport::dynamic_only("mb-1"),
+    CommonClassSupport::dynamic_only("mb-2"),
+    CommonClassSupport::dynamic_only("mb-4"),
+    // Sizing aliases
+    CommonClassSupport::both("w-full"),
+    CommonClassSupport::both("h-full"),
+    CommonClassSupport::both("size-full"),
+    CommonClassSupport::both("aspect-square"),
+    CommonClassSupport::strict_only("w-px"),
+    CommonClassSupport::strict_only("h-px"),
+    CommonClassSupport::strict_only("size-px"),
+    CommonClassSupport::strict_only("w-auto"),
+    CommonClassSupport::strict_only("h-auto"),
+    // Text
+    CommonClassSupport::both("text-xs"),
+    CommonClassSupport::both("text-sm"),
+    CommonClassSupport::both("text-base"),
+    CommonClassSupport::both("text-lg"),
+    CommonClassSupport::both("text-xl"),
+    CommonClassSupport::both("text-2xl"),
+    CommonClassSupport::both("text-3xl"),
+    CommonClassSupport::both("text-left"),
+    CommonClassSupport::both("text-center"),
+    CommonClassSupport::both("text-right"),
+    CommonClassSupport::both("whitespace-normal"),
+    CommonClassSupport::both("whitespace-nowrap"),
+    CommonClassSupport::both("truncate"),
+    CommonClassSupport::both("text-ellipsis"),
+    CommonClassSupport::both("text-ellipsis-start"),
+    CommonClassSupport::both("no-underline"),
+    CommonClassSupport::both("italic"),
+    CommonClassSupport::both("not-italic"),
+    CommonClassSupport::both("underline"),
+    CommonClassSupport::both("line-through"),
+    CommonClassSupport::both("text-decoration-solid"),
+    CommonClassSupport::both("text-decoration-wavy"),
+    CommonClassSupport::both("text-decoration-0"),
+    CommonClassSupport::both("text-decoration-1"),
+    CommonClassSupport::both("text-decoration-2"),
+    CommonClassSupport::both("text-decoration-4"),
+    CommonClassSupport::both("text-decoration-8"),
+    // Font weights are parsed by the static path before strict no-arg validation.
+    CommonClassSupport::dynamic_only("font-thin"),
+    CommonClassSupport::dynamic_only("font-extralight"),
+    CommonClassSupport::dynamic_only("font-light"),
+    CommonClassSupport::dynamic_only("font-normal"),
+    CommonClassSupport::dynamic_only("font-medium"),
+    CommonClassSupport::dynamic_only("font-semibold"),
+    CommonClassSupport::dynamic_only("font-bold"),
+    CommonClassSupport::dynamic_only("font-extrabold"),
+    CommonClassSupport::dynamic_only("font-black"),
+    // Border
+    CommonClassSupport::both("border"),
+    CommonClassSupport::both("border-2"),
+    CommonClassSupport::both("border-dashed"),
+    CommonClassSupport::both("border-t"),
+    CommonClassSupport::both("border-b"),
+    CommonClassSupport::both("border-l"),
+    CommonClassSupport::both("border-r"),
+    CommonClassSupport::both("border-x"),
+    CommonClassSupport::both("border-y"),
+    CommonClassSupport::both("border-t-2"),
+    CommonClassSupport::both("border-b-2"),
+    CommonClassSupport::both("border-l-2"),
+    CommonClassSupport::both("border-r-2"),
+    CommonClassSupport::both("border-x-2"),
+    CommonClassSupport::both("border-y-2"),
+    CommonClassSupport::both("rounded-none"),
+    CommonClassSupport::both("rounded-sm"),
+    CommonClassSupport::both("rounded-md"),
+    CommonClassSupport::both("rounded-lg"),
+    CommonClassSupport::both("rounded-xl"),
+    CommonClassSupport::both("rounded-full"),
+    // Misc
+    CommonClassSupport::both("cursor-pointer"),
+    CommonClassSupport::both("cursor-default"),
+    CommonClassSupport::both("cursor-text"),
+    CommonClassSupport::both("cursor-move"),
+    CommonClassSupport::both("cursor-not-allowed"),
+    CommonClassSupport::both("cursor-context-menu"),
+    CommonClassSupport::both("cursor-crosshair"),
+    CommonClassSupport::both("cursor-vertical-text"),
+    CommonClassSupport::both("cursor-alias"),
+    CommonClassSupport::both("cursor-copy"),
+    CommonClassSupport::both("cursor-no-drop"),
+    CommonClassSupport::both("cursor-grab"),
+    CommonClassSupport::both("cursor-grabbing"),
+    CommonClassSupport::both("cursor-ew-resize"),
+    CommonClassSupport::both("cursor-ns-resize"),
+    CommonClassSupport::both("cursor-nesw-resize"),
+    CommonClassSupport::both("cursor-nwse-resize"),
+    CommonClassSupport::both("cursor-col-resize"),
+    CommonClassSupport::both("cursor-row-resize"),
+    CommonClassSupport::both("cursor-n-resize"),
+    CommonClassSupport::both("cursor-e-resize"),
+    CommonClassSupport::both("cursor-s-resize"),
+    CommonClassSupport::both("cursor-w-resize"),
+    CommonClassSupport::both("debug-outline"),
+    CommonClassSupport::both("overflow-hidden"),
+    CommonClassSupport::both("overflow-x-hidden"),
+    CommonClassSupport::both("overflow-y-hidden"),
+    CommonClassSupport::strict_only("overflow-scroll"),
+    CommonClassSupport::strict_only("overflow-x-scroll"),
+    CommonClassSupport::strict_only("overflow-y-scroll"),
+    // Shadow
+    CommonClassSupport::both("shadow-none"),
+    CommonClassSupport::both("shadow-2xs"),
+    CommonClassSupport::both("shadow-xs"),
+    CommonClassSupport::both("shadow-sm"),
+    CommonClassSupport::both("shadow-md"),
+    CommonClassSupport::both("shadow-lg"),
+    CommonClassSupport::both("shadow-xl"),
+    CommonClassSupport::both("shadow-2xl"),
+    // Opacity fast paths
+    CommonClassSupport::dynamic_only("opacity-0"),
+    CommonClassSupport::dynamic_only("opacity-25"),
+    CommonClassSupport::dynamic_only("opacity-50"),
+    CommonClassSupport::dynamic_only("opacity-75"),
+    CommonClassSupport::dynamic_only("opacity-100"),
+    // Grid placement
+    CommonClassSupport::both("col-span-full"),
+    CommonClassSupport::both("col-start-auto"),
+    CommonClassSupport::both("col-end-auto"),
+    CommonClassSupport::both("row-span-full"),
+    CommonClassSupport::both("row-start-auto"),
+    CommonClassSupport::both("row-end-auto"),
+];
+
+pub(crate) fn is_supported_common_no_arg_class(class: &str) -> bool {
+    COMMON_CLASS_SUPPORT
+        .iter()
+        .any(|entry| entry.strict_no_arg && entry.name == class)
+}
+
+pub(crate) fn dynamic_common_classes() -> impl Iterator<Item = &'static str> {
+    COMMON_CLASS_SUPPORT
+        .iter()
+        .filter(|entry| entry.dynamic_fast_path)
+        .map(|entry| entry.name)
+}
+
 /// 检查是否是有效的文本大小名称
 ///
 /// 使用 match 替代原 VALID_TEXT_SIZES 数组的 `.contains()` 线性扫描。

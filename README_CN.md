@@ -850,7 +850,7 @@ GPUI-RSX 是一个**编译时宏**，静态 RSX 会展开为直接的 GPUI build
 - `.children([...])` 聚合阈值 3 → 2
 
 **二进制体积：**
-- `[profile.release]` 增加 `panic = "abort"` 移除展开表
+- 应用可在自己的 release profile 中选择启用 `panic = "abort"` 以移除展开表
 
 ### v0.2.1 优化亮点
 
