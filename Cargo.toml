@@ -32,10 +32,3 @@ harness = false
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrs"]
-
-# Optimized release profile
-[profile.release]
-lto = true
-codegen-units = 1
-# proc-macro 不需要栈展开，abort 可减小二进制体积并消除展开表开销
-panic = "abort"
