@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-09
+
+### Added
+
+- Added GPUI 0.2.2 element support for `<img src={...}>`, `<canvas prepaint={...} paint={...}>`,
+  and `<svg src={...}>`.
+- Added GPUI 0.2.2 image and prepaint-related attribute mappings such as `objectFit`,
+  `withFallback`, `withLoading`, `imageCache`, and `onChildrenPrepainted`.
+- Added static and strict-mode class support for GPUI 0.2.2 rounded radius variants.
+
+### Changed
+
+- Optimized conditional literal classes such as `class={if active { "flex" } else { "block" }}`
+  so they expand through the static class path instead of the dynamic class matcher.
+- Reduced macro expansion work by skipping attribute analysis for element-level attributes already
+  consumed by the code generator.
+- Reduced static class parser allocations by parsing common numeric length, color, opacity,
+  line-clamp, and directional border classes before falling back to normalized method names.
+- Updated examples and docs to import `gpui::prelude::*` where GPUI 0.2.2 requires it.
+
+### Fixed
+
+- Fixed GPUI 0.2.2 compatibility for `aspect-square` by mutating `style().aspect_ratio` instead of
+  calling a removed GPUI helper method.
+- Fixed permissive/strict handling for unsupported `text-ellipsis-start` after its GPUI helper was
+  removed.
+- Fixed benchmark mocks to match the current GPUI 0.2.2-compatible API surface.
+
 ## [0.5.0] - 2026-05-14
 
 ### Added

@@ -9,6 +9,32 @@
 
 ## [未发布]
 
+## [0.5.1] - 2026-06-09
+
+### 新增
+
+- 新增 GPUI 0.2.2 元素支持：`<img src={...}>`、`<canvas prepaint={...} paint={...}>`
+  和 `<svg src={...}>`。
+- 新增 GPUI 0.2.2 图片和 prepaint 相关属性映射，包括 `objectFit`、`withFallback`、
+  `withLoading`、`imageCache` 和 `onChildrenPrepainted`。
+- 新增 GPUI 0.2.2 圆角半径变体的静态 class 和 strict 模式支持。
+
+### 变更
+
+- 优化 `class={if active { "flex" } else { "block" }}` 这类条件字面量 class，
+  使其走静态 class 展开路径，而不是动态 class matcher。
+- 跳过已由元素代码生成器消费的属性分析，减少宏展开阶段的重复工作。
+- 对常见数值长度、颜色、opacity、line-clamp 和方向性边框 class 先在原始字符串上解析，
+  减少静态 class parser 中的字符串规范化分配。
+- 更新示例和文档，在 GPUI 0.2.2 需要的位置导入 `gpui::prelude::*`。
+
+### 修复
+
+- 修复 `aspect-square` 的 GPUI 0.2.2 兼容性，改为写入 `style().aspect_ratio`，不再调用
+  已移除的 GPUI helper 方法。
+- 修复 GPUI helper 移除后 `text-ellipsis-start` 在 permissive/strict 模式下的处理。
+- 修复 benchmark mock，使其与当前 GPUI 0.2.2 兼容 API 保持一致。
+
 ## [0.5.0] - 2026-05-14
 
 ### 新增
