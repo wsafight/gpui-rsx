@@ -167,3 +167,5 @@ let preview = rsx_expand! {
 - Keep runtime-generated classes for genuinely dynamic dimensions or colors.
 - Prefer direct GPUI attributes for hot paths when a value is already a Rust expression, for example `w={px(width)}`.
 - Use `when` or `whenClass` for small conditional variants instead of concatenating long runtime class strings.
+
+For render-loop allocation, ID/key behavior, and validation commands, see the [Performance guide](/gpui-rsx/guides/performance/).

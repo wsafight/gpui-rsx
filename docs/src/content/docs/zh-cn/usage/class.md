@@ -167,3 +167,5 @@ let preview = rsx_expand! {
 - 只有尺寸或颜色确实运行时变化时再生成动态 class。
 - 热路径中，如果值本来就是 Rust 表达式，优先使用直接 GPUI 属性，例如 `w={px(width)}`。
 - 少量条件变体优先使用 `when` 或 `whenClass`，不要拼接很长的运行时 class 字符串。
+
+关于 render 循环分配、ID/key 行为和验证命令，见[性能优化](/gpui-rsx/zh-cn/guides/performance/)。

@@ -42,7 +42,8 @@ The Starlight site is the canonical documentation set. The old `docs/*.md` files
 - [Syntax Reference](/gpui-rsx/usage/syntax/) for elements, attributes, children, and conditionals.
 - [Class Handling](/gpui-rsx/usage/class/) for static and dynamic utility classes.
 - [IDs and Keys](/gpui-rsx/usage/ids/) for auto IDs, loop safety, and explicit IDs.
-- [Best Practices](/gpui-rsx/guides/best-practices/) for project structure and performance patterns.
+- [Performance](/gpui-rsx/guides/performance/) for static expansion, dynamic class cost, render-loop allocation, and validation.
+- [Best Practices](/gpui-rsx/guides/best-practices/) for project structure and everyday patterns.
 - [Migration Guide](/gpui-rsx/guides/migration/) for manual GPUI migration and the `0.6.x` GPUI target change.
 - [Troubleshooting](/gpui-rsx/guides/troubleshooting/) for parser, type, runtime, and dependency issues.
 - [API Reference](/gpui-rsx/reference/api/) for compact macro and mapping tables.

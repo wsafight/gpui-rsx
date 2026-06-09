@@ -95,6 +95,13 @@ export default defineConfig({
           },
           items: [
             {
+              label: 'Performance',
+              translations: {
+                'zh-CN': '性能优化',
+              },
+              slug: 'guides/performance',
+            },
+            {
               label: 'Best Practices',
               translations: {
                 'zh-CN': '最佳实践',
