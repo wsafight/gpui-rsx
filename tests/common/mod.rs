@@ -61,6 +61,15 @@ pub struct MockElement;
 #[derive(Debug)]
 pub struct AnyElement;
 
+#[derive(Debug)]
+pub struct Bounds;
+
+#[derive(Debug)]
+pub struct Window;
+
+#[derive(Debug)]
+pub struct App;
+
 #[derive(Clone, Copy, Debug)]
 pub struct FontWeight(pub f32);
 
@@ -120,6 +129,7 @@ pub struct StyleRefinement {
     pub align_self: Option<AlignItems>,
     pub justify_content: Option<JustifyContent>,
     pub align_content: Option<AlignContent>,
+    pub aspect_ratio: Option<f32>,
     pub flex_grow: Option<f32>,
     pub debug: Option<bool>,
 }
@@ -229,7 +239,6 @@ pub trait Styled: Sized {
     fn size_px(self) -> Self;
     fn size_1_2(self) -> Self;
     fn size<T>(self, v: T) -> Self;
-    fn aspect_square(self) -> Self;
     fn w<T>(self, v: T) -> Self;
     fn h<T>(self, v: T) -> Self;
     fn min_w<T>(self, v: T) -> Self;
@@ -253,7 +262,6 @@ pub trait Styled: Sized {
     fn whitespace_nowrap(self) -> Self;
     fn truncate(self) -> Self;
     fn text_ellipsis(self) -> Self;
-    fn text_ellipsis_start(self) -> Self;
     fn line_clamp(self, lines: usize) -> Self;
     fn italic(self) -> Self;
     fn not_italic(self) -> Self;
@@ -292,7 +300,13 @@ pub trait Styled: Sized {
     fn rounded_sm(self) -> Self;
     fn rounded_md(self) -> Self;
     fn rounded_lg(self) -> Self;
+    fn rounded_2xl(self) -> Self;
+    fn rounded_3xl(self) -> Self;
     fn rounded_full(self) -> Self;
+    fn rounded_t_lg(self) -> Self;
+    fn rounded_b_lg(self) -> Self;
+    fn rounded_r_lg(self) -> Self;
+    fn rounded_l_lg(self) -> Self;
     // --- misc ---
     fn cursor_pointer(self) -> Self;
     fn overflow_hidden(self) -> Self;
@@ -368,11 +382,15 @@ pub fn svg() -> MockElement {
     MockElement
 }
 #[allow(dead_code)]
-pub fn img() -> MockElement {
+pub fn img<T>(_source: T) -> MockElement {
     MockElement
 }
 #[allow(dead_code)]
-pub fn canvas() -> MockElement {
+pub fn canvas<P, Paint, T>(_prepaint: P, _paint: Paint) -> MockElement
+where
+    P: FnOnce(Bounds, &mut Window, &mut App) -> T,
+    Paint: FnOnce(Bounds, T, &mut Window, &mut App),
+{
     MockElement
 }
 pub fn rgb(hex: u32) -> u32 {
@@ -708,6 +726,34 @@ impl MockElement {
         self
     }
 
+    pub fn path<T>(self, _: T) -> Self {
+        self
+    }
+
+    pub fn grayscale(self, _: bool) -> Self {
+        self
+    }
+
+    pub fn object_fit<T>(self, _: T) -> Self {
+        self
+    }
+
+    pub fn with_fallback<T>(self, _: T) -> Self {
+        self
+    }
+
+    pub fn with_loading<T>(self, _: T) -> Self {
+        self
+    }
+
+    pub fn image_cache<T>(self, _: T) -> Self {
+        self
+    }
+
+    pub fn on_children_prepainted<T>(self, _: T) -> Self {
+        self
+    }
+
     // --- 新增属性映射（不在 Styled 中）---
     pub fn flex_basis<T>(self, _: T) -> Self {
         self
@@ -979,9 +1025,6 @@ impl Styled for MockElement {
     fn size<T>(self, _: T) -> Self {
         self
     }
-    fn aspect_square(self) -> Self {
-        self
-    }
     fn w<T>(self, _: T) -> Self {
         self
     }
@@ -1043,9 +1086,6 @@ impl Styled for MockElement {
         self
     }
     fn text_ellipsis(self) -> Self {
-        self
-    }
-    fn text_ellipsis_start(self) -> Self {
         self
     }
     fn line_clamp(self, lines: usize) -> Self {
@@ -1163,7 +1203,25 @@ impl Styled for MockElement {
     fn rounded_lg(self) -> Self {
         self
     }
+    fn rounded_2xl(self) -> Self {
+        self
+    }
+    fn rounded_3xl(self) -> Self {
+        self
+    }
     fn rounded_full(self) -> Self {
+        self
+    }
+    fn rounded_t_lg(self) -> Self {
+        self
+    }
+    fn rounded_b_lg(self) -> Self {
+        self
+    }
+    fn rounded_r_lg(self) -> Self {
+        self
+    }
+    fn rounded_l_lg(self) -> Self {
         self
     }
     // --- misc ---

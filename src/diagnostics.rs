@@ -168,6 +168,23 @@ pub fn unsupported_jsx_attribute_error(attr_name: &Ident) -> syn::Error {
     )
 }
 
+/// 报告 GPUI 标签缺少构造必需属性。
+pub fn missing_required_attribute_error<T: Spanned>(
+    tag_span: &T,
+    tag_name: &str,
+    required: &str,
+    example: &str,
+) -> syn::Error {
+    syn::Error::new(
+        tag_span.span(),
+        format!(
+            "Element `<{tag_name}>` requires `{required}` for GPUI 0.2 construction.\n\
+             \x20 help: Use the format: {example}\n\
+             \x20 note: GPUI 0.2 does not expose a zero-argument `{tag_name}()` constructor"
+        ),
+    )
+}
+
 /// 报告 whenClass 的 class 参数不是字符串字面量。
 pub fn when_class_string_literal_error<T: Spanned>(value: &T) -> syn::Error {
     syn::Error::new(

@@ -18,6 +18,7 @@ gpui-rsx = "0.5"
 
 ```rust
 use gpui::*;
+use gpui::prelude::*;
 use gpui_rsx::rsx;
 ```
 
@@ -212,6 +213,7 @@ rsx! {
 
 ```rust
 use gpui::*;
+use gpui::prelude::*;
 use gpui_rsx::rsx;
 
 struct CounterView {

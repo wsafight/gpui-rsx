@@ -54,6 +54,7 @@ gpui-rsx = "0.5"
 
 ```rust
 use gpui::*;
+use gpui::prelude::*;
 use gpui_rsx::rsx;
 
 struct CounterView {
@@ -274,7 +275,7 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - `text-2xl`, `text-3xl`
 - `font-thin`, `font-extralight`, `font-light`, `font-normal`, `font-medium`, `font-semibold`, `font-bold`, `font-extrabold`, `font-black`
 - `whitespace-normal`, `whitespace-nowrap`, `line-clamp-*`
-- `text-ellipsis`, `text-ellipsis-start`, `truncate`, `no-underline`
+- `text-ellipsis`, `truncate`, `no-underline`
 - `text-decoration-solid`, `text-decoration-wavy`, `text-decoration-0/1/2/4/8`
 
 **对齐：**
@@ -284,7 +285,8 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 **边框：**
 - `border` → `.border_1()`
 - `border-2` → `.border_2()`, `border-4` → `.border_4()`
-- `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-full`, `rounded-none`
+- `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-2xl`, `rounded-3xl`, `rounded-full`, `rounded-none`
+- 方向圆角类，例如 `rounded-t-lg`, `rounded-b-lg`, `rounded-r-lg`, `rounded-l-lg`
 
 **颜色**（完整 Tailwind 色板）：
 - `text-red-500` → `.text_color(rgb(0xef4444))`
@@ -704,6 +706,7 @@ rsx! {
 
 ```rust
 use gpui::*;
+use gpui::prelude::*;
 use gpui_rsx::rsx;
 
 struct TodoApp {

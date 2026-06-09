@@ -10,6 +10,7 @@
 //! - 间距前缀使用 rfind + match（O(1)）替代线性扫描（O(17)）
 //! - text_ 前缀只做一次 strip_prefix，颜色与文本大小分支合并处理
 //! - 文本大小使用 match 替代 contains 线性查找
+//! - 常见数值长度、颜色、opacity、line-clamp 类先在原始 class 上解析，减少字符串替换
 //! - 先检查 `contains('-')` 跳过无连字符类的堆分配，含连字符时用 `replace` 做完整替换
 //! - split_ascii_whitespace 替代 split_whitespace（class 名只含 ASCII）
 
@@ -65,6 +66,14 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
         };
     }
 
+    if class == "text-ellipsis-start" {
+        return if mode.is_strict() {
+            compile_error(unsupported_class_message(class))
+        } else {
+            quote! {}
+        };
+    }
+
     if let Some(token) = parse_gpui_0_2_compat_class(class) {
         return token;
     }
@@ -74,6 +83,26 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
     }
 
     if let Some(token) = parse_fraction_length_class(class) {
+        return token;
+    }
+
+    if let Some(token) = parse_numeric_length_class(class) {
+        return token;
+    }
+
+    if let Some(token) = parse_direct_color_class(class) {
+        return token;
+    }
+
+    if let Some(token) = parse_direct_opacity_class(class) {
+        return token;
+    }
+
+    if let Some(token) = parse_direct_line_clamp_class(class) {
+        return token;
+    }
+
+    if let Some(token) = parse_direct_directional_border_class(class) {
         return token;
     }
 
@@ -188,6 +217,12 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
 
 fn parse_gpui_0_2_compat_class(class: &str) -> Option<TokenStream> {
     match class {
+        "aspect-square" => Some(quote! {
+            .map(|mut __el| {
+                __el.style().aspect_ratio = Some(1.0);
+                __el
+            })
+        }),
         "content-stretch" => Some(quote! {
             .map(|mut __el| {
                 __el.style().align_content = Some(AlignContent::Stretch);
@@ -367,6 +402,56 @@ fn parse_fraction_length_class(class: &str) -> Option<TokenStream> {
     }
 }
 
+fn parse_numeric_length_class(class: &str) -> Option<TokenStream> {
+    let (method, value, _) = split_length_class(class)?;
+    if value.starts_with('[') || value.contains('/') {
+        return None;
+    }
+    parse_length_number(value).map(|value| length_method_call(method, LengthKind::Px(value)))
+}
+
+fn parse_direct_color_class(class: &str) -> Option<TokenStream> {
+    if let Some(rest) = class.strip_prefix("text-") {
+        return parse_color_with_method(rest, "text_color", class);
+    }
+    if let Some(rest) = class.strip_prefix("bg-") {
+        return parse_color_with_method(rest, "bg", class);
+    }
+    if let Some(rest) = class.strip_prefix("border-")
+        && !is_directional_border(rest)
+    {
+        return parse_color_with_method(rest, "border_color", class);
+    }
+    None
+}
+
+fn parse_direct_opacity_class(class: &str) -> Option<TokenStream> {
+    let rest = class.strip_prefix("opacity-")?;
+    let n = rest.parse::<u8>().ok()?;
+    let val = n as f32 / 100.0;
+    Some(quote! { .opacity(#val) })
+}
+
+fn parse_direct_line_clamp_class(class: &str) -> Option<TokenStream> {
+    let rest = class.strip_prefix("line-clamp-")?;
+    let lines = rest.parse::<usize>().ok()?;
+    Some(quote! { .line_clamp(#lines) })
+}
+
+fn parse_direct_directional_border_class(class: &str) -> Option<TokenStream> {
+    let method = match class {
+        "border-t" => "border_t_1",
+        "border-b" => "border_b_1",
+        "border-l" => "border_l_1",
+        "border-r" => "border_r_1",
+        "border-x" => "border_x_1",
+        "border-y" => "border_y_1",
+        _ => return None,
+    };
+    let ident = syn::Ident::new(method, Span::call_site());
+    Some(quote! { .#ident() })
+}
+
 pub(crate) fn parse_length_number(raw: &str) -> Option<f32> {
     if raw.is_empty() {
         return None;
@@ -440,7 +525,7 @@ fn lookup_color_key(color: &str) -> Option<u32> {
 ///
 /// 方向性边框（fall through 到默认方法调用）：
 /// - 纯方向：`border-t` → rest = `"t"`（len == 1）
-/// - 方向+数值：`border-t-2` → rest = `"t_2"`（首字节是方向，第二字节是 `_`）
+/// - 方向+数值：`border-t-2` → rest = `"t-2"` / `"t_2"`（首字节是方向）
 ///
 /// 颜色类（应生成 `.border_color(rgb(...))`）：
 /// - `border-red-500` → rest = `"red_500"`（首字节 `r` 虽在方向集合中，
@@ -448,7 +533,7 @@ fn lookup_color_key(color: &str) -> Option<u32> {
 fn is_directional_border(rest: &str) -> bool {
     let bytes = rest.as_bytes();
     matches!(bytes.first(), Some(b't' | b'b' | b'l' | b'r' | b'x' | b'y'))
-        && (rest.len() == 1 || bytes.get(1) == Some(&b'_'))
+        && (rest.len() == 1 || matches!(bytes.get(1), Some(b'-' | b'_')))
 }
 
 fn lookup_directional_border_method(class: &str) -> Option<&'static str> {

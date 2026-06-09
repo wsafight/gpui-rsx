@@ -487,6 +487,13 @@ fn parse_dynamic_common_class(class: &str) -> TokenStream {
                 }
             }
         },
+        "aspect-square" => quote! {
+            {
+                let mut el = el;
+                el.style().aspect_ratio = Some(1.0);
+                el
+            }
+        },
         "flex-grow-0" => quote! {
             {
                 let mut el = el;

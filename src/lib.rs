@@ -9,6 +9,7 @@
 //!
 //! ```ignore
 //! use gpui::*;
+//! use gpui::prelude::*;
 //! use gpui_rsx::rsx;
 //!
 //! // Before — verbose GPUI method chain

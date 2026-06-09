@@ -1207,17 +1207,36 @@ fn test_bare_string_multiple() {
 
 #[test]
 fn test_svg_tag() {
-    let _el = rsx! { <svg /> };
+    let _el = rsx! { <svg src={"icons/logo.svg"} /> };
 }
 
 #[test]
 fn test_img_tag() {
-    let _el = rsx! { <img /> };
+    let _el = rsx! { <img src={"images/logo.png"} /> };
+}
+
+#[test]
+fn test_img_source_alias_and_image_attrs() {
+    let _el = rsx! {
+        <img
+            source={"images/avatar.webp"}
+            grayscale
+            objectFit={()}
+            withFallback={|| AnyElement}
+            withLoading={|| AnyElement}
+            imageCache={()}
+        />
+    };
 }
 
 #[test]
 fn test_canvas_tag() {
-    let _el = rsx! { <canvas /> };
+    let _el = rsx! {
+        <canvas
+            prepaint={|_, _, _| ()}
+            paint={|_, _, _, _| {}}
+        />
+    };
 }
 
 #[test]
@@ -1757,11 +1776,18 @@ fn test_class_flex_variants() {
 
 #[test]
 fn test_class_gpui_0_2_2_helpers() {
-    let _a = rsx! { <div class="text-ellipsis-start" /> };
     let _b = rsx! { <div class="aspect-square" /> };
     let _c = rsx! { <div class="content-normal self-center whitespace-nowrap line-clamp-2" /> };
     let _d = rsx! { <div class="col-span-full col-start-auto col-end-auto" /> };
     let _e = rsx! { <div class="row-span-full row-start-auto row-end-auto" /> };
+}
+
+#[test]
+fn test_class_directional_rounded_variants() {
+    let _a = rsx! { <div class="rounded-t-lg" /> };
+    let _b = rsx! { <div class="rounded-b-lg" /> };
+    let _c = rsx! { <div class="rounded-r-lg" /> };
+    let _d = rsx! { <div class="rounded-l-lg" /> };
 }
 
 #[test]
@@ -2617,6 +2643,19 @@ fn test_dynamic_class_directional_border() {
 }
 
 #[test]
+fn test_conditional_literal_class_static_path_evaluates_condition_once() {
+    take_length_calls();
+
+    let mut condition_calls = 0;
+    let _el = rsx! {
+        <div class={if { condition_calls += 1; true } { "gap-7" } else { "gap-9" }} />
+    };
+
+    assert_eq!(condition_calls, 1);
+    assert_eq!(take_length_calls(), vec![("px", 7.0)]);
+}
+
+#[test]
 fn test_rsx_expand_preview_contains_generated_code() {
     let expanded = gpui_rsx::rsx_expand! {
         <div class="flex w-[280px] bg-[rgba(15,23,42,0.8)]" />
@@ -2626,6 +2665,19 @@ fn test_rsx_expand_preview_contains_generated_code() {
     assert!(expanded.contains("w"));
     assert!(expanded.contains("280"));
     assert!(expanded.contains("rgba"));
+}
+
+#[test]
+fn test_rsx_expand_preview_staticizes_conditional_literal_class() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <div class={if active { "flex gap-7" } else { "block" }} />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+
+    assert!(!expanded.contains("__rsx_apply_class"));
+    assert!(compact.contains("ifactive"));
+    assert!(compact.contains(".flex().gap(px(7"));
+    assert!(compact.contains(".block()"));
 }
 
 #[test]

@@ -14,12 +14,12 @@
 //! - 每个子节点独立生成 `.child()` 调用，避免数组类型统一约束
 //! - 自动 ID 基于源码 span 位置（行号 + 列号），增量编译下保持稳定
 
-use super::attribute::{AttrHints, generate_attr_methods_with_mode};
+use super::attribute::{AttrHints, generate_attr_methods_with_mode, static_class_expr_needs_id};
 use super::class::{ClassMode, parse_class_string_with_mode};
 use super::tables::{
     is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
 };
-use crate::diagnostics::for_loop_missing_key_error;
+use crate::diagnostics::{for_loop_missing_key_error, missing_required_attribute_error};
 
 #[derive(Default)]
 struct AttrAnalysis {
@@ -54,7 +54,11 @@ fn analyze_attr(attr: &RsxAttribute) -> AttrAnalysis {
             };
             let needs_id = static_class
                 .as_deref()
-                .is_some_and(|s| s.split_ascii_whitespace().any(is_stateful_class));
+                .is_some_and(|s| s.split_ascii_whitespace().any(is_stateful_class))
+                || static_class
+                    .is_none()
+                    .then(|| static_class_expr_needs_id(value))
+                    .unwrap_or(false);
 
             AttrAnalysis {
                 static_class,
@@ -185,13 +189,16 @@ fn generate_element_checked(
 
     // 快速路径：无属性且无子节点时，跳过所有扫描直接返回基础标签
     if element.attributes.is_empty() && element.children.is_empty() {
-        return Ok(generate_tag(&tag_str, &element.name));
+        return generate_tag(&tag_str, &element.name, None, None, None);
     }
 
     // 单次遍历提取所有需要的信息，同时生成用户属性方法。
     let mut user_id = None;
     let mut user_key = None;
     let mut base_expr = None;
+    let mut img_source = None;
+    let mut canvas_prepaint = None;
+    let mut canvas_paint = None;
     let mut has_styled = false;
     let mut needs_id = false;
 
@@ -202,7 +209,6 @@ fn generate_element_checked(
         Vec::with_capacity(element.attributes.len() * 2 + element.children.len());
 
     for attr in &element.attributes {
-        let analysis = analyze_attr(attr);
         match attr {
             RsxAttribute::Value { name, value } if name == "id" => {
                 user_id = Some(value);
@@ -213,10 +219,25 @@ fn generate_element_checked(
             RsxAttribute::Value { name, value } if name == "base" => {
                 base_expr = Some(value);
             }
+            RsxAttribute::Value { name, value }
+                if tag_str == "img" && (name == "src" || name == "source") =>
+            {
+                img_source = Some(value);
+            }
+            RsxAttribute::Value { name, value } if tag_str == "canvas" && name == "prepaint" => {
+                canvas_prepaint = Some(value);
+            }
+            RsxAttribute::Value { name, value } if tag_str == "canvas" && name == "paint" => {
+                canvas_paint = Some(value);
+            }
+            RsxAttribute::Value { name, value } if tag_str == "svg" && name == "src" => {
+                methods.push(quote! { .path(#value) });
+            }
             RsxAttribute::Flag(name) if name == "styled" => {
                 has_styled = true;
             }
             _ => {
+                let analysis = analyze_attr(attr);
                 if !needs_id && analysis.needs_id {
                     needs_id = true;
                 }
@@ -237,7 +258,13 @@ fn generate_element_checked(
     let tag = if let Some(base) = base_expr {
         quote! { #base }
     } else {
-        generate_tag(&tag_str, &element.name)
+        generate_tag(
+            &tag_str,
+            &element.name,
+            img_source,
+            canvas_prepaint,
+            canvas_paint,
+        )?
     };
     let base = if let Some(id_value) = user_id {
         quote! { #tag.id(#id_value) }
@@ -302,18 +329,55 @@ fn generate_children_methods(
 /// HTML 标签 → `div()`，特殊标签 → 同名函数，自定义组件 → 同名函数调用
 ///
 /// 接受预缓存的 `tag_str` 避免重复 `to_string()`
-fn generate_tag(tag_str: &str, name: &RsxElementName) -> TokenStream {
+fn generate_tag(
+    tag_str: &str,
+    name: &RsxElementName,
+    img_source: Option<&syn::Expr>,
+    canvas_prepaint: Option<&syn::Expr>,
+    canvas_paint: Option<&syn::Expr>,
+) -> CodegenResult {
     if name.as_single_ident().is_none() {
         let path = &name.path;
-        return quote! { #path() };
+        return Ok(quote! { #path() });
     }
 
     let path = &name.path;
-    match tag_str {
+    Ok(match tag_str {
         // 特殊标签：保留为同名函数调用
         "svg" => quote! { svg() },
-        "img" => quote! { img() },
-        "canvas" => quote! { canvas() },
+        "img" => {
+            let Some(source) = img_source else {
+                return Err(missing_required_attribute_error(
+                    &name.path,
+                    "img",
+                    "src",
+                    r#"<img src={"path/to/image.png"} />"#,
+                )
+                .to_compile_error());
+            };
+            quote! { img(#source) }
+        }
+        "canvas" => {
+            let Some(prepaint) = canvas_prepaint else {
+                return Err(missing_required_attribute_error(
+                    &name.path,
+                    "canvas",
+                    "prepaint",
+                    r#"<canvas prepaint={|bounds, window, cx| state} paint={|bounds, state, window, cx| { ... }} />"#,
+                )
+                .to_compile_error());
+            };
+            let Some(paint) = canvas_paint else {
+                return Err(missing_required_attribute_error(
+                    &name.path,
+                    "canvas",
+                    "paint",
+                    r#"<canvas prepaint={|bounds, window, cx| state} paint={|bounds, state, window, cx| { ... }} />"#,
+                )
+                .to_compile_error());
+            };
+            quote! { canvas(#prepaint, #paint) }
+        }
         // HTML 标签：统一映射为 div()
         "div" | "span" | "section" | "article" | "header" | "footer" | "main" | "nav" | "aside"
         | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "label" | "a" | "button" | "input"
@@ -321,7 +385,7 @@ fn generate_tag(tag_str: &str, name: &RsxElementName) -> TokenStream {
             quote! { div() }
         }
         _ => quote! { #path() },
-    }
+    })
 }
 
 /// 生成基于源码位置的稳定自动 ID（无 key）

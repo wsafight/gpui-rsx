@@ -51,6 +51,7 @@ struct StyleRefinement {
     align_self: Option<AlignItems>,
     justify_content: Option<JustifyContent>,
     align_content: Option<AlignContent>,
+    aspect_ratio: Option<f32>,
     flex_grow: Option<f32>,
 }
 
@@ -348,7 +349,6 @@ trait Styled: Sized {
     fn m_2(self) -> Self;
     fn m_4(self) -> Self;
     // --- sizing ---
-    fn aspect_square(self) -> Self;
     fn w_full(self) -> Self;
     fn w_px(self) -> Self;
     fn w_auto(self) -> Self;
@@ -386,7 +386,6 @@ trait Styled: Sized {
     fn whitespace_nowrap(self) -> Self;
     fn truncate(self) -> Self;
     fn text_ellipsis(self) -> Self;
-    fn text_ellipsis_start(self) -> Self;
     fn line_clamp(self, lines: usize) -> Self;
     fn italic(self) -> Self;
     fn not_italic(self) -> Self;
@@ -704,9 +703,6 @@ impl Styled for MockElement {
         self
     }
     // --- sizing ---
-    fn aspect_square(self) -> Self {
-        self
-    }
     fn w_full(self) -> Self {
         self
     }
@@ -810,9 +806,6 @@ impl Styled for MockElement {
         self
     }
     fn text_ellipsis(self) -> Self {
-        self
-    }
-    fn text_ellipsis_start(self) -> Self {
         self
     }
     fn line_clamp(self, _: usize) -> Self {

@@ -36,9 +36,9 @@ All standard HTML tags map to `div()` in GPUI:
 
 ### Special Tags
 
-- `svg` → `svg()`
-- `img` → `img()`
-- `canvas` → `canvas()`
+- `svg` → `svg()`; `src={...}` is accepted as an alias for `.path(...)`
+- `img src={...}` / `img source={...}` → `img(...)`
+- `canvas prepaint={...} paint={...}` → `canvas(prepaint, paint)`
 
 ### Self-Closing Tags
 
