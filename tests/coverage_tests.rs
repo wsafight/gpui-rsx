@@ -413,6 +413,18 @@ fn test_for_loop_with_filter() {
 }
 
 #[test]
+fn test_for_loop_iterator_block_expr() {
+    let items = [1, 2, 3];
+    let _el = rsx! {
+        <div>
+            {for item in { items.iter() } {
+                <span>{*item}</span>
+            }}
+        </div>
+    };
+}
+
+#[test]
 fn test_for_loop_tuple_destructuring() {
     // for 循环元组解构
     let items = vec![(1, "one"), (2, "two"), (3, "three")];

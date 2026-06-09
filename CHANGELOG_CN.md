@@ -9,6 +9,34 @@
 
 ## [未发布]
 
+### 新增
+
+- 新增固定依赖版本的 `demo/` crate，用 Zed git 仓库中的 GPUI 与 `gpui-component`
+  一起做真实 API 校验，覆盖 hello、counter、palette、task list、API surface 和组件集成示例。
+- 新增 demo crate 的 CI 校验：
+  `cargo check --manifest-path demo/Cargo.toml --bins --locked`。
+- 新增基于 demo manifest 的 GPUI 兼容性工作流，使未来 Zed GPUI 变更能通过真实 GPUI API
+  表面检测。
+- 新增 `class={match ...}` 静态展开：当所有 match arm 都返回 class 字符串字面量时，
+  不再走动态 class matcher。
+- 新增静态 `opacity-*` 范围校验，并补充非法 opacity class 的 UI 测试覆盖。
+
+### 变更
+
+- permissive 模式下，未知动态 class 的 debug 警告现在按“生成点 + class 值”最多打印一次，
+  避免渲染循环中重复写 stderr。
+- stateful 元素上的字面量 `key` 现在使用编译期 `concat!` 自动 ID 路径，不再运行时
+  `format!`；动态 `key={expr}` 仍保留原有基于 `Display` 的 fallback。
+- `visible={expr}` 现在只求值一次，再映射到 `.visible()` 或 `.invisible()`。
+- 动态 class 文档现在明确推荐 `if` 和 `match` 字面量表达式作为可编译期展开的替代写法。
+
+### 修复
+
+- 修复 `benches/class_performance.rs`，使 benchmark 目标重新可以干净编译。
+- 修复 for 循环解析，使 `{for item in { items.iter() } { ... }}` 这类 iterator block 表达式可用。
+- 修复动态非法 opacity 处理，使运行时非法 `opacity-*` 值被忽略，而不是生成无效 GPUI opacity 调用。
+- 修复 demo 依赖说明，避免同时使用 `gpui-component` 时产生重复 GPUI crate 实例。
+
 ## [0.5.1] - 2026-06-09
 
 ### 新增
@@ -449,6 +477,10 @@
 
 ---
 
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/wsafight/gpui-rsx/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/wsafight/gpui-rsx/compare/v0.4.4...v0.5.0
+[0.4.4]: https://github.com/wsafight/gpui-rsx/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/wsafight/gpui-rsx/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/wsafight/gpui-rsx/compare/v0.4.1...v0.4.2
 [0.4.0]: https://github.com/wsafight/gpui-rsx/compare/v0.3.2...v0.4.0

@@ -1,6 +1,6 @@
 [package]
 name = "gpui-rsx"
-version = "0.5.1"
+version = "0.6.0"
 edition = "2024"
 description = "A JSX-like macro for GPUI - simplify UI development with HTML-like syntax"
 authors = ["GPUI-RSX Contributors"]

@@ -1,8 +1,10 @@
 # Rust
 /target/
+/demo/target/
 **/*.rs.bk
 *.pdb
 Cargo.lock
+!/demo/Cargo.lock
 
 # Code coverage
 lcov.info

@@ -27,16 +27,26 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
 
 ## 📚 Documentation
 
+- **[Documentation Site](https://wsafight.github.io/gpui-rsx/)** - Bilingual Astro/Starlight documentation
 - **[Architecture Guide](./ARCHITECTURE.md)** - Detailed architecture documentation
   - Module organization and data flow
   - Code generation strategies
   - Design patterns and testing approach
   - Extension points and debugging guide
-- **[Getting Started](./docs/getting-started.md)** - Step-by-step tutorial
-- **[API Reference](./docs/api-reference.md)** - Complete API documentation
-- **[Best Practices](./docs/best-practices.md)** - Recommended patterns
-- **[Migration Guide](./docs/migration-guide.md)** - Upgrade instructions
-- **[Troubleshooting](./docs/troubleshooting.md)** - Common issues and solutions
+- **[Getting Started](https://wsafight.github.io/gpui-rsx/getting-started/)** - Step-by-step tutorial
+- **[Syntax Reference](https://wsafight.github.io/gpui-rsx/usage/syntax/)** - Elements, attributes, children, and conditionals
+- **[API Reference](https://wsafight.github.io/gpui-rsx/reference/api/)** - Macro and mapping reference
+- **[Best Practices](https://wsafight.github.io/gpui-rsx/guides/best-practices/)** - Recommended patterns
+- **[Migration Guide](https://wsafight.github.io/gpui-rsx/guides/migration/)** - Upgrade instructions
+- **[Troubleshooting](https://wsafight.github.io/gpui-rsx/guides/troubleshooting/)** - Common issues and solutions
+
+Run the documentation site locally:
+
+```bash
+cd docs
+pnpm install
+pnpm run dev
+```
 
 ## 📦 Installation
 
@@ -44,9 +54,24 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-gpui = "0.2"
-gpui-rsx = "0.5"
+gpui = { git = "https://github.com/zed-industries/zed" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
+gpui-rsx = "0.6"
 ```
+
+### GPUI Version Target
+
+`gpui-rsx` 0.6 upgrades its GPUI target from the crates.io `gpui = "0.2.2"` package to GPUI from the Zed repository. The git dependency still reports `gpui v0.2.2`, but its API surface differs from the crates.io release and includes the helper methods used by this version.
+
+If you are upgrading from earlier `gpui-rsx` versions, replace:
+
+```toml
+gpui = "0.2.2"
+```
+
+with the Zed git `gpui` and `gpui_platform` dependencies shown above, and update application startup to use `gpui_platform::application()`.
+
+For applications, commit `Cargo.lock` to pin the exact resolved Zed revision. If you also use `gpui-component`, keep your direct `gpui` and `gpui_platform` source identical to `gpui-component`'s GPUI source; mixing a bare git dependency with `rev = "..."` creates duplicate GPUI crate instances and incompatible component types.
 
 ## 🚀 Quick Start
 
@@ -55,6 +80,7 @@ gpui-rsx = "0.5"
 ```rust
 use gpui::*;
 use gpui::prelude::*;
+use gpui_platform::application;
 use gpui_rsx::rsx;
 
 struct CounterView {
@@ -100,10 +126,11 @@ impl Render for CounterView {
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
+    application().run(|cx: &mut App| {
         cx.open_window(WindowOptions::default(), |_, cx| {
             cx.new(|_cx| CounterView { count: 0 })
-        });
+        }).unwrap();
+        cx.activate(true);
     });
 }
 ```
@@ -252,6 +279,7 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 
 **Layout:**
 - `flex`, `flex-col`, `flex-row`, `flex-wrap`, `flex-1`, `flex-none`, `flex-auto`
+- `flex-grow`, `flex-grow-0`, `flex-grow-1`, `flex-shrink`, `flex-shrink-0`, `flex-shrink-1`
 - `min-w-0`, `min-h-0`, `items-center`, `items-start`, `items-end`, `items-stretch`
 - `justify-center`, `justify-between`, `justify-around`, `justify-evenly`
 
@@ -494,7 +522,8 @@ rsx! {
 >
 > **Recommended alternatives** (in priority order):
 > 1. **String literal** (best): `class="flex gap-4"` — compile-time, supports the documented subset
-> 2. **Conditional literal**: `class={if active { "flex gap-4" } else { "block" }}` — still a literal
+> 2. **Conditional/match literal**: `class={if active { "flex gap-4" } else { "block" }}` or
+>    `class={match state { State::Active => "flex", _ => "block" }}` — still compile-time expanded
 > 3. **Individual attributes**: `<div flex gap_4 />` — compile-time, type-checked
 > 4. **`when` attribute**: `when={(cond, |el| el.flex())}` — compile-time, fully flexible
 > 5. **Dynamic expression**: `class={expr}` — runtime parser, narrower coverage than static literals
@@ -567,10 +596,10 @@ rsx! {
 
 ### 13. Attribute Mapping Reference
 
-camelCase attributes are automatically mapped to GPUI snake_case methods:
+Most camelCase attributes map to GPUI snake_case methods; special flag behavior is listed below:
 
-| RSX Attribute | GPUI Method |
-|---------------|-------------|
+| RSX Attribute | Generated GPUI code |
+|---------------|---------------------|
 | `opacity` | `.opacity()` |
 | `visible` / `invisible` | `.visible()` / `.invisible()` |
 | `width` / `height` | `.w()` / `.h()` |
@@ -578,7 +607,7 @@ camelCase attributes are automatically mapped to GPUI snake_case methods:
 | `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
 | `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
 | `flexBasis` | `.flex_basis()` |
-| `flexGrow` / `flexShrink` (flags) | `.flex_grow()` / `.flex_shrink()` |
+| `flexGrow` / `flexShrink` (flags) | `.flex_grow_1()` / `.flex_shrink_1()` |
 | `fontSize` | `.text_size()` |
 | `lineHeight` | `.line_height()` |
 | `fontWeight` | `.font_weight()` |

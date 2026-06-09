@@ -34,6 +34,7 @@ on:
 env:
   RUST_BACKTRACE: 1
   CARGO_TERM_COLOR: always
+  DEMO_MANIFEST: demo/Cargo.toml
 
 jobs:
   check-latest-gpui:
@@ -47,6 +48,12 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux GPUI dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libwayland-dev libx11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -63,26 +70,34 @@ jobs:
       - name: Get current GPUI version
         id: current-version
         run: |
-          VERSION=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "gpui") | .version')
+          META=$(cargo metadata --manifest-path "$DEMO_MANIFEST" --format-version 1)
+          VERSION=$(echo "$META" | jq -r '.packages[] | select(.name == "gpui") | .version')
+          SOURCE=$(echo "$META" | jq -r '.packages[] | select(.name == "gpui") | .source')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "source=$SOURCE" >> $GITHUB_OUTPUT
           echo "Current GPUI version: $VERSION"
+          echo "Current GPUI source: $SOURCE"
 
       - name: Update GPUI to latest
         run: |
           echo "Updating GPUI to latest version..."
-          cargo update -p gpui || true
+          cargo update --manifest-path "$DEMO_MANIFEST" --recursive gpui gpui_platform gpui-component
 
       - name: Get new GPUI version
         id: new-version
         run: |
-          VERSION=$(cargo metadata --format-version 1 | jq -r '.packages[] | select(.name == "gpui") | .version')
+          META=$(cargo metadata --manifest-path "$DEMO_MANIFEST" --format-version 1)
+          VERSION=$(echo "$META" | jq -r '.packages[] | select(.name == "gpui") | .version')
+          SOURCE=$(echo "$META" | jq -r '.packages[] | select(.name == "gpui") | .source')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "source=$SOURCE" >> $GITHUB_OUTPUT
           echo "New GPUI version: $VERSION"
+          echo "New GPUI source: $SOURCE"
 
       - name: Build with latest GPUI
         id: build
         run: |
-          cargo build --all-features
+          cargo check --manifest-path "$DEMO_MANIFEST" --bins
         continue-on-error: true
 
       - name: Run tests with latest GPUI
@@ -94,12 +109,12 @@ jobs:
       - name: Check if update is needed
         id: check-update
         run: |
-          if [ "${{ steps.current-version.outputs.version }}" != "${{ steps.new-version.outputs.version }}" ]; then
+          if [ "${{ steps.current-version.outputs.source }}" != "${{ steps.new-version.outputs.source }}" ]; then
             echo "needs_update=true" >> $GITHUB_OUTPUT
-            echo "GPUI version changed: ${{ steps.current-version.outputs.version }} -> ${{ steps.new-version.outputs.version }}"
+            echo "GPUI source changed: ${{ steps.current-version.outputs.source }} -> ${{ steps.new-version.outputs.source }}"
           else
             echo "needs_update=false" >> $GITHUB_OUTPUT
-            echo "GPUI version unchanged"
+            echo "GPUI source unchanged"
           fi
 
       - name: Create issue if incompatible
@@ -112,6 +127,8 @@ jobs:
 
             **Current GPUI version:** ${{ steps.current-version.outputs.version }}
             **New GPUI version:** ${{ steps.new-version.outputs.version }}
+            **Current GPUI source:** ${{ steps.current-version.outputs.source }}
+            **New GPUI source:** ${{ steps.new-version.outputs.source }}
             **Platform:** ${{ matrix.os }}
 
             ### Build Status
@@ -191,19 +208,3 @@ jobs:
             }
 
             console.log('All compatibility issues resolved');
-
-  check-gpui-main:
-    name: Test with GPUI main branch
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Update to GPUI main branch
-        run: |
-          # This requires adding gpui from git in Cargo.toml
-          echo "Testing with GPUI main branch would require dev-dependencies setup"
-          echo "Skipping for now - implement when needed"
-        continue-on-error: true

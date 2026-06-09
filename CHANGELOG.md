@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added a pinned `demo/` crate that checks GPUI from the Zed git repository together with
+  `gpui-component`, covering hello, counter, palette, task list, API-surface, and component
+  integration examples.
+- Added CI coverage for the demo crate with
+  `cargo check --manifest-path demo/Cargo.toml --bins --locked`.
+- Added GPUI compatibility workflow coverage against the demo manifest so future Zed GPUI changes
+  are checked against the real GPUI API surface.
+- Added static expansion for `class={match ...}` expressions whose arms all return class string
+  literals.
+- Added stricter static opacity validation and UI coverage for invalid `opacity-*` classes.
+
+### Changed
+
+- Dynamic unknown class warnings in permissive mode now print at most once per generated call site
+  and class value in debug builds, avoiding repeated stderr writes in render loops.
+- Literal `key` values on stateful elements now use a compile-time `concat!` auto-ID path instead of
+  runtime `format!`; dynamic `key={expr}` values keep the existing `Display`-based fallback.
+- `visible={expr}` now evaluates the expression once while mapping to `.visible()` or `.invisible()`.
+- Dynamic class documentation now calls out `if` and `match` literal expressions as preferred
+  compile-time-expanded alternatives.
+
+### Fixed
+
+- Fixed `benches/class_performance.rs` so the benchmark target compiles cleanly again.
+- Fixed for-loop parsing so iterator block expressions such as `{for item in { items.iter() } { ... }}`
+  are accepted.
+- Fixed dynamic invalid opacity handling so invalid runtime `opacity-*` values are ignored instead of
+  producing invalid GPUI opacity calls.
+- Fixed demo dependency guidance to avoid duplicate GPUI crate instances when `gpui-component` is
+  present.
+
 ## [0.5.1] - 2026-06-09
 
 ### Added
@@ -491,6 +524,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/wsafight/gpui-rsx/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/wsafight/gpui-rsx/compare/v0.4.4...v0.5.0
+[0.4.4]: https://github.com/wsafight/gpui-rsx/compare/v0.4.3...v0.4.4
 [0.4.3]: https://github.com/wsafight/gpui-rsx/compare/v0.4.2...v0.4.3
 [0.4.2]: https://github.com/wsafight/gpui-rsx/compare/v0.4.1...v0.4.2
 [0.4.0]: https://github.com/wsafight/gpui-rsx/compare/v0.3.2...v0.4.0

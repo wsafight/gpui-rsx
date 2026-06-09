@@ -27,16 +27,26 @@
 
 ## 📚 文档资源
 
+- **[文档站](https://wsafight.github.io/gpui-rsx/zh-cn/)** - Astro/Starlight 中英文文档
 - **[架构指南](./ARCHITECTURE_CN.md)** - 详细的架构文档
   - 模块组织和数据流
   - 代码生成策略（match 查找表、单次扫描、Vec 复用等）
   - 设计模式和测试方法
   - 扩展点和调试指南
-- **[快速入门](./docs/getting-started.md)** - 分步教程
-- **[API 参考](./docs/api-reference.md)** - 完整 API 文档
-- **[最佳实践](./docs/best-practices.md)** - 推荐模式
-- **[迁移指南](./docs/migration-guide.md)** - 升级说明
-- **[问题排查](./docs/troubleshooting.md)** - 常见问题和解决方案
+- **[快速开始](https://wsafight.github.io/gpui-rsx/zh-cn/getting-started/)** - 分步教程
+- **[语法参考](https://wsafight.github.io/gpui-rsx/zh-cn/usage/syntax/)** - 元素、属性、子节点和条件渲染
+- **[API 参考](https://wsafight.github.io/gpui-rsx/zh-cn/reference/api/)** - 宏和映射参考
+- **[最佳实践](https://wsafight.github.io/gpui-rsx/zh-cn/guides/best-practices/)** - 推荐模式
+- **[迁移指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/migration/)** - 升级说明
+- **[问题排查](https://wsafight.github.io/gpui-rsx/zh-cn/guides/troubleshooting/)** - 常见问题和解决方案
+
+本地运行文档站：
+
+```bash
+cd docs
+pnpm install
+pnpm run dev
+```
 
 ## 📦 安装
 
@@ -44,9 +54,24 @@
 
 ```toml
 [dependencies]
-gpui = "0.2"
-gpui-rsx = "0.5"
+gpui = { git = "https://github.com/zed-industries/zed" }
+gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
+gpui-rsx = "0.6"
 ```
+
+### GPUI 版本目标
+
+`gpui-rsx` 0.6 将 GPUI 目标从 crates.io 发布的 `gpui = "0.2.2"` 升级到 Zed 仓库的 git 版本。这个 git 依赖仍然显示为 `gpui v0.2.2`，但 API 面与 crates.io 的 `gpui 0.2.2` 不完全相同，并包含本版本使用的 helper 方法。
+
+如果你从旧版 `gpui-rsx` 升级，请将：
+
+```toml
+gpui = "0.2.2"
+```
+
+替换为上方的 Zed git `gpui` 和 `gpui_platform` 依赖，并把应用启动方式更新为 `gpui_platform::application()`。
+
+应用项目应提交 `Cargo.lock` 来固定实际解析到的 Zed revision。如果同时使用 `gpui-component`，请保持直接依赖的 `gpui` / `gpui_platform` source 与 `gpui-component` 使用的 GPUI source 完全一致；混用 bare git 和 `rev = "..."` 会生成两份 GPUI crate，导致组件类型不兼容。
 
 ## 🚀 快速开始
 
@@ -55,6 +80,7 @@ gpui-rsx = "0.5"
 ```rust
 use gpui::*;
 use gpui::prelude::*;
+use gpui_platform::application;
 use gpui_rsx::rsx;
 
 struct CounterView {
@@ -100,10 +126,11 @@ impl Render for CounterView {
 }
 
 fn main() {
-    Application::new().run(|cx: &mut App| {
+    application().run(|cx: &mut App| {
         cx.open_window(WindowOptions::default(), |_, cx| {
             cx.new(|_cx| CounterView { count: 0 })
-        });
+        }).unwrap();
+        cx.activate(true);
     });
 }
 ```
@@ -252,7 +279,7 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 
 **布局：**
 - `flex`, `flex-col`, `flex-row`, `flex-wrap`, `flex-1`, `flex-none`, `flex-auto`
-- `flex-grow`, `flex-grow-0`, `flex-shrink`, `flex-shrink-0`
+- `flex-grow`, `flex-grow-0`, `flex-grow-1`, `flex-shrink`, `flex-shrink-0`, `flex-shrink-1`
 - `min-w-0`, `min-h-0`, `items-center`, `items-start`, `items-end`, `items-stretch`
 - `justify-center`, `justify-between`, `justify-around`, `justify-evenly`
 
@@ -485,7 +512,8 @@ rsx! {
 >
 > **推荐替代方案**（按优先级排序）：
 > 1. **字符串字面量**（最佳）：`class="flex gap-4"` — 编译期，支持文档列出的子集
-> 2. **条件字面量**：`class={if active { "flex gap-4" } else { "block" }}` — 仍是字面量
+> 2. **条件 / match 字面量**：`class={if active { "flex gap-4" } else { "block" }}`
+>    或 `class={match state { State::Active => "flex", _ => "block" }}` — 仍会编译期展开
 > 3. **独立属性**：`<div flex gap_4 />` — 编译期，类型检查
 > 4. **`when` 属性**：`when={(cond, |el| el.flex())}` — 编译期，完全灵活
 > 5. **动态表达式**：`class={expr}` — 运行时解析器，覆盖范围比静态字面量窄
@@ -568,10 +596,10 @@ rsx! {
 
 ### 13. 属性映射参考
 
-camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
+大多数 camelCase 属性会映射为 GPUI 的 snake_case 方法；特殊标志行为见下表：
 
-| RSX 属性 | GPUI 方法 |
-|----------|-----------|
+| RSX 属性 | 生成的 GPUI 代码 |
+|----------|------------------|
 | `opacity` | `.opacity()` |
 | `visible` / `invisible` | `.visible()` / `.invisible()` |
 | `width` / `height` | `.w()` / `.h()` |
@@ -579,7 +607,7 @@ camelCase 属性会自动映射为 GPUI 的 snake_case 方法：
 | `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
 | `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
 | `flexBasis` | `.flex_basis()` |
-| `flexGrow` / `flexShrink`（标志） | `.flex_grow()` / `.flex_shrink()` |
+| `flexGrow` / `flexShrink`（标志） | `.flex_grow_1()` / `.flex_shrink_1()` |
 | `fontSize` | `.text_size()` |
 | `lineHeight` | `.line_height()` |
 | `fontWeight` | `.font_weight()` |

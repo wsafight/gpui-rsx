@@ -808,6 +808,20 @@ fn test_visible_false() {
 }
 
 #[test]
+fn test_visible_condition_evaluates_once() {
+    let mut calls = 0;
+    let _el = rsx! {
+        <div visible={{
+            calls += 1;
+            true
+        }}>
+            {"可见内容"}
+        </div>
+    };
+    assert_eq!(calls, 1);
+}
+
+#[test]
 fn test_positioning_attributes() {
     let _el = rsx! {
         <div
@@ -1749,7 +1763,7 @@ fn test_class_numeric_sizes_keep_px_semantics() {
 }
 
 #[test]
-fn test_class_font_weight_mapping_gpui_0_2() {
+fn test_class_font_weight_mapping_gpui() {
     take_font_weight_calls();
 
     let _el = rsx! {
@@ -1771,11 +1785,13 @@ fn test_class_flex_variants() {
     let _c = rsx! { <div class="flex-1" /> };
     let _d = rsx! { <div class="flex-grow-0" /> };
     let _e = rsx! { <div class="flex-grow" /> };
-    let _f = rsx! { <div class="flex-shrink" /> };
+    let _f = rsx! { <div class="flex-grow-1" /> };
+    let _g = rsx! { <div class="flex-shrink" /> };
+    let _h = rsx! { <div class="flex-shrink-1" /> };
 }
 
 #[test]
-fn test_class_gpui_0_2_2_helpers() {
+fn test_class_gpui_helpers() {
     let _b = rsx! { <div class="aspect-square" /> };
     let _c = rsx! { <div class="content-normal self-center whitespace-nowrap line-clamp-2" /> };
     let _d = rsx! { <div class="col-span-full col-start-auto col-end-auto" /> };
@@ -2351,6 +2367,29 @@ fn test_auto_id_no_id_for_non_stateful() {
     assert!(captured.is_none(), "无 stateful 属性时不应生成 auto-ID");
 }
 
+#[test]
+fn test_keyed_auto_id_literal_uses_static_concat() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <button key="primary" onClick={h} />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+
+    assert!(compact.contains("concat!(file!(),"));
+    assert!(compact.contains("\"primary\""));
+    assert!(!compact.contains("format!"));
+}
+
+#[test]
+fn test_keyed_auto_id_dynamic_key_keeps_format_fallback() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <button key={item.id} onClick={h} />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+
+    assert!(compact.contains("format!(concat!(file!(),"));
+    assert!(compact.contains("item.id"));
+}
+
 // ===========================================================================
 // 44. 动态 class 数值前缀回退（任意数值支持）
 // ===========================================================================
@@ -2656,6 +2695,37 @@ fn test_conditional_literal_class_static_path_evaluates_condition_once() {
 }
 
 #[test]
+fn test_match_literal_class_static_path_evaluates_expr_once() {
+    take_length_calls();
+
+    let mut match_expr_calls = 0;
+    let _el = rsx! {
+        <div class={match { match_expr_calls += 1; "primary" } {
+            "primary" => "gap-7",
+            _ => "gap-9",
+        }} />
+    };
+
+    assert_eq!(match_expr_calls, 1);
+    assert_eq!(take_length_calls(), vec![("px", 7.0)]);
+}
+
+#[test]
+fn test_match_literal_class_stateful_generates_auto_id() {
+    take_last_auto_id();
+
+    let active = true;
+    let _el = rsx! {
+        <div class={match active {
+            true => "overflow-scroll",
+            false => "",
+        }} />
+    };
+
+    assert!(take_last_auto_id().is_some());
+}
+
+#[test]
 fn test_rsx_expand_preview_contains_generated_code() {
     let expanded = gpui_rsx::rsx_expand! {
         <div class="flex w-[280px] bg-[rgba(15,23,42,0.8)]" />
@@ -2678,6 +2748,19 @@ fn test_rsx_expand_preview_staticizes_conditional_literal_class() {
     assert!(compact.contains("ifactive"));
     assert!(compact.contains(".flex().gap(px(7"));
     assert!(compact.contains(".block()"));
+}
+
+#[test]
+fn test_rsx_expand_preview_staticizes_match_literal_class() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <div class={match state { 0 => "flex gap-7", _ => "block" }} />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+
+    assert!(!expanded.contains("__rsx_apply_class"));
+    assert!(compact.contains("matchstate"));
+    assert!(compact.contains("0=>__el.flex().gap(px(7"));
+    assert!(compact.contains("_=>__el.block()"));
 }
 
 #[test]

@@ -396,11 +396,11 @@
 //!
 //! ### Attribute Mapping Reference
 //!
-//! camelCase names are automatically converted to snake_case GPUI methods. Attributes
-//! not in this table are passed through unchanged (e.g., `bg={color}` → `.bg(color)`).
+//! Most camelCase names are converted to snake_case GPUI methods. Attributes not in this
+//! table are passed through unchanged (e.g., `bg={color}` → `.bg(color)`).
 //!
-//! | RSX attribute | GPUI method |
-//! |---------------|-------------|
+//! | RSX attribute | Generated GPUI code |
+//! |---------------|---------------------|
 //! | `opacity` | `.opacity()` |
 //! | `visible` / `invisible` | `.visible()` / `.invisible()` |
 //! | `width` / `height` | `.w()` / `.h()` |
@@ -408,7 +408,7 @@
 //! | `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
 //! | `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
 //! | `flexBasis` | `.flex_basis()` |
-//! | `flexGrow` / `flexShrink` (flags) | `.flex_grow()` / `.flex_shrink()` |
+//! | `flexGrow` / `flexShrink` (flags) | `.flex_grow_1()` / `.flex_shrink_1()` |
 //! | `fontSize` | `.text_size()` |
 //! | `lineHeight` | `.line_height()` |
 //! | `fontWeight` | `.font_weight()` |
@@ -434,8 +434,8 @@
 //! location. The ID is chosen by the following priority:
 //!
 //! 1. **Explicit `id`** — always wins, `key` is ignored.
-//! 2. **`key` present** (and element is stateful) — composite ID at runtime:
-//!    `format!(concat!(file!(), "::{prefix}_{}"), key_expr)`
+//! 2. **`key` present** (and element is stateful) — composite ID. Literal keys use
+//!    `concat!(...)`; dynamic keys use `format!(concat!(file!(), "::{prefix}_{}"), key_expr)`.
 //! 3. **No `key`** (and element is stateful) — pure compile-time source-location ID:
 //!    `concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")`
 //! 4. **Not stateful** — no `.id()` injected; `key` is silently ignored.
@@ -444,8 +444,9 @@
 //! // Format (no key): concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")
 //! // Example:         "src/views/counter.rs::__rsx_button_L42C8"
 //! //
-//! // Format (key):    format!(concat!(file!(), "::__rsx_{tag}_L{line}C{col}_{}"), key)
-//! // Example:         "src/views/list.rs::__rsx_li_L55C12_42"
+//! // Format (literal key): concat!(file!(), "::__rsx_{tag}_L{line}C{col}_", "42")
+//! // Format (dynamic key): format!(concat!(file!(), "::__rsx_{tag}_L{line}C{col}_{}"), key)
+//! // Example:              "src/views/list.rs::__rsx_li_L55C12_42"
 //! ```
 //!
 //! The source-location ID is stable across incremental rebuilds as long as the
@@ -487,9 +488,9 @@
 //!
 //! - [Architecture guide (ARCHITECTURE.md)](https://github.com/wsafight/gpui-rsx/blob/main/ARCHITECTURE.md) —
 //!   module design, data flow, extension points
-//! - [Getting started](https://github.com/wsafight/gpui-rsx/blob/main/docs/getting-started.md)
-//! - [API reference](https://github.com/wsafight/gpui-rsx/blob/main/docs/api-reference.md)
-//! - [Best practices](https://github.com/wsafight/gpui-rsx/blob/main/docs/best-practices.md)
+//! - [Getting started](https://wsafight.github.io/gpui-rsx/getting-started/)
+//! - [API reference](https://wsafight.github.io/gpui-rsx/reference/api/)
+//! - [Best practices](https://wsafight.github.io/gpui-rsx/guides/best-practices/)
 //! - [Changelog](https://github.com/wsafight/gpui-rsx/blob/main/CHANGELOG.md)
 
 use proc_macro::TokenStream;

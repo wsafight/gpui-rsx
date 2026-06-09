@@ -387,8 +387,8 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
 /// GPUI 0.2 的预设宽度方法 `.border_t_1()`。
 pub(crate) fn lookup_attr_flag_method(name: &str) -> Option<&'static str> {
     match name {
-        "flexGrow" => Some("flex_grow"),
-        "flexShrink" => Some("flex_shrink"),
+        "flexGrow" => Some("flex_grow_1"),
+        "flexShrink" => Some("flex_shrink_1"),
         "border_t" => Some("border_t_1"),
         "border_b" => Some("border_b_1"),
         "border_l" => Some("border_l_1"),
@@ -636,11 +636,13 @@ pub(crate) const COMMON_CLASS_SUPPORT: &[CommonClassSupport] = &[
     CommonClassSupport::both("flex-none"),
     CommonClassSupport::both("flex-grow"),
     CommonClassSupport::both("flex-grow-0"),
+    CommonClassSupport::both("flex-grow-1"),
     CommonClassSupport::both("flex-wrap"),
     CommonClassSupport::both("flex-wrap-reverse"),
     CommonClassSupport::both("flex-nowrap"),
     CommonClassSupport::both("flex-shrink"),
     CommonClassSupport::both("flex-shrink-0"),
+    CommonClassSupport::both("flex-shrink-1"),
     CommonClassSupport::both("block"),
     CommonClassSupport::both("grid"),
     CommonClassSupport::both("hidden"),
@@ -1027,8 +1029,8 @@ mod tests {
 
     #[test]
     fn attr_flag_method_maps_gpui_flex_flags() {
-        assert_eq!(lookup_attr_flag_method("flexGrow"), Some("flex_grow"));
-        assert_eq!(lookup_attr_flag_method("flexShrink"), Some("flex_shrink"));
+        assert_eq!(lookup_attr_flag_method("flexGrow"), Some("flex_grow_1"));
+        assert_eq!(lookup_attr_flag_method("flexShrink"), Some("flex_shrink_1"));
     }
 
     #[test]

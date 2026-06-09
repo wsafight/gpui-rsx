@@ -4,12 +4,12 @@
 
 use crate::codegen::tables::is_stateful_class;
 use crate::diagnostics::*;
-use proc_macro2::{Span, TokenStream};
+use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use std::fmt;
 use syn::{
     Expr, ExprLit, Ident, Lit, Pat, Result, Token,
-    parse::{Parse, ParseStream},
+    parse::{Parse, ParseStream, Parser},
     spanned::Spanned,
     token,
 };
@@ -331,31 +331,33 @@ fn parse_for_loop(content: ParseStream) -> Result<RsxNode> {
 
     content.parse::<Token![in]>()?;
 
-    // 解析迭代器表达式（到 `{` 之前的所有内容）
-    // 由于迭代器后面跟着 `{ body }`，我们需要小心解析。
-    // 使用 Expr::parse 会贪婪消费大括号，所以我们按 token 手动收集。
-    let mut iter_tokens = proc_macro2::TokenStream::new();
-    while !content.peek(token::Brace) {
-        if content.is_empty() {
-            return Err(for_loop_missing_brace_error(content.span()));
-        }
-        let tt: proc_macro2::TokenTree = content.parse()?;
-        iter_tokens.extend([tt]);
+    // 解析剩余 token：最后一个顶层 `{...}` 是 RSX body，前面的 token 是 iterator expr。
+    // 这样 `for item in { items.iter() } { ... }` 这类 iterator block 不会被提前截断。
+    let mut remaining = Vec::new();
+    while !content.is_empty() {
+        remaining.push(content.parse::<TokenTree>()?);
     }
-    let iter_expr: Expr = syn::parse2(iter_tokens)?;
 
-    // 解析 body: { children... }
-    let body_content;
-    syn::braced!(body_content in content);
+    let body_group = match remaining.pop() {
+        Some(TokenTree::Group(group)) if group.delimiter() == Delimiter::Brace => group,
+        Some(tt) => return Err(for_loop_missing_brace_error(tt.span())),
+        None => return Err(for_loop_missing_brace_error(content.span())),
+    };
 
-    let mut body = Vec::with_capacity(2);
-    while !body_content.is_empty() {
-        if let Some(node) = try_parse_child_node(&body_content)? {
-            body.push(node);
-        } else {
-            return Err(for_loop_invalid_body_error(body_content.span()));
+    let iter_expr: Expr = syn::parse2(remaining.into_iter().collect())?;
+
+    let body = (|body_content: ParseStream| {
+        let mut body = Vec::with_capacity(2);
+        while !body_content.is_empty() {
+            if let Some(node) = try_parse_child_node(body_content)? {
+                body.push(node);
+            } else {
+                return Err(for_loop_invalid_body_error(body_content.span()));
+            }
         }
-    }
+        Ok(body)
+    })
+    .parse2(body_group.stream())?;
 
     Ok(RsxNode::For {
         binding: Box::new(binding),

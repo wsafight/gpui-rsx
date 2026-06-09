@@ -1,0 +1,7 @@
+error: Invalid opacity class `opacity-250`. Expected `opacity-0` through `opacity-100`.
+ --> tests/ui/invalid_opacity.rs:8:15
+  |
+8 |     let _el = rsx! { <div class="opacity-250" /> };
+  |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `rsx` (in Nightly builds, run with -Z macro-backtrace for more info)

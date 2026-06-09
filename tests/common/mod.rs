@@ -131,6 +131,7 @@ pub struct StyleRefinement {
     pub align_content: Option<AlignContent>,
     pub aspect_ratio: Option<f32>,
     pub flex_grow: Option<f32>,
+    pub flex_shrink: Option<f32>,
     pub debug: Option<bool>,
 }
 
@@ -170,15 +171,18 @@ pub trait Styled: Sized {
     fn flex_none(self) -> Self;
     fn flex_grow(self) -> Self;
     fn flex_grow_0(self) -> Self;
+    fn flex_grow_1(self) -> Self;
     fn flex_wrap(self) -> Self;
     fn flex_wrap_reverse(self) -> Self;
     fn flex_nowrap(self) -> Self;
     fn flex_shrink(self) -> Self;
     fn flex_shrink_0(self) -> Self;
+    fn flex_shrink_1(self) -> Self;
     // --- layout ---
     fn block(self) -> Self;
     fn grid(self) -> Self;
     fn hidden(self) -> Self;
+    fn aspect_square(self) -> Self;
     // --- alignment ---
     fn items_center(self) -> Self;
     fn items_start(self) -> Self;
@@ -826,6 +830,9 @@ impl Styled for MockElement {
     fn flex_grow_0(self) -> Self {
         self
     }
+    fn flex_grow_1(self) -> Self {
+        self
+    }
     fn flex_wrap(self) -> Self {
         self
     }
@@ -841,6 +848,9 @@ impl Styled for MockElement {
     fn flex_shrink_0(self) -> Self {
         self
     }
+    fn flex_shrink_1(self) -> Self {
+        self
+    }
     // --- layout ---
     fn block(self) -> Self {
         self
@@ -849,6 +859,9 @@ impl Styled for MockElement {
         self
     }
     fn hidden(self) -> Self {
+        self
+    }
+    fn aspect_square(self) -> Self {
         self
     }
     // --- alignment ---

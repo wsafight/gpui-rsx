@@ -71,6 +71,47 @@ jobs:
       - name: Run tests
         run: cargo test --all-features
 
+  demo:
+    name: Demo GPUI Check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.95.0
+
+      - name: Install Linux GPUI dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfontconfig1-dev libwayland-dev libx11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/registry
+          key: ${{ runner.os }}-demo-cargo-registry-${{ hashFiles('demo/Cargo.lock') }}
+
+      - name: Cache cargo index
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/git
+          key: ${{ runner.os }}-demo-cargo-index-${{ hashFiles('demo/Cargo.lock') }}
+
+      - name: Cache demo build
+        uses: actions/cache@v4
+        with:
+          path: demo/target
+          key: ${{ runner.os }}-demo-cargo-build-target-${{ hashFiles('demo/Cargo.lock') }}
+
+      - name: Check demo bins
+        run: cargo check --manifest-path demo/Cargo.toml --bins --locked
+
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest

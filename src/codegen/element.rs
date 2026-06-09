@@ -52,13 +52,11 @@ fn analyze_attr(attr: &RsxAttribute) -> AttrAnalysis {
             } else {
                 None
             };
-            let needs_id = static_class
-                .as_deref()
-                .is_some_and(|s| s.split_ascii_whitespace().any(is_stateful_class))
-                || static_class
-                    .is_none()
-                    .then(|| static_class_expr_needs_id(value))
-                    .unwrap_or(false);
+            let needs_id = if let Some(class) = static_class.as_deref() {
+                class.split_ascii_whitespace().any(is_stateful_class)
+            } else {
+                static_class_expr_needs_id(value)
+            };
 
             AttrAnalysis {
                 static_class,
@@ -406,9 +404,10 @@ fn make_auto_id(tag_name: &RsxElementName) -> TokenStream {
 
 /// 生成带 `key` 的复合自动 ID（用于循环场景）
 ///
-/// 格式：`format!("{file}::{prefix}_{key}", file!(), key_expr)`
+/// 动态 key 格式：`format!("{file}::{prefix}_{key}", file!(), key_expr)`
+/// 字面量 key 格式：`concat!(file!(), "::{prefix}_", "literal")`
 ///
-/// `concat!(file!(), ...)` 在编译期求值（零开销），`key_expr` 在运行时拼接，
+/// `concat!(file!(), ...)` 在编译期求值（零开销）。动态 `key_expr` 在运行时拼接，
 /// 使同一循环迭代内的每个元素获得唯一 ID。
 /// `key_expr` 需实现 `std::fmt::Display`（数字、字符串、自定义类型均可）。
 fn make_keyed_auto_id(tag_name: &RsxElementName, key_expr: &syn::Expr) -> TokenStream {
@@ -417,7 +416,47 @@ fn make_keyed_auto_id(tag_name: &RsxElementName, key_expr: &syn::Expr) -> TokenS
     // 编译期常量前缀，包含文件路径 + 源码位置，格式如：
     //   "src/views/list.rs::__rsx_li_L42C8_"
     let prefix_suffix = format!("::__rsx_{}_L{}C{}_", tag_name, loc.line, loc.column);
+    if let Some(static_suffix) = static_key_suffix(key_expr) {
+        return quote! { concat!(file!(), #prefix_suffix, #static_suffix) };
+    }
     // 运行时将 key 追加到前缀后，生成如：
     //   "src/views/list.rs::__rsx_li_L42C8_item_42"
     quote! { format!(concat!(file!(), #prefix_suffix, "{}"), #key_expr) }
+}
+
+fn static_key_suffix(expr: &syn::Expr) -> Option<String> {
+    match expr {
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Str(lit),
+            ..
+        }) => Some(lit.value()),
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Int(lit),
+            ..
+        }) => lit
+            .base10_parse::<u128>()
+            .ok()
+            .map(|value| value.to_string()),
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Bool(lit),
+            ..
+        }) => Some(lit.value.to_string()),
+        syn::Expr::Lit(syn::ExprLit {
+            lit: syn::Lit::Char(lit),
+            ..
+        }) => Some(lit.value().to_string()),
+        syn::Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Neg(_)) => match &*unary.expr {
+            syn::Expr::Lit(syn::ExprLit {
+                lit: syn::Lit::Int(lit),
+                ..
+            }) => lit
+                .base10_parse::<u128>()
+                .ok()
+                .map(|value| format!("-{value}")),
+            _ => None,
+        },
+        syn::Expr::Paren(expr) => static_key_suffix(&expr.expr),
+        syn::Expr::Group(expr) => static_key_suffix(&expr.expr),
+        _ => None,
+    }
 }

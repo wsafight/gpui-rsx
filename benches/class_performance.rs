@@ -28,6 +28,7 @@ impl FontWeight {
     const BLACK: FontWeight = FontWeight;
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 enum AlignItems {
     FlexStart,
@@ -39,12 +40,14 @@ enum AlignItems {
 
 type JustifyContent = AlignContent;
 
+#[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 enum AlignContent {
     Stretch,
     SpaceEvenly,
 }
 
+#[allow(dead_code)]
 #[derive(Default, Debug)]
 struct StyleRefinement {
     align_items: Option<AlignItems>,
@@ -290,12 +293,15 @@ trait Styled: Sized {
     fn flex_wrap_reverse(self) -> Self;
     fn flex_nowrap(self) -> Self;
     fn flex_grow_0(self) -> Self;
+    fn flex_grow_1(self) -> Self;
     fn flex_shrink(self) -> Self;
     fn flex_shrink_0(self) -> Self;
+    fn flex_shrink_1(self) -> Self;
     // --- layout ---
     fn block(self) -> Self;
     fn grid(self) -> Self;
     fn hidden(self) -> Self;
+    fn aspect_square(self) -> Self;
     // --- alignment ---
     fn items_center(self) -> Self;
     fn items_start(self) -> Self;
@@ -534,10 +540,16 @@ impl Styled for MockElement {
     fn flex_grow_0(self) -> Self {
         self
     }
+    fn flex_grow_1(self) -> Self {
+        self
+    }
     fn flex_shrink(self) -> Self {
         self
     }
     fn flex_shrink_0(self) -> Self {
+        self
+    }
+    fn flex_shrink_1(self) -> Self {
         self
     }
     // --- layout ---
@@ -548,6 +560,9 @@ impl Styled for MockElement {
         self
     }
     fn hidden(self) -> Self {
+        self
+    }
+    fn aspect_square(self) -> Self {
         self
     }
     // --- alignment ---

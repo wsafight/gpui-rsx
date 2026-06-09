@@ -98,7 +98,16 @@ pub(crate) fn generate_attr_methods_with_mode(
             }
 
             if name == "visible" {
-                out.push(quote! { .when(#value, |__el| __el.visible()).when(!(#value), |__el| __el.invisible()) });
+                out.push(quote! {
+                    .map(|__el| {
+                        let __visible = #value;
+                        if __visible {
+                            __el.visible()
+                        } else {
+                            __el.invisible()
+                        }
+                    })
+                });
                 return;
             }
 
@@ -164,6 +173,32 @@ fn generate_static_class_expr_code(expr: &syn::Expr, mode: ClassMode) -> Option<
                 }
             })
         }
+        syn::Expr::Match(expr_match) => {
+            let expr = &expr_match.expr;
+            let arms = expr_match
+                .arms
+                .iter()
+                .map(|arm| {
+                    let attrs = &arm.attrs;
+                    let pat = &arm.pat;
+                    let guard = if let Some((if_token, guard_expr)) = &arm.guard {
+                        quote! { #if_token #guard_expr }
+                    } else {
+                        quote! {}
+                    };
+                    let body = generate_static_class_expr_code(&arm.body, mode)?;
+                    Some(quote! {
+                        #(#attrs)*
+                        #pat #guard => #body,
+                    })
+                })
+                .collect::<Option<Vec<_>>>()?;
+            Some(quote! {
+                match #expr {
+                    #(#arms)*
+                }
+            })
+        }
         syn::Expr::Lit(syn::ExprLit {
             lit: syn::Lit::Str(lit_str),
             ..
@@ -192,6 +227,14 @@ fn static_class_expr_has_stateful_class(expr: &syn::Expr) -> Option<bool> {
             }
             let (_, else_expr) = expr_if.else_branch.as_ref()?;
             static_class_expr_has_stateful_class(else_expr)
+        }
+        syn::Expr::Match(expr_match) => {
+            for arm in &expr_match.arms {
+                if static_class_expr_has_stateful_class(&arm.body)? {
+                    return Some(true);
+                }
+            }
+            Some(false)
         }
         syn::Expr::Lit(syn::ExprLit {
             lit: syn::Lit::Str(lit_str),

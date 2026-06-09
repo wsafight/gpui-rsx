@@ -74,7 +74,7 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
         };
     }
 
-    if let Some(token) = parse_gpui_0_2_compat_class(class) {
+    if let Some(token) = parse_tailwind_alias_class(class) {
         return token;
     }
 
@@ -215,68 +215,10 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
     }
 }
 
-fn parse_gpui_0_2_compat_class(class: &str) -> Option<TokenStream> {
+fn parse_tailwind_alias_class(class: &str) -> Option<TokenStream> {
     match class {
-        "aspect-square" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().aspect_ratio = Some(1.0);
-                __el
-            })
-        }),
-        "content-stretch" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().align_content = Some(AlignContent::Stretch);
-                __el
-            })
-        }),
-        "flex-grow-0" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().flex_grow = Some(0.0);
-                __el
-            })
-        }),
-        "items-stretch" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().align_items = Some(AlignItems::Stretch);
-                __el
-            })
-        }),
-        "justify-evenly" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().justify_content = Some(JustifyContent::SpaceEvenly);
-                __el
-            })
-        }),
-        "self-start" | "self-flex-start" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().align_self = Some(AlignItems::FlexStart);
-                __el
-            })
-        }),
-        "self-end" | "self-flex-end" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().align_self = Some(AlignItems::FlexEnd);
-                __el
-            })
-        }),
-        "self-center" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().align_self = Some(AlignItems::Center);
-                __el
-            })
-        }),
-        "self-baseline" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().align_self = Some(AlignItems::Baseline);
-                __el
-            })
-        }),
-        "self-stretch" => Some(quote! {
-            .map(|mut __el| {
-                __el.style().align_self = Some(AlignItems::Stretch);
-                __el
-            })
-        }),
+        "flex-grow" => Some(quote! { .flex_grow_1() }),
+        "flex-shrink" => Some(quote! { .flex_shrink_1() }),
         _ => None,
     }
 }
@@ -427,7 +369,10 @@ fn parse_direct_color_class(class: &str) -> Option<TokenStream> {
 
 fn parse_direct_opacity_class(class: &str) -> Option<TokenStream> {
     let rest = class.strip_prefix("opacity-")?;
-    let n = rest.parse::<u8>().ok()?;
+    let n = match rest.parse::<u8>() {
+        Ok(n) if n <= 100 => n,
+        _ => return Some(compile_error(invalid_opacity_value_message(class))),
+    };
     let val = n as f32 / 100.0;
     Some(quote! { .opacity(#val) })
 }
@@ -654,6 +599,10 @@ fn invalid_color_value_message(class: &str) -> String {
     format!(
         "Invalid color class `{class}`. Expected #rgb, #rrggbb, #rrggbbaa, rgb(r,g,b), or rgba(r,g,b,a)."
     )
+}
+
+fn invalid_opacity_value_message(class: &str) -> String {
+    format!("Invalid opacity class `{class}`. Expected `opacity-0` through `opacity-100`.")
 }
 
 fn unsupported_class_message(class: &str) -> String {

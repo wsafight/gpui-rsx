@@ -123,14 +123,30 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
     let numeric_fallbacks = get_cached_numeric_fallback();
     let unknown_fallback = match mode {
         ClassMode::Permissive => quote! {
-            // 仅在 debug 构建中打印警告，避免 release 中每帧触发 syscall 污染日志
+            // 仅在 debug 构建中打印警告，避免 release 中每帧触发 syscall 污染日志。
+            // 同一生成点的同一未知 class 只提示一次，避免 render loop 反复刷 stderr。
             #[cfg(debug_assertions)]
             if !class.is_empty() {
-                eprintln!(
-                    "[gpui-rsx] warning: 动态 class {:?} 被忽略（不支持的 class 类型）\n  \
-                     提示：改用字符串字面量 class=\"{}\" 可支持所有 class",
-                    class, class
-                );
+                fn __rsx_warn_unknown_dynamic_class_once(class: &str) {
+                    static __RSX_WARNED_UNKNOWN_CLASSES: std::sync::OnceLock<
+                        std::sync::Mutex<std::collections::HashSet<String>>
+                    > = std::sync::OnceLock::new();
+
+                    let warned = __RSX_WARNED_UNKNOWN_CLASSES
+                        .get_or_init(|| std::sync::Mutex::new(std::collections::HashSet::new()));
+                    let Ok(mut warned) = warned.lock() else {
+                        return;
+                    };
+                    if warned.insert(class.to_owned()) {
+                        eprintln!(
+                            "[gpui-rsx] warning: 动态 class {:?} 被忽略（不支持的 class 类型）\n  \
+                             提示：改用字符串字面量 class=\"{}\" 可支持所有 class",
+                            class, class
+                        );
+                    }
+                }
+
+                __rsx_warn_unknown_dynamic_class_once(class);
             }
             el
         },
@@ -380,7 +396,11 @@ fn generate_numeric_fallback_code() -> TokenStream {
         #(#length_fallbacks)*
         // --- opacity: opacity-50 → 0.50 ---
         if let Some(rest) = class.strip_prefix("opacity-") {
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() { return el.opacity(n / 100.0); }
+            if let Ok(n) = rest.parse::<f32>().__rsx_finite() {
+                if (0.0..=100.0).contains(&n) {
+                    return el.opacity(n / 100.0);
+                }
+            }
         }
         #(#usize_fallbacks)*
         #(#u16_fallbacks)*
@@ -485,76 +505,6 @@ fn parse_dynamic_common_class(class: &str) -> TokenStream {
                 {
                     el
                 }
-            }
-        },
-        "aspect-square" => quote! {
-            {
-                let mut el = el;
-                el.style().aspect_ratio = Some(1.0);
-                el
-            }
-        },
-        "flex-grow-0" => quote! {
-            {
-                let mut el = el;
-                el.style().flex_grow = Some(0.0);
-                el
-            }
-        },
-        "items-stretch" => quote! {
-            {
-                let mut el = el;
-                el.style().align_items = Some(AlignItems::Stretch);
-                el
-            }
-        },
-        "content-stretch" => quote! {
-            {
-                let mut el = el;
-                el.style().align_content = Some(AlignContent::Stretch);
-                el
-            }
-        },
-        "justify-evenly" => quote! {
-            {
-                let mut el = el;
-                el.style().justify_content = Some(JustifyContent::SpaceEvenly);
-                el
-            }
-        },
-        "self-start" | "self-flex-start" => quote! {
-            {
-                let mut el = el;
-                el.style().align_self = Some(AlignItems::FlexStart);
-                el
-            }
-        },
-        "self-end" | "self-flex-end" => quote! {
-            {
-                let mut el = el;
-                el.style().align_self = Some(AlignItems::FlexEnd);
-                el
-            }
-        },
-        "self-center" => quote! {
-            {
-                let mut el = el;
-                el.style().align_self = Some(AlignItems::Center);
-                el
-            }
-        },
-        "self-baseline" => quote! {
-            {
-                let mut el = el;
-                el.style().align_self = Some(AlignItems::Baseline);
-                el
-            }
-        },
-        "self-stretch" => quote! {
-            {
-                let mut el = el;
-                el.style().align_self = Some(AlignItems::Stretch);
-                el
             }
         },
         _ => {
