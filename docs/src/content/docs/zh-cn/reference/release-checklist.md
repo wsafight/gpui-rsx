@@ -19,11 +19,23 @@ scripts/check.sh --proxy --release
 check/clippy。`--release` 模式还会检查 benchmark 目标、确认 demo 中只有一个 `gpui`
 实例、构建文档站，并执行 cargo publish dry-run。
 
+## 发布包内容
+
+发布前确认 crates.io 包只包含构建 crate 和展示文档所需文件：
+
+```bash
+cargo package --list --allow-dirty
+```
+
+发布包应包含 manifest、license、README、`src/**` 和 benchmark 目标；不应包含 `demo/`、
+`docs/`、`.github/`、`tests/` 或本地构建产物。
+
 如果本地环境不能跑 docs 或 package 验证，可以显式拆开执行：
 
 ```bash
 cargo bench --bench class_performance --no-run
 cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
+cargo package --list --allow-dirty
 pnpm --dir docs install --frozen-lockfile
 pnpm --dir docs run check
 pnpm --dir docs run build
