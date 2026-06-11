@@ -285,6 +285,19 @@ pub(crate) fn lookup_color(name: &str) -> Option<u32> {
 ///
 /// 使用 match 语句替代线性扫描，编译器生成高效跳转表。
 /// 合并了原 EVENT_HANDLERS 和 ATTRIBUTE_NAME_MAP 两张表。
+#[derive(Clone, Copy)]
+pub(crate) struct AttrMethodInfo {
+    pub(crate) method: &'static str,
+    pub(crate) needs_id: bool,
+    pub(crate) multi_arg: bool,
+}
+
+#[derive(Clone, Copy)]
+struct MethodProperties {
+    needs_id: bool,
+    multi_arg: bool,
+}
+
 pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
     match name {
         // 事件处理器（camelCase 和 snake_case 均支持）
@@ -300,6 +313,7 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "onKeyUp" | "on_key_up" => Some("on_key_up"),
         "onModifiersChanged" | "on_modifiers_changed" => Some("on_modifiers_changed"),
         "onHover" | "on_hover" => Some("on_hover"),
+        "onAuxClick" | "on_aux_click" => Some("on_aux_click"),
         "onScrollWheel" | "on_scroll_wheel" => Some("on_scroll_wheel"),
         "onDrag" | "on_drag" => Some("on_drag"),
         "onDragMove" | "on_drag_move" => Some("on_drag_move"),
@@ -318,9 +332,9 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "debugSelector" => Some("debug_selector"),
         "dragOver" => Some("drag_over"),
         "groupActive" => Some("group_active"),
-        "groupDragOver" => Some("group_drag_over"),
         "groupHover" => Some("group_hover"),
         "inFocus" => Some("in_focus"),
+        "focusVisible" | "focus_visible" => Some("focus_visible"),
         "keyContext" => Some("key_context"),
         "tabGroup" => Some("tab_group"),
         "tabIndex" => Some("tab_index"),
@@ -329,6 +343,23 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "windowControlArea" => Some("window_control_area"),
         "anchorScroll" => Some("anchor_scroll"),
         "hoverableTooltip" => Some("hoverable_tooltip"),
+        "tooltipShowDelay" => Some("tooltip_show_delay"),
+        "onA11yAction" | "on_a11y_action" => Some("on_a11y_action"),
+        "ariaLabel" => Some("aria_label"),
+        "ariaSelected" => Some("aria_selected"),
+        "ariaExpanded" => Some("aria_expanded"),
+        "ariaToggled" => Some("aria_toggled"),
+        "ariaNumericValue" => Some("aria_numeric_value"),
+        "ariaMinNumericValue" => Some("aria_min_numeric_value"),
+        "ariaMaxNumericValue" => Some("aria_max_numeric_value"),
+        "ariaOrientation" => Some("aria_orientation"),
+        "ariaLevel" => Some("aria_level"),
+        "ariaPositionInSet" => Some("aria_position_in_set"),
+        "ariaSizeOfSet" => Some("aria_size_of_set"),
+        "ariaRowIndex" => Some("aria_row_index"),
+        "ariaColumnIndex" => Some("aria_column_index"),
+        "ariaRowCount" => Some("aria_row_count"),
+        "ariaColumnCount" => Some("aria_column_count"),
         "imageCache" => Some("image_cache"),
         "objectFit" => Some("object_fit"),
         "onChildrenPrepainted" => Some("on_children_prepainted"),
@@ -380,6 +411,16 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
     }
 }
 
+pub(crate) fn lookup_attr_method_info(name: &str) -> Option<AttrMethodInfo> {
+    let method = lookup_attr_method(name)?;
+    let properties = method_properties(method);
+    Some(AttrMethodInfo {
+        method,
+        needs_id: properties.needs_id,
+        multi_arg: properties.multi_arg,
+    })
+}
+
 /// 查找 flag 属性的 GPUI 方法名。
 ///
 /// 绝大多数 flag 属性可直接复用 value 属性映射；方向性 border 是例外：
@@ -404,47 +445,69 @@ pub(crate) fn lookup_attr_flag_method(name: &str) -> Option<&'static str> {
 /// GPUI 0.2 将大多数事件放在 `InteractiveElement` 上，不要求 stateful ID。
 /// 只有 `StatefulInteractiveElement` 方法需要先调用 `.id()`。
 pub(crate) fn is_stateful_attr(name: &str) -> bool {
-    if let Some(method) = lookup_attr_method(name) {
-        return is_stateful_method(method);
+    if let Some(info) = lookup_attr_method_info(name) {
+        return info.needs_id;
     }
 
     is_stateful_method(name)
 }
 
 pub(crate) fn is_stateful_method(method: &str) -> bool {
-    // `active` here is StatefulInteractiveElement::active (takes closure), not Styled::active.
-    // hover/focus/group are Styled trait methods that don't need .id().
-    matches!(
-        method,
-        "active"
-            | "anchor_scroll"
-            | "focusable"
-            | "group_active"
-            | "hoverable_tooltip"
-            | "on_click"
-            | "on_drag"
-            | "on_hover"
-            | "overflow_scroll"
-            | "overflow_x_scroll"
-            | "overflow_y_scroll"
-            | "scrollbar_width"
-            | "tooltip"
-            | "track_scroll"
-    )
+    method_properties(method).needs_id
 }
 
-pub(crate) fn is_multi_arg_method(method: &str) -> bool {
-    matches!(
-        method,
-        "group_active"
-            | "group_drag_over"
-            | "group_hover"
-            | "on_boxed_action"
-            | "on_drag"
-            | "on_mouse_down"
-            | "on_mouse_up"
-            | "on_mouse_up_out"
-    )
+fn method_properties(method: &str) -> MethodProperties {
+    // `active` here is StatefulInteractiveElement::active (takes closure), not Styled::active.
+    // hover/focus/group are Styled trait methods that don't need .id().
+    match method {
+        "group_active" | "on_a11y_action" | "on_drag" => MethodProperties {
+            needs_id: true,
+            multi_arg: true,
+        },
+        "active"
+        | "anchor_scroll"
+        | "aria_column_count"
+        | "aria_column_index"
+        | "aria_expanded"
+        | "aria_label"
+        | "aria_level"
+        | "aria_max_numeric_value"
+        | "aria_min_numeric_value"
+        | "aria_numeric_value"
+        | "aria_orientation"
+        | "aria_position_in_set"
+        | "aria_row_count"
+        | "aria_row_index"
+        | "aria_selected"
+        | "aria_size_of_set"
+        | "aria_toggled"
+        | "focusable"
+        | "hoverable_tooltip"
+        | "on_aux_click"
+        | "on_click"
+        | "on_hover"
+        | "overflow_scroll"
+        | "overflow_x_scroll"
+        | "overflow_y_scroll"
+        | "role"
+        | "scrollbar_width"
+        | "tooltip"
+        | "tooltip_show_delay"
+        | "track_scroll" => MethodProperties {
+            needs_id: true,
+            multi_arg: false,
+        },
+        "group_hover" | "on_boxed_action" | "on_mouse_down" | "on_mouse_up" | "on_mouse_up_out" => {
+            MethodProperties {
+                needs_id: false,
+                multi_arg: true,
+            }
+        }
+        _ => MethodProperties {
+            needs_id: false,
+            multi_arg: false,
+        },
+    }
 }
 
 /// 检查静态 class 是否会调用 `StatefulInteractiveElement` 方法。
@@ -985,6 +1048,8 @@ mod tests {
         assert_eq!(lookup_attr_method("onKeyDown"), Some("on_key_down"));
         assert_eq!(lookup_attr_method("onDragMove"), Some("on_drag_move"));
         assert_eq!(lookup_attr_method("onBoxedAction"), Some("on_boxed_action"));
+        assert_eq!(lookup_attr_method("onAuxClick"), Some("on_aux_click"));
+        assert_eq!(lookup_attr_method("onA11yAction"), Some("on_a11y_action"));
     }
 
     #[test]
@@ -1001,6 +1066,15 @@ mod tests {
         assert_eq!(lookup_attr_method("minWidth"), Some("min_w"));
         assert_eq!(lookup_attr_method("maxHeight"), Some("max_h"));
         assert_eq!(lookup_attr_method("trackFocus"), Some("track_focus"));
+        assert_eq!(lookup_attr_method("focusVisible"), Some("focus_visible"));
+        assert_eq!(
+            lookup_attr_method("tooltipShowDelay"),
+            Some("tooltip_show_delay")
+        );
+        assert_eq!(lookup_attr_method("groupHover"), Some("group_hover"));
+        assert_eq!(lookup_attr_method("groupActive"), Some("group_active"));
+        assert_eq!(lookup_attr_method("ariaLabel"), Some("aria_label"));
+        assert_eq!(lookup_attr_method("ariaSelected"), Some("aria_selected"));
         assert_eq!(lookup_attr_method("fontSize"), Some("text_size"));
         assert_eq!(lookup_attr_method("fontFamily"), Some("font_family"));
         assert_eq!(lookup_attr_method("textColor"), Some("text_color"));
@@ -1035,11 +1109,33 @@ mod tests {
 
     #[test]
     fn attr_method_unknown_returns_none() {
-        assert_eq!(lookup_attr_method("onAuxClick"), None);
         assert_eq!(lookup_attr_method("onFocus"), None);
         assert_eq!(lookup_attr_method("onMousePressure"), None);
         assert_eq!(lookup_attr_method("unknown_attr"), None);
         assert_eq!(lookup_attr_method(""), None);
+    }
+
+    #[test]
+    fn attr_method_info_keeps_behavior_flags_together() {
+        let a11y = lookup_attr_method_info("onA11yAction").unwrap();
+        assert_eq!(a11y.method, "on_a11y_action");
+        assert!(a11y.needs_id);
+        assert!(a11y.multi_arg);
+
+        let mouse_down = lookup_attr_method_info("onMouseDown").unwrap();
+        assert_eq!(mouse_down.method, "on_mouse_down");
+        assert!(!mouse_down.needs_id);
+        assert!(mouse_down.multi_arg);
+
+        let focus_visible = lookup_attr_method_info("focusVisible").unwrap();
+        assert_eq!(focus_visible.method, "focus_visible");
+        assert!(!focus_visible.needs_id);
+        assert!(!focus_visible.multi_arg);
+
+        let aria_label = lookup_attr_method_info("ariaLabel").unwrap();
+        assert_eq!(aria_label.method, "aria_label");
+        assert!(aria_label.needs_id);
+        assert!(!aria_label.multi_arg);
     }
 
     // --- is_stateful_attr ---
@@ -1060,6 +1156,11 @@ mod tests {
         assert!(is_stateful_attr("overflow_scroll"));
         assert!(is_stateful_attr("tooltip"));
         assert!(is_stateful_attr("track_scroll"));
+        assert!(is_stateful_attr("onAuxClick"));
+        assert!(is_stateful_attr("ariaLabel"));
+        assert!(is_stateful_attr("role"));
+        assert!(is_stateful_attr("tooltipShowDelay"));
+        assert!(is_stateful_attr("groupActive"));
     }
 
     #[test]
@@ -1068,6 +1169,7 @@ mod tests {
         assert!(!is_stateful_attr("hover"));
         assert!(!is_stateful_attr("focus"));
         assert!(!is_stateful_attr("group"));
+        assert!(!is_stateful_attr("groupHover"));
     }
 
     #[test]

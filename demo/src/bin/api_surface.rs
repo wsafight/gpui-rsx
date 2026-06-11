@@ -1,7 +1,9 @@
 use gpui::prelude::*;
 use gpui::*;
+use gpui_component::tooltip::Tooltip;
 use gpui_platform::application;
 use gpui_rsx::rsx;
+use std::time::Duration;
 
 struct ApiSurfaceView {
     expanded: bool,
@@ -69,14 +71,38 @@ impl Render for ApiSurfaceView {
                         </p>
                     </div>
 
+                    <div
+                        class="flex gap-3 p-3 rounded-md bg-zinc-950 border border-zinc-800"
+                        group={"api-surface"}
+                    >
+                        <span
+                            class="px-3 py-1 rounded-md bg-zinc-800 text-zinc-100"
+                            groupHover={("api-surface", |style| style.bg(rgb(0x334155)))}
+                            groupActive={("api-surface", |style| style.opacity(0.85))}
+                        >
+                            {"group state"}
+                        </span>
+                    </div>
+
                     <button
-                        class="px-4 py-2 rounded-md bg-sky-500 text-white cursor-pointer"
+                        class="px-4 py-2 rounded-md bg-sky-500 text-white cursor-pointer border border-sky-700"
                         flexGrow
                         flexShrink
+                        role={Role::Button}
+                        ariaLabel={"Toggle API surface state"}
+                        ariaSelected={self.expanded}
+                        hoverClass="bg-sky-600"
+                        focusClass="border-sky-300"
+                        focusVisible={|style| style.border_color(rgb(0xbae6fd))}
+                        activeClass="opacity-75"
+                        tooltip={|window, cx| Tooltip::new("Toggle the demo state").build(window, cx)}
+                        tooltipShowDelay={Duration::from_millis(150)}
                         onClick={cx.listener(|view, _, _window, cx| {
                             view.expanded = !view.expanded;
                             cx.notify();
                         })}
+                        onAuxClick={|_, _, _| {}}
+                        onA11yAction={(AccessibleAction::Click, |_extra, _window, _cx| {})}
                     >
                         {"Toggle"}
                     </button>

@@ -31,9 +31,9 @@ rsx! {
 
 The generated ID is deterministic for the macro expansion site.
 
-Common ID-triggering attributes include `onClick`, `onHover`, `onDrag`, `tooltip`, `focusable`, `overflowScroll`, `overflowXScroll`, `overflowYScroll`, `trackScroll`, `scrollbarWidth`, and static `overflow-scroll` class variants.
+Common ID-triggering attributes include `onClick`, `onHover`, `onDrag`, `onAuxClick`, `onA11yAction`, `active`, `activeClass`, `groupActive`, `tooltip`, `tooltipShowDelay`, `focusable`, `role`, `ariaLabel`, `overflowScroll`, `overflowXScroll`, `overflowYScroll`, `trackScroll`, `scrollbarWidth`, and static `overflow-scroll` class variants.
 
-Attributes such as `hover`, `focus`, `group`, `onMouseDown`, and `captureKeyDown` do not by themselves require a stateful ID in the current GPUI target.
+Attributes such as `hover`, `hoverClass`, `focus`, `focusClass`, `group`, `groupHover`, `onMouseDown`, and `captureKeyDown` do not by themselves require a stateful ID in the current GPUI target.
 
 ## Keys in Loops
 

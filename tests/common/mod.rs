@@ -5,375 +5,264 @@
 //! 所有测试文件共用的 MockElement 和辅助函数，
 //! 避免在 macro_tests.rs 和 coverage_tests.rs 中重复定义。
 
-use std::cell::RefCell;
+mod capture;
+mod types;
 
-// 捕获最近一次自动生成的 ID（以 `__rsx_` 开头）。
-// 供 auto-ID 格式验证测试使用。
-thread_local! {
-    pub static LAST_AUTO_ID: RefCell<Option<String>> = const { RefCell::new(None) };
-    pub static RGB_CALLS: RefCell<Vec<u32>> = const { RefCell::new(Vec::new()) };
-    pub static RGBA_CALLS: RefCell<Vec<u32>> = const { RefCell::new(Vec::new()) };
-    pub static BORDER_CALLS: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
-    pub static FONT_WEIGHT_CALLS: RefCell<Vec<f32>> = const { RefCell::new(Vec::new()) };
-    pub static LENGTH_CALLS: RefCell<Vec<(&'static str, f32)>> = const { RefCell::new(Vec::new()) };
-    pub static INTEGER_CALLS: RefCell<Vec<(&'static str, i32)>> = const { RefCell::new(Vec::new()) };
+pub use capture::*;
+pub use types::*;
+
+macro_rules! styled_no_arg_methods {
+    ($($name:ident),* $(,)?) => {
+        $(fn $name(self) -> Self { self })*
+    };
 }
 
-pub fn take_border_calls() -> Vec<&'static str> {
-    BORDER_CALLS.with(|c| c.borrow_mut().drain(..).collect())
+macro_rules! styled_value_methods {
+    ($($name:ident),* $(,)?) => {
+        $(fn $name<T>(self, _: T) -> Self { self })*
+    };
 }
 
-/// 返回最近捕获的 auto-ID，并清空缓存。
-pub fn take_last_auto_id() -> Option<String> {
-    LAST_AUTO_ID.with(|c| c.borrow_mut().take())
-}
-
-/// 返回测试期间捕获的 rgb() 入参，并清空缓存。
-pub fn take_rgb_calls() -> Vec<u32> {
-    RGB_CALLS.with(|c| c.borrow_mut().drain(..).collect())
-}
-
-/// 返回测试期间捕获的 rgba() 入参，并清空缓存。
-pub fn take_rgba_calls() -> Vec<u32> {
-    RGBA_CALLS.with(|c| c.borrow_mut().drain(..).collect())
-}
-
-/// 返回测试期间捕获的 font_weight() 入参，并清空缓存。
-pub fn take_font_weight_calls() -> Vec<f32> {
-    FONT_WEIGHT_CALLS.with(|c| c.borrow_mut().drain(..).collect())
-}
-
-/// 返回测试期间捕获的长度 helper 入参，并清空缓存。
-pub fn take_length_calls() -> Vec<(&'static str, f32)> {
-    LENGTH_CALLS.with(|c| c.borrow_mut().drain(..).collect())
-}
-
-/// 返回测试期间捕获的整数 helper 入参，并清空缓存。
-pub fn take_integer_calls() -> Vec<(&'static str, i32)> {
-    INTEGER_CALLS.with(|c| c.borrow_mut().drain(..).collect())
-}
-
-/// Mock Element，模拟 GPUI 的 Div / Stateful<Div>。
-/// 所有 builder 方法返回 Self 以支持方法链。
-#[derive(Debug)]
-pub struct MockElement;
-
-#[derive(Debug)]
-pub struct AnyElement;
-
-#[derive(Debug)]
-pub struct Bounds;
-
-#[derive(Debug)]
-pub struct Window;
-
-#[derive(Debug)]
-pub struct App;
-
-#[derive(Clone, Copy, Debug)]
-pub struct FontWeight(pub f32);
-
-impl FontWeight {
-    pub const THIN: FontWeight = FontWeight(100.0);
-    pub const EXTRA_LIGHT: FontWeight = FontWeight(200.0);
-    pub const LIGHT: FontWeight = FontWeight(300.0);
-    pub const NORMAL: FontWeight = FontWeight(400.0);
-    pub const MEDIUM: FontWeight = FontWeight(500.0);
-    pub const SEMIBOLD: FontWeight = FontWeight(600.0);
-    pub const BOLD: FontWeight = FontWeight(700.0);
-    pub const EXTRA_BOLD: FontWeight = FontWeight(800.0);
-    pub const BLACK: FontWeight = FontWeight(900.0);
-}
-
-impl From<i32> for FontWeight {
-    fn from(value: i32) -> Self {
-        Self(value as f32)
+impl Styled for StyleRefinement {
+    fn style(&mut self) -> &mut StyleRefinement {
+        self
     }
-}
 
-impl From<f32> for FontWeight {
-    fn from(value: f32) -> Self {
-        Self(value)
+    styled_no_arg_methods!(
+        flex,
+        flex_col,
+        flex_col_reverse,
+        flex_row,
+        flex_row_reverse,
+        flex_1,
+        flex_auto,
+        flex_initial,
+        flex_none,
+        flex_grow,
+        flex_grow_0,
+        flex_grow_1,
+        flex_wrap,
+        flex_wrap_reverse,
+        flex_nowrap,
+        flex_shrink,
+        flex_shrink_0,
+        flex_shrink_1,
+        block,
+        grid,
+        hidden,
+        aspect_square,
+        items_center,
+        items_start,
+        items_end,
+        items_baseline,
+        items_stretch,
+        justify_center,
+        justify_between,
+        justify_start,
+        justify_end,
+        justify_around,
+        justify_evenly,
+        content_normal,
+        content_center,
+        content_start,
+        content_end,
+        content_between,
+        content_around,
+        content_evenly,
+        content_stretch,
+        self_start,
+        self_end,
+        self_flex_start,
+        self_flex_end,
+        self_center,
+        self_baseline,
+        self_stretch,
+        w_full,
+        w_px,
+        w_auto,
+        w_1_2,
+        w_1_3,
+        h_full,
+        h_px,
+        h_auto,
+        h_1_2,
+        h_1_3,
+        size_full,
+        size_px,
+        size_1_2,
+        text_xs,
+        text_sm,
+        text_base,
+        text_lg,
+        text_xl,
+        text_2xl,
+        text_3xl,
+        text_left,
+        text_center,
+        text_right,
+        whitespace_normal,
+        whitespace_nowrap,
+        truncate,
+        text_ellipsis,
+        italic,
+        not_italic,
+        underline,
+        line_through,
+        text_decoration_none,
+        text_decoration_solid,
+        text_decoration_wavy,
+        text_decoration_0,
+        text_decoration_1,
+        text_decoration_2,
+        text_decoration_4,
+        text_decoration_8,
+        font_bold,
+        border_1,
+        border_2,
+        border_dashed,
+        border_t_1,
+        border_b_1,
+        border_l_1,
+        border_r_1,
+        border_x_1,
+        border_y_1,
+        border_t_2,
+        border_b_2,
+        border_l_2,
+        border_r_2,
+        border_x_2,
+        border_y_2,
+        rounded_sm,
+        rounded_md,
+        rounded_lg,
+        rounded_2xl,
+        rounded_3xl,
+        rounded_full,
+        rounded_t_lg,
+        rounded_b_lg,
+        rounded_r_lg,
+        rounded_l_lg,
+        cursor_pointer,
+        overflow_hidden,
+        overflow_x_hidden,
+        overflow_y_hidden,
+        absolute,
+        relative,
+        col_span_full,
+        col_start_auto,
+        col_end_auto,
+        row_span_full,
+        row_start_auto,
+        row_end_auto,
+        cursor_default,
+        cursor_text,
+        cursor_move,
+        cursor_not_allowed,
+        cursor_context_menu,
+        cursor_crosshair,
+        cursor_vertical_text,
+        cursor_alias,
+        cursor_copy,
+        cursor_no_drop,
+        cursor_grab,
+        cursor_grabbing,
+        cursor_ew_resize,
+        cursor_ns_resize,
+        cursor_nesw_resize,
+        cursor_nwse_resize,
+        cursor_col_resize,
+        cursor_row_resize,
+        cursor_n_resize,
+        cursor_e_resize,
+        cursor_s_resize,
+        cursor_w_resize,
+        debug,
+        shadow_none,
+        shadow_2xs,
+        shadow_xs,
+        shadow_sm,
+        shadow_md,
+        shadow_lg,
+        shadow_xl,
+        shadow_2xl,
+        rounded_none,
+        rounded_xl,
+    );
+
+    styled_value_methods!(
+        gap,
+        gap_x,
+        gap_y,
+        p,
+        px,
+        py,
+        pt,
+        pb,
+        pl,
+        pr,
+        m,
+        mx,
+        my,
+        mt,
+        mb,
+        ml,
+        mr,
+        size,
+        w,
+        h,
+        min_w,
+        max_w,
+        min_h,
+        max_h,
+        font_family,
+        bg,
+        text_color,
+        border_color,
+        opacity,
+    );
+
+    fn line_clamp(self, _: usize) -> Self {
+        self
     }
-}
 
-#[derive(Clone, Copy, Debug)]
-pub enum AlignItems {
-    Start,
-    End,
-    FlexStart,
-    FlexEnd,
-    Center,
-    Baseline,
-    Stretch,
-}
-
-pub type JustifyContent = AlignContent;
-
-#[derive(Clone, Copy, Debug)]
-pub enum AlignContent {
-    Start,
-    End,
-    FlexStart,
-    FlexEnd,
-    Center,
-    Stretch,
-    SpaceBetween,
-    SpaceEvenly,
-    SpaceAround,
-}
-
-#[derive(Default, Debug)]
-pub struct StyleRefinement {
-    pub align_items: Option<AlignItems>,
-    pub align_self: Option<AlignItems>,
-    pub justify_content: Option<JustifyContent>,
-    pub align_content: Option<AlignContent>,
-    pub aspect_ratio: Option<f32>,
-    pub flex_grow: Option<f32>,
-    pub flex_shrink: Option<f32>,
-    pub debug: Option<bool>,
-}
-
-/// Minimal stand-in for GPUI's IntoElement trait.
-pub trait IntoElement: Sized {
-    fn into_any_element(self) -> AnyElement {
-        AnyElement
-    }
-}
-
-impl IntoElement for MockElement {}
-impl IntoElement for &str {}
-impl IntoElement for String {}
-impl IntoElement for i32 {}
-impl IntoElement for usize {}
-impl IntoElement for u32 {}
-
-#[derive(Clone, Copy, Debug)]
-pub enum MouseButton {
-    Left,
-    Right,
-}
-
-/// Styled trait，用于动态 class 的运行时解析
-pub trait Styled: Sized {
-    fn style(&mut self) -> &mut StyleRefinement;
-
-    // --- flex ---
-    fn flex(self) -> Self;
-    fn flex_col(self) -> Self;
-    fn flex_col_reverse(self) -> Self;
-    fn flex_row(self) -> Self;
-    fn flex_row_reverse(self) -> Self;
-    fn flex_1(self) -> Self;
-    fn flex_auto(self) -> Self;
-    fn flex_initial(self) -> Self;
-    fn flex_none(self) -> Self;
-    fn flex_grow(self) -> Self;
-    fn flex_grow_0(self) -> Self;
-    fn flex_grow_1(self) -> Self;
-    fn flex_wrap(self) -> Self;
-    fn flex_wrap_reverse(self) -> Self;
-    fn flex_nowrap(self) -> Self;
-    fn flex_shrink(self) -> Self;
-    fn flex_shrink_0(self) -> Self;
-    fn flex_shrink_1(self) -> Self;
-    // --- layout ---
-    fn block(self) -> Self;
-    fn grid(self) -> Self;
-    fn hidden(self) -> Self;
-    fn aspect_square(self) -> Self;
-    // --- alignment ---
-    fn items_center(self) -> Self;
-    fn items_start(self) -> Self;
-    fn items_end(self) -> Self;
-    fn items_baseline(self) -> Self;
-    fn items_stretch(self) -> Self;
-    fn justify_center(self) -> Self;
-    fn justify_between(self) -> Self;
-    fn justify_start(self) -> Self;
-    fn justify_end(self) -> Self;
-    fn justify_around(self) -> Self;
-    fn justify_evenly(self) -> Self;
-    fn content_normal(self) -> Self;
-    fn content_center(self) -> Self;
-    fn content_start(self) -> Self;
-    fn content_end(self) -> Self;
-    fn content_between(self) -> Self;
-    fn content_around(self) -> Self;
-    fn content_evenly(self) -> Self;
-    fn content_stretch(self) -> Self;
-    fn self_start(self) -> Self;
-    fn self_end(self) -> Self;
-    fn self_flex_start(self) -> Self;
-    fn self_flex_end(self) -> Self;
-    fn self_center(self) -> Self;
-    fn self_baseline(self) -> Self;
-    fn self_stretch(self) -> Self;
-    // --- spacing ---
-    fn gap<T>(self, v: T) -> Self;
-    fn gap_x<T>(self, v: T) -> Self;
-    fn gap_y<T>(self, v: T) -> Self;
-    fn p<T>(self, v: T) -> Self;
-    fn px<T>(self, v: T) -> Self;
-    fn py<T>(self, v: T) -> Self;
-    fn pt<T>(self, v: T) -> Self;
-    fn pb<T>(self, v: T) -> Self;
-    fn pl<T>(self, v: T) -> Self;
-    fn pr<T>(self, v: T) -> Self;
-    fn m<T>(self, v: T) -> Self;
-    fn mx<T>(self, v: T) -> Self;
-    fn my<T>(self, v: T) -> Self;
-    fn mt<T>(self, v: T) -> Self;
-    fn mb<T>(self, v: T) -> Self;
-    fn ml<T>(self, v: T) -> Self;
-    fn mr<T>(self, v: T) -> Self;
-    // --- sizing ---
-    fn w_full(self) -> Self;
-    fn w_px(self) -> Self;
-    fn w_auto(self) -> Self;
-    fn w_1_2(self) -> Self;
-    fn w_1_3(self) -> Self;
-    fn h_full(self) -> Self;
-    fn h_px(self) -> Self;
-    fn h_auto(self) -> Self;
-    fn h_1_2(self) -> Self;
-    fn h_1_3(self) -> Self;
-    fn size_full(self) -> Self;
-    fn size_px(self) -> Self;
-    fn size_1_2(self) -> Self;
-    fn size<T>(self, v: T) -> Self;
-    fn w<T>(self, v: T) -> Self;
-    fn h<T>(self, v: T) -> Self;
-    fn min_w<T>(self, v: T) -> Self;
-    fn max_w<T>(self, v: T) -> Self;
-    fn min_h<T>(self, v: T) -> Self;
-    fn max_h<T>(self, v: T) -> Self;
-    // --- text size ---
-    fn text_xs(self) -> Self;
-    fn text_sm(self) -> Self;
-    fn text_base(self) -> Self;
-    fn text_lg(self) -> Self;
-    fn text_xl(self) -> Self;
-    fn text_2xl(self) -> Self;
-    fn text_3xl(self) -> Self;
-    // --- text alignment ---
-    fn text_left(self) -> Self;
-    fn text_center(self) -> Self;
-    fn text_right(self) -> Self;
-    // --- text decoration ---
-    fn whitespace_normal(self) -> Self;
-    fn whitespace_nowrap(self) -> Self;
-    fn truncate(self) -> Self;
-    fn text_ellipsis(self) -> Self;
-    fn line_clamp(self, lines: usize) -> Self;
-    fn italic(self) -> Self;
-    fn not_italic(self) -> Self;
-    fn underline(self) -> Self;
-    fn line_through(self) -> Self;
-    fn text_decoration_none(self) -> Self;
-    fn text_decoration_solid(self) -> Self;
-    fn text_decoration_wavy(self) -> Self;
-    fn text_decoration_0(self) -> Self;
-    fn text_decoration_1(self) -> Self;
-    fn text_decoration_2(self) -> Self;
-    fn text_decoration_4(self) -> Self;
-    fn text_decoration_8(self) -> Self;
-    // --- font ---
-    fn font_bold(self) -> Self;
-    fn font_family<T>(self, v: T) -> Self;
-    fn font_weight<T>(self, v: T) -> Self
+    fn font_weight<T>(self, _: T) -> Self
     where
-        T: Into<FontWeight>;
-    // --- border ---
-    fn border_1(self) -> Self;
-    fn border_2(self) -> Self;
-    fn border_dashed(self) -> Self;
-    fn border_t_1(self) -> Self;
-    fn border_b_1(self) -> Self;
-    fn border_l_1(self) -> Self;
-    fn border_r_1(self) -> Self;
-    fn border_x_1(self) -> Self;
-    fn border_y_1(self) -> Self;
-    fn border_t_2(self) -> Self;
-    fn border_b_2(self) -> Self;
-    fn border_l_2(self) -> Self;
-    fn border_r_2(self) -> Self;
-    fn border_x_2(self) -> Self;
-    fn border_y_2(self) -> Self;
-    fn rounded_sm(self) -> Self;
-    fn rounded_md(self) -> Self;
-    fn rounded_lg(self) -> Self;
-    fn rounded_2xl(self) -> Self;
-    fn rounded_3xl(self) -> Self;
-    fn rounded_full(self) -> Self;
-    fn rounded_t_lg(self) -> Self;
-    fn rounded_b_lg(self) -> Self;
-    fn rounded_r_lg(self) -> Self;
-    fn rounded_l_lg(self) -> Self;
-    // --- misc ---
-    fn cursor_pointer(self) -> Self;
-    fn overflow_hidden(self) -> Self;
-    fn overflow_x_hidden(self) -> Self;
-    fn overflow_y_hidden(self) -> Self;
-    fn absolute(self) -> Self;
-    fn relative(self) -> Self;
-    // --- color / opacity ---
-    fn bg<T>(self, v: T) -> Self;
-    fn text_color<T>(self, v: T) -> Self;
-    fn border_color<T>(self, v: T) -> Self;
-    fn opacity<T>(self, v: T) -> Self;
-    // --- grid ---
-    fn grid_cols(self, v: u16) -> Self;
-    fn grid_rows(self, v: u16) -> Self;
-    fn col_span(self, v: u16) -> Self;
-    fn col_span_full(self) -> Self;
-    fn col_start(self, v: i16) -> Self;
-    fn col_start_auto(self) -> Self;
-    fn col_end(self, v: i16) -> Self;
-    fn col_end_auto(self) -> Self;
-    fn row_span(self, v: u16) -> Self;
-    fn row_span_full(self) -> Self;
-    fn row_start(self, v: i16) -> Self;
-    fn row_start_auto(self) -> Self;
-    fn row_end(self, v: i16) -> Self;
-    fn row_end_auto(self) -> Self;
-    // --- cursor ---
-    fn cursor_default(self) -> Self;
-    fn cursor_text(self) -> Self;
-    fn cursor_move(self) -> Self;
-    fn cursor_not_allowed(self) -> Self;
-    fn cursor_context_menu(self) -> Self;
-    fn cursor_crosshair(self) -> Self;
-    fn cursor_vertical_text(self) -> Self;
-    fn cursor_alias(self) -> Self;
-    fn cursor_copy(self) -> Self;
-    fn cursor_no_drop(self) -> Self;
-    fn cursor_grab(self) -> Self;
-    fn cursor_grabbing(self) -> Self;
-    fn cursor_ew_resize(self) -> Self;
-    fn cursor_ns_resize(self) -> Self;
-    fn cursor_nesw_resize(self) -> Self;
-    fn cursor_nwse_resize(self) -> Self;
-    fn cursor_col_resize(self) -> Self;
-    fn cursor_row_resize(self) -> Self;
-    fn cursor_n_resize(self) -> Self;
-    fn cursor_e_resize(self) -> Self;
-    fn cursor_s_resize(self) -> Self;
-    fn cursor_w_resize(self) -> Self;
-    fn debug(self) -> Self;
-    // --- shadow ---
-    fn shadow_none(self) -> Self;
-    fn shadow_2xs(self) -> Self;
-    fn shadow_xs(self) -> Self;
-    fn shadow_sm(self) -> Self;
-    fn shadow_md(self) -> Self;
-    fn shadow_lg(self) -> Self;
-    fn shadow_xl(self) -> Self;
-    fn shadow_2xl(self) -> Self;
-    // --- rounded extra ---
-    fn rounded_none(self) -> Self;
-    fn rounded_xl(self) -> Self;
+        T: Into<FontWeight>,
+    {
+        self
+    }
+
+    fn grid_cols(self, _: u16) -> Self {
+        self
+    }
+
+    fn grid_rows(self, _: u16) -> Self {
+        self
+    }
+
+    fn col_span(self, _: u16) -> Self {
+        self
+    }
+
+    fn col_start(self, _: i16) -> Self {
+        self
+    }
+
+    fn col_end(self, _: i16) -> Self {
+        self
+    }
+
+    fn row_span(self, _: u16) -> Self {
+        self
+    }
+
+    fn row_start(self, _: i16) -> Self {
+        self
+    }
+
+    fn row_end(self, _: i16) -> Self {
+        self
+    }
 }
 
 // 模拟 GPUI 构造函数
@@ -618,13 +507,19 @@ impl MockElement {
     }
 
     // --- 状态样式 ---
-    pub fn hover<F: FnOnce(Self) -> Self>(self, _f: F) -> Self {
+    pub fn hover<F: FnOnce(StyleRefinement) -> StyleRefinement>(self, _f: F) -> Self {
         self
     }
-    pub fn active<F: FnOnce(Self) -> Self>(self, _f: F) -> Self {
+    pub fn active<F: FnOnce(StyleRefinement) -> StyleRefinement>(self, _f: F) -> Self {
         self
     }
-    pub fn focus<F: FnOnce(Self) -> Self>(self, _f: F) -> Self {
+    pub fn focus<F: FnOnce(StyleRefinement) -> StyleRefinement>(self, _f: F) -> Self {
+        self
+    }
+    pub fn focus_visible<F: FnOnce(StyleRefinement) -> StyleRefinement>(self, _f: F) -> Self {
+        self
+    }
+    pub fn in_focus<F: FnOnce(StyleRefinement) -> StyleRefinement>(self, _f: F) -> Self {
         self
     }
     pub fn tooltip<T>(self, _: T) -> Self {
@@ -639,6 +534,15 @@ impl MockElement {
     pub fn hoverable_tooltip<T>(self, _: T) -> Self {
         self
     }
+    pub fn tooltip_show_delay<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn on_aux_click<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn on_a11y_action<T, U>(self, _: T, _: U) -> Self {
+        self
+    }
     pub fn overflow_scroll(self) -> Self {
         self
     }
@@ -651,7 +555,25 @@ impl MockElement {
     pub fn scrollbar_width<T>(self, _: T) -> Self {
         self
     }
-    pub fn group_active<F: FnOnce(Self) -> Self>(self, _f: F) -> Self {
+    pub fn group_hover<T, F: FnOnce(StyleRefinement) -> StyleRefinement>(
+        self,
+        _: T,
+        _f: F,
+    ) -> Self {
+        self
+    }
+    pub fn group_active<T, F: FnOnce(StyleRefinement) -> StyleRefinement>(
+        self,
+        _: T,
+        _f: F,
+    ) -> Self {
+        self
+    }
+    pub fn group_drag_over<T, F: FnOnce(StyleRefinement) -> StyleRefinement>(
+        self,
+        _: T,
+        _f: F,
+    ) -> Self {
         self
     }
     pub fn anchor_scroll<T>(self, _: T) -> Self {
@@ -661,6 +583,54 @@ impl MockElement {
         self
     }
     pub fn track_scroll<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn role<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_label<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_selected<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_expanded<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_toggled<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_numeric_value<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_min_numeric_value<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_max_numeric_value<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_orientation<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_level<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_position_in_set<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_size_of_set<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_row_index<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_column_index<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_row_count<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_column_count<T>(self, _: T) -> Self {
         self
     }
 
@@ -796,358 +766,198 @@ impl Styled for MockElement {
         Box::leak(Box::new(StyleRefinement::default()))
     }
 
-    // --- flex ---
-    fn flex(self) -> Self {
-        self
-    }
-    fn flex_col(self) -> Self {
-        self
-    }
-    fn flex_col_reverse(self) -> Self {
-        self
-    }
-    fn flex_row(self) -> Self {
-        self
-    }
-    fn flex_row_reverse(self) -> Self {
-        self
-    }
-    fn flex_1(self) -> Self {
-        self
-    }
-    fn flex_auto(self) -> Self {
-        self
-    }
-    fn flex_initial(self) -> Self {
-        self
-    }
-    fn flex_none(self) -> Self {
-        self
-    }
-    fn flex_grow(self) -> Self {
-        self
-    }
-    fn flex_grow_0(self) -> Self {
-        self
-    }
-    fn flex_grow_1(self) -> Self {
-        self
-    }
-    fn flex_wrap(self) -> Self {
-        self
-    }
-    fn flex_wrap_reverse(self) -> Self {
-        self
-    }
-    fn flex_nowrap(self) -> Self {
-        self
-    }
-    fn flex_shrink(self) -> Self {
-        self
-    }
-    fn flex_shrink_0(self) -> Self {
-        self
-    }
-    fn flex_shrink_1(self) -> Self {
-        self
-    }
-    // --- layout ---
-    fn block(self) -> Self {
-        self
-    }
-    fn grid(self) -> Self {
-        self
-    }
-    fn hidden(self) -> Self {
-        self
-    }
-    fn aspect_square(self) -> Self {
-        self
-    }
-    // --- alignment ---
-    fn items_center(self) -> Self {
-        self
-    }
-    fn items_start(self) -> Self {
-        self
-    }
-    fn items_end(self) -> Self {
-        self
-    }
-    fn items_baseline(self) -> Self {
-        self
-    }
-    fn items_stretch(self) -> Self {
-        self
-    }
-    fn justify_center(self) -> Self {
-        self
-    }
-    fn justify_between(self) -> Self {
-        self
-    }
-    fn justify_start(self) -> Self {
-        self
-    }
-    fn justify_end(self) -> Self {
-        self
-    }
-    fn justify_around(self) -> Self {
-        self
-    }
-    fn justify_evenly(self) -> Self {
-        self
-    }
-    fn content_normal(self) -> Self {
-        self
-    }
-    fn content_center(self) -> Self {
-        self
-    }
-    fn content_start(self) -> Self {
-        self
-    }
-    fn content_end(self) -> Self {
-        self
-    }
-    fn content_between(self) -> Self {
-        self
-    }
-    fn content_around(self) -> Self {
-        self
-    }
-    fn content_evenly(self) -> Self {
-        self
-    }
-    fn content_stretch(self) -> Self {
-        self
-    }
-    fn self_start(self) -> Self {
-        self
-    }
-    fn self_end(self) -> Self {
-        self
-    }
-    fn self_flex_start(self) -> Self {
-        self
-    }
-    fn self_flex_end(self) -> Self {
-        self
-    }
-    fn self_center(self) -> Self {
-        self
-    }
-    fn self_baseline(self) -> Self {
-        self
-    }
-    fn self_stretch(self) -> Self {
-        self
-    }
-    // --- spacing ---
-    fn gap<T>(self, _: T) -> Self {
-        self
-    }
-    fn gap_x<T>(self, _: T) -> Self {
-        self
-    }
-    fn gap_y<T>(self, _: T) -> Self {
-        self
-    }
-    fn p<T>(self, _: T) -> Self {
-        self
-    }
-    fn px<T>(self, _: T) -> Self {
-        self
-    }
-    fn py<T>(self, _: T) -> Self {
-        self
-    }
-    fn pt<T>(self, _: T) -> Self {
-        self
-    }
-    fn pb<T>(self, _: T) -> Self {
-        self
-    }
-    fn pl<T>(self, _: T) -> Self {
-        self
-    }
-    fn pr<T>(self, _: T) -> Self {
-        self
-    }
-    fn m<T>(self, _: T) -> Self {
-        self
-    }
-    fn mx<T>(self, _: T) -> Self {
-        self
-    }
-    fn my<T>(self, _: T) -> Self {
-        self
-    }
-    fn mt<T>(self, _: T) -> Self {
-        self
-    }
-    fn mb<T>(self, _: T) -> Self {
-        self
-    }
-    fn ml<T>(self, _: T) -> Self {
-        self
-    }
-    fn mr<T>(self, _: T) -> Self {
-        self
-    }
-    // --- sizing ---
-    fn w_full(self) -> Self {
-        self
-    }
-    fn w_px(self) -> Self {
-        self
-    }
-    fn w_auto(self) -> Self {
-        self
-    }
-    fn w_1_2(self) -> Self {
-        self
-    }
-    fn w_1_3(self) -> Self {
-        self
-    }
-    fn h_full(self) -> Self {
-        self
-    }
-    fn h_px(self) -> Self {
-        self
-    }
-    fn h_auto(self) -> Self {
-        self
-    }
-    fn h_1_2(self) -> Self {
-        self
-    }
-    fn h_1_3(self) -> Self {
-        self
-    }
-    fn size_full(self) -> Self {
-        self
-    }
-    fn size_px(self) -> Self {
-        self
-    }
-    fn size_1_2(self) -> Self {
-        self
-    }
-    fn size<T>(self, _: T) -> Self {
-        self
-    }
-    fn w<T>(self, _: T) -> Self {
-        self
-    }
-    fn h<T>(self, _: T) -> Self {
-        self
-    }
-    fn min_w<T>(self, _: T) -> Self {
-        self
-    }
-    fn max_w<T>(self, _: T) -> Self {
-        self
-    }
-    fn min_h<T>(self, _: T) -> Self {
-        self
-    }
-    fn max_h<T>(self, _: T) -> Self {
-        self
-    }
-    // --- text size ---
-    fn text_xs(self) -> Self {
-        self
-    }
-    fn text_sm(self) -> Self {
-        self
-    }
-    fn text_base(self) -> Self {
-        self
-    }
-    fn text_lg(self) -> Self {
-        self
-    }
-    fn text_xl(self) -> Self {
-        self
-    }
-    fn text_2xl(self) -> Self {
-        self
-    }
-    fn text_3xl(self) -> Self {
-        self
-    }
-    // --- text alignment ---
-    fn text_left(self) -> Self {
-        self
-    }
-    fn text_center(self) -> Self {
-        self
-    }
-    fn text_right(self) -> Self {
-        self
-    }
-    // --- text decoration ---
-    fn whitespace_normal(self) -> Self {
-        self
-    }
-    fn whitespace_nowrap(self) -> Self {
-        self
-    }
-    fn truncate(self) -> Self {
-        self
-    }
-    fn text_ellipsis(self) -> Self {
-        self
-    }
+    styled_no_arg_methods!(
+        flex,
+        flex_col,
+        flex_col_reverse,
+        flex_row,
+        flex_row_reverse,
+        flex_1,
+        flex_auto,
+        flex_initial,
+        flex_none,
+        flex_grow,
+        flex_grow_0,
+        flex_grow_1,
+        flex_wrap,
+        flex_wrap_reverse,
+        flex_nowrap,
+        flex_shrink,
+        flex_shrink_0,
+        flex_shrink_1,
+        block,
+        grid,
+        hidden,
+        aspect_square,
+        items_center,
+        items_start,
+        items_end,
+        items_baseline,
+        items_stretch,
+        justify_center,
+        justify_between,
+        justify_start,
+        justify_end,
+        justify_around,
+        justify_evenly,
+        content_normal,
+        content_center,
+        content_start,
+        content_end,
+        content_between,
+        content_around,
+        content_evenly,
+        content_stretch,
+        self_start,
+        self_end,
+        self_flex_start,
+        self_flex_end,
+        self_center,
+        self_baseline,
+        self_stretch,
+        w_full,
+        w_px,
+        w_auto,
+        w_1_2,
+        w_1_3,
+        h_full,
+        h_px,
+        h_auto,
+        h_1_2,
+        h_1_3,
+        size_full,
+        size_px,
+        size_1_2,
+        text_xs,
+        text_sm,
+        text_base,
+        text_lg,
+        text_xl,
+        text_2xl,
+        text_3xl,
+        text_left,
+        text_center,
+        text_right,
+        whitespace_normal,
+        whitespace_nowrap,
+        truncate,
+        text_ellipsis,
+        italic,
+        not_italic,
+        underline,
+        line_through,
+        text_decoration_none,
+        text_decoration_solid,
+        text_decoration_wavy,
+        text_decoration_0,
+        text_decoration_1,
+        text_decoration_2,
+        text_decoration_4,
+        text_decoration_8,
+        font_bold,
+        border_1,
+        border_2,
+        border_dashed,
+        border_t_2,
+        border_b_2,
+        border_l_2,
+        border_r_2,
+        border_x_2,
+        border_y_2,
+        rounded_sm,
+        rounded_md,
+        rounded_lg,
+        rounded_2xl,
+        rounded_3xl,
+        rounded_full,
+        rounded_t_lg,
+        rounded_b_lg,
+        rounded_r_lg,
+        rounded_l_lg,
+        cursor_pointer,
+        overflow_hidden,
+        overflow_x_hidden,
+        overflow_y_hidden,
+        absolute,
+        relative,
+        col_span_full,
+        col_start_auto,
+        col_end_auto,
+        row_span_full,
+        row_start_auto,
+        row_end_auto,
+        cursor_default,
+        cursor_text,
+        cursor_move,
+        cursor_not_allowed,
+        cursor_context_menu,
+        cursor_crosshair,
+        cursor_vertical_text,
+        cursor_alias,
+        cursor_copy,
+        cursor_no_drop,
+        cursor_grab,
+        cursor_grabbing,
+        cursor_ew_resize,
+        cursor_ns_resize,
+        cursor_nesw_resize,
+        cursor_nwse_resize,
+        cursor_col_resize,
+        cursor_row_resize,
+        cursor_n_resize,
+        cursor_e_resize,
+        cursor_s_resize,
+        cursor_w_resize,
+        debug,
+        shadow_none,
+        shadow_2xs,
+        shadow_xs,
+        shadow_sm,
+        shadow_md,
+        shadow_lg,
+        shadow_xl,
+        shadow_2xl,
+        rounded_none,
+        rounded_xl,
+    );
+
+    styled_value_methods!(
+        gap,
+        gap_x,
+        gap_y,
+        p,
+        px,
+        py,
+        pt,
+        pb,
+        pl,
+        pr,
+        m,
+        mx,
+        my,
+        mt,
+        mb,
+        ml,
+        mr,
+        size,
+        w,
+        h,
+        min_w,
+        max_w,
+        min_h,
+        max_h,
+        font_family,
+        bg,
+        text_color,
+        border_color,
+        opacity,
+    );
+
     fn line_clamp(self, lines: usize) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("line_clamp", lines as i32)));
         self
     }
-    fn italic(self) -> Self {
-        self
-    }
-    fn not_italic(self) -> Self {
-        self
-    }
-    fn underline(self) -> Self {
-        self
-    }
-    fn line_through(self) -> Self {
-        self
-    }
-    fn text_decoration_none(self) -> Self {
-        self
-    }
-    fn text_decoration_solid(self) -> Self {
-        self
-    }
-    fn text_decoration_wavy(self) -> Self {
-        self
-    }
-    fn text_decoration_0(self) -> Self {
-        self
-    }
-    fn text_decoration_1(self) -> Self {
-        self
-    }
-    fn text_decoration_2(self) -> Self {
-        self
-    }
-    fn text_decoration_4(self) -> Self {
-        self
-    }
-    fn text_decoration_8(self) -> Self {
-        self
-    }
-    // --- font ---
-    fn font_bold(self) -> Self {
-        self
-    }
-    fn font_family<T>(self, _: T) -> Self {
-        self
-    }
+
     fn font_weight<T>(self, weight: T) -> Self
     where
         T: Into<FontWeight>,
@@ -1155,16 +965,7 @@ impl Styled for MockElement {
         FONT_WEIGHT_CALLS.with(|c| c.borrow_mut().push(weight.into().0));
         self
     }
-    // --- border ---
-    fn border_1(self) -> Self {
-        self
-    }
-    fn border_2(self) -> Self {
-        self
-    }
-    fn border_dashed(self) -> Self {
-        self
-    }
+
     fn border_t_1(self) -> Self {
         BORDER_CALLS.with(|c| c.borrow_mut().push("border_t_1"));
         self
@@ -1189,87 +990,7 @@ impl Styled for MockElement {
         BORDER_CALLS.with(|c| c.borrow_mut().push("border_y_1"));
         self
     }
-    fn border_t_2(self) -> Self {
-        self
-    }
-    fn border_b_2(self) -> Self {
-        self
-    }
-    fn border_l_2(self) -> Self {
-        self
-    }
-    fn border_r_2(self) -> Self {
-        self
-    }
-    fn border_x_2(self) -> Self {
-        self
-    }
-    fn border_y_2(self) -> Self {
-        self
-    }
-    fn rounded_sm(self) -> Self {
-        self
-    }
-    fn rounded_md(self) -> Self {
-        self
-    }
-    fn rounded_lg(self) -> Self {
-        self
-    }
-    fn rounded_2xl(self) -> Self {
-        self
-    }
-    fn rounded_3xl(self) -> Self {
-        self
-    }
-    fn rounded_full(self) -> Self {
-        self
-    }
-    fn rounded_t_lg(self) -> Self {
-        self
-    }
-    fn rounded_b_lg(self) -> Self {
-        self
-    }
-    fn rounded_r_lg(self) -> Self {
-        self
-    }
-    fn rounded_l_lg(self) -> Self {
-        self
-    }
-    // --- misc ---
-    fn cursor_pointer(self) -> Self {
-        self
-    }
-    fn overflow_hidden(self) -> Self {
-        self
-    }
-    fn overflow_x_hidden(self) -> Self {
-        self
-    }
-    fn overflow_y_hidden(self) -> Self {
-        self
-    }
-    fn absolute(self) -> Self {
-        self
-    }
-    fn relative(self) -> Self {
-        self
-    }
-    // --- color / opacity ---
-    fn bg<T>(self, _: T) -> Self {
-        self
-    }
-    fn text_color<T>(self, _: T) -> Self {
-        self
-    }
-    fn border_color<T>(self, _: T) -> Self {
-        self
-    }
-    fn opacity<T>(self, _: T) -> Self {
-        self
-    }
-    // --- grid ---
+
     fn grid_cols(self, v: u16) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_cols", v as i32)));
         self
@@ -1282,144 +1003,24 @@ impl Styled for MockElement {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("col_span", v as i32)));
         self
     }
-    fn col_span_full(self) -> Self {
-        self
-    }
     fn col_start(self, v: i16) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("col_start", v as i32)));
-        self
-    }
-    fn col_start_auto(self) -> Self {
         self
     }
     fn col_end(self, v: i16) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("col_end", v as i32)));
         self
     }
-    fn col_end_auto(self) -> Self {
-        self
-    }
     fn row_span(self, v: u16) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_span", v as i32)));
-        self
-    }
-    fn row_span_full(self) -> Self {
         self
     }
     fn row_start(self, v: i16) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_start", v as i32)));
         self
     }
-    fn row_start_auto(self) -> Self {
-        self
-    }
     fn row_end(self, v: i16) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_end", v as i32)));
-        self
-    }
-    fn row_end_auto(self) -> Self {
-        self
-    }
-    // --- cursor ---
-    fn cursor_default(self) -> Self {
-        self
-    }
-    fn cursor_text(self) -> Self {
-        self
-    }
-    fn cursor_move(self) -> Self {
-        self
-    }
-    fn cursor_not_allowed(self) -> Self {
-        self
-    }
-    fn cursor_context_menu(self) -> Self {
-        self
-    }
-    fn cursor_crosshair(self) -> Self {
-        self
-    }
-    fn cursor_vertical_text(self) -> Self {
-        self
-    }
-    fn cursor_alias(self) -> Self {
-        self
-    }
-    fn cursor_copy(self) -> Self {
-        self
-    }
-    fn cursor_no_drop(self) -> Self {
-        self
-    }
-    fn cursor_grab(self) -> Self {
-        self
-    }
-    fn cursor_grabbing(self) -> Self {
-        self
-    }
-    fn cursor_ew_resize(self) -> Self {
-        self
-    }
-    fn cursor_ns_resize(self) -> Self {
-        self
-    }
-    fn cursor_nesw_resize(self) -> Self {
-        self
-    }
-    fn cursor_nwse_resize(self) -> Self {
-        self
-    }
-    fn cursor_col_resize(self) -> Self {
-        self
-    }
-    fn cursor_row_resize(self) -> Self {
-        self
-    }
-    fn cursor_n_resize(self) -> Self {
-        self
-    }
-    fn cursor_e_resize(self) -> Self {
-        self
-    }
-    fn cursor_s_resize(self) -> Self {
-        self
-    }
-    fn cursor_w_resize(self) -> Self {
-        self
-    }
-    fn debug(self) -> Self {
-        self
-    }
-    // --- shadow ---
-    fn shadow_none(self) -> Self {
-        self
-    }
-    fn shadow_2xs(self) -> Self {
-        self
-    }
-    fn shadow_xs(self) -> Self {
-        self
-    }
-    fn shadow_sm(self) -> Self {
-        self
-    }
-    fn shadow_md(self) -> Self {
-        self
-    }
-    fn shadow_lg(self) -> Self {
-        self
-    }
-    fn shadow_xl(self) -> Self {
-        self
-    }
-    fn shadow_2xl(self) -> Self {
-        self
-    }
-    // --- rounded extra ---
-    fn rounded_none(self) -> Self {
-        self
-    }
-    fn rounded_xl(self) -> Self {
         self
     }
 }

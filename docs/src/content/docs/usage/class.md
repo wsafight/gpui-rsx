@@ -53,6 +53,23 @@ rsx! {
 
 This keeps conditional styling ergonomic without paying the dynamic-class matcher cost for simple literal branches. The optimization applies to the expression inside `class={...}`; assigning the result to a variable first makes it a normal dynamic class expression.
 
+## State Class Attributes
+
+Use `hoverClass`, `focusClass`, and `activeClass` for GPUI state-style hooks when the styling can be represented as static classes:
+
+```rust
+rsx! {
+    <button
+        class="px-4 py-2 rounded-md bg-blue-500 text-white"
+        hoverClass="bg-blue-600"
+        focusClass="border-blue-500"
+        activeClass="opacity-75"
+    />
+}
+```
+
+These attributes expand to GPUI `StyleRefinement` closures. They only accept string literals, and classes that require element-level state such as `overflow-scroll` or `debug-outline` are compile errors. `activeClass` injects an ID because GPUI's `active` hook is stateful; `hoverClass` and `focusClass` do not.
+
 ## Dynamic Classes
 
 Use dynamic classes when the class string is assembled at runtime:

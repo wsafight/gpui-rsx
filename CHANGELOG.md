@@ -21,6 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added static expansion for `class={match ...}` expressions whose arms all return class string
   literals.
 - Added stricter static opacity validation and UI coverage for invalid `opacity-*` classes.
+- Added `hoverClass`, `focusClass`, and `activeClass` attributes for GPUI state-style class
+  expansion through `StyleRefinement` closures.
+- Added more real GPUI interactive and accessibility mappings, including `focusVisible`,
+  `tooltipShowDelay`, `onAuxClick`, `onA11yAction`, `role`, and `aria*` attributes.
 
 ### Changed
 
@@ -31,6 +35,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `visible={expr}` now evaluates the expression once while mapping to `.visible()` or `.invisible()`.
 - Dynamic class documentation now calls out `if` and `match` literal expressions as preferred
   compile-time-expanded alternatives.
+- Consolidated attribute method metadata so method mapping, auto-ID decisions, and tuple argument
+  expansion share one lookup path.
+- The Astro docs workflow now runs on documentation pull requests, performs `pnpm run check`, and
+  only deploys Pages artifacts from `main` pushes with scoped Pages permissions.
+- Documented the `groupHover` / `groupActive` ID boundary and the explicit
+  `group_drag_over::<YourType>(...)` fallback required by GPUI.
+- Reduced duplicate test mock implementations by generating `MockElement`'s `Styled` surface with
+  the same helper macros used by `StyleRefinement`.
+- Split shared test mock state and types into focused `tests/common` modules.
+- Added `scripts/check.sh` to run the standard root and real-GPUI demo validation commands, with
+  an extended `--release` mode for benchmark, docs, GPUI tree, and publish dry-run checks.
+- Reduced the crates.io package contents to the files required to build and document the crate.
 
 ### Fixed
 
@@ -41,6 +57,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   producing invalid GPUI opacity calls.
 - Fixed demo dependency guidance to avoid duplicate GPUI crate instances when `gpui-component` is
   present.
+- Fixed GPUI state-style compatibility so `hover`, `focus`, and `active` closures receive
+  `StyleRefinement` consistently with current GPUI.
+- Improved state class diagnostics with concrete guidance for element-level classes such as
+  `overflow-scroll` and `debug-outline`.
+- Rejected `groupDragOver` attributes with an actionable diagnostic because GPUI requires an
+  explicit drag data type.
 
 ## [0.5.1] - 2026-06-09
 

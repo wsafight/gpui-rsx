@@ -1,0 +1,7 @@
+error: Unsupported class `overflow-scroll` in `activeClass`.
+         help: Move `overflow-scroll` to `class="..."`, or use `when` with an explicit GPUI method when it is conditional
+         note: `activeClass` maps to a GPUI StyleRefinement closure, so element-level classes such as `overflow-scroll` cannot be applied there
+ --> tests/ui/state_class_stateful.rs:4:39
+  |
+4 |     let _el = rsx! { <div activeClass="overflow-scroll" /> };
+  |                                       ^^^^^^^^^^^^^^^^^

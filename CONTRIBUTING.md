@@ -69,16 +69,18 @@ Branch naming conventions:
 
 1. Make your changes in your feature branch
 2. Add tests for any new functionality
-3. Ensure all tests pass: `cargo test`
-4. Format your code: `cargo fmt`
-5. Run linter: `cargo clippy -- -D warnings`
-6. Update documentation if needed
+3. Run the standard validation suite: `scripts/check.sh`
+4. For quick root-only checks, use `scripts/check.sh --skip-demo`
+5. Update documentation if needed
 
 ### Testing Your Changes
 
 ```bash
-# Run all tests
-cargo test
+# Run the standard validation suite
+scripts/check.sh
+
+# Skip the real-GPUI demo checks when iterating locally
+scripts/check.sh --skip-demo
 
 # Run specific test
 cargo test test_name
@@ -90,9 +92,6 @@ cargo test test_name
 # View macro expansions (for debugging)
 cargo install cargo-expand
 cargo expand --lib
-
-# Run test script
-bash test_syntax.sh
 ```
 
 ## Pull Request Process
@@ -100,7 +99,7 @@ bash test_syntax.sh
 ### Before Submitting
 
 1. Update CHANGELOG.md with your changes
-2. Ensure all tests pass
+2. Run `scripts/check.sh`
 3. Update documentation if applicable
 4. Add yourself to the contributors list if it's your first contribution
 
@@ -230,9 +229,9 @@ We aim for high test coverage (target: 80%+):
 
 Update relevant documentation in:
 - `README.md` - Project overview and quick start
-- `docs/getting-started.md` - Tutorial
-- `docs/api-reference.md` - API documentation
-- `docs/best-practices.md` - Best practices guide
+- `docs/src/content/docs/getting-started.md` - Tutorial
+- `docs/src/content/docs/reference/api.md` - API documentation
+- `docs/src/content/docs/guides/best-practices.md` - Best practices guide
 - `CHANGELOG.md` - Version history
 
 ### Examples
@@ -338,16 +337,18 @@ git checkout -b feature/amazing-feature
 
 1. 在功能分支上进行修改
 2. 为新功能添加测试
-3. 确保所有测试通过：`cargo test`
-4. 格式化代码：`cargo fmt`
-5. 运行代码检查：`cargo clippy -- -D warnings`
-6. 根据需要更新文档
+3. 运行标准验证：`scripts/check.sh`
+4. 本地快速迭代时可用 `scripts/check.sh --skip-demo`
+5. 根据需要更新文档
 
 ### 测试改动
 
 ```bash
-# 运行所有测试
-cargo test
+# 运行标准验证
+scripts/check.sh
+
+# 本地迭代时跳过真实 GPUI demo 检查
+scripts/check.sh --skip-demo
 
 # 运行特定测试
 cargo test test_name
@@ -359,9 +360,6 @@ cargo test test_name
 # 查看宏展开（用于调试）
 cargo install cargo-expand
 cargo expand --lib
-
-# 运行测试脚本
-bash test_syntax.sh
 ```
 
 ## Pull Request 流程
@@ -369,7 +367,7 @@ bash test_syntax.sh
 ### 提交前检查
 
 1. 更新 CHANGELOG.md
-2. 确保所有测试通过
+2. 运行 `scripts/check.sh`
 3. 更新相关文档
 4. 如果是首次贡献，将自己添加到贡献者列表
 
@@ -499,9 +497,9 @@ fn parse_element(input: ParseStream) -> Result<Element> {
 
 更新相关文档：
 - `README.md` - 项目概览和快速开始
-- `docs/getting-started.md` - 教程
-- `docs/api-reference.md` - API 文档
-- `docs/best-practices.md` - 最佳实践指南
+- `docs/src/content/docs/zh-cn/getting-started.md` - 教程
+- `docs/src/content/docs/zh-cn/reference/api.md` - API 文档
+- `docs/src/content/docs/zh-cn/guides/best-practices.md` - 最佳实践指南
 - `CHANGELOG.md` - 版本历史
 
 ### 示例

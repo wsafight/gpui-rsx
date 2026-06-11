@@ -98,6 +98,11 @@ pub enum RsxAttribute {
         condition: Expr,
         class_lit: syn::LitStr,
     },
+    /// GPUI 状态样式 class，如 `hoverClass="bg-blue-500"`
+    StateClass {
+        method: Ident,
+        class_lit: syn::LitStr,
+    },
 }
 
 /// RSX 节点
@@ -170,7 +175,9 @@ impl Parse for RsxElement {
                 };
 
                 // 特殊处理 when 和 whenSome 属性（直接比较 Ident，避免 to_string() 分配）
-                if attr_name == "whiteSpace" {
+                if is_group_drag_over_attr(&attr_name) {
+                    return Err(unsupported_generic_attribute_error(&attr_name));
+                } else if attr_name == "whiteSpace" {
                     return Err(unsupported_jsx_attribute_error(&attr_name));
                 } else if attr_name == "when" {
                     let (first, second) = parse_condition_tuple(value, "when")?;
@@ -191,6 +198,12 @@ impl Parse for RsxElement {
                         condition,
                         class_lit,
                     });
+                } else if let Some(state_method) = state_class_method(&attr_name) {
+                    let class_lit = parse_state_class_lit(value, &attr_name)?;
+                    attributes.push(RsxAttribute::StateClass {
+                        method: Ident::new(state_method, attr_name.span()),
+                        class_lit,
+                    });
                 } else {
                     attributes.push(RsxAttribute::Value {
                         name: attr_name,
@@ -199,6 +212,9 @@ impl Parse for RsxElement {
                 }
             } else {
                 // 布尔属性: name
+                if is_group_drag_over_attr(&attr_name) {
+                    return Err(unsupported_generic_attribute_error(&attr_name));
+                }
                 if attr_name == "whiteSpace" {
                     return Err(unsupported_jsx_attribute_error(&attr_name));
                 }
@@ -403,5 +419,42 @@ fn parse_when_class_lit(value: Expr) -> Result<syn::LitStr> {
         Ok(lit_str)
     } else {
         Err(when_class_string_literal_error(&value))
+    }
+}
+
+fn state_class_method(attr_name: &Ident) -> Option<&'static str> {
+    if attr_name == "hoverClass" {
+        Some("hover")
+    } else if attr_name == "focusClass" {
+        Some("focus")
+    } else if attr_name == "activeClass" {
+        Some("active")
+    } else {
+        None
+    }
+}
+
+fn is_group_drag_over_attr(attr_name: &Ident) -> bool {
+    attr_name == "groupDragOver" || attr_name == "group_drag_over"
+}
+
+fn parse_state_class_lit(value: Expr, attr_name: &Ident) -> Result<syn::LitStr> {
+    if let Expr::Lit(ExprLit {
+        lit: Lit::Str(lit_str),
+        ..
+    }) = value
+    {
+        let class_value = lit_str.value();
+        if let Some(class) = class_value
+            .split_ascii_whitespace()
+            .find(|class| is_stateful_class(class) || matches!(*class, "debug-outline"))
+        {
+            return Err(state_class_unsupported_class_error(
+                attr_name, &lit_str, class,
+            ));
+        }
+        Ok(lit_str)
+    } else {
+        Err(state_class_string_literal_error(attr_name, &value))
     }
 }

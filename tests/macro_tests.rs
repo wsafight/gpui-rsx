@@ -1311,6 +1311,75 @@ fn test_focusable_auto_id() {
     };
 }
 
+#[test]
+fn test_hover_focus_active_class_attributes() {
+    let _el = rsx! {
+        <button
+            hoverClass="bg-blue-600 text-white"
+            focusClass="border-blue-500"
+            activeClass="opacity-75"
+        >
+            {"State classes"}
+        </button>
+    };
+}
+
+#[test]
+fn test_active_class_generates_auto_id() {
+    let _el = rsx! {
+        <button activeClass="bg-blue-700">
+            {"Active"}
+        </button>
+    };
+    let id = take_last_auto_id().expect("activeClass should trigger auto-ID generation");
+    assert!(id.contains("__rsx_button_"));
+}
+
+#[test]
+fn test_group_hover_does_not_generate_auto_id() {
+    let _ = take_last_auto_id();
+    let _el = rsx! {
+        <button groupHover={("menu", |style| style.bg(rgb(0x334155)))}>
+            {"Hover"}
+        </button>
+    };
+
+    assert!(take_last_auto_id().is_none());
+}
+
+#[test]
+fn test_group_active_generates_auto_id() {
+    let _el = rsx! {
+        <button groupActive={("menu", |style| style.opacity(0.85))}>
+            {"Active"}
+        </button>
+    };
+
+    let id = take_last_auto_id().expect("groupActive should trigger auto-ID generation");
+    assert!(id.contains("__rsx_button_"));
+}
+
+#[test]
+fn test_gpui_interactive_and_a11y_mappings() {
+    let aux = |_: ()| {};
+    let a11y = |_: (), _: (), _: ()| {};
+    let _el = rsx! {
+        <button
+            role={"button"}
+            ariaLabel={"Open command palette"}
+            ariaSelected={true}
+            ariaExpanded={false}
+            ariaLevel={2usize}
+            focusVisible={|style| style.border_color(rgb(0x3b82f6))}
+            tooltipShowDelay={0usize}
+            onAuxClick={aux}
+            onA11yAction={("press", a11y)}
+        >
+            {"Accessible action"}
+        </button>
+    };
+}
+
 // ===========================================================================
 // 26. 新事件处理器
 // ===========================================================================
@@ -2795,4 +2864,52 @@ fn test_rsx_expand_preview_uses_when_class() {
         compact
             .contains(".when(active,|__el|__el.bg(rgb(1513239u32)).text_color(rgb(16777215u32)))")
     );
+}
+
+#[test]
+fn test_rsx_expand_preview_uses_state_class_attributes() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <button
+            hoverClass="bg-blue-600"
+            focusClass="border-blue-500"
+            activeClass="opacity-75"
+        />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+
+    assert!(compact.contains(".id("));
+    assert!(compact.contains(".hover(|__style|__style.bg(rgb("));
+    assert!(compact.contains(".focus(|__style|__style.border_color(rgb("));
+    assert!(compact.contains(".active(|__style|__style.opacity("));
+    assert!(!compact.contains("__rsx_apply_class"));
+}
+
+#[test]
+fn test_rsx_expand_preview_hover_focus_class_do_not_inject_id() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <button
+            hoverClass="bg-blue-600"
+            focusClass="border-blue-500"
+        />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+
+    assert!(!compact.contains(".id("));
+    assert!(compact.contains(".hover(|__style|__style.bg(rgb("));
+    assert!(compact.contains(".focus(|__style|__style.border_color(rgb("));
+}
+
+#[test]
+fn test_rsx_expand_preview_expands_multi_arg_interactive_attrs() {
+    let expanded = gpui_rsx::rsx_expand! {
+        <button
+            onA11yAction={(AccessibleAction::Click, handler)}
+            onAuxClick={aux}
+        />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+
+    assert!(compact.contains(".id("));
+    assert!(compact.contains(".on_a11y_action(AccessibleAction::Click,handler)"));
+    assert!(compact.contains(".on_aux_click(aux)"));
 }

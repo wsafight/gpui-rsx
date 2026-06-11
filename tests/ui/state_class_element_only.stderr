@@ -1,0 +1,7 @@
+error: Unsupported class `debug-outline` in `hoverClass`.
+         help: Move `debug-outline` to `class="..."`, or use `when` with an explicit GPUI method when it is conditional
+         note: `hoverClass` maps to a GPUI StyleRefinement closure, so element-level classes such as `debug-outline` cannot be applied there
+ --> tests/ui/state_class_element_only.rs:4:38
+  |
+4 |     let _el = rsx! { <div hoverClass="debug-outline" /> };
+  |                                      ^^^^^^^^^^^^^^^

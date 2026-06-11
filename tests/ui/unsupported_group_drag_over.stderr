@@ -1,0 +1,7 @@
+error: Unsupported generic GPUI attribute `groupDragOver`.
+         help: use `when` or `base` and call `group_drag_over::<YourType>(...)` explicitly
+         note: GPUI requires an explicit drag data type for `group_drag_over`, which RSX attributes cannot infer
+ --> tests/ui/unsupported_group_drag_over.rs:5:14
+  |
+5 |         <div groupDragOver={("items", |style| style.opacity(0.75))} />
+  |              ^^^^^^^^^^^^^

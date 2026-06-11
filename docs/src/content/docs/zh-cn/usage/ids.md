@@ -31,9 +31,9 @@ rsx! {
 
 生成的 ID 对同一个宏展开调用点是确定的。
 
-常见触发 ID 的属性包括 `onClick`、`onHover`、`onDrag`、`tooltip`、`focusable`、`overflowScroll`、`overflowXScroll`、`overflowYScroll`、`trackScroll`、`scrollbarWidth`，以及静态 `overflow-scroll` class 变体。
+常见触发 ID 的属性包括 `onClick`、`onHover`、`onDrag`、`onAuxClick`、`onA11yAction`、`active`、`activeClass`、`groupActive`、`tooltip`、`tooltipShowDelay`、`focusable`、`role`、`ariaLabel`、`overflowScroll`、`overflowXScroll`、`overflowYScroll`、`trackScroll`、`scrollbarWidth`，以及静态 `overflow-scroll` class 变体。
 
-当前 GPUI 目标下，`hover`、`focus`、`group`、`onMouseDown`、`captureKeyDown` 等属性本身不会触发有状态 ID。
+当前 GPUI 目标下，`hover`、`hoverClass`、`focus`、`focusClass`、`group`、`groupHover`、`onMouseDown`、`captureKeyDown` 等属性本身不会触发有状态 ID。
 
 ## 循环中的 Key
 

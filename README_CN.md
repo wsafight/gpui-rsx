@@ -446,8 +446,10 @@ div().children((&self.items).into_iter().map(|item| {
 
 #### 循环安全 — `key` 属性
 
-for 循环内有 stateful 属性（`onClick`、`onHover`、`onDrag`、`tooltip`、
-`focusable`、`overflowScroll`、`trackScroll` 或 `overflow-scroll`）的元素**必须**提供
+for 循环内有 stateful 属性（`onClick`、`onHover`、`onDrag`、`onAuxClick`、
+`onA11yAction`、`active`、`activeClass`、`groupActive`、`tooltip`、`tooltipShowDelay`、
+`focusable`、`role`、`ariaLabel`、`overflowScroll`、`trackScroll`、`scrollbarWidth`
+或 `overflow-scroll`）的元素**必须**提供
 `id` 或 `key`，否则宏会报编译错误：
 
 ```rust
@@ -678,6 +680,27 @@ rsx! {
 ```
 
 `whenClass` 只接受字符串字面量。`overflow-scroll` 这类需要 stateful ID 的 class 会被拒绝；需要 ID 敏感的 GPUI 方法时，请使用 `when={(cond, |el| el.overflow_scroll())}`。
+
+#### 状态 class 属性 - hover/focus/active
+
+状态样式可以用静态 class 表达时，使用 `hoverClass`、`focusClass` 和 `activeClass`：
+
+```rust
+rsx! {
+    <button
+        class="px-4 py-2 rounded-md bg-blue-500 text-white"
+        hoverClass="bg-blue-600"
+        focusClass="border-blue-500"
+        activeClass="opacity-75"
+    />
+}
+```
+
+这些属性会编译为 GPUI `StyleRefinement` 闭包。它们只接受字符串字面量；`overflow-scroll` 或 `debug-outline` 这类需要元素级 stateful 方法的 class 会被拒绝。`activeClass` 会触发自动 ID 注入；`hoverClass` 和 `focusClass` 不会。
+
+`groupHover` 走 GPUI 的非 stateful 样式闭包路径。`groupActive` 需要 stateful ID。
+`groupDragOver` 不作为属性暴露，因为 GPUI 需要显式拖拽数据类型；请使用 `when` 或 `base`
+并直接调用 `group_drag_over::<YourType>(...)`。
 
 #### 多个条件
 

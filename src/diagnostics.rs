@@ -168,6 +168,18 @@ pub fn unsupported_jsx_attribute_error(attr_name: &Ident) -> syn::Error {
     )
 }
 
+/// 报告当前 RSX 属性语法无法表达的 GPUI 泛型属性。
+pub fn unsupported_generic_attribute_error(attr_name: &Ident) -> syn::Error {
+    syn::Error::new_spanned(
+        attr_name,
+        format!(
+            "Unsupported generic GPUI attribute `{attr_name}`.\n\
+             \x20 help: use `when` or `base` and call `group_drag_over::<YourType>(...)` explicitly\n\
+             \x20 note: GPUI requires an explicit drag data type for `group_drag_over`, which RSX attributes cannot infer"
+        ),
+    )
+}
+
 /// 报告 GPUI 标签缺少构造必需属性。
 pub fn missing_required_attribute_error<T: Spanned>(
     tag_span: &T,
@@ -203,6 +215,34 @@ pub fn when_class_stateful_error(lit: &syn::LitStr, class: &str) -> syn::Error {
             "Unsupported stateful class `{class}` in `whenClass`.\n\
              \x20 help: Use `when` with an explicit closure for stateful classes\n\
              \x20 note: Stateful classes like `{class}` require element ID semantics that `whenClass` cannot provide"
+        ),
+    )
+}
+
+/// 报告状态 class 属性的 class 参数不是字符串字面量。
+pub fn state_class_string_literal_error<T: Spanned>(attr_name: &Ident, value: &T) -> syn::Error {
+    syn::Error::new(
+        value.span(),
+        format!(
+            "The `{attr_name}` attribute expects a string literal class value.\n\
+             \x20 help: Use the format: {attr_name}=\"bg-blue-500 text-white\"\n\
+             \x20 note: State class attributes are compiled into GPUI style-refinement closures."
+        ),
+    )
+}
+
+/// 报告状态 class 属性中包含不适用于 StyleRefinement 的 class。
+pub fn state_class_unsupported_class_error(
+    attr_name: &Ident,
+    lit: &syn::LitStr,
+    class: &str,
+) -> syn::Error {
+    syn::Error::new(
+        lit.span(),
+        format!(
+            "Unsupported class `{class}` in `{attr_name}`.\n\
+             \x20 help: Move `{class}` to `class=\"...\"`, or use `when` with an explicit GPUI method when it is conditional\n\
+             \x20 note: `{attr_name}` maps to a GPUI StyleRefinement closure, so element-level classes such as `{class}` cannot be applied there"
         ),
     )
 }
@@ -312,6 +352,16 @@ mod tests {
         assert!(msg.contains("whiteSpace"), "应包含属性名");
         assert!(msg.contains("whitespace-nowrap"), "应提示 class 写法");
         assert!(msg.contains("whitespace_nowrap"), "应提示 flag 写法");
+    }
+
+    #[test]
+    fn unsupported_generic_attribute_has_actionable_hint() {
+        let attr = make_ident("groupDragOver");
+        let err = unsupported_generic_attribute_error(&attr);
+        let msg = err.to_string();
+        assert!(msg.contains("groupDragOver"), "应包含属性名");
+        assert!(msg.contains("group_drag_over::<YourType>"));
+        assert!(msg.contains("cannot infer"));
     }
 
     #[test]

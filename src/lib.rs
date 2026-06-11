@@ -59,6 +59,7 @@
 //! | For-loop sugar | `{for item in iter { ... }}` |
 //! | Spread | `{...iterator}` |
 //! | Conditional | `when` / `whenSome` attributes |
+//! | State classes | `hoverClass`, `focusClass`, `activeClass` |
 //! | Styled defaults | `<h1 styled>` injects sensible tag defaults |
 //! | camelCase mapping | `onClick` → `.on_click()`, `fontSize` → `.text_size()` |
 //! | Custom constructors | `base={Button::new("id")}` starts a component method chain |
@@ -365,6 +366,22 @@
 //! `whenClass` only accepts string literal classes and rejects stateful classes such as
 //! `overflow-scroll`; use `when` for those explicit GPUI method calls.
 //!
+//! State-style classes can be attached to GPUI's style-refinement hooks:
+//!
+//! ```ignore
+//! rsx! {
+//!     <button
+//!         class="px-4 py-2 rounded-md bg-blue-500 text-white"
+//!         hoverClass="bg-blue-600"
+//!         focusClass="border-blue-500"
+//!         activeClass="opacity-75"
+//!     />
+//! }
+//! ```
+//!
+//! These attributes accept only string literal classes. Element-only or stateful classes such as
+//! `overflow-scroll` are rejected because GPUI passes a `StyleRefinement` into the closure.
+//!
 //! ### The `styled` Flag — Semantic Tag Defaults
 //!
 //! Adding `styled` injects sensible default classes for the tag name, applied before
@@ -453,11 +470,10 @@
 //! element's position in the file does not change. For IDs that must survive
 //! refactors, use the explicit `id` attribute.
 //!
-//! > **Note on style attributes:** `hover`, `active`, `focus`, and `group` are
-//! > *`Styled` trait* methods and do **not** trigger auto ID injection.
-//! > Only `StatefulInteractiveElement` / `FocusableElement` attributes
-//! > (`onClick`, `onHover`, `onDrag`, `tooltip`, `focusable`, `overflowScroll`,
-//! > `trackScroll`, etc.) require an ID.
+//! > **Note on style attributes:** `hover`, `focus`, `group`, and `groupHover` are
+//! > *`Styled` trait* methods and do **not** trigger auto ID injection. `active`,
+//! > `activeClass`, and `groupActive` map to stateful GPUI hooks in the current target
+//! > and do require an ID.
 //!
 //! ### Loop safety
 //!

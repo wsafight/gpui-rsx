@@ -70,6 +70,7 @@ use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
 | `overflowScroll` | `overflow_scroll` |
 | `overflowXScroll` / `overflowYScroll` | `overflow_x_scroll` / `overflow_y_scroll` |
 | `trackScroll` | `track_scroll` |
+| `groupHover` / `groupActive` | `group_hover` / `group_active` |
 | `tabIndex` / `tabStop` | `tab_index` / `tab_stop` |
 
 多参数方法使用 tuple 值：
@@ -82,6 +83,9 @@ rsx! {
     />
 }
 ```
+
+`groupDragOver` / `group_drag_over` 不作为属性提供，因为 GPUI 需要显式拖拽数据类型。
+请使用 `when` 或 `base` 并直接调用 `group_drag_over::<YourType>(...)`。
 
 ## 条件属性
 
@@ -116,11 +120,13 @@ rsx! {
 
 | 分类 | 名称 |
 | --- | --- |
-| 事件 | `onClick`, `onHover`, `onDrag` |
-| 交互状态 | `active`, `focusable`, `tooltip`, `hoverableTooltip`, `anchorScroll`, `trackScroll`, `scrollbarWidth` |
+| 事件 | `onClick`, `onHover`, `onDrag`, `onAuxClick`, `onA11yAction` |
+| 交互状态 | `active`, `activeClass`, `groupActive`, `focusable`, `tooltip`, `hoverableTooltip`, `tooltipShowDelay`, `anchorScroll`, `trackScroll`, `scrollbarWidth` |
+| 无障碍 | `role`, `ariaLabel`, `ariaSelected`, `ariaExpanded` 以及其他 `aria*` 属性 |
 | 滚动 class | `overflow-scroll`, `overflow-x-scroll`, `overflow-y-scroll` |
 
-在 `{for ...}` 中，有状态元素必须提供 `id={...}` 或 `key={...}`。
+在 `{for ...}` 中，有状态元素必须提供 `id={...}` 或 `key={...}`。`groupHover` 不需要
+ID；`groupActive` 需要。
 
 ## 返回形状
 

@@ -53,6 +53,23 @@ rsx! {
 
 这种写法可以保留状态样式的可读性，同时避免简单字面量分支走动态 class matcher。优化只作用于 `class={...}` 内部的表达式；如果先赋值给变量，再把变量传给 `class`，就会走普通动态 class 路径。
 
+## 状态 Class 属性
+
+状态样式可以用静态 class 表达时，使用 `hoverClass`、`focusClass` 和 `activeClass`：
+
+```rust
+rsx! {
+    <button
+        class="px-4 py-2 rounded-md bg-blue-500 text-white"
+        hoverClass="bg-blue-600"
+        focusClass="border-blue-500"
+        activeClass="opacity-75"
+    />
+}
+```
+
+这些属性会展开为 GPUI `StyleRefinement` 闭包。它们只接受字符串字面量；`overflow-scroll` 或 `debug-outline` 这类需要元素级 stateful 行为的 class 会产生编译错误。由于当前 GPUI 的 `active` hook 是 stateful，`activeClass` 会自动注入 ID；`hoverClass` 和 `focusClass` 不会。
+
 ## 动态 Class
 
 当 class 字符串必须在运行时组装时，再使用动态 class：

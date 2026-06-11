@@ -1,0 +1,7 @@
+error: The `hoverClass` attribute expects a string literal class value.
+         help: Use the format: hoverClass="bg-blue-500 text-white"
+         note: State class attributes are compiled into GPUI style-refinement closures.
+ --> tests/ui/state_class_dynamic.rs:5:39
+  |
+5 |     let _el = rsx! { <div hoverClass={classes} /> };
+  |                                       ^^^^^^^

@@ -875,9 +875,10 @@ and is being passed as a method name literally.
 
 **Workflow**:
 1. Modify code in `src/codegen/`
-2. Run `cargo test` (all 287 tests)
+2. Run `scripts/check.sh --skip-demo` while iterating
 3. Check a specific test: `cargo test test_name`
-4. View generated code: `cargo expand --test macro_tests`
+4. Before release, run `scripts/check.sh --release`
+5. View generated code: `cargo expand --test macro_tests`
 
 ## Future Improvements
 

@@ -446,8 +446,10 @@ div().children((&self.items).into_iter().map(|item| {
 
 #### Loop safety — `key` attribute
 
-Elements with stateful attributes (`onClick`, `onHover`, `onDrag`, `tooltip`,
-`focusable`, `overflowScroll`, `trackScroll`, or `overflow-scroll`) inside a for-loop **must**
+Elements with stateful attributes (`onClick`, `onHover`, `onDrag`, `onAuxClick`,
+`onA11yAction`, `active`, `activeClass`, `groupActive`, `tooltip`, `tooltipShowDelay`,
+`focusable`, `role`, `ariaLabel`, `overflowScroll`, `trackScroll`, `scrollbarWidth`,
+or `overflow-scroll`) inside a for-loop **must**
 provide `id` or `key`, otherwise the macro emits a compile error:
 
 ```rust
@@ -673,6 +675,27 @@ rsx! {
 ```
 
 `whenClass` only accepts string literals. Stateful classes such as `overflow-scroll` are rejected; use `when={(cond, |el| el.overflow_scroll())}` when ID-sensitive GPUI methods are needed.
+
+#### State class attributes - hover/focus/active
+
+Use `hoverClass`, `focusClass`, and `activeClass` when the state styling can be expressed as static classes:
+
+```rust
+rsx! {
+    <button
+        class="px-4 py-2 rounded-md bg-blue-500 text-white"
+        hoverClass="bg-blue-600"
+        focusClass="border-blue-500"
+        activeClass="opacity-75"
+    />
+}
+```
+
+These attributes compile to GPUI `StyleRefinement` closures. They only accept string literals, and classes that need an element-level stateful method, such as `overflow-scroll` or `debug-outline`, are rejected. `activeClass` triggers auto ID injection; `hoverClass` and `focusClass` do not.
+
+`groupHover` follows GPUI's non-stateful style-refinement path. `groupActive` requires a stateful
+ID. `groupDragOver` is intentionally rejected as an attribute because GPUI requires an explicit drag
+data type; use `when` or `base` and call `group_drag_over::<YourType>(...)` directly.
 
 #### Multiple conditions
 

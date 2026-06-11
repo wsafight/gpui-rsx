@@ -836,9 +836,10 @@ error[E0599]: no method named `flex_col` found for struct `Div`
 
 **工作流**：
 1. 修改 `src/codegen/` 中的代码
-2. 运行 `cargo test`（全部 287 个测试）
+2. 迭代时运行 `scripts/check.sh --skip-demo`
 3. 检查特定测试：`cargo test test_name`
-4. 查看生成代码：`cargo expand --test macro_tests`
+4. 发布前运行 `scripts/check.sh --release`
+5. 查看生成代码：`cargo expand --test macro_tests`
 
 ## 未来改进
 

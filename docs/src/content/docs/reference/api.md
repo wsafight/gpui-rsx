@@ -70,6 +70,7 @@ use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
 | `overflowScroll` | `overflow_scroll` |
 | `overflowXScroll` / `overflowYScroll` | `overflow_x_scroll` / `overflow_y_scroll` |
 | `trackScroll` | `track_scroll` |
+| `groupHover` / `groupActive` | `group_hover` / `group_active` |
 | `tabIndex` / `tabStop` | `tab_index` / `tab_stop` |
 
 Multi-argument methods use tuple values:
@@ -82,6 +83,9 @@ rsx! {
     />
 }
 ```
+
+`groupDragOver` / `group_drag_over` is not available as an attribute because GPUI requires an
+explicit drag data type. Use `when` or `base` and call `group_drag_over::<YourType>(...)` directly.
 
 ## Conditional Attributes
 
@@ -116,11 +120,13 @@ The macro injects IDs for attributes and static classes that require GPUI statef
 
 | Category | Names |
 | --- | --- |
-| Events | `onClick`, `onHover`, `onDrag` |
-| Interactive state | `active`, `focusable`, `tooltip`, `hoverableTooltip`, `anchorScroll`, `trackScroll`, `scrollbarWidth` |
+| Events | `onClick`, `onHover`, `onDrag`, `onAuxClick`, `onA11yAction` |
+| Interactive state | `active`, `activeClass`, `groupActive`, `focusable`, `tooltip`, `hoverableTooltip`, `tooltipShowDelay`, `anchorScroll`, `trackScroll`, `scrollbarWidth` |
+| Accessibility | `role`, `ariaLabel`, `ariaSelected`, `ariaExpanded`, and other `aria*` attributes |
 | Scroll classes | `overflow-scroll`, `overflow-x-scroll`, `overflow-y-scroll` |
 
-Inside `{for ...}`, stateful elements must provide `id={...}` or `key={...}`.
+Inside `{for ...}`, stateful elements must provide `id={...}` or `key={...}`. `groupHover`
+does not require an ID; `groupActive` does.
 
 ## Return Shapes
 

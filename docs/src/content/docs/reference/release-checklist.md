@@ -3,33 +3,31 @@ title: Release Checklist
 description: Commands and checks to run before releasing GPUI-RSX.
 ---
 
-Run the Rust checks first:
+Run the extended pre-release validation suite:
 
 ```bash
-cargo fmt --all -- --check
-cargo test
-cargo clippy --all-targets --all-features -- -D warnings
+scripts/check.sh --release
 ```
 
-Check the class benchmark target still compiles:
+If the Zed GPUI git dependency needs the local proxy, use:
+
+```bash
+scripts/check.sh --proxy --release
+```
+
+The script runs root crate formatting, tests, clippy, and the real GPUI demo check/clippy against
+the pinned lockfile. In `--release` mode it also checks the benchmark target, confirms the demo uses
+a single `gpui` instance, builds the docs site, and runs a cargo publish dry-run.
+
+If the local environment cannot run docs or package validation, split those checks explicitly:
 
 ```bash
 cargo bench --bench class_performance --no-run
-```
-
-Check the real GPUI demo against the pinned lockfile:
-
-```bash
-cargo check --manifest-path demo/Cargo.toml --bins --locked
 cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
-```
-
-Build the documentation site:
-
-```bash
-cd docs
-pnpm install --frozen-lockfile
-pnpm run build
+pnpm --dir docs install --frozen-lockfile
+pnpm --dir docs run check
+pnpm --dir docs run build
+cargo publish --dry-run --allow-dirty
 ```
 
 Before publishing:

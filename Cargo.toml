@@ -11,6 +11,13 @@ documentation = "https://docs.rs/gpui-rsx"
 readme = "README.md"
 keywords = ["gpui", "rsx", "jsx", "macro", "ui"]
 categories = ["gui", "development-tools"]
+include = [
+    "/Cargo.toml",
+    "/LICENSE",
+    "/README.md",
+    "/src/**",
+    "/benches/class_performance.rs",
+]
 
 [lib]
 proc-macro = true

@@ -20,6 +20,10 @@
 - 新增 `class={match ...}` 静态展开：当所有 match arm 都返回 class 字符串字面量时，
   不再走动态 class matcher。
 - 新增静态 `opacity-*` 范围校验，并补充非法 opacity class 的 UI 测试覆盖。
+- 新增 `hoverClass`、`focusClass` 和 `activeClass` 属性，通过 `StyleRefinement` 闭包展开
+  GPUI 状态样式 class。
+- 新增更多真实 GPUI 交互与无障碍属性映射，包括 `focusVisible`、`tooltipShowDelay`、
+  `onAuxClick`、`onA11yAction`、`role` 和 `aria*` 属性。
 
 ### 变更
 
@@ -29,6 +33,17 @@
   `format!`；动态 `key={expr}` 仍保留原有基于 `Display` 的 fallback。
 - `visible={expr}` 现在只求值一次，再映射到 `.visible()` 或 `.invisible()`。
 - 动态 class 文档现在明确推荐 `if` 和 `match` 字面量表达式作为可编译期展开的替代写法。
+- 收敛属性方法元信息，使方法映射、自动 ID 判断和 tuple 参数展开共用同一条查找路径。
+- Astro docs workflow 现在会在文档 PR 上运行，执行 `pnpm run check`，并且只在 main push
+  时使用收敛后的 Pages 权限部署 Pages artifact。
+- 补充 `groupHover` / `groupActive` 的 ID 边界，并说明 GPUI 要求通过
+  `group_drag_over::<YourType>(...)` 显式处理 `groupDragOver`。
+- 复用 `StyleRefinement` 使用的 helper 宏生成 `MockElement` 的 `Styled` surface，减少测试
+  mock 中的重复实现。
+- 将共享测试 mock 的状态捕获和基础类型拆到独立的 `tests/common` 子模块。
+- 新增 `scripts/check.sh`，统一运行根 crate 和真实 GPUI demo 的标准验证命令，并通过
+  `--release` 模式覆盖 benchmark、docs、GPUI tree 和 publish dry-run 检查。
+- 收敛 crates.io 发布包内容，仅保留构建和文档展示所需文件。
 
 ### 修复
 
@@ -36,6 +51,11 @@
 - 修复 for 循环解析，使 `{for item in { items.iter() } { ... }}` 这类 iterator block 表达式可用。
 - 修复动态非法 opacity 处理，使运行时非法 `opacity-*` 值被忽略，而不是生成无效 GPUI opacity 调用。
 - 修复 demo 依赖说明，避免同时使用 `gpui-component` 时产生重复 GPUI crate 实例。
+- 修复 GPUI 状态样式兼容性，使 `hover`、`focus` 和 `active` 闭包与当前 GPUI 一样接收
+  `StyleRefinement`。
+- 改进状态 class 诊断，对 `overflow-scroll` 和 `debug-outline` 这类元素级 class 给出更具体的
+  修复建议。
+- 对 `groupDragOver` 属性给出可操作诊断，因为 GPUI 需要显式拖拽数据类型。
 
 ## [0.5.1] - 2026-06-09
 

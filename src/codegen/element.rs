@@ -84,6 +84,15 @@ fn analyze_attr(attr: &RsxAttribute) -> AttrAnalysis {
                 ..AttrAnalysis::default()
             }
         }
+        RsxAttribute::StateClass { method, .. } => {
+            let name = method.to_string();
+            let needs_id = is_stateful_attr(&name);
+            AttrAnalysis {
+                name: Some(name),
+                needs_id,
+                ..AttrAnalysis::default()
+            }
+        }
         _ => AttrAnalysis::default(),
     }
 }

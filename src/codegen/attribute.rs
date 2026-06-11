@@ -13,9 +13,7 @@
 
 use super::class::{ClassMode, parse_class_string_with_mode};
 use super::runtime::generate_dynamic_class_code_with_mode;
-use super::tables::{
-    is_multi_arg_method, is_stateful_class, lookup_attr_flag_method, lookup_attr_method,
-};
+use super::tables::{is_stateful_class, lookup_attr_flag_method, lookup_attr_method_info};
 use crate::parser::RsxAttribute;
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -119,9 +117,9 @@ pub(crate) fn generate_attr_methods_with_mode(
                 name_storage = name.to_string();
                 &name_storage
             };
-            if let Some(mapped) = lookup_attr_method(name_str) {
-                let method_ident = syn::Ident::new(mapped, name.span());
-                if is_multi_arg_method(mapped)
+            if let Some(info) = lookup_attr_method_info(name_str) {
+                let method_ident = syn::Ident::new(info.method, name.span());
+                if info.multi_arg
                     && let syn::Expr::Tuple(tuple) = value
                 {
                     let args = &tuple.elems;
@@ -154,6 +152,14 @@ pub(crate) fn generate_attr_methods_with_mode(
             let class_str = class_lit.value();
             let class_methods: Vec<_> = parse_class_string_with_mode(&class_str, mode).collect();
             out.push(quote! { .when(#condition, |__el| __el #(#class_methods)* ) });
+        }
+
+        // GPUI state-style helpers. These methods receive StyleRefinement, which implements
+        // Styled in real GPUI, so the same static class expansion can be reused here.
+        RsxAttribute::StateClass { method, class_lit } => {
+            let class_str = class_lit.value();
+            let class_methods: Vec<_> = parse_class_string_with_mode(&class_str, mode).collect();
+            out.push(quote! { .#method(|__style| __style #(#class_methods)* ) });
         }
     }
 }
