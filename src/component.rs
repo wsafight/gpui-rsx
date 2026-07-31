@@ -27,9 +27,17 @@ pub fn generate_component(item: ItemFn) -> syn::Result<TokenStream> {
     let mut builder_methods = TokenStream::new();
     let mut init_fields = TokenStream::new();
     let mut field_extracts = TokenStream::new();
+    
+    struct_fields.extend(quote! { children: ::std::vec::Vec<::gpui::AnyElement>, });
+    init_fields.extend(quote! { children: ::std::vec::Vec::new(), });
 
     for arg in &item.sig.inputs {
         let (ident, ty) = parse_prop(arg)?;
+
+        if ident == "children" {
+            field_extracts.extend(quote! { let children = self.children; });
+            continue;
+        }
 
         let err_msg = format!("Missing required property `{ident}` for component `{name}`");
         struct_fields.extend(quote! { #ident: ::std::option::Option<#ty>, });
@@ -60,6 +68,12 @@ pub fn generate_component(item: ItemFn) -> syn::Result<TokenStream> {
 
         impl #name {
             #builder_methods
+        }
+
+        impl ::gpui::ParentElement for #name {
+            fn extend(&mut self, elements: impl ::std::iter::IntoIterator<Item = ::gpui::AnyElement>) {
+                self.children.extend(elements);
+            }
         }
 
         impl ::gpui::IntoElement for #name {
