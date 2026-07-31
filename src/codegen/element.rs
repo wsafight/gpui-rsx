@@ -207,6 +207,7 @@ fn generate_element_checked(
     let mut canvas_prepaint = None;
     let mut canvas_paint = None;
     let mut has_styled = false;
+    let is_component = tag_str.chars().next().map_or(false, |c| c.is_ascii_uppercase());
     let mut needs_id = false;
 
     // 预分配方法链容量：
@@ -245,7 +246,7 @@ fn generate_element_checked(
             }
             _ => {
                 let analysis = analyze_attr(attr);
-                if !needs_id && analysis.needs_id {
+                if !needs_id && analysis.needs_id && !is_component {
                     needs_id = true;
                 }
                 generate_attr_methods_with_mode(attr, analysis.hints(), &mut methods, mode);
