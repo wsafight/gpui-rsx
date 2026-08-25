@@ -20,6 +20,7 @@ cargo run --bin counter
 cargo run --bin palette
 cargo run --bin task_list
 cargo run --bin project_dashboard
+cargo run --bin incident_console
 cargo run --bin api_surface
 cargo run --bin component
 ```
@@ -32,6 +33,8 @@ cargo check --bin api_contract
 ```
 
 `project_dashboard` is the most complete interactive example. It includes filtered keyed lists, selection state, conditional classes, dynamic progress, density controls, and item mutations.
+
+`incident_console` is the complex application example. It combines a multi-pane operations layout, data-driven filters, sorting, selection, incident lifecycle transitions, a timeline, mutable sample data, and empty states. Its source is split by model and UI responsibility under `src/bin/incident_console/`.
 
 The committed `Cargo.lock` and Rust toolchain pin the resolved `gpui-component` and Zed revisions so demo builds are reproducible. When updating either git dependency, regenerate `Cargo.lock`, check the generated GPUI APIs, and run:
 

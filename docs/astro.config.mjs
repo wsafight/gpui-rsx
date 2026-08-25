@@ -89,6 +89,21 @@ export default defineConfig({
           ],
         },
         {
+          label: 'Examples',
+          translations: {
+            'zh-CN': '示例',
+          },
+          items: [
+            {
+              label: 'Incident Console',
+              translations: {
+                'zh-CN': '事故响应控制台',
+              },
+              slug: 'examples/incident-console',
+            },
+          ],
+        },
+        {
           label: 'Guides',
           translations: {
             'zh-CN': '指南',

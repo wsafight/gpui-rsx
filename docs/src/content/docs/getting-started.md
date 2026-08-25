@@ -181,9 +181,16 @@ cargo check --manifest-path demo/Cargo.toml --bins --locked
 
 The demo lockfile pins GPUI and `gpui-component` so compatibility problems are reproducible.
 
+Run the complete multi-pane example directly:
+
+```bash
+cargo run --manifest-path demo/Cargo.toml --bin incident_console --locked
+```
+
 ## Next Steps
 
 - Read [Syntax Reference](/gpui-rsx/usage/syntax/) for elements, attributes, children, and fragments.
 - Read [Class Handling](/gpui-rsx/usage/class/) before relying on dynamic class strings.
 - Read [IDs and Keys](/gpui-rsx/usage/ids/) before rendering interactive rows in loops.
+- Explore the [Incident Console](/gpui-rsx/examples/incident-console/) for a modular application example.
 - Read [Compatibility](/gpui-rsx/compatibility/) when aligning GPUI, gpui-component, Rust, and the demo lockfile.
