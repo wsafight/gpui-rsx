@@ -9,32 +9,28 @@
 
 ## [未发布]
 
+## [0.7.0] - 2026-08-25
+
 ### 新增
 
-- 为最新 accessibility、滚动轴限制、外部拖拽、mouse pressure、pinch、grid min/max-content
-  和 text ellipsis API 补充 alias 与真实 GPUI contract。
-- 新增固定的 42 方法 `StatefulInteractiveElement` 快照，以及 latest 兼容性工作流使用的
-  实际源码漂移检查。
+- 新增完整的项目仪表盘 demo，覆盖 keyed 过滤列表、选中状态、条件 class、动态进度、
+  密度控制和条目增删改操作。
 
 ### 变更
 
-- 在发布检查清单中补充 crates.io 包内容验证。
-- 补充状态 class 属性和显式指定类型的 `group_drag_over` fallback 问题排查说明。
-- 明确 0.6.0 新增有状态自动 ID 触发项的性能文档说明。
+- 将过程宏 crate 的 MSRV 从 Rust 1.85 提升到 Rust 1.88，并同步更新 CI 检查通道。
 - 按模式缓存完整的动态 class helper，使每次宏展开只解析一个 token stream，
   不再分别解析 common、color 和 numeric 三段代码。
 - 将文档栈升级到 Astro 7，并把依赖安装、脚本和 CI 从 pnpm 迁移到 Bun 1.4，
   使用固定的 Bun lockfile。
-- 在主要文档入口补充兼容性和发布检查清单页面链接。
-- 将 demo lockfile 升级到 Zed GPUI `e9735934` 与 gpui-component / gpui-base `7885c416`。
-- 声明根过程宏 crate 的 MSRV 为 Rust 1.88，并保留 demo 的 Rust 1.95 兼容性目标。
-- 兼容性 issue 现在先汇总两个平台的结果，再统一改变 issue 状态。
+- 使用共享生成宏减少 benchmark 和测试 mock 的重复实现，并补充聚焦的 parser/codegen
+  单元测试覆盖。
 
 ### 修复
 
-- 不再把 `scrollbarWidth` 误判为 stateful，同时保留 overflow scroll 的自动 ID。
-- 在静态、strict 和动态 class 路径恢复 `text-ellipsis-start` 并新增 `text-ellipsis-middle`。
-- 让 class benchmark 消费带可观察状态的非零大小 builder 结果。
+- 防止 class benchmark 初始化被常量折叠，并增加动态 spacing 快速路径与数值 fallback
+  的直接对比测量。
+- 所有 demo 在窗口创建失败时都会报告错误，不再静默丢弃结果。
 
 ## [0.6.0] - 2026-06-12
 
@@ -53,6 +49,10 @@
   GPUI 状态样式 class。
 - 新增更多真实 GPUI 交互与无障碍属性映射，包括 `focusVisible`、`tooltipShowDelay`、
   `onAuxClick`、`onA11yAction`、`role` 和 `aria*` 属性。
+- 为最新 accessibility、滚动轴限制、外部拖拽、mouse pressure、pinch、grid min/max-content
+  和 text ellipsis API 补充 alias 与真实 GPUI contract。
+- 新增固定的 42 方法 `StatefulInteractiveElement` 快照，以及 latest 兼容性工作流使用的
+  实际源码漂移检查。
 
 ### 变更
 
@@ -73,6 +73,13 @@
 - 新增 `scripts/check.sh`，统一运行根 crate 和真实 GPUI demo 的标准验证命令，并通过
   `--release` 模式覆盖 benchmark、docs、GPUI tree 和 publish dry-run 检查。
 - 收敛 crates.io 发布包内容，仅保留构建和文档展示所需文件。
+- 在发布检查清单中补充 crates.io 包内容验证。
+- 补充状态 class 属性和显式指定类型的 `group_drag_over` fallback 问题排查说明。
+- 明确 0.6.0 新增有状态自动 ID 触发项的性能文档说明。
+- 在主要文档入口补充兼容性和发布检查清单页面链接。
+- 将 demo lockfile 升级到 Zed GPUI `e9735934` 与 gpui-component / gpui-base `7885c416`。
+- 声明根过程宏 crate 的 MSRV 为 Rust 1.85，并保留 demo 的 Rust 1.95 兼容性目标。
+- 兼容性 issue 现在先汇总两个平台的结果，再统一改变 issue 状态。
 
 ### 修复
 
@@ -85,6 +92,9 @@
 - 改进状态 class 诊断，对 `overflow-scroll` 和 `debug-outline` 这类元素级 class 给出更具体的
   修复建议。
 - 对 `groupDragOver` 属性给出可操作诊断，因为 GPUI 需要显式拖拽数据类型。
+- 不再把 `scrollbarWidth` 误判为 stateful，同时保留 overflow scroll 的自动 ID。
+- 在静态、strict 和动态 class 路径恢复 `text-ellipsis-start` 并新增 `text-ellipsis-middle`。
+- 让 class benchmark 消费带可观察状态的非零大小 builder 结果。
 
 ## [0.5.1] - 2026-06-09
 
@@ -526,7 +536,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.6.0...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/wsafight/gpui-rsx/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/wsafight/gpui-rsx/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/wsafight/gpui-rsx/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/wsafight/gpui-rsx/compare/v0.4.4...v0.5.0

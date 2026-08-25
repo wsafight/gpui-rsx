@@ -3,7 +3,7 @@ title: 兼容性
 description: GPUI、gpui-component、Rust 和 demo lockfile 的兼容性说明。
 ---
 
-GPUI-RSX `0.6.x` 目标是 Zed 仓库中的 GPUI，而不是 crates.io 上发布的 `gpui = "0.2.2"` 包。
+GPUI-RSX `0.7.x` 目标是 Zed 仓库中的 GPUI，而不是 crates.io 上发布的 `gpui = "0.2.2"` 包。
 
 Zed git 依赖当前仍会把 crate 包版本显示为 `gpui v0.2.2`，但它的 API 面与 crates.io release 不同。所以即使 `cargo tree` 显示 `gpui v0.2.2`，只要 source 是 Zed git，项目也可能是正确配置。
 
@@ -11,7 +11,7 @@ Zed git 依赖当前仍会把 crate 包版本显示为 `gpui v0.2.2`，但它的
 
 | 项目 | 值 |
 | --- | --- |
-| GPUI-RSX | `0.6.0` |
+| GPUI-RSX | `0.7.0` |
 | GPUI source | `https://github.com/zed-industries/zed` |
 | GPUI resolved revision | `e973593455af18719be22b0455c3f928c6ccc24d` |
 | `gpui-component` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |

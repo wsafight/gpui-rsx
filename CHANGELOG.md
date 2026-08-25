@@ -9,34 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-08-25
+
 ### Added
 
-- Added aliases and real GPUI contracts for the latest accessibility, scroll-axis, external-drag,
-  mouse pressure, pinch, grid min/max-content, and text ellipsis APIs.
-- Added a pinned 42-method `StatefulInteractiveElement` snapshot plus a live source drift check for
-  the latest compatibility workflow.
+- Added a complete project dashboard demo with keyed filtering, selection state, conditional
+  classes, dynamic progress, density controls, and item mutations.
 
 ### Changed
 
-- Documented crates.io package content verification in the release checklist.
-- Added troubleshooting guidance for state class attributes and the explicitly typed
-  `group_drag_over` fallback.
-- Clarified performance documentation for stateful auto-ID triggers introduced in 0.6.0.
+- Raised the proc-macro crate MSRV from Rust 1.85 to Rust 1.88 and updated its CI lane.
 - Cached the complete dynamic class helper per mode so each macro expansion parses one token stream
   instead of parsing the common, color, and numeric sections separately.
 - Upgraded the documentation stack to Astro 7 and migrated installs, scripts, and CI from pnpm to
   Bun 1.4 with a frozen Bun lockfile.
-- Linked compatibility and release-checklist pages from the main documentation entry points.
-- Upgraded the demo lockfile to Zed GPUI `e9735934` and gpui-component / gpui-base `7885c416`.
-- Declared Rust 1.88 as the root proc-macro MSRV and retained Rust 1.95 for demo compatibility.
-- Made compatibility issue reporting aggregate both platform results before changing issue state.
+- Reduced repeated benchmark and test mock implementations with shared generation macros and added
+  focused parser/codegen unit coverage.
 
 ### Fixed
 
-- Stopped treating `scrollbarWidth` as stateful, while preserving auto IDs for overflow scrolling.
-- Restored `text-ellipsis-start` and added `text-ellipsis-middle` across static, strict, and dynamic
-  class paths.
-- Made class benchmarks consume observable non-zero builder results.
+- Prevented class benchmark setup from being constant-folded and added direct fast-path versus
+  numeric-fallback dynamic spacing measurements.
+- Made every demo report window creation failures instead of silently discarding them.
 
 ## [0.6.0] - 2026-06-12
 
@@ -56,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   expansion through `StyleRefinement` closures.
 - Added more real GPUI interactive and accessibility mappings, including `focusVisible`,
   `tooltipShowDelay`, `onAuxClick`, `onA11yAction`, `role`, and `aria*` attributes.
+- Added aliases and real GPUI contracts for the latest accessibility, scroll-axis, external-drag,
+  mouse pressure, pinch, grid min/max-content, and text ellipsis APIs.
+- Added a pinned 42-method `StatefulInteractiveElement` snapshot plus a live source drift check for
+  the latest compatibility workflow.
 
 ### Changed
 
@@ -78,6 +76,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `scripts/check.sh` to run the standard root and real-GPUI demo validation commands, with
   an extended `--release` mode for benchmark, docs, GPUI tree, and publish dry-run checks.
 - Reduced the crates.io package contents to the files required to build and document the crate.
+- Documented crates.io package content verification in the release checklist.
+- Added troubleshooting guidance for state class attributes and the explicitly typed
+  `group_drag_over` fallback.
+- Clarified performance documentation for stateful auto-ID triggers introduced in 0.6.0.
+- Linked compatibility and release-checklist pages from the main documentation entry points.
+- Upgraded the demo lockfile to Zed GPUI `e9735934` and gpui-component / gpui-base `7885c416`.
+- Declared Rust 1.85 as the root proc-macro MSRV and retained Rust 1.95 for demo compatibility.
+- Made compatibility issue reporting aggregate both platform results before changing issue state.
 
 ### Fixed
 
@@ -94,6 +100,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `overflow-scroll` and `debug-outline`.
 - Rejected `groupDragOver` attributes with an actionable diagnostic because GPUI requires an
   explicit drag data type.
+- Stopped treating `scrollbarWidth` as stateful, while preserving auto IDs for overflow scrolling.
+- Restored `text-ellipsis-start` and added `text-ellipsis-middle` across static, strict, and dynamic
+  class paths.
+- Made class benchmarks consume observable non-zero builder results.
 
 ## [0.5.1] - 2026-06-09
 
@@ -577,7 +587,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/wsafight/gpui-rsx/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/wsafight/gpui-rsx/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/wsafight/gpui-rsx/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/wsafight/gpui-rsx/compare/v0.4.4...v0.5.0

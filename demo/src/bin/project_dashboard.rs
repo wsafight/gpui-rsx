@@ -155,7 +155,7 @@ impl Render for ProjectDashboard {
                         <header class="flex flex-col gap-4">
                             <span class="text-xs font-bold text-emerald-400">{"GPUI RSX"}</span>
                             <h1 class="text-xl font-bold text-white">{"Release desk"}</h1>
-                            <span class="text-sm text-neutral-500">{"v0.6 workspace"}</span>
+                            <span class="text-sm text-neutral-500">{"v0.7 workspace"}</span>
                         </header>
 
                         <nav class="flex flex-col gap-6">

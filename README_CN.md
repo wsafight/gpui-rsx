@@ -56,12 +56,12 @@ bun run dev
 [dependencies]
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
-gpui-rsx = "0.6"
+gpui-rsx = "0.7"
 ```
 
 ### GPUI 版本目标
 
-`gpui-rsx` 0.6 将 GPUI 目标从 crates.io 发布的 `gpui = "0.2.2"` 升级到 Zed 仓库的 git 版本。这个 git 依赖仍然显示为 `gpui v0.2.2`，但 API 面与 crates.io 的 `gpui 0.2.2` 不完全相同，并包含本版本使用的 helper 方法。
+`gpui-rsx` 0.6 及后续版本使用 Zed 仓库中的 GPUI，而不是 crates.io 发布的 `gpui = "0.2.2"` 包。这个 git 依赖仍然显示为 `gpui v0.2.2`，但 API 面与 crates.io 的版本不同，并包含这些版本使用的 helper 方法。
 
 如果你从旧版 `gpui-rsx` 升级，请将：
 

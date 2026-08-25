@@ -3,7 +3,7 @@ title: Compatibility
 description: GPUI, gpui-component, Rust, and demo lockfile compatibility notes.
 ---
 
-GPUI-RSX `0.6.x` targets GPUI from the Zed repository instead of the crates.io `gpui = "0.2.2"` package.
+GPUI-RSX `0.7.x` targets GPUI from the Zed repository instead of the crates.io `gpui = "0.2.2"` package.
 
 The Zed git dependency currently still reports its crate package version as `gpui v0.2.2`, but it exposes a different API surface from the crates.io release. This is why `cargo tree` can show `gpui v0.2.2` even when the project is correctly using Zed git GPUI.
 
@@ -11,7 +11,7 @@ The Zed git dependency currently still reports its crate package version as `gpu
 
 | Item | Value |
 | --- | --- |
-| GPUI-RSX | `0.6.0` |
+| GPUI-RSX | `0.7.0` |
 | GPUI source | `https://github.com/zed-industries/zed` |
 | GPUI resolved revision | `e973593455af18719be22b0455c3f928c6ccc24d` |
 | `gpui-component` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |

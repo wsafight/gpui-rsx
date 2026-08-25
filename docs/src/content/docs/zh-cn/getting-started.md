@@ -13,7 +13,7 @@ GPUI-RSX 是一个用于编写 GPUI 视图的过程宏。静态标记会在编�
 [dependencies]
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
-gpui-rsx = "0.6"
+gpui-rsx = "0.7"
 ```
 
 应用项目应提交 `Cargo.lock`，以固定实际解析到的 GPUI git revision。

@@ -33,7 +33,7 @@ impl Default for TaskListView {
                 },
                 Task {
                     id: 3,
-                    title: "Add demos for 0.6",
+                    title: "Add demos for 0.7",
                     owner: "Docs",
                     done: false,
                 },

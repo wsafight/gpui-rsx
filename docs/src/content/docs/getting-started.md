@@ -13,7 +13,7 @@ Add GPUI from the Zed repository and GPUI-RSX to your application:
 [dependencies]
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
-gpui-rsx = "0.6"
+gpui-rsx = "0.7"
 ```
 
 Applications should commit `Cargo.lock` so the exact GPUI git revision is pinned.

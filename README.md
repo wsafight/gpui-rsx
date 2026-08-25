@@ -56,12 +56,12 @@ Add to your `Cargo.toml`:
 [dependencies]
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
-gpui-rsx = "0.6"
+gpui-rsx = "0.7"
 ```
 
 ### GPUI Version Target
 
-`gpui-rsx` 0.6 upgrades its GPUI target from the crates.io `gpui = "0.2.2"` package to GPUI from the Zed repository. The git dependency still reports `gpui v0.2.2`, but its API surface differs from the crates.io release and includes the helper methods used by this version.
+`gpui-rsx` 0.6 and later target GPUI from the Zed repository instead of the crates.io `gpui = "0.2.2"` package. The git dependency still reports `gpui v0.2.2`, but its API surface differs from the crates.io release and includes the helper methods used by these versions.
 
 If you are upgrading from earlier `gpui-rsx` versions, replace:
 
