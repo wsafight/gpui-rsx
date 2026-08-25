@@ -73,9 +73,10 @@ impl Render for PaletteView {
 
 fn main() {
     application().run(|cx: &mut App| {
-        let _ = cx.open_window(WindowOptions::default(), |_, cx| {
+        cx.open_window(WindowOptions::default(), |_, cx| {
             cx.new(|_| PaletteView::default())
-        });
+        })
+        .expect("failed to open palette window");
         cx.activate(true);
     });
 }

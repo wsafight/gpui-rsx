@@ -1,12 +1,12 @@
 use gpui::prelude::*;
 use gpui::*;
+use gpui_component::Sizable as _;
+use gpui_component::StyledExt as _;
 use gpui_component::button::{Button, ButtonVariants as _};
 use gpui_component::input::{Input, InputState};
 use gpui_component::label::Label;
 use gpui_component::popover::Popover;
 use gpui_component::tab::Tab;
-use gpui_component::Sizable as _;
-use gpui_component::StyledExt as _;
 use gpui_platform::application;
 use gpui_rsx::rsx;
 
@@ -85,7 +85,8 @@ impl Render for ComponentView {
 fn main() {
     application().run(|cx: &mut App| {
         gpui_component::init(cx);
-        let _ = cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| ComponentView));
+        cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| ComponentView))
+            .expect("failed to open component window");
         cx.activate(true);
     });
 }

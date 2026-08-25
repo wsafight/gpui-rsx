@@ -114,9 +114,10 @@ impl Render for ApiSurfaceView {
 
 fn main() {
     application().run(|cx: &mut App| {
-        let _ = cx.open_window(WindowOptions::default(), |_, cx| {
+        cx.open_window(WindowOptions::default(), |_, cx| {
             cx.new(|_| ApiSurfaceView::default())
-        });
+        })
+        .expect("failed to open API surface window");
         cx.activate(true);
     });
 }

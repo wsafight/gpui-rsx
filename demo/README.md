@@ -5,7 +5,7 @@ These demos target GPUI from the Zed repository:
 ```toml
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "8752104289424b7f35045b68a2d394018da48e7e" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 gpui-rsx = { path = ".." }
 ```
 
@@ -19,11 +19,21 @@ cargo run --bin hello
 cargo run --bin counter
 cargo run --bin palette
 cargo run --bin task_list
+cargo run --bin project_dashboard
 cargo run --bin api_surface
 cargo run --bin component
 ```
 
-The `gpui-component` rev, `Cargo.lock`, and Rust toolchain are pinned so demo builds are reproducible. When updating `gpui-component` or the resolved Zed revision, regenerate `Cargo.lock`, check the generated GPUI APIs, and run:
+`api_contract` is a compile-only binary for API compatibility checks:
+
+```bash
+cd demo
+cargo check --bin api_contract
+```
+
+`project_dashboard` is the most complete interactive example. It includes filtered keyed lists, selection state, conditional classes, dynamic progress, density controls, and item mutations.
+
+The committed `Cargo.lock` and Rust toolchain pin the resolved `gpui-component` and Zed revisions so demo builds are reproducible. When updating either git dependency, regenerate `Cargo.lock`, check the generated GPUI APIs, and run:
 
 ```bash
 cd demo

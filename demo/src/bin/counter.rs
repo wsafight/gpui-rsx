@@ -70,9 +70,10 @@ impl Render for CounterView {
 
 fn main() {
     application().run(|cx: &mut App| {
-        let _ = cx.open_window(WindowOptions::default(), |_, cx| {
+        cx.open_window(WindowOptions::default(), |_, cx| {
             cx.new(|_| CounterView::default())
-        });
+        })
+        .expect("failed to open counter window");
         cx.activate(true);
     });
 }

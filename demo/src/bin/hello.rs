@@ -36,7 +36,8 @@ impl Render for HelloView {
 
 fn main() {
     application().run(|cx: &mut App| {
-        let _ = cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| HelloView));
+        cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| HelloView))
+            .expect("failed to open hello window");
         cx.activate(true);
     });
 }
