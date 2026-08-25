@@ -218,5 +218,5 @@ cargo check --manifest-path demo/Cargo.toml --bins --locked
 
 ```bash
 cd docs
-pnpm run build
+bun run build
 ```

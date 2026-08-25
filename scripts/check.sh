@@ -15,13 +15,13 @@ Runs the standard local validation suite:
 With --release, also runs:
   cargo bench --bench class_performance --no-run
   cargo +1.95.0 tree --manifest-path demo/Cargo.toml --locked -i gpui
-  pnpm --dir docs install --frozen-lockfile
-  pnpm --dir docs run check
-  pnpm --dir docs run build
+  bun install --cwd docs --frozen-lockfile
+  bun run --cwd docs check
+  bun run --cwd docs build
   cargo publish --dry-run --allow-dirty
 
 Options:
-  --proxy         Set http_proxy/https_proxy/all_proxy to 127.0.0.1:7890 for git/npm deps.
+  --proxy         Set http_proxy/https_proxy/all_proxy to 127.0.0.1:7890 for git/registry deps.
   --skip-demo     Skip demo manifest checks.
   --release       Run the extended pre-release validation suite.
   --skip-docs     Skip docs install/check/build in --release mode.
@@ -34,11 +34,6 @@ skip_demo=0
 release=0
 skip_docs=0
 skip_package=0
-
-# Keep release checks deterministic and avoid pnpm's background update check from
-# emitting network errors when the local proxy is unavailable.
-export npm_config_update_notifier=false
-export NO_UPDATE_NOTIFIER=1
 
 while (($#)); do
     case "$1" in
@@ -94,9 +89,9 @@ if [[ "$release" -eq 1 ]]; then
     fi
 
     if [[ "$skip_docs" -eq 0 ]]; then
-        run pnpm --dir docs install --frozen-lockfile
-        run pnpm --dir docs run check
-        run pnpm --dir docs run build
+        run bun install --cwd docs --frozen-lockfile
+        run bun run --cwd docs check
+        run bun run --cwd docs build
     fi
 
     if [[ "$skip_package" -eq 0 ]]; then

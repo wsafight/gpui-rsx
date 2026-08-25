@@ -23,7 +23,7 @@ This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participatin
 
 ### Prerequisites
 
-- Rust 1.75 or later
+- Rust 1.88 or later
 - Cargo
 - Git
 
@@ -291,7 +291,7 @@ Add examples to demonstrate new features:
 
 ### 前置要求
 
-- Rust 1.75 或更高版本
+- Rust 1.88 或更高版本
 - Cargo
 - Git
 

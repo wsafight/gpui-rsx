@@ -16,7 +16,7 @@ The Zed git dependency currently still reports its crate package version as `gpu
 | GPUI resolved revision | `e973593455af18719be22b0455c3f928c6ccc24d` |
 | `gpui-component` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |
 | `gpui-base` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |
-| GPUI-RSX root MSRV | `1.85.0` |
+| GPUI-RSX root MSRV | `1.88.0` |
 | Demo Rust toolchain | `1.95.0` |
 | Demo check | `cargo +1.95.0 check --manifest-path demo/Cargo.toml --bins --locked` |
 

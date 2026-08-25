@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "packageManager": "bun@1.4.0",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
@@ -11,16 +12,14 @@
     "check": "astro check"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.9",
-    "@astrojs/starlight": "^0.39.3",
-    "astro": "^6.4.5",
-    "sharp": "^0.34.5",
+    "@astrojs/check": "^0.9.10",
+    "@astrojs/starlight": "^0.41.8",
+    "astro": "^7.2.6",
+    "sharp": "^0.35.3",
     "typescript": "^6.0.3"
   },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild",
-      "sharp"
-    ]
-  }
+  "trustedDependencies": [
+    "esbuild",
+    "sharp"
+  ]
 }

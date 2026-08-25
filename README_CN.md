@@ -44,8 +44,8 @@
 
 ```bash
 cd docs
-pnpm install
-pnpm run dev
+bun install
+bun run dev
 ```
 
 ## 📦 安装

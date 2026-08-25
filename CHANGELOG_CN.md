@@ -21,9 +21,13 @@
 - 在发布检查清单中补充 crates.io 包内容验证。
 - 补充状态 class 属性和显式指定类型的 `group_drag_over` fallback 问题排查说明。
 - 明确 0.6.0 新增有状态自动 ID 触发项的性能文档说明。
+- 按模式缓存完整的动态 class helper，使每次宏展开只解析一个 token stream，
+  不再分别解析 common、color 和 numeric 三段代码。
+- 将文档栈升级到 Astro 7，并把依赖安装、脚本和 CI 从 pnpm 迁移到 Bun 1.4，
+  使用固定的 Bun lockfile。
 - 在主要文档入口补充兼容性和发布检查清单页面链接。
 - 将 demo lockfile 升级到 Zed GPUI `e9735934` 与 gpui-component / gpui-base `7885c416`。
-- 声明根过程宏 crate 的 MSRV 为 Rust 1.85，并保留 demo 的 Rust 1.95 兼容性目标。
+- 声明根过程宏 crate 的 MSRV 为 Rust 1.88，并保留 demo 的 Rust 1.95 兼容性目标。
 - 兼容性 issue 现在先汇总两个平台的结果，再统一改变 issue 状态。
 
 ### 修复

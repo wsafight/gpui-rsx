@@ -61,7 +61,9 @@ struct StyleRefinement {
 }
 
 fn div() -> MockElement {
-    MockElement::default()
+    MockElement {
+        checksum: black_box(0),
+    }
 }
 
 fn rgb(hex: u32) -> u32 {
@@ -1077,6 +1079,16 @@ fn bench_dynamic_class(c: &mut Criterion) {
     let complex_classes = "flex flex-col gap-4 p-4 bg-blue-500 text-white rounded-md";
     c.bench_function("dynamic_class_complex", |b| {
         b.iter(|| black_box(rsx! { <div class={black_box(complex_classes)} /> }))
+    });
+
+    let fast_spacing = "gap-4";
+    c.bench_function("dynamic_spacing_fast_path", |b| {
+        b.iter(|| black_box(rsx! { <div class={black_box(fast_spacing)} /> }))
+    });
+
+    let fallback_spacing = "gap-7";
+    c.bench_function("dynamic_spacing_numeric_fallback", |b| {
+        b.iter(|| black_box(rsx! { <div class={black_box(fallback_spacing)} /> }))
     });
 }
 

@@ -13,11 +13,10 @@ pub fn tag_mismatch_error<T: Spanned>(
     syn::Error::new(
         closing_span.span(),
         format!(
-            "Closing tag `</{}>` does not match opening tag `<{}>`. \
+            "Closing tag `</{closing_name}>` does not match opening tag `<{opening_name}>`. \
              Tags must be properly nested.\n\
-             \x20 help: Change the closing tag to `</{}>`\n\
-             \x20 note: RSX syntax requires matching tags like in HTML/JSX",
-            closing_name, opening_name, opening_name
+             \x20 help: Change the closing tag to `</{opening_name}>`\n\
+             \x20 note: RSX syntax requires matching tags like in HTML/JSX"
         ),
     )
 }
@@ -27,10 +26,9 @@ pub fn unclosed_tag_error(span: proc_macro2::Span, tag_name: &str) -> syn::Error
     syn::Error::new(
         span,
         format!(
-            "Unclosed tag `<{}>`. Expected closing tag before end of input.\n\
-             \x20 help: Add a closing tag `</{}>`\n\
-             \x20 note: All RSX tags must be properly closed",
-            tag_name, tag_name
+            "Unclosed tag `<{tag_name}>`. Expected closing tag before end of input.\n\
+             \x20 help: Add a closing tag `</{tag_name}>`\n\
+             \x20 note: All RSX tags must be properly closed"
         ),
     )
 }
@@ -50,11 +48,10 @@ pub fn invalid_child_in_tag_error(span: proc_macro2::Span, tag_name: &str) -> sy
     syn::Error::new(
         span,
         format!(
-            "Unexpected token in `<{}>`. \
-             Expected one of: {{expr}}, \"text\", <child>, or </{}>\n\
+            "Unexpected token in `<{tag_name}>`. \
+             Expected one of: {{expr}}, \"text\", <child>, or </{tag_name}>\n\
              \x20 help: RSX children must be expressions in {{}}, text in quotes, or nested elements\n\
-             \x20 note: Bare identifiers are not allowed - wrap them in braces like {{variable}}",
-            tag_name, tag_name
+             \x20 note: Bare identifiers are not allowed - wrap them in braces like {{variable}}"
         ),
     )
 }
@@ -124,13 +121,12 @@ pub fn for_loop_missing_key_error<T: Spanned>(tag_span: &T, tag_name: &str) -> s
     syn::Error::new(
         tag_span.span(),
         format!(
-            "Element `<{}>` inside a for-loop has event handlers but no `id` or `key` attribute.\n\
+            "Element `<{tag_name}>` inside a for-loop has event handlers but no `id` or `key` attribute.\n\
              \x20 help: Add a `key={{unique_value}}` attribute so each iteration gets a unique ID:\n\
-             \x20        for item in &self.items {{ <{} key={{item.id}} onClick={{...}}>...</{}> }}\n\
+             \x20        for item in &self.items {{ <{tag_name} key={{item.id}} onClick={{...}}>...</{tag_name}> }}\n\
              \x20 note: Elements in loops share the same source location, so the auto-generated ID\n\
              \x20       would be identical across iterations, causing GPUI state conflicts.\n\
-             \x20       Use `key` for a composite auto-ID, or `id` to supply a fully custom ID.",
-            tag_name, tag_name, tag_name
+             \x20       Use `key` for a composite auto-ID, or `id` to supply a fully custom ID."
         ),
     )
 }

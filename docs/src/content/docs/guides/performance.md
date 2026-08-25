@@ -218,5 +218,5 @@ For documentation examples and navigation, build the docs site:
 
 ```bash
 cd docs
-pnpm run build
+bun run build
 ```

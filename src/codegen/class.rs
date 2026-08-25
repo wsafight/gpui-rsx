@@ -198,12 +198,10 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
     {
         let ident = syn::Ident::new(&method_name, Span::call_site());
         quote! { .#ident() }
+    } else if mode.is_strict() {
+        compile_error(unsupported_class_message(class))
     } else {
-        if mode.is_strict() {
-            compile_error(unsupported_class_message(class))
-        } else {
-            quote! {}
-        }
+        quote! {}
     }
 }
 

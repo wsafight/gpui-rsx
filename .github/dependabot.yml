@@ -65,6 +65,29 @@ updates:
       include: "scope"
     versioning-strategy: auto
 
+  # Maintain the Astro/Starlight documentation stack through Bun's lockfile.
+  - package-ecosystem: "bun"
+    directory: "/docs"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "wsafight"
+    labels:
+      - "dependencies"
+      - "docs"
+    commit-message:
+      prefix: "chore(docs-deps)"
+      include: "scope"
+    groups:
+      docs-updates:
+        patterns:
+          - "*"
+    versioning-strategy: auto
+
   # Maintain dependencies for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"

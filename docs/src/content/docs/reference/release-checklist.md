@@ -37,9 +37,9 @@ If the local environment cannot run docs or package validation, split those chec
 cargo bench --bench class_performance --no-run
 cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
 cargo package --list --allow-dirty
-pnpm --dir docs install --frozen-lockfile
-pnpm --dir docs run check
-pnpm --dir docs run build
+bun install --cwd docs --frozen-lockfile
+bun run --cwd docs check
+bun run --cwd docs build
 cargo publish --dry-run --allow-dirty
 ```
 

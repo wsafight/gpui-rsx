@@ -3,7 +3,7 @@
 //! 生成运行时动态 class 字符串解析和应用的代码。
 //! 当 class 属性的值是表达式而非字符串字面量时使用。
 //!
-//! 优化：使用 thread_local 缓存 match 表，避免多个动态 class 重复生成相同 TokenStream。
+//! 优化：使用 thread_local 缓存完整 helper 源码，避免多个动态 class 重复生成和分段解析。
 
 use super::class::{ClassMode, parse_single_class_with_mode};
 use super::tables::{
@@ -11,7 +11,7 @@ use super::tables::{
 };
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use std::cell::RefCell;
+use std::cell::OnceCell;
 
 // 缓存所有 match 分支拼接后的字符串（thread_local 保证编译过程中只生成一次）
 //
@@ -19,48 +19,29 @@ use std::cell::RefCell;
 // 当前 proc macro 调用的 bridge 连接。每次调用结束后 bridge 失效，
 // 下次调用时旧 handle 变成悬垂引用，导致 "use-after-free" panic。
 //
-// 优化：将所有 match arm 拼接为单个字符串，每次宏调用只做 1 次 parse，
-// 而非对每个 arm 分别 parse（原先每次调用需数百次 parse）。
+// 优化：将完整 helper 缓存为单个字符串，每次宏调用只做 1 次 parse，
+// 避免 common/color/numeric 三段代码分别重建和解析。
 thread_local! {
-    static COMMON_CLASS_MATCHES_STR: RefCell<Option<String>> = const { RefCell::new(None) };
-    static COLOR_FALLBACK_STR: RefCell<Option<String>> = const { RefCell::new(None) };
-    static NUMERIC_FALLBACK_STR: RefCell<Option<String>> = const { RefCell::new(None) };
+    static PERMISSIVE_HELPER_STR: OnceCell<String> = const { OnceCell::new() };
+    static STRICT_HELPER_STR: OnceCell<String> = const { OnceCell::new() };
 }
 
-/// 获取 common class match 表（惰性初始化字符串缓存，每次返回当前 bridge 的新 TokenStream）
-fn get_cached_common_class_matches() -> TokenStream {
-    COMMON_CLASS_MATCHES_STR.with(|cell| {
-        let mut borrow = cell.borrow_mut();
-        let s = borrow.get_or_insert_with(|| {
-            // 将所有 match arm 拼接为单个字符串，避免后续每次调用时逐条解析
-            generate_common_class_matches()
-                .into_iter()
-                .map(|ts| ts.to_string())
-                .collect::<String>()
-        });
-        s.parse::<TokenStream>()
-            .expect("cached match arms are valid")
-    })
-}
+/// 获取完整动态 class helper。
+///
+/// 缓存字符串而非 `TokenStream`，避免跨 proc-macro bridge 保存失效的 token handle。
+/// 每个调用点只需解析一次完整 helper，取代 common/color/numeric 三次独立解析。
+fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
+    let parse_cached = |cell: &OnceCell<String>| {
+        let source = cell.get_or_init(|| generate_dynamic_class_helper(mode).to_string());
+        source
+            .parse::<TokenStream>()
+            .expect("cached dynamic class helper is valid")
+    };
 
-/// 获取颜色回退代码（惰性初始化字符串缓存，每次返回当前 bridge 的新 TokenStream）
-fn get_cached_color_fallback() -> TokenStream {
-    COLOR_FALLBACK_STR.with(|cell| {
-        let mut borrow = cell.borrow_mut();
-        let s = borrow.get_or_insert_with(|| generate_color_fallback_code().to_string());
-        s.parse::<TokenStream>()
-            .expect("cached color fallback is valid")
-    })
-}
-
-/// 获取数值回退代码（惰性初始化字符串缓存，每次返回当前 bridge 的新 TokenStream）
-fn get_cached_numeric_fallback() -> TokenStream {
-    NUMERIC_FALLBACK_STR.with(|cell| {
-        let mut borrow = cell.borrow_mut();
-        let s = borrow.get_or_insert_with(|| generate_numeric_fallback_code().to_string());
-        s.parse::<TokenStream>()
-            .expect("cached numeric fallback is valid")
-    })
+    match mode {
+        ClassMode::Permissive => PERMISSIVE_HELPER_STR.with(parse_cached),
+        ClassMode::Strict => STRICT_HELPER_STR.with(parse_cached),
+    }
 }
 
 /// 生成运行时 class 解析代码
@@ -118,9 +99,29 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
     class_expr: &syn::Expr,
     mode: ClassMode,
 ) -> TokenStream {
-    let common_classes = get_cached_common_class_matches();
-    let color_fallbacks = get_cached_color_fallback();
-    let numeric_fallbacks = get_cached_numeric_fallback();
+    let helper = get_cached_dynamic_class_helper(mode);
+
+    quote! {
+        {
+            #helper
+            // AsRef<str>：&str、String、Cow<str> 均零拷贝通过
+            let __class_expr = #class_expr;
+            let __class_str: &str = __class_expr.as_ref();
+            // 空字符串快速路径：跳过迭代器创建（常见于 class={if c { "flex" } else { "" }}）
+            // split_ascii_whitespace 比 split_whitespace 更快——class 名只含 ASCII 字符
+            if __class_str.is_empty() {
+                __el
+            } else {
+                __class_str.split_ascii_whitespace().fold(__el, __rsx_apply_class)
+            }
+        }
+    }
+}
+
+fn generate_dynamic_class_helper(mode: ClassMode) -> TokenStream {
+    let common_classes = generate_common_class_matches();
+    let color_fallbacks = generate_color_fallback_code();
+    let numeric_fallbacks = generate_numeric_fallback_code();
     let unknown_fallback = match mode {
         ClassMode::Permissive => quote! {
             // 仅在 debug 构建中打印警告，避免 release 中每帧触发 syscall 污染日志。
@@ -160,33 +161,21 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
     };
 
     quote! {
-        {
-            // match 表提取为 #[inline(never)] 局部函数：
-            // - 阻止内联膨胀，同一组件内多个 class={expr} 共享函数体
-            // - LLVM ICF 可合并同类型的单态化实例
-            #[inline(never)]
-            fn __rsx_apply_class<E: Styled>(el: E, class: &str) -> E {
-                match class {
-                    #common_classes
-                    _ => {
-                        // 颜色前缀解析：覆盖完整 Tailwind 色板和 arbitrary hex。
-                        #color_fallbacks
-                        // 数值前缀回退：静态 match 未命中时，尝试前缀 + 数值解析
-                        // 覆盖 gap-7、px-5、ml-3、opacity-33 等任意数值
-                        #numeric_fallbacks
-                        #unknown_fallback
-                    }
+        // match 表提取为 #[inline(never)] 局部函数：
+        // - 阻止内联膨胀，同一组件内多个 class={expr} 共享函数体
+        // - LLVM ICF 可合并同类型的单态化实例
+        #[inline(never)]
+        fn __rsx_apply_class<E: Styled>(el: E, class: &str) -> E {
+            match class {
+                #(#common_classes)*
+                _ => {
+                    // 颜色前缀解析：覆盖完整 Tailwind 色板和 arbitrary hex。
+                    #color_fallbacks
+                    // 数值前缀回退：静态 match 未命中时，尝试前缀 + 数值解析
+                    // 覆盖 gap-7、px-5、ml-3、opacity-33 等任意数值
+                    #numeric_fallbacks
+                    #unknown_fallback
                 }
-            }
-            // AsRef<str>：&str、String、Cow<str> 均零拷贝通过
-            let __class_expr = #class_expr;
-            let __class_str: &str = __class_expr.as_ref();
-            // 空字符串快速路径：跳过迭代器创建（常见于 class={if c { "flex" } else { "" }}）
-            // split_ascii_whitespace 比 split_whitespace 更快——class 名只含 ASCII 字符
-            if __class_str.is_empty() {
-                __el
-            } else {
-                __class_str.split_ascii_whitespace().fold(__el, __rsx_apply_class)
             }
         }
     }
@@ -480,17 +469,13 @@ fn generate_integer_fallback(prefix: &'static str, method: &'static str, ty: &st
 /// 返回一个 match arm 列表，每个 arm 匹配一个 class 字符串并应用相应的方法。
 /// 通过 thread_local 缓存，整个编译过程只调用一次。
 ///
-fn generate_common_class_matches() -> Vec<TokenStream> {
-    let mut matches = Vec::new();
-
-    for class_str in dynamic_common_classes() {
+fn generate_common_class_matches() -> impl Iterator<Item = TokenStream> {
+    dynamic_common_classes().map(|class_str| {
         let method_call = parse_dynamic_common_class(class_str);
-        matches.push(quote! {
+        quote! {
             #class_str => #method_call,
-        });
-    }
-
-    matches
+        }
+    })
 }
 
 fn parse_dynamic_common_class(class: &str) -> TokenStream {

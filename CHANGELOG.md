@@ -22,9 +22,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added troubleshooting guidance for state class attributes and the explicitly typed
   `group_drag_over` fallback.
 - Clarified performance documentation for stateful auto-ID triggers introduced in 0.6.0.
+- Cached the complete dynamic class helper per mode so each macro expansion parses one token stream
+  instead of parsing the common, color, and numeric sections separately.
+- Upgraded the documentation stack to Astro 7 and migrated installs, scripts, and CI from pnpm to
+  Bun 1.4 with a frozen Bun lockfile.
 - Linked compatibility and release-checklist pages from the main documentation entry points.
 - Upgraded the demo lockfile to Zed GPUI `e9735934` and gpui-component / gpui-base `7885c416`.
-- Declared Rust 1.85 as the root proc-macro MSRV and retained Rust 1.95 for demo compatibility.
+- Declared Rust 1.88 as the root proc-macro MSRV and retained Rust 1.95 for demo compatibility.
 - Made compatibility issue reporting aggregate both platform results before changing issue state.
 
 ### Fixed

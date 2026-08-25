@@ -2825,33 +2825,27 @@ fn test_dynamic_class_directional_border() {
     let calls = common::take_border_calls();
     assert!(
         calls.contains(&"border_t_1"),
-        "dynamic class `border-t` should map to .border_t_1(), got {:?}",
-        calls
+        "dynamic class `border-t` should map to .border_t_1(), got {calls:?}"
     );
     assert!(
         calls.contains(&"border_b_1"),
-        "dynamic class `border-b` should map to .border_b_1(), got {:?}",
-        calls
+        "dynamic class `border-b` should map to .border_b_1(), got {calls:?}"
     );
     assert!(
         calls.contains(&"border_l_1"),
-        "dynamic class `border-l` should map to .border_l_1(), got {:?}",
-        calls
+        "dynamic class `border-l` should map to .border_l_1(), got {calls:?}"
     );
     assert!(
         calls.contains(&"border_r_1"),
-        "dynamic class `border-r` should map to .border_r_1(), got {:?}",
-        calls
+        "dynamic class `border-r` should map to .border_r_1(), got {calls:?}"
     );
     assert!(
         calls.contains(&"border_x_1"),
-        "dynamic class `border-x` should map to .border_x_1(), got {:?}",
-        calls
+        "dynamic class `border-x` should map to .border_x_1(), got {calls:?}"
     );
     assert!(
         calls.contains(&"border_y_1"),
-        "dynamic class `border-y` should map to .border_y_1(), got {:?}",
-        calls
+        "dynamic class `border-y` should map to .border_y_1(), got {calls:?}"
     );
 }
 

@@ -44,8 +44,8 @@ Run the documentation site locally:
 
 ```bash
 cd docs
-pnpm install
-pnpm run dev
+bun install
+bun run dev
 ```
 
 ## 📦 Installation
