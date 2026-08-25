@@ -8,6 +8,50 @@ mod common;
 use common::*;
 use gpui_rsx::rsx;
 
+macro_rules! class_compile_tests {
+    ($($name:ident => $classes:literal),+ $(,)?) => {
+        $(
+            #[test]
+            fn $name() {
+                let _el = rsx! { <div class=$classes /> };
+            }
+        )+
+    };
+}
+
+macro_rules! styled_tag_compile_tests {
+    ($($name:ident => $tag:ident),+ $(,)?) => {
+        $(
+            #[test]
+            fn $name() {
+                let _el = rsx! { <$tag styled>{"content"}</$tag> };
+            }
+        )+
+    };
+}
+
+macro_rules! flag_attr_compile_tests {
+    ($($name:ident => $attr:ident),+ $(,)?) => {
+        $(
+            #[test]
+            fn $name() {
+                let _el = rsx! { <div $attr /> };
+            }
+        )+
+    };
+}
+
+macro_rules! value_attr_compile_tests {
+    ($($name:ident => $attr:ident = $value:expr),+ $(,)?) => {
+        $(
+            #[test]
+            fn $name() {
+                let _el = rsx! { <div $attr={$value} /> };
+            }
+        )+
+    };
+}
+
 mod ui {
     use super::MockElement;
 
@@ -1639,68 +1683,26 @@ fn test_on_drop_event_snake_auto_id() {
 // 27. 颜色映射测试
 // ===========================================================================
 
-#[test]
-fn test_class_color_red_500() {
-    let _el = rsx! { <div class="bg-red-500" /> };
-}
-
-#[test]
-fn test_class_color_green_500() {
-    let _el = rsx! { <div class="bg-green-500" /> };
-}
-
-#[test]
-fn test_class_color_gray_500() {
-    let _el = rsx! { <div class="bg-gray-500" /> };
-}
-
-#[test]
-fn test_class_color_yellow_500() {
-    let _el = rsx! { <div class="bg-yellow-500" /> };
-}
-
-#[test]
-fn test_class_color_purple_500() {
-    let _el = rsx! { <div class="bg-purple-500" /> };
-}
-
-#[test]
-fn test_class_color_pink_500() {
-    let _el = rsx! { <div class="bg-pink-500" /> };
-}
-
-#[test]
-fn test_class_color_indigo_500() {
-    let _el = rsx! { <div class="bg-indigo-500" /> };
-}
-
-#[test]
-fn test_class_color_white() {
-    let _el = rsx! { <div class="bg-white" /> };
-}
-
-#[test]
-fn test_class_color_black() {
-    let _el = rsx! { <div class="text-black" /> };
+class_compile_tests! {
+    test_class_color_red_500 => "bg-red-500",
+    test_class_color_green_500 => "bg-green-500",
+    test_class_color_gray_500 => "bg-gray-500",
+    test_class_color_yellow_500 => "bg-yellow-500",
+    test_class_color_purple_500 => "bg-purple-500",
+    test_class_color_pink_500 => "bg-pink-500",
+    test_class_color_indigo_500 => "bg-indigo-500",
+    test_class_color_white => "bg-white",
+    test_class_color_black => "text-black",
 }
 
 // ===========================================================================
 // 28. 文本大小白名单测试
 // ===========================================================================
 
-#[test]
-fn test_class_text_xs() {
-    let _el = rsx! { <div class="text-xs" /> };
-}
-
-#[test]
-fn test_class_text_base() {
-    let _el = rsx! { <div class="text-base" /> };
-}
-
-#[test]
-fn test_class_text_lg() {
-    let _el = rsx! { <div class="text-lg" /> };
+class_compile_tests! {
+    test_class_text_xs => "text-xs",
+    test_class_text_base => "text-base",
+    test_class_text_lg => "text-lg",
 }
 
 // ===========================================================================
@@ -1749,45 +1751,15 @@ fn test_overflow_attribute() {
 // 30. styled 标志属性 — 默认样式注入
 // ===========================================================================
 
-#[test]
-fn test_styled_button() {
-    // button + styled → cursor_pointer
-    let _el = rsx! { <button styled>{"Click"}</button> };
-}
-
-#[test]
-fn test_styled_h1() {
-    let _el = rsx! { <h1 styled>{"Title"}</h1> };
-}
-
-#[test]
-fn test_styled_h2() {
-    let _el = rsx! { <h2 styled>{"Title"}</h2> };
-}
-
-#[test]
-fn test_styled_h3() {
-    let _el = rsx! { <h3 styled>{"Title"}</h3> };
-}
-
-#[test]
-fn test_styled_h4() {
-    let _el = rsx! { <h4 styled>{"Title"}</h4> };
-}
-
-#[test]
-fn test_styled_h5() {
-    let _el = rsx! { <h5 styled>{"Title"}</h5> };
-}
-
-#[test]
-fn test_styled_h6() {
-    let _el = rsx! { <h6 styled>{"Title"}</h6> };
-}
-
-#[test]
-fn test_styled_a() {
-    let _el = rsx! { <a styled>{"Link"}</a> };
+styled_tag_compile_tests! {
+    test_styled_button => button,
+    test_styled_h1 => h1,
+    test_styled_h2 => h2,
+    test_styled_h3 => h3,
+    test_styled_h4 => h4,
+    test_styled_h5 => h5,
+    test_styled_h6 => h6,
+    test_styled_a => a,
 }
 
 #[test]
@@ -2197,64 +2169,25 @@ fn test_flex_shrink_flag_attribute() {
     let _el = rsx! { <div flexShrink /> };
 }
 
-#[test]
-fn test_border_top_attribute() {
-    let _el = rsx! { <div border_t /> };
+flag_attr_compile_tests! {
+    test_border_top_attribute => border_t,
+    test_border_bottom_attribute => border_b,
+    test_border_left_attribute => border_l,
+    test_border_right_attribute => border_r,
 }
 
-#[test]
-fn test_border_bottom_attribute() {
-    let _el = rsx! { <div border_b /> };
+value_attr_compile_tests! {
+    test_border_top_value_attribute => border_t = px(1.0),
+    test_border_bottom_value_attribute => border_b = px(1.0),
+    test_border_left_value_attribute => border_l = px(1.0),
+    test_border_right_value_attribute => border_r = px(1.0),
 }
 
-#[test]
-fn test_border_left_attribute() {
-    let _el = rsx! { <div border_l /> };
-}
-
-#[test]
-fn test_border_right_attribute() {
-    let _el = rsx! { <div border_r /> };
-}
-
-#[test]
-fn test_border_top_value_attribute() {
-    let _el = rsx! { <div border_t={px(1.0)} /> };
-}
-
-#[test]
-fn test_border_bottom_value_attribute() {
-    let _el = rsx! { <div border_b={px(1.0)} /> };
-}
-
-#[test]
-fn test_border_left_value_attribute() {
-    let _el = rsx! { <div border_l={px(1.0)} /> };
-}
-
-#[test]
-fn test_border_right_value_attribute() {
-    let _el = rsx! { <div border_r={px(1.0)} /> };
-}
-
-#[test]
-fn test_class_border_t() {
-    let _el = rsx! { <div class="border-t" /> };
-}
-
-#[test]
-fn test_class_border_b() {
-    let _el = rsx! { <div class="border-b" /> };
-}
-
-#[test]
-fn test_class_border_l() {
-    let _el = rsx! { <div class="border-l" /> };
-}
-
-#[test]
-fn test_class_border_r() {
-    let _el = rsx! { <div class="border-r" /> };
+class_compile_tests! {
+    test_class_border_t => "border-t",
+    test_class_border_b => "border-b",
+    test_class_border_l => "border-l",
+    test_class_border_r => "border-r",
 }
 
 #[test]

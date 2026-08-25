@@ -39,7 +39,7 @@ impl AttrAnalysis {
 
 fn analyze_attr(attr: &RsxAttribute) -> AttrAnalysis {
     match attr {
-        RsxAttribute::Value { name, value } if name == "id" || name == "key" => {
+        RsxAttribute::Value { name, value: _ } if name == "id" || name == "key" => {
             AttrAnalysis::default()
         }
         RsxAttribute::Value { name, value } if name == "class" => {
@@ -467,5 +467,66 @@ fn static_key_suffix(expr: &syn::Expr) -> Option<String> {
         syn::Expr::Paren(expr) => static_key_suffix(&expr.expr),
         syn::Expr::Group(expr) => static_key_suffix(&expr.expr),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn element_name(name: &str) -> RsxElementName {
+        RsxElementName {
+            path: syn::parse_str(name).expect("valid element name"),
+        }
+    }
+
+    #[test]
+    fn img_requires_source() {
+        let error = generate_tag("img", &element_name("img"), None, None, None)
+            .expect_err("img without src must fail")
+            .to_string();
+
+        assert!(error.contains("Element `<img>` requires `src`"));
+    }
+
+    #[test]
+    fn canvas_requires_prepaint_and_paint() {
+        let callback: syn::Expr = syn::parse_quote!(callback);
+        let name = element_name("canvas");
+
+        let missing_prepaint = generate_tag("canvas", &name, None, None, Some(&callback))
+            .expect_err("canvas without prepaint must fail")
+            .to_string();
+        assert!(missing_prepaint.contains("Element `<canvas>` requires `prepaint`"));
+
+        let missing_paint = generate_tag("canvas", &name, None, Some(&callback), None)
+            .expect_err("canvas without paint must fail")
+            .to_string();
+        assert!(missing_paint.contains("Element `<canvas>` requires `paint`"));
+    }
+
+    #[test]
+    fn static_key_suffix_supports_literal_display_types() {
+        let cases: [(syn::Expr, &str); 6] = [
+            (syn::parse_quote!("item"), "item"),
+            (syn::parse_quote!(42), "42"),
+            (syn::parse_quote!(true), "true"),
+            (syn::parse_quote!('x'), "x"),
+            (syn::parse_quote!(-7), "-7"),
+            (syn::parse_quote!((9)), "9"),
+        ];
+
+        for (expr, expected) in cases {
+            assert_eq!(static_key_suffix(&expr).as_deref(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn static_key_suffix_keeps_dynamic_values_at_runtime() {
+        let dynamic: syn::Expr = syn::parse_quote!(item.id);
+        let non_integer_negative: syn::Expr = syn::parse_quote!(-1.5);
+
+        assert_eq!(static_key_suffix(&dynamic), None);
+        assert_eq!(static_key_suffix(&non_integer_negative), None);
     }
 }

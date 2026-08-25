@@ -23,6 +23,24 @@ macro_rules! styled_value_methods {
     };
 }
 
+macro_rules! mock_no_arg_methods {
+    ($($name:ident),* $(,)?) => {
+        $(pub fn $name(self) -> Self { self })*
+    };
+}
+
+macro_rules! mock_value_methods {
+    ($($name:ident),* $(,)?) => {
+        $(pub fn $name<T>(self, _: T) -> Self { self })*
+    };
+}
+
+macro_rules! mock_two_value_methods {
+    ($($name:ident),* $(,)?) => {
+        $(pub fn $name<T, U>(self, _: T, _: U) -> Self { self })*
+    };
+}
+
 impl Styled for StyleRefinement {
     fn style(&mut self) -> &mut StyleRefinement {
         self
@@ -352,192 +370,65 @@ impl MockElement {
         self
     }
 
-    // --- flex（不在 Styled 中）---
-    pub fn flex_grow(self) -> Self {
-        self
-    }
-    pub fn flex_shrink(self) -> Self {
-        self
-    }
+    mock_no_arg_methods!(
+        flex_grow,
+        flex_shrink,
+        gap_2,
+        gap_3,
+        gap_4,
+        gap_6,
+        p_2,
+        p_3,
+        p_4,
+        px_2,
+        px_3,
+        px_4,
+        px_6,
+        py_1,
+        py_2,
+        border_4,
+        visible,
+        invisible,
+    );
 
-    // --- 间距固定值（不在 Styled 中）---
-    pub fn gap_2(self) -> Self {
-        self
-    }
-    pub fn gap_3(self) -> Self {
-        self
-    }
-    pub fn gap_4(self) -> Self {
-        self
-    }
-    pub fn gap_6(self) -> Self {
-        self
-    }
-    pub fn p_2(self) -> Self {
-        self
-    }
-    pub fn p_3(self) -> Self {
-        self
-    }
-    pub fn p_4(self) -> Self {
-        self
-    }
-    pub fn px_2(self) -> Self {
-        self
-    }
-    pub fn px_3(self) -> Self {
-        self
-    }
-    pub fn px_4(self) -> Self {
-        self
-    }
-    pub fn px_6(self) -> Self {
-        self
-    }
-    pub fn py_1(self) -> Self {
-        self
-    }
-    pub fn py_2(self) -> Self {
-        self
-    }
-
-    // --- 边框（不在 Styled 中）---
-    pub fn rounded<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn border_4(self) -> Self {
-        self
-    }
-    pub fn border_t<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn border_b<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn border_l<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn border_r<T>(self, _: T) -> Self {
-        self
-    }
-
-    // --- 定位（不在 Styled 中）---
-    pub fn overflow<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn overflow_x<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn overflow_y<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn top<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn left<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn right<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn bottom<T>(self, _: T) -> Self {
-        self
-    }
-
-    // --- 可见性 ---
-    pub fn visible(self) -> Self {
-        self
-    }
-    pub fn invisible(self) -> Self {
-        self
-    }
+    mock_value_methods!(
+        rounded, border_t, border_b, border_l, border_r, overflow, overflow_x, overflow_y, top,
+        left, right, bottom,
+    );
 
     // --- 事件 ---
-    pub fn on_click<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_mouse_down<T, U>(self, _: T, _: U) -> Self {
-        self
-    }
-    pub fn on_mouse_up<T, U>(self, _: T, _: U) -> Self {
-        self
-    }
-    pub fn on_mouse_move<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_mouse_exit<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_mouse_pressure<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_pinch<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_mouse_down_out<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_mouse_up_out<T, U>(self, _: T, _: U) -> Self {
-        self
-    }
-    pub fn on_any_mouse_down<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_any_mouse_up<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_key_down<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_key_up<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_modifiers_changed<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_hover<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_scroll_wheel<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_drag<T, U>(self, _: T, _: U) -> Self {
-        self
-    }
-    pub fn on_drag_move<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_drop<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_action<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_boxed_action<T, U>(self, _: T, _: U) -> Self {
-        self
-    }
-    // --- 捕获阶段事件 ---
-    pub fn capture_any_mouse_down<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn capture_any_mouse_up<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn capture_key_down<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn capture_key_up<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn capture_action<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn capture_mouse_pressure<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn capture_pinch<T>(self, _: T) -> Self {
-        self
-    }
+    mock_value_methods!(
+        on_click,
+        on_mouse_move,
+        on_mouse_exit,
+        on_mouse_pressure,
+        on_pinch,
+        on_mouse_down_out,
+        on_any_mouse_down,
+        on_any_mouse_up,
+        on_key_down,
+        on_key_up,
+        on_modifiers_changed,
+        on_hover,
+        on_scroll_wheel,
+        on_drag_move,
+        on_drop,
+        on_action,
+        capture_any_mouse_down,
+        capture_any_mouse_up,
+        capture_key_down,
+        capture_key_up,
+        capture_action,
+        capture_mouse_pressure,
+        capture_pinch,
+    );
+    mock_two_value_methods!(
+        on_mouse_down,
+        on_mouse_up,
+        on_mouse_up_out,
+        on_drag,
+        on_boxed_action,
+    );
 
     // --- 状态样式 ---
     pub fn hover<F: FnOnce(StyleRefinement) -> StyleRefinement>(self, _f: F) -> Self {
@@ -555,42 +446,22 @@ impl MockElement {
     pub fn in_focus<F: FnOnce(StyleRefinement) -> StyleRefinement>(self, _f: F) -> Self {
         self
     }
-    pub fn tooltip<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn group<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn track_focus<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn hoverable_tooltip<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn tooltip_show_delay<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_aux_click<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn on_a11y_action<T, U>(self, _: T, _: U) -> Self {
-        self
-    }
-    pub fn overflow_scroll(self) -> Self {
-        self
-    }
-    pub fn overflow_x_scroll(self) -> Self {
-        self
-    }
-    pub fn overflow_y_scroll(self) -> Self {
-        self
-    }
-    pub fn restrict_scroll_to_axis(self) -> Self {
-        self
-    }
-    pub fn scrollbar_width<T>(self, _: T) -> Self {
-        self
-    }
+    mock_value_methods!(
+        tooltip,
+        group,
+        track_focus,
+        hoverable_tooltip,
+        tooltip_show_delay,
+        on_aux_click,
+        scrollbar_width,
+    );
+    mock_two_value_methods!(on_a11y_action);
+    mock_no_arg_methods!(
+        overflow_scroll,
+        overflow_x_scroll,
+        overflow_y_scroll,
+        restrict_scroll_to_axis,
+    );
     pub fn group_hover<T, F: FnOnce(StyleRefinement) -> StyleRefinement>(
         self,
         _: T,
@@ -612,101 +483,38 @@ impl MockElement {
     ) -> Self {
         self
     }
-    pub fn anchor_scroll<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn focusable(self) -> Self {
-        self
-    }
-    pub fn track_scroll<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn role<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn accessibility_id<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_label<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_description<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_keyshortcuts<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_active_descendant(self) -> Self {
-        self
-    }
-    pub fn a11y_synthetic_children<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_selected<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_expanded<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_toggled<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_numeric_value<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_numeric_value_step<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_value<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_placeholder<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_min_numeric_value<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_max_numeric_value<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_orientation<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_level<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_position_in_set<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_size_of_set<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_row_index<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_column_index<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_row_count<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn aria_column_count<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn external_drag_payload<T>(self, _: T) -> Self {
-        self
-    }
+    mock_no_arg_methods!(focusable, aria_active_descendant);
+    mock_value_methods!(
+        anchor_scroll,
+        track_scroll,
+        role,
+        accessibility_id,
+        aria_label,
+        aria_description,
+        aria_keyshortcuts,
+        a11y_synthetic_children,
+        aria_selected,
+        aria_expanded,
+        aria_toggled,
+        aria_numeric_value,
+        aria_numeric_value_step,
+        aria_value,
+        aria_placeholder,
+        aria_min_numeric_value,
+        aria_max_numeric_value,
+        aria_orientation,
+        aria_level,
+        aria_position_in_set,
+        aria_size_of_set,
+        aria_row_index,
+        aria_column_index,
+        aria_row_count,
+        aria_column_count,
+        external_drag_payload,
+    );
 
     // --- 额外属性映射 ---
-    pub fn text_size<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn line_height<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn font_family<T>(self, _: T) -> Self {
-        self
-    }
+    mock_value_methods!(text_size, line_height, font_family, text_align, shadow);
     pub fn font_weight<T>(self, weight: T) -> Self
     where
         T: Into<FontWeight>,
@@ -714,15 +522,7 @@ impl MockElement {
         FONT_WEIGHT_CALLS.with(|c| c.borrow_mut().push(weight.into().0));
         self
     }
-    pub fn font_display(self) -> Self {
-        self
-    }
-    pub fn text_align<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn shadow<T>(self, _: T) -> Self {
-        self
-    }
+    mock_no_arg_methods!(font_display);
 
     // --- 子节点 ---
     pub fn child<T>(self, _: T) -> Self {
@@ -759,66 +559,26 @@ impl MockElement {
         Box::leak(Box::new(StyleRefinement::default()))
     }
 
-    pub fn debug(self) -> Self {
-        self
-    }
-
-    pub fn path<T>(self, _: T) -> Self {
-        self
-    }
+    mock_no_arg_methods!(debug);
+    mock_value_methods!(
+        path,
+        object_fit,
+        with_fallback,
+        with_loading,
+        image_cache,
+        on_children_prepainted,
+        flex_basis,
+        inset,
+        rounded_t,
+        rounded_b,
+        rounded_tl,
+        rounded_tr,
+        rounded_bl,
+        rounded_br,
+        placeholder,
+    );
 
     pub fn grayscale(self, _: bool) -> Self {
-        self
-    }
-
-    pub fn object_fit<T>(self, _: T) -> Self {
-        self
-    }
-
-    pub fn with_fallback<T>(self, _: T) -> Self {
-        self
-    }
-
-    pub fn with_loading<T>(self, _: T) -> Self {
-        self
-    }
-
-    pub fn image_cache<T>(self, _: T) -> Self {
-        self
-    }
-
-    pub fn on_children_prepainted<T>(self, _: T) -> Self {
-        self
-    }
-
-    // --- 新增属性映射（不在 Styled 中）---
-    pub fn flex_basis<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn inset<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn rounded_t<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn rounded_b<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn rounded_tl<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn rounded_tr<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn rounded_bl<T>(self, _: T) -> Self {
-        self
-    }
-    pub fn rounded_br<T>(self, _: T) -> Self {
-        self
-    }
-
-    // --- 杂项 ---
-    pub fn placeholder<T>(self, _: T) -> Self {
         self
     }
 }

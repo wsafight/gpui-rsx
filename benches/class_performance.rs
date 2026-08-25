@@ -81,6 +81,18 @@ fn relative(val: f32) -> f32 {
     val
 }
 
+macro_rules! mock_no_arg_methods {
+    ($($name:ident),* $(,)?) => {
+        $(fn $name(self) -> Self { self })*
+    };
+}
+
+macro_rules! mock_value_methods {
+    ($($name:ident),* $(,)?) => {
+        $(fn $name<T>(self, _: T) -> Self { self })*
+    };
+}
+
 #[allow(dead_code)] // benchmark 中并非所有方法都被使用
 impl MockElement {
     fn touch(mut self, operation: u64) -> Self {
@@ -97,162 +109,69 @@ impl MockElement {
     fn flex_col(self) -> Self {
         self.touch(3)
     }
-    fn flex_row(self) -> Self {
-        self
-    }
-    fn flex_1(self) -> Self {
-        self
-    }
-    fn flex_wrap(self) -> Self {
-        self
-    }
+    mock_no_arg_methods!(flex_row, flex_1, flex_wrap);
+
     fn gap<T>(self, _: T) -> Self {
         self.touch(4)
-    }
-    fn gap_2(self) -> Self {
-        self
     }
     fn gap_4(self) -> Self {
         self.touch(5)
     }
-    fn gap_6(self) -> Self {
-        self
-    }
+    mock_no_arg_methods!(gap_2, gap_6);
+
     fn p<T>(self, _: T) -> Self {
         self.touch(6)
-    }
-    fn p_2(self) -> Self {
-        self
     }
     fn p_4(self) -> Self {
         self.touch(7)
     }
+    mock_no_arg_methods!(p_2);
+
     fn bg<T>(self, _: T) -> Self {
         self.touch(8)
     }
     fn text_color<T>(self, _: T) -> Self {
         self.touch(9)
     }
-    fn px<T>(self, _: T) -> Self {
-        self
-    }
-    fn px_2(self) -> Self {
-        self
-    }
-    fn px_4(self) -> Self {
-        self
-    }
-    fn py<T>(self, _: T) -> Self {
-        self
-    }
-    fn py_2(self) -> Self {
-        self
-    }
-    fn py_4(self) -> Self {
-        self
-    }
-    fn m<T>(self, _: T) -> Self {
-        self
-    }
-    fn m_2(self) -> Self {
-        self
-    }
-    fn m_4(self) -> Self {
-        self
-    }
+    mock_value_methods!(px, py, m, font_weight);
+    mock_no_arg_methods!(px_2, px_4, py_2, py_4, m_2, m_4);
+
     fn rounded_md(self) -> Self {
         self.touch(10)
     }
-    fn rounded_lg(self) -> Self {
-        self
-    }
-    fn rounded_full(self) -> Self {
-        self
-    }
-    fn items_center(self) -> Self {
-        self
-    }
-    fn items_start(self) -> Self {
-        self
-    }
-    fn items_end(self) -> Self {
-        self
-    }
-    fn justify_center(self) -> Self {
-        self
-    }
-    fn justify_between(self) -> Self {
-        self
-    }
-    fn justify_start(self) -> Self {
-        self
-    }
-    fn justify_end(self) -> Self {
-        self
-    }
-    fn w_full(self) -> Self {
-        self
-    }
-    fn h_full(self) -> Self {
-        self
-    }
-    fn size_full(self) -> Self {
-        self
-    }
-    fn text_sm(self) -> Self {
-        self
-    }
-    fn text_base(self) -> Self {
-        self
-    }
-    fn text_lg(self) -> Self {
-        self
-    }
-    fn text_xl(self) -> Self {
-        self
-    }
-    fn text_2xl(self) -> Self {
-        self
-    }
-    fn text_3xl(self) -> Self {
-        self
-    }
-    fn font_bold(self) -> Self {
-        self
-    }
-    fn font_weight<T>(self, _: T) -> Self {
-        self
-    }
-    fn border(self) -> Self {
-        self
-    }
-    fn border_1(self) -> Self {
-        self
-    }
-    fn border_2(self) -> Self {
-        self
-    }
-    fn cursor_pointer(self) -> Self {
-        self
-    }
-    fn overflow_hidden(self) -> Self {
-        self
-    }
-    fn overflow_scroll(self) -> Self {
-        self
-    }
-    fn text_xs(self) -> Self {
-        self
-    }
-    fn rounded_sm(self) -> Self {
-        self
-    }
-    fn absolute(self) -> Self {
-        self
-    }
-    fn relative(self) -> Self {
-        self
-    }
+    mock_no_arg_methods!(
+        rounded_lg,
+        rounded_full,
+        items_center,
+        items_start,
+        items_end,
+        justify_center,
+        justify_between,
+        justify_start,
+        justify_end,
+        w_full,
+        h_full,
+        size_full,
+        text_xs,
+        text_sm,
+        text_base,
+        text_lg,
+        text_xl,
+        text_2xl,
+        text_3xl,
+        font_bold,
+        border,
+        border_1,
+        border_2,
+        cursor_pointer,
+        overflow_hidden,
+        overflow_scroll,
+        rounded_sm,
+        absolute,
+        relative,
+        debug,
+    );
+
     fn child<T>(self, _: T) -> Self {
         self.touch(11)
     }
@@ -270,9 +189,6 @@ impl MockElement {
         F: FnOnce(Self) -> Self,
     {
         f(self)
-    }
-    fn debug(self) -> Self {
-        self
     }
     fn style(&mut self) -> &mut StyleRefinement {
         Box::leak(Box::new(StyleRefinement::default()))

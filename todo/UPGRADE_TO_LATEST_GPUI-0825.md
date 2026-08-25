@@ -450,6 +450,11 @@ Dependabot 更新后仍需由 demo 的 `--locked` 构建和单 GPUI source 检�
 - demo 同时测试 `1.95.0` 和 stable，或明确提升 demo toolchain；
 - `scripts/check.sh` 显式调用目标 toolchain，不要依赖从根目录执行时自动采用 `demo/rust-toolchain.toml`。
 
+实施验证后，根 crate 的 MSRV 确定为 Rust 1.88，而不是 edition 2024 的最低版本
+Rust 1.85。自动 ID 依赖 `proc_macro2::Span::start()` 的真实源码位置；该能力在
+rustc 1.88 之前的过程宏上下文中只返回 `L0C0`，会破坏 ID 唯一性。demo 仍以
+Rust 1.95 作为可复现验证版本，并额外由 stable lane 覆盖新工具链。
+
 ## 12. 文档同步
 
 代码合并前同步更新：
