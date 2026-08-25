@@ -66,14 +66,6 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
         };
     }
 
-    if class == "text-ellipsis-start" {
-        return if mode.is_strict() {
-            compile_error(unsupported_class_message(class))
-        } else {
-            quote! {}
-        };
-    }
-
     if let Some(token) = parse_tailwind_alias_class(class) {
         return token;
     }

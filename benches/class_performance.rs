@@ -10,8 +10,10 @@ use std::hint::black_box;
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
 // Mock GPUI 类型（与 tests/macro_tests.rs 相同）
-#[derive(Debug)]
-struct MockElement;
+#[derive(Debug, Default)]
+struct MockElement {
+    checksum: u64,
+}
 
 #[derive(Clone, Copy, Debug)]
 struct FontWeight;
@@ -59,36 +61,41 @@ struct StyleRefinement {
 }
 
 fn div() -> MockElement {
-    MockElement
+    MockElement::default()
 }
 
-fn rgb(_hex: u32) -> u32 {
-    0
+fn rgb(hex: u32) -> u32 {
+    hex
 }
-fn rgba(_hex: u32) -> u32 {
-    0
+fn rgba(hex: u32) -> u32 {
+    hex
 }
 
-fn px(_val: f32) -> f32 {
-    0.0
+fn px(val: f32) -> f32 {
+    val
 }
-fn rems(_val: f32) -> f32 {
-    0.0
+fn rems(val: f32) -> f32 {
+    val
 }
-fn relative(_val: f32) -> f32 {
-    0.0
+fn relative(val: f32) -> f32 {
+    val
 }
 
 #[allow(dead_code)] // benchmark 中并非所有方法都被使用
 impl MockElement {
-    fn id<T>(self, _: T) -> Self {
+    fn touch(mut self, operation: u64) -> Self {
+        self.checksum = self.checksum.wrapping_mul(16777619) ^ operation;
         self
+    }
+
+    fn id<T>(self, _: T) -> Self {
+        self.touch(1)
     }
     fn flex(self) -> Self {
-        self
+        self.touch(2)
     }
     fn flex_col(self) -> Self {
-        self
+        self.touch(3)
     }
     fn flex_row(self) -> Self {
         self
@@ -100,31 +107,31 @@ impl MockElement {
         self
     }
     fn gap<T>(self, _: T) -> Self {
-        self
+        self.touch(4)
     }
     fn gap_2(self) -> Self {
         self
     }
     fn gap_4(self) -> Self {
-        self
+        self.touch(5)
     }
     fn gap_6(self) -> Self {
         self
     }
     fn p<T>(self, _: T) -> Self {
-        self
+        self.touch(6)
     }
     fn p_2(self) -> Self {
         self
     }
     fn p_4(self) -> Self {
-        self
+        self.touch(7)
     }
     fn bg<T>(self, _: T) -> Self {
-        self
+        self.touch(8)
     }
     fn text_color<T>(self, _: T) -> Self {
-        self
+        self.touch(9)
     }
     fn px<T>(self, _: T) -> Self {
         self
@@ -154,7 +161,7 @@ impl MockElement {
         self
     }
     fn rounded_md(self) -> Self {
-        self
+        self.touch(10)
     }
     fn rounded_lg(self) -> Self {
         self
@@ -247,10 +254,10 @@ impl MockElement {
         self
     }
     fn child<T>(self, _: T) -> Self {
-        self
+        self.touch(11)
     }
     fn children<I: IntoIterator>(self, _: I) -> Self {
-        self
+        self.touch(12)
     }
     fn map<F>(self, f: F) -> Self
     where
@@ -392,6 +399,8 @@ trait Styled: Sized {
     fn whitespace_nowrap(self) -> Self;
     fn truncate(self) -> Self;
     fn text_ellipsis(self) -> Self;
+    fn text_ellipsis_start(self) -> Self;
+    fn text_ellipsis_middle(self) -> Self;
     fn line_clamp(self, lines: usize) -> Self;
     fn italic(self) -> Self;
     fn not_italic(self) -> Self;
@@ -478,6 +487,10 @@ trait Styled: Sized {
     // --- grid ---
     fn grid_cols(self, v: u16) -> Self;
     fn grid_rows(self, v: u16) -> Self;
+    fn grid_cols_min_content(self, v: u16) -> Self;
+    fn grid_cols_max_content(self, v: u16) -> Self;
+    fn grid_rows_min_content(self, v: u16) -> Self;
+    fn grid_rows_max_content(self, v: u16) -> Self;
     fn col_span(self, v: u16) -> Self;
     fn col_span_full(self) -> Self;
     fn col_start(self, v: i16) -> Self;
@@ -499,10 +512,10 @@ impl Styled for MockElement {
 
     // --- flex ---
     fn flex(self) -> Self {
-        self
+        self.touch(2)
     }
     fn flex_col(self) -> Self {
-        self
+        self.touch(3)
     }
     fn flex_col_reverse(self) -> Self {
         self
@@ -646,7 +659,7 @@ impl Styled for MockElement {
     }
     // --- spacing ---
     fn gap(self, _: f32) -> Self {
-        self
+        self.touch(4)
     }
     fn gap_x(self, _: f32) -> Self {
         self
@@ -658,13 +671,13 @@ impl Styled for MockElement {
         self
     }
     fn gap_4(self) -> Self {
-        self
+        self.touch(5)
     }
     fn gap_6(self) -> Self {
         self
     }
     fn p(self, _: f32) -> Self {
-        self
+        self.touch(6)
     }
     fn px(self, _: f32) -> Self {
         self
@@ -688,7 +701,7 @@ impl Styled for MockElement {
         self
     }
     fn p_4(self) -> Self {
-        self
+        self.touch(7)
     }
     fn m(self, _: f32) -> Self {
         self
@@ -823,6 +836,12 @@ impl Styled for MockElement {
     fn text_ellipsis(self) -> Self {
         self
     }
+    fn text_ellipsis_start(self) -> Self {
+        self
+    }
+    fn text_ellipsis_middle(self) -> Self {
+        self
+    }
     fn line_clamp(self, _: usize) -> Self {
         self
     }
@@ -922,7 +941,7 @@ impl Styled for MockElement {
         self
     }
     fn rounded_md(self) -> Self {
-        self
+        self.touch(10)
     }
     fn rounded_lg(self) -> Self {
         self
@@ -1049,10 +1068,10 @@ impl Styled for MockElement {
     }
     // --- color / opacity ---
     fn bg<T>(self, _: T) -> Self {
-        self
+        self.touch(8)
     }
     fn text_color<T>(self, _: T) -> Self {
-        self
+        self.touch(9)
     }
     fn border_color<T>(self, _: T) -> Self {
         self
@@ -1065,6 +1084,18 @@ impl Styled for MockElement {
         self
     }
     fn grid_rows(self, _: u16) -> Self {
+        self
+    }
+    fn grid_cols_min_content(self, _: u16) -> Self {
+        self
+    }
+    fn grid_cols_max_content(self, _: u16) -> Self {
+        self
+    }
+    fn grid_rows_min_content(self, _: u16) -> Self {
+        self
+    }
+    fn grid_rows_max_content(self, _: u16) -> Self {
         self
     }
     fn col_span(self, _: u16) -> Self {
@@ -1108,16 +1139,14 @@ impl Styled for MockElement {
 /// 基准测试：静态 class（编译期优化）
 fn bench_static_class(c: &mut Criterion) {
     c.bench_function("static_class_simple", |b| {
-        b.iter(|| {
-            let _el = rsx! { <div class="flex gap-4" /> };
-        })
+        b.iter(|| black_box(rsx! { <div class="flex gap-4" /> }))
     });
 
     c.bench_function("static_class_complex", |b| {
         b.iter(|| {
-            let _el = rsx! {
+            black_box(rsx! {
                 <div class="flex flex-col gap-4 p-4 bg-blue-500 text-white rounded-md" />
-            };
+            })
         })
     });
 }
@@ -1126,16 +1155,12 @@ fn bench_static_class(c: &mut Criterion) {
 fn bench_dynamic_class(c: &mut Criterion) {
     let simple_classes = "flex gap-4";
     c.bench_function("dynamic_class_simple", |b| {
-        b.iter(|| {
-            let _el = rsx! { <div class={black_box(simple_classes)} /> };
-        })
+        b.iter(|| black_box(rsx! { <div class={black_box(simple_classes)} /> }))
     });
 
     let complex_classes = "flex flex-col gap-4 p-4 bg-blue-500 text-white rounded-md";
     c.bench_function("dynamic_class_complex", |b| {
-        b.iter(|| {
-            let _el = rsx! { <div class={black_box(complex_classes)} /> };
-        })
+        b.iter(|| black_box(rsx! { <div class={black_box(complex_classes)} /> }))
     });
 }
 
@@ -1147,9 +1172,9 @@ fn bench_conditional_class(c: &mut Criterion) {
     group.bench_function("static_if_else", |b| {
         let is_active = black_box(true);
         b.iter(|| {
-            let _el = rsx! {
+            black_box(rsx! {
                 <div class={if is_active { "bg-blue-500" } else { "bg-gray-200" }} />
-            };
+            })
         })
     });
 
@@ -1157,12 +1182,12 @@ fn bench_conditional_class(c: &mut Criterion) {
     group.bench_function("when_attribute", |b| {
         let is_active = black_box(true);
         b.iter(|| {
-            let _el = rsx! {
+            black_box(rsx! {
                 <div
                     bg={rgb(0xe5e7eb)}
                     when={(is_active, |el| el.bg(rgb(0x3b82f6)))}
                 />
-            };
+            })
         })
     });
 
@@ -1179,14 +1204,14 @@ fn bench_nested_elements(c: &mut Criterion) {
                 // 动态生成不同深度的嵌套
                 match depth {
                     2 => {
-                        let _el = rsx! {
+                        black_box(rsx! {
                             <div class="flex">
                                 <div class="gap-4">{"Content"}</div>
                             </div>
-                        };
+                        });
                     }
                     5 => {
-                        let _el = rsx! {
+                        black_box(rsx! {
                             <div class="flex">
                                 <div class="flex-col">
                                     <div class="gap-4">
@@ -1196,10 +1221,10 @@ fn bench_nested_elements(c: &mut Criterion) {
                                     </div>
                                 </div>
                             </div>
-                        };
+                        });
                     }
                     10 => {
-                        let _el = rsx! {
+                        black_box(rsx! {
                             <div class="flex">
                                 <div><div><div><div><div>
                                     <div><div><div><div>
@@ -1207,7 +1232,7 @@ fn bench_nested_elements(c: &mut Criterion) {
                                     </div></div></div></div>
                                 </div></div></div></div></div>
                             </div>
-                        };
+                        });
                     }
                     _ => unreachable!(),
                 }
@@ -1226,25 +1251,25 @@ fn bench_loop_rendering(c: &mut Criterion) {
 
     group.bench_function("for_loop", |b| {
         b.iter(|| {
-            let _el = rsx! {
+            black_box(rsx! {
                 <div>
                     {for item in black_box(&items) {
                         <div>{*item}</div>
                     }}
                 </div>
-            };
+            })
         })
     });
 
     group.bench_function("iterator_map", |b| {
         b.iter(|| {
-            let _el = rsx! {
+            black_box(rsx! {
                 <div>
                     {black_box(&items).iter().map(|item| {
                         rsx! { <div>{*item}</div> }
                     }).collect::<Vec<_>>()}
                 </div>
-            };
+            })
         })
     });
 
@@ -1259,18 +1284,18 @@ fn bench_string_allocation(c: &mut Criterion) {
 
     group.bench_function("format_macro", |b| {
         b.iter(|| {
-            let _el = rsx! {
+            black_box(rsx! {
                 <div>{format!("Count: {}", black_box(count))}</div>
-            };
+            })
         })
     });
 
     group.bench_function("separate_children", |b| {
         b.iter(|| {
             let count_str = black_box(count).to_string();
-            let _el = rsx! {
+            black_box(rsx! {
                 <div>{"Count: "}{count_str.as_str()}</div>
-            };
+            })
         })
     });
 

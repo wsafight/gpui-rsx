@@ -13,10 +13,16 @@ The Zed git dependency currently still reports its crate package version as `gpu
 | --- | --- |
 | GPUI-RSX | `0.6.0` |
 | GPUI source | `https://github.com/zed-industries/zed` |
-| GPUI resolved revision | `f164afda46188939f76c24aba4099d04423bc356` |
-| `gpui-component` revision | `8752104289424b7f35045b68a2d394018da48e7e` |
+| GPUI resolved revision | `e973593455af18719be22b0455c3f928c6ccc24d` |
+| `gpui-component` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |
+| `gpui-base` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |
+| GPUI-RSX root MSRV | `1.85.0` |
 | Demo Rust toolchain | `1.95.0` |
-| Demo check | `cargo check --manifest-path demo/Cargo.toml --bins --locked` |
+| Demo check | `cargo +1.95.0 check --manifest-path demo/Cargo.toml --bins --locked` |
+
+The root MSRV is a lower bound, not a required day-to-day toolchain. Newer stable Rust versions are
+supported; this locked demo revision was also verified with Rust `1.98.0`. Rust `1.95.0` remains the
+explicit reproducibility lane for the demo.
 
 ## Avoid Duplicate GPUI Crates
 
@@ -29,6 +35,11 @@ Bad dependency graphs often look like this:
 - component types that no longer match because they came from different crate instances.
 
 Pinning the application lockfile and using the demo as a reference keeps the graph deterministic.
+
+The current gpui-component main branch splits lower-level controls into `gpui-base`. Applications
+normally keep depending on the `gpui-component` facade; its public re-exports cover supported base
+types. Add a direct `gpui-base` dependency only when using an API that the facade does not export,
+and keep it on the same source revision.
 
 ## Inspect the Resolved GPUI
 

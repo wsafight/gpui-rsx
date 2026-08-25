@@ -186,3 +186,4 @@ The demo lockfile pins GPUI and `gpui-component` so compatibility problems are r
 - Read [Syntax Reference](/gpui-rsx/usage/syntax/) for elements, attributes, children, and fragments.
 - Read [Class Handling](/gpui-rsx/usage/class/) before relying on dynamic class strings.
 - Read [IDs and Keys](/gpui-rsx/usage/ids/) before rendering interactive rows in loops.
+- Read [Compatibility](/gpui-rsx/compatibility/) when aligning GPUI, gpui-component, Rust, and the demo lockfile.

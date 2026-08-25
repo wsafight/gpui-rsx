@@ -448,8 +448,8 @@ div().children((&self.items).into_iter().map(|item| {
 
 for 循环内有 stateful 属性（`onClick`、`onHover`、`onDrag`、`onAuxClick`、
 `onA11yAction`、`active`、`activeClass`、`groupActive`、`tooltip`、`tooltipShowDelay`、
-`focusable`、`role`、`ariaLabel`、`overflowScroll`、`trackScroll`、`scrollbarWidth`
-或 `overflow-scroll`）的元素**必须**提供
+`focusable`、`role`、`ariaLabel`、`ariaDescription`、`accessibilityId`、`overflowScroll`、
+`restrictScrollToAxis`、`trackScroll`、`externalDragPayload` 或 `overflow-scroll`）的元素**必须**提供
 `id` 或 `key`，否则宏会报编译错误：
 
 ```rust

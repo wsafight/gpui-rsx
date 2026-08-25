@@ -144,6 +144,60 @@ rsx! {
 
 Use `rsx_strict!` to panic when an unsupported dynamic token is evaluated.
 
+### State Class Attribute Uses a Dynamic Value
+
+`hoverClass`, `focusClass`, and `activeClass` are compile-time helpers and only accept string literals:
+
+```rust
+// Wrong
+let classes = "bg-blue-600";
+rsx! { <button hoverClass={classes} /> }
+
+// Correct
+rsx! { <button hoverClass="bg-blue-600" /> }
+```
+
+Use `hover`, `focus`, or `active` directly when the refinement needs Rust logic:
+
+```rust
+rsx! {
+    <button hover={|style| style.bg(rgb(0x2563eb))} />
+}
+```
+
+### State Class Contains an Element-Level Class
+
+State class attributes receive a GPUI `StyleRefinement`, so element-level classes such as
+`overflow-scroll` or `debug-outline` cannot be applied there:
+
+```rust
+// Wrong
+rsx! { <button activeClass="overflow-scroll" /> }
+```
+
+Put always-on element behavior on the main `class`:
+
+```rust
+rsx! {
+    <button
+        class="overflow-scroll"
+        activeClass="opacity-75"
+    />
+}
+```
+
+For conditional element-level behavior, provide an explicit `id` and call GPUI through `when`:
+
+```rust
+rsx! {
+    <button
+        id="results"
+        when={(is_scrollable, |el| el.overflow_scroll())}
+        activeClass="opacity-75"
+    />
+}
+```
+
 ## Conditional Attribute Errors
 
 ### `when`, `whenSome`, or `whenClass` Tuple Shape
@@ -298,6 +352,30 @@ fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl Into
 ### Events Do Not Fire
 
 Check the handler signature expected by the GPUI method you are calling. For repeated stateful event targets, ensure the element has a `key` or explicit `id`.
+
+### `groupDragOver` Is Rejected
+
+`groupDragOver` is not exposed as an RSX attribute because GPUI needs the drag data type at the
+call site:
+
+```rust
+// Wrong
+rsx! {
+    <div groupDragOver={("items", |style| style.opacity(0.75))} />
+}
+```
+
+Call GPUI directly through `when` or `base` so the type parameter is explicit:
+
+```rust
+rsx! {
+    <div
+        when={(drag_enabled, |el| {
+            el.group_drag_over::<MyDragData>("items", |style| style.opacity(0.75))
+        })}
+    />
+}
+```
 
 ### Styling Does Not Apply
 

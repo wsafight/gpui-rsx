@@ -186,3 +186,4 @@ demo lockfile 会固定 GPUI 和 `gpui-component`，方便复现兼容性问题�
 - 阅读[语法参考](/gpui-rsx/zh-cn/usage/syntax/)了解元素、属性、子节点和 Fragment。
 - 在依赖动态 class 前阅读 [Class 处理](/gpui-rsx/zh-cn/usage/class/)。
 - 在循环中渲染可交互行前阅读 [ID 与 Key](/gpui-rsx/zh-cn/usage/ids/)。
+- 对齐 GPUI、gpui-component、Rust 和 demo lockfile 时阅读 [兼容性](/gpui-rsx/zh-cn/compatibility/)。

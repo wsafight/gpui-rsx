@@ -35,6 +35,20 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  msrv:
+    name: Root MSRV
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust 1.85
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.85.0
+
+      - name: Check proc-macro crate
+        run: cargo check --lib --locked
+
   test:
     name: Test Suite
     runs-on: ${{ matrix.os }}

@@ -1,12 +1,28 @@
 use gpui::prelude::*;
 use gpui::*;
 use gpui_component::button::{Button, ButtonVariants as _};
+use gpui_component::input::{Input, InputState};
 use gpui_component::label::Label;
+use gpui_component::popover::Popover;
+use gpui_component::tab::Tab;
 use gpui_component::Sizable as _;
+use gpui_component::StyledExt as _;
 use gpui_platform::application;
 use gpui_rsx::rsx;
 
 struct ComponentView;
+
+#[allow(dead_code)]
+fn stateful_input_contract(window: &mut Window, cx: &mut App) -> impl IntoElement {
+    let state = cx.new(|cx| InputState::new(window, cx));
+    rsx! { <Input base={Input::new(&state)} /> }
+}
+
+#[allow(dead_code)]
+fn facade_reexport_contract() -> impl IntoElement {
+    let _edges: gpui_component::Edges<Pixels> = gpui_component::Edges::all(px(4.0));
+    rsx! { <div base={div().h_flex()} /> }
+}
 
 impl Render for ComponentView {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
@@ -47,6 +63,19 @@ impl Render for ComponentView {
                             small
                         />
                     </div>
+
+                    <Tab
+                        base={Tab::new()
+                            .label("Overview")
+                            .aria_label("Overview tab")}
+                        underline
+                    />
+
+                    <Popover
+                        base={Popover::new("component-popover")
+                            .trigger(Button::new("component-popover-trigger").label("Open"))
+                            .content(|_, _, _| div().child("Popover content"))}
+                    />
                 </section>
             </div>
         }

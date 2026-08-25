@@ -9,12 +9,12 @@ Runs the standard local validation suite:
   cargo fmt --all -- --check
   cargo test --all-features
   cargo clippy --all-targets --all-features -- -D warnings
-  cargo check --manifest-path demo/Cargo.toml --bins --locked
-  cargo clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
+  cargo +1.95.0 check --manifest-path demo/Cargo.toml --bins --locked
+  cargo +1.95.0 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
 
 With --release, also runs:
   cargo bench --bench class_performance --no-run
-  cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
+  cargo +1.95.0 tree --manifest-path demo/Cargo.toml --locked -i gpui
   pnpm --dir docs install --frozen-lockfile
   pnpm --dir docs run check
   pnpm --dir docs run build
@@ -82,15 +82,15 @@ run cargo test --all-features
 run cargo clippy --all-targets --all-features -- -D warnings
 
 if [[ "$skip_demo" -eq 0 ]]; then
-    run cargo check --manifest-path demo/Cargo.toml --bins --locked
-    run cargo clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
+    run cargo +1.95.0 check --manifest-path demo/Cargo.toml --bins --locked
+    run cargo +1.95.0 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
 fi
 
 if [[ "$release" -eq 1 ]]; then
     run cargo bench --bench class_performance --no-run
 
     if [[ "$skip_demo" -eq 0 ]]; then
-        run cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
+        run cargo +1.95.0 tree --manifest-path demo/Cargo.toml --locked -i gpui
     fi
 
     if [[ "$skip_docs" -eq 0 ]]; then

@@ -13,7 +13,7 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
 ## ✨ Features
 
 - 🎨 **HTML-like Syntax** - React JSX-like development experience
-- 🚀 **Zero Runtime Overhead** - Expands to native GPUI code at compile time
+- 🚀 **Static RSX Has No Runtime Parser** - Expands static markup to native GPUI builder calls
 - 📦 **Lightweight** - Only depends on `syn`, `quote`, `proc-macro2`
 - 🔧 **Flexible** - Supports expressions, conditional rendering, component composition
 - 💡 **Type Safe** - Full compile-time type checking
@@ -448,8 +448,8 @@ div().children((&self.items).into_iter().map(|item| {
 
 Elements with stateful attributes (`onClick`, `onHover`, `onDrag`, `onAuxClick`,
 `onA11yAction`, `active`, `activeClass`, `groupActive`, `tooltip`, `tooltipShowDelay`,
-`focusable`, `role`, `ariaLabel`, `overflowScroll`, `trackScroll`, `scrollbarWidth`,
-or `overflow-scroll`) inside a for-loop **must**
+`focusable`, `role`, `ariaLabel`, `ariaDescription`, `accessibilityId`, `overflowScroll`,
+`restrictScrollToAxis`, `trackScroll`, `externalDragPayload`, or `overflow-scroll`) inside a for-loop **must**
 provide `id` or `key`, otherwise the macro emits a compile error:
 
 ```rust

@@ -17,7 +17,7 @@
 
 | 依赖 | Revision | 日期 |
 | --- | --- | --- |
-| GPUI / Zed | `5631830c564afa89b3aba679f45d9c3345f9460f` | 2026-08-25 |
+| GPUI / Zed | `e973593455af18719be22b0455c3f928c6ccc24d` | 2026-08-25 13:57（Asia/Shanghai） |
 | gpui-component | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` | 2026-08-25 |
 
 截至该日期，crates.io 最新发布版仍为：
@@ -35,24 +35,20 @@
 
 - 根 crate 单元测试、macro tests、coverage tests 和 trybuild tests；
 - 根 crate 与 demo 的 Clippy；
-- 6 个真实 GPUI demo bin；
-- 文档测试和 benchmark 编译检查。
+- 6 个升级前真实 GPUI demo bin；
+- doctest harness 和 benchmark 编译检查；当前 28 个 doctest 均为 `ignored`，不能视为有效示例覆盖。
 
-目标主线组合已经在独立参考副本中通过：
+目标主线组合已于 2026-08-25 13:57（Asia/Shanghai）重新核对远端 `main` 并验证。临时目录不是可持久复核的证据；可复现信息由本节记录的 revision、Rust 版本、命令和提交后的 CI run 共同提供。
 
-```text
-/private/tmp/gpui-rsx-latest-review
-```
-
-验证命令：
+在解除 gpui-component 的 manifest `rev`、按第 5.2 节固定锁文件后执行：
 
 ```bash
-cd /private/tmp/gpui-rsx-latest-review/demo
-CARGO_TARGET_DIR=/private/tmp/gpui-rsx-latest-target cargo check --locked --bins
+cargo +1.95.0 check --locked --bins
 cargo tree --locked -i gpui
 ```
 
-结果：Rust 1.95 可以编译全部 6 个 demo，依赖树中只有一份 GPUI。
+结果：Rust 1.95 可以编译全部 6 个升级前 demo，依赖树中只有一份 GPUI。升级实施后新增
+`api_contract` bin，当前锁定组合会在 CI 中检查全部 7 个 bin。
 
 这个结果只能证明现有 demo 用法没有被破坏，不能证明新增 GPUI API 已被宏正确分类和覆盖。
 
@@ -75,20 +71,21 @@ cargo tree --locked -i gpui
 - 将 `gpui-base` 设为 gpui-rsx 的直接运行时依赖；
 - 改变现有 `rsx!`、`rsx_strict!` 或 `rsx_permissive!` 的公开返回形状。
 
-## 4. 第一阶段：建立可审查基线
+## 4. 第一阶段：建立可审查工作状态
 
-当前仓库没有可用的 `HEAD`，全部文件处于首次 staged 状态。升级前先建立基线提交，否则依赖锁文件和 API 表的改动无法可靠审查或回退。
+当前仓库已有可用 `HEAD`。文档编写时 `main` 指向 `2f232d2`，并存在独立 staged 文档改动。升级前应先审查并保留这些改动，不能用所谓“基线提交”把未知 staged 内容一起提交。
 
 建议步骤：
 
 ```bash
 git status --short
 git diff --cached --stat
-git commit -m "chore: establish gpui-rsx 0.6 baseline"
+git diff --cached --check
+# 可选：在确认当前 index 内容后创建升级分支
 git switch -c upgrade/latest-gpui
 ```
 
-提交前确认 staged 内容确实是预期的完整项目，不要把 `target/`、临时参考副本或本机配置加入仓库。
+如果不创建分支，也必须在每个阶段使用 `git diff` 和 `git diff --cached` 区分既有改动与升级改动。不要把 `target/`、临时参考副本或本机配置加入仓库。
 
 ## 5. 第二阶段：更新依赖
 
@@ -117,22 +114,23 @@ cargo check --locked --bins
 cargo tree --locked -i gpui
 ```
 
-如需精确复现本指南记录的组合，可使用 git package 的 `--precise` 更新能力，随后再次检查锁文件中的 source：
+如需精确复现本指南记录的组合，可使用 git package 的 `--precise` 更新能力。必须先固定 gpui-component，再固定 GPUI；固定 gpui-component 时 Cargo 会重新解析它的 bare Zed source，如果把该命令放在最后，会覆盖刚固定的 GPUI revision：
 
 ```bash
-cargo update -p gpui --precise 5631830c564afa89b3aba679f45d9c3345f9460f
 cargo update -p gpui-component --precise 7885c41663c7a6cc68ad0c99b1ba33550f807ff0
+cargo update -p gpui --precise e973593455af18719be22b0455c3f928c6ccc24d
 ```
 
 验收时必须确认：
 
-- `gpui`、`gpui_platform` 及相关 Zed crates 都来自 `5631830c...`；
+- `gpui`、`gpui_platform` 及相关 Zed crates 都来自 `e9735934...`；
 - `gpui-component`、`gpui-base`、assets 和 macros 来自 `7885c416...`；
 - `cargo tree -i gpui` 只显示一个 `gpui` package ID。
 
 ## 6. 第三阶段：补齐 GPUI API 元数据
 
-属性映射、自动 ID 和多参数展开集中在 `src/codegen/tables.rs`。最新 GPUI 有 42 个 `StatefulInteractiveElement` 方法，当前项目仍按旧版 32 个方法维护。
+属性映射、自动 ID 和多参数展开集中在 `src/codegen/tables.rs`。最新 GPUI 有 42 个
+`StatefulInteractiveElement` 方法；升级前项目按旧版 32 个方法维护。
 
 ### 6.1 新增 stateful 方法
 
@@ -155,6 +153,8 @@ cargo update -p gpui-component --precise 7885c41663c7a6cc68ad0c99b1ba33550f807ff
 
 - 前 9 个方法独立使用时都必须让宏先生成 `.id(...)`。
 - `external_drag_payload` 按 GPUI 约束必须跟在 `on_drag` 后，并使用相同拖拽值类型；`on_drag` 通常已经触发 ID，但该方法仍应有完整元数据和 alias。
+- `aria_active_descendant` 和 `a11y_synthetic_children` 只有在元素同时具有 ID 和 `role`、从而生成 accessibility node 时才有实际效果。宏负责 ID，调用方仍需提供 `role`；文档和真实 contract 必须使用语义有效的组合。
+- `accessibility_id` 是暴露给辅助技术的平台标识，不等同于 GPUI `.id(...)`；公开文档应明确两者区别。
 - `ariaKeyShortcuts` 的公开拼写确定后要同时更新中英文文档和测试，避免再引入第二种不一致的大小写形式。
 
 ### 6.2 修正 false positive
@@ -225,7 +225,7 @@ scrollbar_width
 
 ### 8.2 拆分 stateful mock 类型
 
-当前 `MockElement` 同时模拟 `Div` 和 `Stateful<Div>`，而且 `.id()` 仍返回 `Self`。这会让漏掉自动 ID 的代码继续通过编译。
+当前 `MockElement` 同时模拟 `Div` 和 `Stateful<Div>`，而且 `.id()` 仍返回 `Self`。这会让漏掉自动 ID 的代码继续通过编译。为避免一次性改写所有既有 mock 测试，优先在独立 type-contract 测试模块中引入严格的两类型 mock；只有确认共享测试可以平滑迁移时，才替换全局 `tests/common` mock。
 
 建议重构为：
 
@@ -284,10 +284,12 @@ mock 可记录调用序列，例如 `Vec<&'static str>`，用于断言 `.id()` �
 建议增加一份带目标 revision 的 fixture，例如：
 
 ```text
-tests/fixtures/gpui_stateful_methods_5631830.txt
+tests/fixtures/gpui_stateful_methods_e973593.txt
 ```
 
 fixture 应列出最新 42 个 stateful 方法。单元测试逐项调用 `is_stateful_method`，使上游 API snapshot 在代码审查中可见。不要让测试依赖本机 Cargo checkout 路径或运行时网络。
+
+固定 fixture 只能保护已知目标 revision，不能发现未来上游新增方法。latest workflow 应额外运行一个本地检查工具：从 Cargo 实际解析到的 GPUI source 使用 Rust parser 提取 trait 方法，与 fixture 做集合比较。新增或删除方法都应产生可审查的失败，而不是等待现有 demo 偶然编译失败。
 
 ### 8.4 宏展开单元测试
 
@@ -383,13 +385,13 @@ cargo check --manifest-path demo/Cargo.toml --bins --locked
 
 单元测试阶段的完成标准：
 
-- [ ] 新增或修改的每条 API 元数据至少有一个直接表级断言。
-- [ ] 每个新增 stateful 方法有独立自动 ID 展开测试。
-- [ ] 每个新增 alias 同时覆盖方法名和 stateful 分类。
-- [ ] 至少一个测试能在漏掉 `.id()` 时产生类型错误，而非只检查字符串。
-- [ ] `scrollbarWidth` false positive 有循环和非循环回归测试。
-- [ ] 高风险参数不再只由无约束泛型 mock 验证。
-- [ ] trybuild 错误快照与真实 API contract 均通过。
+- [x] 新增或修改的每条 API 元数据至少有一个直接表级断言。
+- [x] 每个新增 stateful 方法有独立自动 ID 展开测试。
+- [x] 每个新增 alias 同时覆盖方法名和 stateful 分类。
+- [x] 至少一个测试能在漏掉 `.id()` 时产生类型错误，而非只检查字符串。
+- [x] `scrollbarWidth` false positive 有循环和非循环回归测试。
+- [x] 高风险参数不再只由无约束泛型 mock 验证。
+- [x] trybuild 错误快照与真实 API contract 均通过。
 
 ## 9. 第六阶段：扩展 gpui-component 合约
 
@@ -419,7 +421,9 @@ gpui-rsx 对组件的支持是通用 builder 组合，不需要为 gpui-componen
 4. 编译所有真实 API contract bins。
 5. 至少运行 `cargo check` 和 `cargo clippy`；根 crate tests 只能作为补充。
 6. 明确声明创建/关闭 issue 所需的 `issues: write` 权限。
-7. 兼容性失败时输出 `cargo tree -d` 和 `cargo tree -i gpui`，便于定位重复 source。
+7. 将“只有一个 GPUI package ID”实现为无条件失败门禁；`cargo tree -d` 和 `cargo tree -i gpui` 作为诊断输出，不能只靠人工查看。
+8. 从实际解析的 GPUI source 提取 `StatefulInteractiveElement` 方法并与 fixture 比较，发现不破坏编译的新增 API。
+9. matrix job 只负责构建并上传结果，由单一汇总 job 创建或关闭 issue，避免一个平台成功就关闭另一个平台的失败 issue。
 
 工作流不能继续依赖固定 `rev` 的 gpui-component，然后把 `cargo update gpui-component` 当作“最新 component”检查。
 
@@ -466,7 +470,7 @@ Dependabot 更新后仍需由 demo 的 `--locked` 构建和单 GPUI source 检�
 
 ## 13. Benchmark 调整
 
-当前 benchmark 使用零大小 mock，builder 调用没有可观察状态，结果也没有参与后续计算。优化器可能删除待测逻辑。
+当前 benchmark 使用零大小 mock，builder 调用没有可观察状态，结果也没有参与后续计算。动态输入已部分使用 `black_box`，但最终 builder 结果未被消费，优化器仍可能删除待测逻辑。
 
 升级时至少完成：
 
@@ -494,6 +498,7 @@ cargo tree --manifest-path demo/Cargo.toml --locked -d
 
 cargo bench --bench class_performance --no-run
 cargo report future-incompatibilities
+(cd demo && cargo report future-incompatibilities)
 ```
 
 发布前再执行：
@@ -501,26 +506,27 @@ cargo report future-incompatibilities
 ```bash
 scripts/check.sh --release
 cargo package --list --allow-dirty
-cargo publish --dry-run --allow-dirty
 ```
+
+`scripts/check.sh --release` 已包含 `cargo publish --dry-run --allow-dirty`，无需重复执行。
 
 最终验收清单：
 
-- [ ] 目标 revision 与本指南一致，或已在变更说明中记录更新后的 revision。
-- [ ] demo 依赖树中只有一份 GPUI。
-- [ ] 42 个最新 stateful 方法已逐项分类。
-- [ ] 新增 API 同时有 metadata test、expansion test 和真实 GPUI compile contract。
-- [ ] `scrollbarWidth` 不注入 ID，不在循环中误报缺少 key。
-- [ ] latest workflow 真正更新两套上游。
-- [ ] gpui-component 的代表性构造器和 extension traits 已覆盖。
-- [ ] Rust 版本策略、README、双语文档和 changelog 已同步。
-- [ ] benchmark 不再依赖可被完全优化掉的零大小 mock。
+- [x] 目标 revision 与本指南一致，或已在变更说明中记录更新后的 revision。
+- [x] demo 依赖树中只有一份 GPUI。
+- [x] 42 个最新 stateful 方法已逐项分类。
+- [x] 新增 API 同时有 metadata test、expansion test 和真实 GPUI compile contract。
+- [x] `scrollbarWidth` 不注入 ID，不在循环中误报缺少 key。
+- [x] latest workflow 真正更新两套上游。
+- [x] gpui-component 的代表性构造器和 extension traits 已覆盖。
+- [x] Rust 版本策略、README、双语文档和 changelog 已同步。
+- [x] benchmark 不再依赖可被完全优化掉的零大小 mock。
 
 ## 15. 回退方案
 
 升级应拆成可独立回退的提交，建议顺序：
 
-1. 建立基线；
+1. 审查并保留既有 staged 文档改动；
 2. 更新 API 元数据和测试；
 3. 更新 demo 依赖与锁文件；
 4. 扩展 gpui-component contract；

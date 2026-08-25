@@ -108,7 +108,7 @@ rsx! {
 | 间距 | `gap-4`, `gap-x-2`, `p-4`, `px-2`, `m-4`, `mt-2` |
 | 尺寸 | `w-full`, `w-64`, `w-[280px]`, `w-[37.5%]`, `w-6/24` |
 | 颜色 | `bg-blue-500`, `text-white`, `border-gray-300`, `bg-[#ff0000]` |
-| 排版 | `text-sm`, `text-2xl`, `font-bold`, `text-center`, `truncate` |
+| 排版 | `text-sm`, `text-2xl`, `font-bold`, `text-center`, `truncate`, `text-ellipsis-start`, `text-ellipsis-middle` |
 | 边框 | `border`, `border-t`, `border-2`, `rounded-md`, `rounded-full` |
 | 其他 | `cursor-pointer`, `debug-outline`, `shadow-md`, `opacity-50`, `col-span-full` |
 
@@ -121,12 +121,15 @@ rsx! {
 | 分类 | 名称 |
 | --- | --- |
 | 事件 | `onClick`, `onHover`, `onDrag`, `onAuxClick`, `onA11yAction` |
-| 交互状态 | `active`, `activeClass`, `groupActive`, `focusable`, `tooltip`, `hoverableTooltip`, `tooltipShowDelay`, `anchorScroll`, `trackScroll`, `scrollbarWidth` |
-| 无障碍 | `role`, `ariaLabel`, `ariaSelected`, `ariaExpanded` 以及其他 `aria*` 属性 |
+| 交互状态 | `active`, `activeClass`, `groupActive`, `focusable`, `tooltip`, `hoverableTooltip`, `tooltipShowDelay`, `anchorScroll`, `trackScroll`, `restrictScrollToAxis`, `externalDragPayload` |
+| 无障碍 | `role`, `accessibilityId`, `ariaLabel`, `ariaDescription`, `ariaKeyShortcuts`, `ariaActiveDescendant`, `a11ySyntheticChildren` 以及其他 `aria*` 属性 |
 | 滚动 class | `overflow-scroll`, `overflow-x-scroll`, `overflow-y-scroll` |
 
 在 `{for ...}` 中，有状态元素必须提供 `id={...}` 或 `key={...}`。`groupHover` 不需要
 ID；`groupActive` 需要。
+
+`scrollbarWidth` 是 `Styled` 方法，不会注入 ID。Mouse exit、pressure 和 pinch handler
+属于 `InteractiveElement`，同样保持非 stateful。
 
 ## 返回形状
 

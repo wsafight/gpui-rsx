@@ -31,9 +31,13 @@ rsx! {
 
 生成的 ID 对同一个宏展开调用点是确定的。
 
-常见触发 ID 的属性包括 `onClick`、`onHover`、`onDrag`、`onAuxClick`、`onA11yAction`、`active`、`activeClass`、`groupActive`、`tooltip`、`tooltipShowDelay`、`focusable`、`role`、`ariaLabel`、`overflowScroll`、`overflowXScroll`、`overflowYScroll`、`trackScroll`、`scrollbarWidth`，以及静态 `overflow-scroll` class 变体。
+常见触发 ID 的属性包括 `onClick`、`onHover`、`onDrag`、`onAuxClick`、`onA11yAction`、`active`、`activeClass`、`groupActive`、`tooltip`、`tooltipShowDelay`、`focusable`、`role`、`accessibilityId`、`ariaLabel`、`ariaDescription`、`ariaKeyShortcuts`、`ariaActiveDescendant`、`a11ySyntheticChildren`、`ariaNumericValueStep`、`ariaValue`、`ariaPlaceholder`、`overflowScroll`、`overflowXScroll`、`overflowYScroll`、`restrictScrollToAxis`、`trackScroll`、`externalDragPayload`，以及静态 `overflow-scroll` class 变体。
 
-当前 GPUI 目标下，`hover`、`hoverClass`、`focus`、`focusClass`、`group`、`groupHover`、`onMouseDown`、`captureKeyDown` 等属性本身不会触发有状态 ID。
+当前 GPUI 目标下，`hover`、`hoverClass`、`focus`、`focusClass`、`group`、`groupHover`、`scrollbarWidth`、`onMouseDown`、`onMouseExit`、`onMousePressure`、`captureMousePressure`、`onPinch`、`capturePinch`、`captureKeyDown` 等属性本身不会触发有状态 ID。
+
+`accessibilityId` 设置的是暴露给辅助技术的作者标识，不是 `.id(...)` 创建的 GPUI 元素身份；
+宏仍会先注入一份独立的 GPUI ID，再调用 `.accessibility_id(...)`。
+`ariaActiveDescendant` 和 `a11ySyntheticChildren` 还需要配合合适的 `role`，才能生成有意义的无障碍节点。
 
 ## 循环中的 Key
 

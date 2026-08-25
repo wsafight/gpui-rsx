@@ -108,7 +108,7 @@ Static class strings are the broadest and fastest path. Dynamic class strings su
 | Spacing | `gap-4`, `gap-x-2`, `p-4`, `px-2`, `m-4`, `mt-2` |
 | Sizing | `w-full`, `w-64`, `w-[280px]`, `w-[37.5%]`, `w-6/24` |
 | Colors | `bg-blue-500`, `text-white`, `border-gray-300`, `bg-[#ff0000]` |
-| Typography | `text-sm`, `text-2xl`, `font-bold`, `text-center`, `truncate` |
+| Typography | `text-sm`, `text-2xl`, `font-bold`, `text-center`, `truncate`, `text-ellipsis-start`, `text-ellipsis-middle` |
 | Borders | `border`, `border-t`, `border-2`, `rounded-md`, `rounded-full` |
 | Misc | `cursor-pointer`, `debug-outline`, `shadow-md`, `opacity-50`, `col-span-full` |
 
@@ -121,12 +121,15 @@ The macro injects IDs for attributes and static classes that require GPUI statef
 | Category | Names |
 | --- | --- |
 | Events | `onClick`, `onHover`, `onDrag`, `onAuxClick`, `onA11yAction` |
-| Interactive state | `active`, `activeClass`, `groupActive`, `focusable`, `tooltip`, `hoverableTooltip`, `tooltipShowDelay`, `anchorScroll`, `trackScroll`, `scrollbarWidth` |
-| Accessibility | `role`, `ariaLabel`, `ariaSelected`, `ariaExpanded`, and other `aria*` attributes |
+| Interactive state | `active`, `activeClass`, `groupActive`, `focusable`, `tooltip`, `hoverableTooltip`, `tooltipShowDelay`, `anchorScroll`, `trackScroll`, `restrictScrollToAxis`, `externalDragPayload` |
+| Accessibility | `role`, `accessibilityId`, `ariaLabel`, `ariaDescription`, `ariaKeyShortcuts`, `ariaActiveDescendant`, `a11ySyntheticChildren`, and other `aria*` attributes |
 | Scroll classes | `overflow-scroll`, `overflow-x-scroll`, `overflow-y-scroll` |
 
 Inside `{for ...}`, stateful elements must provide `id={...}` or `key={...}`. `groupHover`
 does not require an ID; `groupActive` does.
+
+`scrollbarWidth` is a `Styled` method and does not inject an ID. Mouse exit, pressure, and pinch
+handlers are `InteractiveElement` methods and likewise remain non-stateful.
 
 ## Return Shapes
 

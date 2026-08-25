@@ -8,4 +8,4 @@ publish = false
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
 gpui-rsx = { path = ".." }
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "8752104289424b7f35045b68a2d394018da48e7e" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }

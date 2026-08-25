@@ -9,9 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added aliases and real GPUI contracts for the latest accessibility, scroll-axis, external-drag,
+  mouse pressure, pinch, grid min/max-content, and text ellipsis APIs.
+- Added a pinned 42-method `StatefulInteractiveElement` snapshot plus a live source drift check for
+  the latest compatibility workflow.
+
 ### Changed
 
 - Documented crates.io package content verification in the release checklist.
+- Added troubleshooting guidance for state class attributes and the explicitly typed
+  `group_drag_over` fallback.
+- Clarified performance documentation for stateful auto-ID triggers introduced in 0.6.0.
+- Linked compatibility and release-checklist pages from the main documentation entry points.
+- Upgraded the demo lockfile to Zed GPUI `e9735934` and gpui-component / gpui-base `7885c416`.
+- Declared Rust 1.85 as the root proc-macro MSRV and retained Rust 1.95 for demo compatibility.
+- Made compatibility issue reporting aggregate both platform results before changing issue state.
+
+### Fixed
+
+- Stopped treating `scrollbarWidth` as stateful, while preserving auto IDs for overflow scrolling.
+- Restored `text-ellipsis-start` and added `text-ellipsis-middle` across static, strict, and dynamic
+  class paths.
+- Made class benchmarks consume observable non-zero builder results.
 
 ## [0.6.0] - 2026-06-12
 

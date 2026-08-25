@@ -14,7 +14,7 @@ The demo uses:
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
 gpui-rsx = { path = ".." }
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "8752104289424b7f35045b68a2d394018da48e7e" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 ```
 
 Commit `Cargo.lock` for applications so the resolved Zed revision does not float unexpectedly.
@@ -38,6 +38,18 @@ rsx! {
 ```
 
 The `base` attribute replaces the inferred constructor and does not generate a `.base(...)` method call.
+
+Use `base` for component methods whose names overlap GPUI stateful attributes. For example,
+`gpui_component::tab::Tab::aria_label` is a component builder; writing it as an RSX attribute would
+be classified as GPUI's stateful `aria_label`. Keep the component-specific chain explicit:
+
+```rust
+<Tab base={Tab::new().label("Overview").aria_label("Overview tab")} underline />
+```
+
+The current main branch internally uses the new `gpui-base` crate. Prefer the `gpui-component`
+facade re-exports such as `StyledExt`, `Edges`, and input state types so both crates remain on the
+same locked revision.
 
 ## Import Extension Traits
 

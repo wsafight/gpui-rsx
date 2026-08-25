@@ -115,6 +115,17 @@ rsx! {
 | `minWidth` / `maxHeight` | `min_w` / `max_h` |
 | `overflowScroll` | `overflow_scroll` |
 | `trackScroll` | `track_scroll` |
+| `accessibilityId` / `ariaDescription` | `accessibility_id` / `aria_description` |
+| `ariaKeyShortcuts` / `ariaValue` | `aria_keyshortcuts` / `aria_value` |
+| `ariaActiveDescendant` | `aria_active_descendant` |
+| `a11ySyntheticChildren` | `a11y_synthetic_children` |
+| `restrictScrollToAxis` | `restrict_scroll_to_axis` |
+| `externalDragPayload` | `external_drag_payload` |
+| `onMouseExit` / `onMousePressure` / `onPinch` | `on_mouse_exit` / `on_mouse_pressure` / `on_pinch` |
+| `gridColsMinContent` / `gridRowsMaxContent` | `grid_cols_min_content` / `grid_rows_max_content` |
+
+`externalDragPayload` 必须位于同一元素的 `onDrag` 之后，并使用相同的拖拽值类型，以符合
+GPUI 的方法契约。宏会保留属性顺序，不会自动重排这两个调用。
 
 `whiteSpace` 会被显式拒绝。可使用 `whitespace-nowrap` 等 class，或在 GPUI 可用时直接调用对应方法。
 

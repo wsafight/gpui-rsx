@@ -31,9 +31,14 @@ rsx! {
 
 The generated ID is deterministic for the macro expansion site.
 
-Common ID-triggering attributes include `onClick`, `onHover`, `onDrag`, `onAuxClick`, `onA11yAction`, `active`, `activeClass`, `groupActive`, `tooltip`, `tooltipShowDelay`, `focusable`, `role`, `ariaLabel`, `overflowScroll`, `overflowXScroll`, `overflowYScroll`, `trackScroll`, `scrollbarWidth`, and static `overflow-scroll` class variants.
+Common ID-triggering attributes include `onClick`, `onHover`, `onDrag`, `onAuxClick`, `onA11yAction`, `active`, `activeClass`, `groupActive`, `tooltip`, `tooltipShowDelay`, `focusable`, `role`, `accessibilityId`, `ariaLabel`, `ariaDescription`, `ariaKeyShortcuts`, `ariaActiveDescendant`, `a11ySyntheticChildren`, `ariaNumericValueStep`, `ariaValue`, `ariaPlaceholder`, `overflowScroll`, `overflowXScroll`, `overflowYScroll`, `restrictScrollToAxis`, `trackScroll`, `externalDragPayload`, and static `overflow-scroll` class variants.
 
-Attributes such as `hover`, `hoverClass`, `focus`, `focusClass`, `group`, `groupHover`, `onMouseDown`, and `captureKeyDown` do not by themselves require a stateful ID in the current GPUI target.
+Attributes such as `hover`, `hoverClass`, `focus`, `focusClass`, `group`, `groupHover`, `scrollbarWidth`, `onMouseDown`, `onMouseExit`, `onMousePressure`, `captureMousePressure`, `onPinch`, `capturePinch`, and `captureKeyDown` do not by themselves require a stateful ID in the current GPUI target.
+
+`accessibilityId` sets the author-provided identifier exposed to assistive technology. It is not the
+GPUI element identity created by `.id(...)`; the macro still injects a separate GPUI ID before calling
+`.accessibility_id(...)`. `ariaActiveDescendant` and `a11ySyntheticChildren` also need an appropriate
+`role` to produce a meaningful accessibility node.
 
 ## Keys in Loops
 

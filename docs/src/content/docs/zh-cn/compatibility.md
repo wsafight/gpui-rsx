@@ -13,10 +13,16 @@ Zed git 依赖当前仍会把 crate 包版本显示为 `gpui v0.2.2`，但它的
 | --- | --- |
 | GPUI-RSX | `0.6.0` |
 | GPUI source | `https://github.com/zed-industries/zed` |
-| GPUI resolved revision | `f164afda46188939f76c24aba4099d04423bc356` |
-| `gpui-component` revision | `8752104289424b7f35045b68a2d394018da48e7e` |
+| GPUI resolved revision | `e973593455af18719be22b0455c3f928c6ccc24d` |
+| `gpui-component` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |
+| `gpui-base` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |
+| GPUI-RSX 根 crate MSRV | `1.85.0` |
 | Demo Rust toolchain | `1.95.0` |
-| Demo 检查命令 | `cargo check --manifest-path demo/Cargo.toml --bins --locked` |
+| Demo 检查命令 | `cargo +1.95.0 check --manifest-path demo/Cargo.toml --bins --locked` |
+
+根 crate 的 MSRV 是最低版本，不是日常开发必须固定的工具链。可以使用更新的 stable Rust；
+当前锁定的 demo revision 也已使用 Rust `1.98.0` 验证。Rust `1.95.0` 继续作为 demo 的显式
+可复现验证通道。
 
 ## 避免重复 GPUI Crate
 
@@ -29,6 +35,10 @@ Zed git 依赖当前仍会把 crate 包版本显示为 `gpui v0.2.2`，但它的
 - 组件类型来自不同 crate 实例，最终类型不兼容。
 
 提交应用的 lockfile，并参考 demo 的依赖形态，可以让依赖图保持确定。
+
+当前 gpui-component 主线已将底层控件拆到 `gpui-base`。应用通常仍只依赖
+`gpui-component` facade，并通过其公开 re-export 使用受支持的基础类型。只有 facade
+没有导出所需 API 时才直接依赖 `gpui-base`，且必须保持相同 source revision。
 
 ## 查看实际解析到的 GPUI
 

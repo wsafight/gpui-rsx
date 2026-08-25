@@ -140,7 +140,14 @@ Avoid calling `cx.notify()` after each individual field assignment.
 
 ## Understand ID and Key Cost
 
-Auto IDs are generated only for elements that need GPUI stateful identity, such as `onClick`, `onHover`, `onDrag`, `tooltip`, `focusable`, `trackScroll`, and static `overflow-scroll` class variants.
+Auto IDs are generated only for elements that need GPUI stateful identity. Common triggers include
+`onClick`, `onHover`, `onDrag`, `onAuxClick`, `onA11yAction`, `active`, `activeClass`,
+`groupActive`, `tooltip`, `hoverableTooltip`, `tooltipShowDelay`, `focusable`, `role`, `aria*`,
+`trackScroll`, `overflowScroll`, `overflowXScroll`, `overflowYScroll`, and static
+`overflow-scroll` class variants.
+
+`hover`, `hoverClass`, `focus`, `focusClass`, `group`, `groupHover`, and `scrollbarWidth` are
+style-refinement paths and do not trigger auto ID injection by themselves.
 
 Plain layout elements do not become stateful just because they have `key={...}`:
 

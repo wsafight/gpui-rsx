@@ -115,6 +115,17 @@ CamelCase aliases map to GPUI snake_case methods where needed:
 | `minWidth` / `maxHeight` | `min_w` / `max_h` |
 | `overflowScroll` | `overflow_scroll` |
 | `trackScroll` | `track_scroll` |
+| `accessibilityId` / `ariaDescription` | `accessibility_id` / `aria_description` |
+| `ariaKeyShortcuts` / `ariaValue` | `aria_keyshortcuts` / `aria_value` |
+| `ariaActiveDescendant` | `aria_active_descendant` |
+| `a11ySyntheticChildren` | `a11y_synthetic_children` |
+| `restrictScrollToAxis` | `restrict_scroll_to_axis` |
+| `externalDragPayload` | `external_drag_payload` |
+| `onMouseExit` / `onMousePressure` / `onPinch` | `on_mouse_exit` / `on_mouse_pressure` / `on_pinch` |
+| `gridColsMinContent` / `gridRowsMaxContent` | `grid_cols_min_content` / `grid_rows_max_content` |
+
+`externalDragPayload` must follow `onDrag` on the same element and use the same dragged value type,
+matching GPUI's method contract. The macro preserves attribute order; it does not reorder these calls.
 
 `whiteSpace` is intentionally rejected. Use GPUI's supported whitespace helpers through class utilities such as `whitespace-nowrap`, or direct GPUI methods when available.
 

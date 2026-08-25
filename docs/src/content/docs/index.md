@@ -39,6 +39,7 @@ use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
 The Starlight site is the canonical documentation set. The old `docs/*.md` files have been folded into these pages:
 
 - [Getting Started](/gpui-rsx/getting-started/) for installation and a first view.
+- [Compatibility](/gpui-rsx/compatibility/) for the GPUI, gpui-component, Rust, and demo lockfile matrix.
 - [Syntax Reference](/gpui-rsx/usage/syntax/) for elements, attributes, children, and conditionals.
 - [Class Handling](/gpui-rsx/usage/class/) for static and dynamic utility classes.
 - [IDs and Keys](/gpui-rsx/usage/ids/) for auto IDs, loop safety, and explicit IDs.
@@ -47,3 +48,4 @@ The Starlight site is the canonical documentation set. The old `docs/*.md` files
 - [Migration Guide](/gpui-rsx/guides/migration/) for manual GPUI migration and the `0.6.x` GPUI target change.
 - [Troubleshooting](/gpui-rsx/guides/troubleshooting/) for parser, type, runtime, and dependency issues.
 - [API Reference](/gpui-rsx/reference/api/) for compact macro and mapping tables.
+- [Release Checklist](/gpui-rsx/reference/release-checklist/) for release validation and package contents.

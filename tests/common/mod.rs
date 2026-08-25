@@ -104,6 +104,8 @@ impl Styled for StyleRefinement {
         whitespace_nowrap,
         truncate,
         text_ellipsis,
+        text_ellipsis_start,
+        text_ellipsis_middle,
         italic,
         not_italic,
         underline,
@@ -240,6 +242,22 @@ impl Styled for StyleRefinement {
         self
     }
 
+    fn grid_cols_min_content(self, _: u16) -> Self {
+        self
+    }
+
+    fn grid_cols_max_content(self, _: u16) -> Self {
+        self
+    }
+
+    fn grid_rows_min_content(self, _: u16) -> Self {
+        self
+    }
+
+    fn grid_rows_max_content(self, _: u16) -> Self {
+        self
+    }
+
     fn col_span(self, _: u16) -> Self {
         self
     }
@@ -323,10 +341,10 @@ pub fn CustomWidget() -> MockElement {
 #[allow(dead_code)]
 impl MockElement {
     // --- 身份 ---
-    /// 接受 &str，捕获 auto-ID 供测试验证。
+    /// 接受静态或动态字符串，捕获 auto-ID 供测试验证。
     /// 新格式："{file}::__rsx_{tag}_L{line}C{col}"（含文件路径前缀）
-    /// 所有测试中的 id 属性均为字符串类型，故 &str 签名覆盖全部情况。
-    pub fn id(self, id: &str) -> Self {
+    pub fn id(self, id: impl AsRef<str>) -> Self {
+        let id = id.as_ref();
         // 新格式含文件路径前缀，用 contains 兼容两种格式
         if id.contains("__rsx_") {
             LAST_AUTO_ID.with(|c| *c.borrow_mut() = Some(id.to_string()));
@@ -447,6 +465,15 @@ impl MockElement {
     pub fn on_mouse_move<T>(self, _: T) -> Self {
         self
     }
+    pub fn on_mouse_exit<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn on_mouse_pressure<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn on_pinch<T>(self, _: T) -> Self {
+        self
+    }
     pub fn on_mouse_down_out<T>(self, _: T) -> Self {
         self
     }
@@ -505,6 +532,12 @@ impl MockElement {
     pub fn capture_action<T>(self, _: T) -> Self {
         self
     }
+    pub fn capture_mouse_pressure<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn capture_pinch<T>(self, _: T) -> Self {
+        self
+    }
 
     // --- 状态样式 ---
     pub fn hover<F: FnOnce(StyleRefinement) -> StyleRefinement>(self, _f: F) -> Self {
@@ -552,6 +585,9 @@ impl MockElement {
     pub fn overflow_y_scroll(self) -> Self {
         self
     }
+    pub fn restrict_scroll_to_axis(self) -> Self {
+        self
+    }
     pub fn scrollbar_width<T>(self, _: T) -> Self {
         self
     }
@@ -588,7 +624,22 @@ impl MockElement {
     pub fn role<T>(self, _: T) -> Self {
         self
     }
+    pub fn accessibility_id<T>(self, _: T) -> Self {
+        self
+    }
     pub fn aria_label<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_description<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_keyshortcuts<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_active_descendant(self) -> Self {
+        self
+    }
+    pub fn a11y_synthetic_children<T>(self, _: T) -> Self {
         self
     }
     pub fn aria_selected<T>(self, _: T) -> Self {
@@ -601,6 +652,15 @@ impl MockElement {
         self
     }
     pub fn aria_numeric_value<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_numeric_value_step<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_value<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn aria_placeholder<T>(self, _: T) -> Self {
         self
     }
     pub fn aria_min_numeric_value<T>(self, _: T) -> Self {
@@ -631,6 +691,9 @@ impl MockElement {
         self
     }
     pub fn aria_column_count<T>(self, _: T) -> Self {
+        self
+    }
+    pub fn external_drag_payload<T>(self, _: T) -> Self {
         self
     }
 
@@ -842,6 +905,8 @@ impl Styled for MockElement {
         whitespace_nowrap,
         truncate,
         text_ellipsis,
+        text_ellipsis_start,
+        text_ellipsis_middle,
         italic,
         not_italic,
         underline,
@@ -997,6 +1062,22 @@ impl Styled for MockElement {
     }
     fn grid_rows(self, v: u16) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_rows", v as i32)));
+        self
+    }
+    fn grid_cols_min_content(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_cols_min_content", v as i32)));
+        self
+    }
+    fn grid_cols_max_content(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_cols_max_content", v as i32)));
+        self
+    }
+    fn grid_rows_min_content(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_rows_min_content", v as i32)));
+        self
+    }
+    fn grid_rows_max_content(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_rows_max_content", v as i32)));
         self
     }
     fn col_span(self, v: u16) -> Self {

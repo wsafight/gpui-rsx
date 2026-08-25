@@ -1,35 +1,13 @@
-# =============================================================================
-# GPUI Compatibility Check Workflow
-# GPUI 兼容性检查工作流
-# =============================================================================
-#
-# English:
-# Monitors compatibility with the latest GPUI version. Performs:
-# - Daily Checks: Automatically runs at 00:00 UTC every day
-# - Manual Trigger: Can be manually triggered via workflow_dispatch
-# - Version Detection: Checks for GPUI version updates
-# - Build & Test: Builds and tests with the latest GPUI version
-# - Issue Creation: Automatically creates GitHub issues if incompatibilities
-#                   are detected
-# - Issue Resolution: Automatically closes issues when compatibility is restored
-#
-# 中文：
-# 监控与最新 GPUI 版本的兼容性。执行：
-# - 每日检查：每天 UTC 时间 00:00 自动运行
-# - 手动触发：可通过 workflow_dispatch 手动触发
-# - 版本检测：检查 GPUI 版本更新
-# - 构建和测试：使用最新 GPUI 版本进行构建和测试
-# - Issue 创建：检测到不兼容时自动创建 GitHub issue
-# - Issue 解决：恢复兼容性时自动关闭 issue
-# =============================================================================
-
 name: GPUI Compatibility
 
 on:
   schedule:
-    # Run daily at 00:00 UTC
     - cron: '0 0 * * *'
-  workflow_dispatch: # Allow manual trigger
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
 
 env:
   RUST_BACKTRACE: 1
@@ -37,17 +15,21 @@ env:
   DEMO_MANIFEST: demo/Cargo.toml
 
 jobs:
-  check-latest-gpui:
-    name: Test with Latest GPUI
+  compatibility:
+    name: Latest GPUI (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
 
       - name: Install Linux GPUI dependencies
         if: runner.os == 'Linux'
@@ -55,156 +37,197 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libfontconfig1-dev libwayland-dev libx11-dev libxcb1-dev libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev
 
-      - name: Cache cargo registry
+      - name: Cache Cargo data
         uses: actions/cache@v4
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+            demo/target
+          key: ${{ runner.os }}-latest-gpui-${{ hashFiles('Cargo.lock', 'demo/Cargo.lock') }}
 
-      - name: Cache cargo index
-        uses: actions/cache@v4
-        with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: Get current GPUI version
-        id: current-version
+      - name: Record locked sources
+        id: locked
         run: |
-          META=$(cargo metadata --manifest-path "$DEMO_MANIFEST" --format-version 1)
-          VERSION=$(echo "$META" | jq -r '.packages[] | select(.name == "gpui") | .version')
-          SOURCE=$(echo "$META" | jq -r '.packages[] | select(.name == "gpui") | .source')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "source=$SOURCE" >> $GITHUB_OUTPUT
-          echo "Current GPUI version: $VERSION"
-          echo "Current GPUI source: $SOURCE"
+          cargo metadata --manifest-path "$DEMO_MANIFEST" --locked --format-version 1 > locked-metadata.json
+          echo "gpui=$(jq -r '[.packages[] | select(.name == "gpui") | .source] | unique | join(",")' locked-metadata.json)" >> "$GITHUB_OUTPUT"
+          echo "component=$(jq -r '[.packages[] | select(.name == "gpui-component") | .source] | unique | join(",")' locked-metadata.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Update GPUI to latest
+      - name: Update both upstream repositories
         run: |
-          echo "Updating GPUI to latest version..."
-          cargo update --manifest-path "$DEMO_MANIFEST" --recursive gpui gpui_platform gpui-component
+          cargo update --manifest-path "$DEMO_MANIFEST" -p gpui-component
+          cargo update --manifest-path "$DEMO_MANIFEST" -p gpui -p gpui_platform
+          cargo metadata --manifest-path "$DEMO_MANIFEST" --format-version 1 > latest-metadata.json
 
-      - name: Get new GPUI version
-        id: new-version
+      - name: Record latest sources
+        id: latest
         run: |
-          META=$(cargo metadata --manifest-path "$DEMO_MANIFEST" --format-version 1)
-          VERSION=$(echo "$META" | jq -r '.packages[] | select(.name == "gpui") | .version')
-          SOURCE=$(echo "$META" | jq -r '.packages[] | select(.name == "gpui") | .source')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "source=$SOURCE" >> $GITHUB_OUTPUT
-          echo "New GPUI version: $VERSION"
-          echo "New GPUI source: $SOURCE"
+          echo "gpui=$(jq -r '[.packages[] | select(.name == "gpui") | .source] | unique | join(",")' latest-metadata.json)" >> "$GITHUB_OUTPUT"
+          echo "component=$(jq -r '[.packages[] | select(.name == "gpui-component") | .source] | unique | join(",")' latest-metadata.json)" >> "$GITHUB_OUTPUT"
 
-      - name: Build with latest GPUI
+      - name: Require one GPUI package ID
+        id: unique-gpui
+        continue-on-error: true
+        run: |
+          count=$(jq '[.packages[] | select(.name == "gpui") | .id] | unique | length' latest-metadata.json)
+          cargo tree --manifest-path "$DEMO_MANIFEST" -i gpui
+          cargo tree --manifest-path "$DEMO_MANIFEST" -d
+          test "$count" -eq 1
+
+      - name: Check StatefulInteractiveElement API snapshot
+        id: api-snapshot
+        continue-on-error: true
+        run: |
+          manifest=$(jq -r '.packages[] | select(.name == "gpui") | .manifest_path' latest-metadata.json)
+          GPUI_SOURCE_ROOT=$(dirname "$manifest") cargo test --test gpui_api_snapshot
+
+      - name: Check all real API contracts
         id: build
-        run: |
-          cargo check --manifest-path "$DEMO_MANIFEST" --bins
         continue-on-error: true
+        run: cargo check --manifest-path "$DEMO_MANIFEST" --bins
 
-      - name: Run tests with latest GPUI
+      - name: Clippy all real API contracts
+        id: clippy
+        continue-on-error: true
+        run: cargo clippy --manifest-path "$DEMO_MANIFEST" --bins -- -D warnings
+
+      - name: Run root tests
         id: test
-        run: |
-          cargo test --all-features
         continue-on-error: true
+        run: cargo test --all-features
 
-      - name: Check if update is needed
-        id: check-update
+      - name: Write platform result
+        if: always()
         run: |
-          if [ "${{ steps.current-version.outputs.source }}" != "${{ steps.new-version.outputs.source }}" ]; then
-            echo "needs_update=true" >> $GITHUB_OUTPUT
-            echo "GPUI source changed: ${{ steps.current-version.outputs.source }} -> ${{ steps.new-version.outputs.source }}"
-          else
-            echo "needs_update=false" >> $GITHUB_OUTPUT
-            echo "GPUI source unchanged"
-          fi
+          mkdir -p compatibility-result
+          jq -n \
+            --arg os "${{ matrix.os }}" \
+            --arg locked_gpui "${{ steps.locked.outputs.gpui }}" \
+            --arg locked_component "${{ steps.locked.outputs.component }}" \
+            --arg latest_gpui "${{ steps.latest.outputs.gpui }}" \
+            --arg latest_component "${{ steps.latest.outputs.component }}" \
+            --arg unique_gpui "${{ steps.unique-gpui.outcome }}" \
+            --arg api_snapshot "${{ steps.api-snapshot.outcome }}" \
+            --arg build "${{ steps.build.outcome }}" \
+            --arg clippy "${{ steps.clippy.outcome }}" \
+            --arg test "${{ steps.test.outcome }}" \
+            '{os: $os, locked_gpui: $locked_gpui, locked_component: $locked_component, latest_gpui: $latest_gpui, latest_component: $latest_component, unique_gpui: $unique_gpui, api_snapshot: $api_snapshot, build: $build, clippy: $clippy, test: $test}' \
+            > "compatibility-result/${{ runner.os }}.json"
 
-      - name: Create issue if incompatible
-        if: steps.build.outcome == 'failure' || steps.test.outcome == 'failure'
+      - name: Upload platform result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compatibility-${{ runner.os }}
+          path: compatibility-result/*.json
+
+      - name: Fail incompatible platform
+        if: always()
+        run: |
+          test "${{ steps.unique-gpui.outcome }}" = success
+          test "${{ steps.api-snapshot.outcome }}" = success
+          test "${{ steps.build.outcome }}" = success
+          test "${{ steps.clippy.outcome }}" = success
+          test "${{ steps.test.outcome }}" = success
+
+  report:
+    name: Report Compatibility
+    if: always()
+    needs: compatibility
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download platform results
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: compatibility-*
+          path: compatibility-results
+          merge-multiple: true
+
+      - name: Create, update, or close compatibility issue
         uses: actions/github-script@v7
         with:
           script: |
-            const title = `GPUI Compatibility Issue: v${{ steps.new-version.outputs.version }}`;
-            const body = `## GPUI Compatibility Check Failed
-
-            **Current GPUI version:** ${{ steps.current-version.outputs.version }}
-            **New GPUI version:** ${{ steps.new-version.outputs.version }}
-            **Current GPUI source:** ${{ steps.current-version.outputs.source }}
-            **New GPUI source:** ${{ steps.new-version.outputs.source }}
-            **Platform:** ${{ matrix.os }}
-
-            ### Build Status
-            ${{ steps.build.outcome == 'failure' && '❌ Build failed' || '✅ Build succeeded' }}
-
-            ### Test Status
-            ${{ steps.test.outcome == 'failure' && '❌ Tests failed' || '✅ Tests passed' }}
-
-            ### Action Required
-            The project may need updates to remain compatible with the latest GPUI version.
-
-            ### Next Steps
-            1. Review the failed workflow run
-            2. Update code to fix compatibility issues
-            3. Test locally with the new GPUI version
-            4. Update documentation if needed
-
-            **Workflow Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-            `;
-
-            // Check if issue already exists
-            const issues = await github.rest.issues.listForRepo({
+            const fs = require('fs');
+            const path = require('path');
+            const resultDir = 'compatibility-results';
+            const files = fs.existsSync(resultDir)
+              ? fs.readdirSync(resultDir).filter(file => file.endsWith('.json'))
+              : [];
+            const results = files.map(file =>
+              JSON.parse(fs.readFileSync(path.join(resultDir, file), 'utf8'))
+            );
+            const checks = ['unique_gpui', 'api_snapshot', 'build', 'clippy', 'test'];
+            const failed = results.length !== 2 || results.some(result =>
+              checks.some(check => result[check] !== 'success')
+            );
+            const first = results[0] || {};
+            const shortHash = source => {
+              const match = (source || '').match(/#([0-9a-f]{7,40})$/);
+              return match ? match[1].slice(0, 8) : 'unknown';
+            };
+            const gpuiHash = shortHash(first.latest_gpui);
+            const componentHash = shortHash(first.latest_component);
+            const title = `GPUI compatibility: gpui@${gpuiHash} / component@${componentHash}`;
+            const body = [
+              '## Latest GPUI compatibility check failed',
+              '',
+              `Locked GPUI source: \`${first.locked_gpui || 'unavailable'}\``,
+              `Latest GPUI source: \`${first.latest_gpui || 'unavailable'}\``,
+              `Locked gpui-component source: \`${first.locked_component || 'unavailable'}\``,
+              `Latest gpui-component source: \`${first.latest_component || 'unavailable'}\``,
+              '',
+              '| Platform | Single GPUI | API snapshot | Build | Clippy | Tests |',
+              '| --- | --- | --- | --- | --- | --- |',
+              ...results.map(result =>
+                `| ${result.os} | ${result.unique_gpui} | ${result.api_snapshot} | ${result.build} | ${result.clippy} | ${result.test} |`
+              ),
+              '',
+              `Workflow run: ${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+            ].join('\n');
+            const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner,
               repo: context.repo.repo,
               state: 'open',
-              labels: 'gpui-compatibility'
+              labels: 'gpui-compatibility',
             });
 
-            const existingIssue = issues.data.find(issue => issue.title === title);
-
-            if (!existingIssue) {
-              await github.rest.issues.create({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                title: title,
-                body: body,
-                labels: ['gpui-compatibility', 'bug']
-              });
-              console.log('Created new compatibility issue');
-            } else {
-              await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: existingIssue.number,
-                body: `Update: Compatibility issue still exists.\n\n${body}`
-              });
-              console.log('Updated existing compatibility issue');
+            if (failed) {
+              const existing = issues.find(issue => issue.title === title);
+              if (existing) {
+                await github.rest.issues.createComment({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: existing.number,
+                  body,
+                });
+              } else {
+                await github.rest.issues.create({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  title,
+                  body,
+                  labels: ['gpui-compatibility', 'bug'],
+                });
+              }
+              core.setFailed('Latest GPUI compatibility check failed');
+              return;
             }
 
-      - name: Report success
-        if: steps.build.outcome == 'success' && steps.test.outcome == 'success' && steps.check-update.outputs.needs_update == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            // Close any open compatibility issues
-            const issues = await github.rest.issues.listForRepo({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              state: 'open',
-              labels: 'gpui-compatibility'
-            });
-
-            for (const issue of issues.data) {
+            for (const issue of issues) {
               await github.rest.issues.createComment({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                body: `✅ Compatibility restored with GPUI v${{ steps.new-version.outputs.version }}`
+                body: `Compatibility restored with gpui@${gpuiHash} and component@${componentHash}.`,
               });
-
               await github.rest.issues.update({
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 issue_number: issue.number,
-                state: 'closed'
+                state: 'closed',
+                state_reason: 'completed',
               });
             }
-
-            console.log('All compatibility issues resolved');

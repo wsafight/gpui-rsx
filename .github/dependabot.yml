@@ -45,6 +45,26 @@ updates:
     # Allow both direct and indirect dependencies
     versioning-strategy: auto
 
+  # Maintain the locked GPUI and gpui-component compatibility graph.
+  - package-ecosystem: "cargo"
+    directory: "/demo"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Asia/Shanghai"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "wsafight"
+    labels:
+      - "dependencies"
+      - "rust"
+      - "gpui"
+    commit-message:
+      prefix: "chore(demo-deps)"
+      include: "scope"
+    versioning-strategy: auto
+
   # Maintain dependencies for GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"

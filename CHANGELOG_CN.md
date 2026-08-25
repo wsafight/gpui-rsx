@@ -9,9 +9,28 @@
 
 ## [未发布]
 
+### 新增
+
+- 为最新 accessibility、滚动轴限制、外部拖拽、mouse pressure、pinch、grid min/max-content
+  和 text ellipsis API 补充 alias 与真实 GPUI contract。
+- 新增固定的 42 方法 `StatefulInteractiveElement` 快照，以及 latest 兼容性工作流使用的
+  实际源码漂移检查。
+
 ### 变更
 
 - 在发布检查清单中补充 crates.io 包内容验证。
+- 补充状态 class 属性和显式指定类型的 `group_drag_over` fallback 问题排查说明。
+- 明确 0.6.0 新增有状态自动 ID 触发项的性能文档说明。
+- 在主要文档入口补充兼容性和发布检查清单页面链接。
+- 将 demo lockfile 升级到 Zed GPUI `e9735934` 与 gpui-component / gpui-base `7885c416`。
+- 声明根过程宏 crate 的 MSRV 为 Rust 1.85，并保留 demo 的 Rust 1.95 兼容性目标。
+- 兼容性 issue 现在先汇总两个平台的结果，再统一改变 issue 状态。
+
+### 修复
+
+- 不再把 `scrollbarWidth` 误判为 stateful，同时保留 overflow scroll 的自动 ID。
+- 在静态、strict 和动态 class 路径恢复 `text-ellipsis-start` 并新增 `text-ellipsis-middle`。
+- 让 class benchmark 消费带可观察状态的非零大小 builder 结果。
 
 ## [0.6.0] - 2026-06-12
 

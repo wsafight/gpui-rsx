@@ -140,7 +140,14 @@ onClick={cx.listener(|view, _, _window, cx| {
 
 ## 理解 ID 和 Key 的成本
 
-只有需要 GPUI 有状态身份的元素才会生成自动 ID，例如 `onClick`、`onHover`、`onDrag`、`tooltip`、`focusable`、`trackScroll` 和静态 `overflow-scroll` class 变体。
+只有需要 GPUI 有状态身份的元素才会生成自动 ID。常见触发项包括 `onClick`、`onHover`、
+`onDrag`、`onAuxClick`、`onA11yAction`、`active`、`activeClass`、`groupActive`、
+`tooltip`、`hoverableTooltip`、`tooltipShowDelay`、`focusable`、`role`、`aria*`、
+`trackScroll`、`overflowScroll`、`overflowXScroll`、`overflowYScroll` 和静态
+`overflow-scroll` class 变体。
+
+`hover`、`hoverClass`、`focus`、`focusClass`、`group`、`groupHover` 和 `scrollbarWidth`
+走样式 refinement 路径，本身不会触发自动 ID 注入。
 
 普通布局元素不会因为带了 `key={...}` 就变成有状态元素：
 

@@ -14,7 +14,7 @@ demo 使用：
 gpui = { git = "https://github.com/zed-industries/zed" }
 gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
 gpui-rsx = { path = ".." }
-gpui-component = { git = "https://github.com/longbridge/gpui-component", rev = "8752104289424b7f35045b68a2d394018da48e7e" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component" }
 ```
 
 应用项目应提交 `Cargo.lock`，避免解析到的 Zed revision 意外漂移。
@@ -38,6 +38,17 @@ rsx! {
 ```
 
 `base` 会替换推导出的构造器，不会生成 `.base(...)` 方法调用。
+
+组件方法名与 GPUI stateful 属性重名时也应使用 `base`。例如
+`gpui_component::tab::Tab::aria_label` 是组件 builder；直接写成 RSX 属性会按 GPUI 的
+stateful `aria_label` 分类。应显式保留组件方法链：
+
+```rust
+<Tab base={Tab::new().label("Overview").aria_label("Overview tab")} underline />
+```
+
+当前主线内部已使用新的 `gpui-base` crate。优先使用 `gpui-component` facade re-export 的
+`StyledExt`、`Edges` 和 input state 类型，让两者保持在同一个 lockfile revision。
 
 ## 显式导入扩展 Trait
 

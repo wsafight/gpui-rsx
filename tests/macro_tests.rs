@@ -1380,6 +1380,178 @@ fn test_gpui_interactive_and_a11y_mappings() {
     };
 }
 
+fn assert_auto_id_before_method(expanded: &str, method: &str) {
+    let compact = expanded.split_whitespace().collect::<String>();
+    let id_position = compact.find(".id(").expect("missing auto ID");
+    let method_call = format!(".{method}(");
+    let method_position = compact
+        .find(&method_call)
+        .unwrap_or_else(|| panic!("missing {method_call} in {compact}"));
+    assert!(id_position < method_position, "{compact}");
+}
+
+#[test]
+fn test_latest_stateful_attributes_inject_id_independently() {
+    let cases = [
+        (
+            "accessibility_id",
+            gpui_rsx::rsx_expand! { <div accessibility_id={"platform-id"} /> },
+            gpui_rsx::rsx_expand! { <div accessibilityId={"platform-id"} /> },
+        ),
+        (
+            "aria_description",
+            gpui_rsx::rsx_expand! { <div aria_description={"description"} /> },
+            gpui_rsx::rsx_expand! { <div ariaDescription={"description"} /> },
+        ),
+        (
+            "aria_keyshortcuts",
+            gpui_rsx::rsx_expand! { <div aria_keyshortcuts={"Ctrl+K"} /> },
+            gpui_rsx::rsx_expand! { <div ariaKeyShortcuts={"Ctrl+K"} /> },
+        ),
+        (
+            "aria_active_descendant",
+            gpui_rsx::rsx_expand! { <div aria_active_descendant /> },
+            gpui_rsx::rsx_expand! { <div ariaActiveDescendant /> },
+        ),
+        (
+            "a11y_synthetic_children",
+            gpui_rsx::rsx_expand! { <div a11y_synthetic_children={|| ()} /> },
+            gpui_rsx::rsx_expand! { <div a11ySyntheticChildren={|| ()} /> },
+        ),
+        (
+            "aria_numeric_value_step",
+            gpui_rsx::rsx_expand! { <div aria_numeric_value_step={1.0} /> },
+            gpui_rsx::rsx_expand! { <div ariaNumericValueStep={1.0} /> },
+        ),
+        (
+            "aria_value",
+            gpui_rsx::rsx_expand! { <div aria_value={"value"} /> },
+            gpui_rsx::rsx_expand! { <div ariaValue={"value"} /> },
+        ),
+        (
+            "aria_placeholder",
+            gpui_rsx::rsx_expand! { <div aria_placeholder={"placeholder"} /> },
+            gpui_rsx::rsx_expand! { <div ariaPlaceholder={"placeholder"} /> },
+        ),
+        (
+            "restrict_scroll_to_axis",
+            gpui_rsx::rsx_expand! { <div restrict_scroll_to_axis /> },
+            gpui_rsx::rsx_expand! { <div restrictScrollToAxis /> },
+        ),
+        (
+            "external_drag_payload",
+            gpui_rsx::rsx_expand! { <div external_drag_payload={|_| ()} /> },
+            gpui_rsx::rsx_expand! { <div externalDragPayload={|_| ()} /> },
+        ),
+    ];
+
+    for (method, snake_case, camel_case) in cases {
+        assert_auto_id_before_method(snake_case, method);
+        assert_auto_id_before_method(camel_case, method);
+    }
+}
+
+#[test]
+fn test_latest_stateful_value_is_evaluated_once_and_explicit_id_is_not_duplicated() {
+    let mut evaluations = 0;
+    let _el = rsx! {
+        <div
+            id="described-control"
+            ariaDescription={{
+                evaluations += 1;
+                "description"
+            }}
+        />
+    };
+    assert_eq!(evaluations, 1);
+
+    let expanded = gpui_rsx::rsx_expand! {
+        <div id="described-control" ariaDescription={"description"} />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+    assert_eq!(compact.matches(".id(").count(), 1, "{compact}");
+}
+
+#[test]
+fn test_latest_interactive_event_aliases_do_not_inject_id() {
+    let cases = [
+        (
+            "on_mouse_exit",
+            gpui_rsx::rsx_expand! { <div onMouseExit={h} /> },
+        ),
+        (
+            "on_mouse_pressure",
+            gpui_rsx::rsx_expand! { <div onMousePressure={h} /> },
+        ),
+        (
+            "capture_mouse_pressure",
+            gpui_rsx::rsx_expand! { <div captureMousePressure={h} /> },
+        ),
+        ("on_pinch", gpui_rsx::rsx_expand! { <div onPinch={h} /> }),
+        (
+            "capture_pinch",
+            gpui_rsx::rsx_expand! { <div capturePinch={h} /> },
+        ),
+    ];
+
+    for (method, expanded) in cases {
+        let compact = expanded.split_whitespace().collect::<String>();
+        assert!(compact.contains(&format!(".{method}(")), "{compact}");
+        assert!(!compact.contains(".id("), "{compact}");
+    }
+}
+
+#[test]
+fn test_scrollbar_width_does_not_inject_id() {
+    take_last_auto_id();
+    let _el = rsx! { <div scrollbarWidth={px(8.0)} /> };
+    assert!(take_last_auto_id().is_none());
+
+    let expanded = gpui_rsx::rsx_expand! { <div scrollbarWidth={px(8.0)} /> };
+    let compact = expanded.split_whitespace().collect::<String>();
+    assert!(compact.contains(".scrollbar_width("), "{compact}");
+    assert!(!compact.contains(".id("), "{compact}");
+}
+
+#[test]
+fn test_ellipsis_classes_cover_static_strict_and_dynamic_paths() {
+    let _static = rsx! { <div class="text-ellipsis-start text-ellipsis-middle" /> };
+    let _strict = gpui_rsx::rsx_strict! {
+        <div class="text-ellipsis-start text-ellipsis-middle" />
+    };
+    let classes = "text-ellipsis-start text-ellipsis-middle";
+    let _dynamic = rsx! { <div class={classes} /> };
+
+    let expanded = gpui_rsx::rsx_expand! {
+        <div class="text-ellipsis-start text-ellipsis-middle" />
+    };
+    let compact = expanded.split_whitespace().collect::<String>();
+    assert!(compact.contains(".text_ellipsis_start()"), "{compact}");
+    assert!(compact.contains(".text_ellipsis_middle()"), "{compact}");
+}
+
+#[test]
+fn test_grid_min_max_content_aliases_keep_u16_values() {
+    take_integer_calls();
+    let _el = rsx! {
+        <div
+            gridColsMinContent={1u16}
+            gridColsMaxContent={2u16}
+            gridRowsMinContent={3u16}
+            gridRowsMaxContent={4u16}
+        />
+    };
+    assert_eq!(
+        take_integer_calls(),
+        vec![
+            ("grid_cols_min_content", 1),
+            ("grid_cols_max_content", 2),
+            ("grid_rows_min_content", 3),
+            ("grid_rows_max_content", 4),
+        ]
+    );
+}
+
 // ===========================================================================
 // 26. 新事件处理器
 // ===========================================================================

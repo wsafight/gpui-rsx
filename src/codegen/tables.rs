@@ -305,6 +305,9 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "onMouseDown" | "on_mouse_down" => Some("on_mouse_down"),
         "onMouseUp" | "on_mouse_up" => Some("on_mouse_up"),
         "onMouseMove" | "on_mouse_move" => Some("on_mouse_move"),
+        "onMouseExit" | "on_mouse_exit" => Some("on_mouse_exit"),
+        "onMousePressure" | "on_mouse_pressure" => Some("on_mouse_pressure"),
+        "onPinch" | "on_pinch" => Some("on_pinch"),
         "onMouseDownOut" | "on_mouse_down_out" => Some("on_mouse_down_out"),
         "onMouseUpOut" | "on_mouse_up_out" => Some("on_mouse_up_out"),
         "onAnyMouseDown" | "on_any_mouse_down" => Some("on_any_mouse_down"),
@@ -326,6 +329,8 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "captureKeyDown" | "capture_key_down" => Some("capture_key_down"),
         "captureKeyUp" | "capture_key_up" => Some("capture_key_up"),
         "captureAction" | "capture_action" => Some("capture_action"),
+        "captureMousePressure" | "capture_mouse_pressure" => Some("capture_mouse_pressure"),
+        "capturePinch" | "capture_pinch" => Some("capture_pinch"),
         // 属性名称映射（camelCase → snake_case，仅非恒等映射）
         "blockMouseExceptScroll" => Some("block_mouse_except_scroll"),
         "canDrop" => Some("can_drop"),
@@ -345,11 +350,19 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "hoverableTooltip" => Some("hoverable_tooltip"),
         "tooltipShowDelay" => Some("tooltip_show_delay"),
         "onA11yAction" | "on_a11y_action" => Some("on_a11y_action"),
+        "accessibilityId" => Some("accessibility_id"),
         "ariaLabel" => Some("aria_label"),
+        "ariaDescription" => Some("aria_description"),
+        "ariaKeyShortcuts" => Some("aria_keyshortcuts"),
+        "ariaActiveDescendant" => Some("aria_active_descendant"),
+        "a11ySyntheticChildren" => Some("a11y_synthetic_children"),
         "ariaSelected" => Some("aria_selected"),
         "ariaExpanded" => Some("aria_expanded"),
         "ariaToggled" => Some("aria_toggled"),
         "ariaNumericValue" => Some("aria_numeric_value"),
+        "ariaNumericValueStep" => Some("aria_numeric_value_step"),
+        "ariaValue" => Some("aria_value"),
+        "ariaPlaceholder" => Some("aria_placeholder"),
         "ariaMinNumericValue" => Some("aria_min_numeric_value"),
         "ariaMaxNumericValue" => Some("aria_max_numeric_value"),
         "ariaOrientation" => Some("aria_orientation"),
@@ -366,6 +379,7 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "overflowScroll" => Some("overflow_scroll"),
         "overflowXScroll" => Some("overflow_x_scroll"),
         "overflowYScroll" => Some("overflow_y_scroll"),
+        "restrictScrollToAxis" => Some("restrict_scroll_to_axis"),
         "scrollbarWidth" => Some("scrollbar_width"),
         "trackScroll" => Some("track_scroll"),
         "withFallback" => Some("with_fallback"),
@@ -398,9 +412,14 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "roundedBottomLeft" => Some("rounded_bl"),
         "roundedBottomRight" => Some("rounded_br"),
         "boxShadow" => Some("shadow"),
+        "externalDragPayload" => Some("external_drag_payload"),
         // Grid 布局属性
         "gridCols" => Some("grid_cols"),
         "gridRows" => Some("grid_rows"),
+        "gridColsMinContent" => Some("grid_cols_min_content"),
+        "gridColsMaxContent" => Some("grid_cols_max_content"),
+        "gridRowsMinContent" => Some("grid_rows_min_content"),
+        "gridRowsMaxContent" => Some("grid_rows_max_content"),
         "colSpan" => Some("col_span"),
         "rowSpan" => Some("row_span"),
         "colStart" => Some("col_start"),
@@ -465,22 +484,31 @@ fn method_properties(method: &str) -> MethodProperties {
             multi_arg: true,
         },
         "active"
+        | "a11y_synthetic_children"
+        | "accessibility_id"
         | "anchor_scroll"
+        | "aria_active_descendant"
         | "aria_column_count"
         | "aria_column_index"
+        | "aria_description"
         | "aria_expanded"
+        | "aria_keyshortcuts"
         | "aria_label"
         | "aria_level"
         | "aria_max_numeric_value"
         | "aria_min_numeric_value"
         | "aria_numeric_value"
+        | "aria_numeric_value_step"
         | "aria_orientation"
+        | "aria_placeholder"
         | "aria_position_in_set"
         | "aria_row_count"
         | "aria_row_index"
         | "aria_selected"
         | "aria_size_of_set"
         | "aria_toggled"
+        | "aria_value"
+        | "external_drag_payload"
         | "focusable"
         | "hoverable_tooltip"
         | "on_aux_click"
@@ -490,7 +518,7 @@ fn method_properties(method: &str) -> MethodProperties {
         | "overflow_x_scroll"
         | "overflow_y_scroll"
         | "role"
-        | "scrollbar_width"
+        | "restrict_scroll_to_axis"
         | "tooltip"
         | "tooltip_show_delay"
         | "track_scroll" => MethodProperties {
@@ -817,6 +845,8 @@ pub(crate) const COMMON_CLASS_SUPPORT: &[CommonClassSupport] = &[
     CommonClassSupport::both("whitespace-nowrap"),
     CommonClassSupport::both("truncate"),
     CommonClassSupport::both("text-ellipsis"),
+    CommonClassSupport::both("text-ellipsis-start"),
+    CommonClassSupport::both("text-ellipsis-middle"),
     CommonClassSupport::both("no-underline"),
     CommonClassSupport::both("italic"),
     CommonClassSupport::both("not-italic"),
@@ -1043,13 +1073,24 @@ mod tests {
 
     #[test]
     fn attr_method_camel_case_events() {
-        assert_eq!(lookup_attr_method("onClick"), Some("on_click"));
-        assert_eq!(lookup_attr_method("onMouseDown"), Some("on_mouse_down"));
-        assert_eq!(lookup_attr_method("onKeyDown"), Some("on_key_down"));
-        assert_eq!(lookup_attr_method("onDragMove"), Some("on_drag_move"));
-        assert_eq!(lookup_attr_method("onBoxedAction"), Some("on_boxed_action"));
-        assert_eq!(lookup_attr_method("onAuxClick"), Some("on_aux_click"));
-        assert_eq!(lookup_attr_method("onA11yAction"), Some("on_a11y_action"));
+        let cases = [
+            ("onClick", "on_click"),
+            ("onMouseDown", "on_mouse_down"),
+            ("onKeyDown", "on_key_down"),
+            ("onDragMove", "on_drag_move"),
+            ("onBoxedAction", "on_boxed_action"),
+            ("onAuxClick", "on_aux_click"),
+            ("onA11yAction", "on_a11y_action"),
+            ("onMouseExit", "on_mouse_exit"),
+            ("onMousePressure", "on_mouse_pressure"),
+            ("captureMousePressure", "capture_mouse_pressure"),
+            ("onPinch", "on_pinch"),
+            ("capturePinch", "capture_pinch"),
+        ];
+
+        for (attr, method) in cases {
+            assert_eq!(lookup_attr_method(attr), Some(method), "{attr}");
+        }
     }
 
     #[test]
@@ -1110,9 +1151,87 @@ mod tests {
     #[test]
     fn attr_method_unknown_returns_none() {
         assert_eq!(lookup_attr_method("onFocus"), None);
-        assert_eq!(lookup_attr_method("onMousePressure"), None);
+        assert_eq!(lookup_attr_method("onDoubleClick"), None);
         assert_eq!(lookup_attr_method("unknown_attr"), None);
         assert_eq!(lookup_attr_method(""), None);
+    }
+
+    #[test]
+    fn latest_stateful_aliases_keep_method_properties() {
+        let cases = [
+            ("accessibilityId", "accessibility_id", false),
+            ("ariaDescription", "aria_description", false),
+            ("ariaKeyShortcuts", "aria_keyshortcuts", false),
+            ("ariaActiveDescendant", "aria_active_descendant", false),
+            ("a11ySyntheticChildren", "a11y_synthetic_children", false),
+            ("ariaNumericValueStep", "aria_numeric_value_step", false),
+            ("ariaValue", "aria_value", false),
+            ("ariaPlaceholder", "aria_placeholder", false),
+            ("restrictScrollToAxis", "restrict_scroll_to_axis", false),
+            ("externalDragPayload", "external_drag_payload", false),
+        ];
+
+        for (attr, method, multi_arg) in cases {
+            let info = lookup_attr_method_info(attr).unwrap_or_else(|| panic!("missing {attr}"));
+            assert_eq!(info.method, method, "{attr}");
+            assert!(info.needs_id, "{attr}");
+            assert_eq!(info.multi_arg, multi_arg, "{attr}");
+            assert!(is_stateful_attr(method), "{method}");
+        }
+    }
+
+    #[test]
+    fn latest_interactive_events_do_not_need_id() {
+        for attr in [
+            "onMouseExit",
+            "on_mouse_exit",
+            "onMousePressure",
+            "on_mouse_pressure",
+            "captureMousePressure",
+            "capture_mouse_pressure",
+            "onPinch",
+            "on_pinch",
+            "capturePinch",
+            "capture_pinch",
+        ] {
+            let info = lookup_attr_method_info(attr).unwrap_or_else(|| panic!("missing {attr}"));
+            assert!(!info.needs_id, "{attr}");
+            assert!(!info.multi_arg, "{attr}");
+        }
+    }
+
+    #[test]
+    fn latest_styled_aliases_map_without_id() {
+        let cases = [
+            ("scrollbarWidth", "scrollbar_width"),
+            ("gridColsMinContent", "grid_cols_min_content"),
+            ("gridColsMaxContent", "grid_cols_max_content"),
+            ("gridRowsMinContent", "grid_rows_min_content"),
+            ("gridRowsMaxContent", "grid_rows_max_content"),
+        ];
+
+        for (attr, method) in cases {
+            let info = lookup_attr_method_info(attr).unwrap_or_else(|| panic!("missing {attr}"));
+            assert_eq!(info.method, method, "{attr}");
+            assert!(!info.needs_id, "{attr}");
+            assert!(!info.multi_arg, "{attr}");
+            assert!(!is_stateful_attr(method), "{method}");
+        }
+    }
+
+    #[test]
+    fn pinned_gpui_stateful_snapshot_is_classified() {
+        let methods: Vec<_> =
+            include_str!("../../tests/fixtures/gpui_stateful_methods_e973593.txt")
+                .lines()
+                .map(str::trim)
+                .filter(|line| !line.is_empty() && !line.starts_with('#'))
+                .collect();
+
+        assert_eq!(methods.len(), 42);
+        for method in methods {
+            assert!(is_stateful_method(method), "unclassified method: {method}");
+        }
     }
 
     #[test]
@@ -1136,6 +1255,24 @@ mod tests {
         assert_eq!(aria_label.method, "aria_label");
         assert!(aria_label.needs_id);
         assert!(!aria_label.multi_arg);
+
+        for attr in ["groupActive", "onA11yAction", "onDrag"] {
+            let info = lookup_attr_method_info(attr).unwrap();
+            assert!(info.needs_id, "{attr}");
+            assert!(info.multi_arg, "{attr}");
+        }
+
+        for attr in [
+            "groupHover",
+            "onMouseDown",
+            "onMouseUp",
+            "onMouseUpOut",
+            "onBoxedAction",
+        ] {
+            let info = lookup_attr_method_info(attr).unwrap();
+            assert!(!info.needs_id, "{attr}");
+            assert!(info.multi_arg, "{attr}");
+        }
     }
 
     // --- is_stateful_attr ---

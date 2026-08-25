@@ -39,6 +39,7 @@ use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
 Starlight 站点现在是唯一维护的文档集。原来的 `docs/*.md` 内容已合并到以下页面：
 
 - [快速开始](/gpui-rsx/zh-cn/getting-started/)：安装和第一个视图。
+- [兼容性](/gpui-rsx/zh-cn/compatibility/)：GPUI、gpui-component、Rust 和 demo lockfile 矩阵。
 - [语法参考](/gpui-rsx/zh-cn/usage/syntax/)：元素、属性、子节点和条件渲染。
 - [Class 处理](/gpui-rsx/zh-cn/usage/class/)：静态和动态工具类。
 - [ID 与 Key](/gpui-rsx/zh-cn/usage/ids/)：自动 ID、循环安全和显式 ID。
@@ -47,3 +48,4 @@ Starlight 站点现在是唯一维护的文档集。原来的 `docs/*.md` 内容
 - [迁移指南](/gpui-rsx/zh-cn/guides/migration/)：从手写 GPUI 迁移，以及 `0.6.x` 的 GPUI 目标变化。
 - [问题排查](/gpui-rsx/zh-cn/guides/troubleshooting/)：解析、类型、运行时和依赖问题。
 - [API 参考](/gpui-rsx/zh-cn/reference/api/)：宏和映射表速查。
+- [发布检查清单](/gpui-rsx/zh-cn/reference/release-checklist/)：发布验证和包内容检查。

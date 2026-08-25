@@ -211,6 +211,8 @@ pub trait Styled: Sized {
     fn whitespace_nowrap(self) -> Self;
     fn truncate(self) -> Self;
     fn text_ellipsis(self) -> Self;
+    fn text_ellipsis_start(self) -> Self;
+    fn text_ellipsis_middle(self) -> Self;
     fn line_clamp(self, lines: usize) -> Self;
     fn italic(self) -> Self;
     fn not_italic(self) -> Self;
@@ -271,6 +273,10 @@ pub trait Styled: Sized {
     // --- grid ---
     fn grid_cols(self, v: u16) -> Self;
     fn grid_rows(self, v: u16) -> Self;
+    fn grid_cols_min_content(self, v: u16) -> Self;
+    fn grid_cols_max_content(self, v: u16) -> Self;
+    fn grid_rows_min_content(self, v: u16) -> Self;
+    fn grid_rows_max_content(self, v: u16) -> Self;
     fn col_span(self, v: u16) -> Self;
     fn col_span_full(self) -> Self;
     fn col_start(self, v: i16) -> Self;

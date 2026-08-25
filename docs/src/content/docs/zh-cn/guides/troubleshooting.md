@@ -144,6 +144,60 @@ rsx! {
 
 需要在运行时遇到未知 token 直接失败时，使用 `rsx_strict!`。
 
+### 状态 Class 属性使用了动态值
+
+`hoverClass`、`focusClass` 和 `activeClass` 是编译期 helper，只接受字符串字面量：
+
+```rust
+// 错误
+let classes = "bg-blue-600";
+rsx! { <button hoverClass={classes} /> }
+
+// 正确
+rsx! { <button hoverClass="bg-blue-600" /> }
+```
+
+如果 refinement 需要 Rust 逻辑，直接使用 `hover`、`focus` 或 `active`：
+
+```rust
+rsx! {
+    <button hover={|style| style.bg(rgb(0x2563eb))} />
+}
+```
+
+### 状态 Class 包含元素级 Class
+
+状态 class 属性接收的是 GPUI `StyleRefinement`，因此 `overflow-scroll` 或
+`debug-outline` 这类元素级 class 不能放进去：
+
+```rust
+// 错误
+rsx! { <button activeClass="overflow-scroll" /> }
+```
+
+始终启用的元素行为放在主 `class`：
+
+```rust
+rsx! {
+    <button
+        class="overflow-scroll"
+        activeClass="opacity-75"
+    />
+}
+```
+
+需要条件启用元素级行为时，提供显式 `id`，再通过 `when` 调用 GPUI：
+
+```rust
+rsx! {
+    <button
+        id="results"
+        when={(is_scrollable, |el| el.overflow_scroll())}
+        activeClass="opacity-75"
+    />
+}
+```
+
 ## 条件属性错误
 
 ### `when`、`whenSome` 或 `whenClass` 的 Tuple 形状错误
@@ -298,6 +352,29 @@ fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl Into
 ### 事件没有触发
 
 检查 handler 签名是否符合对应 GPUI 方法要求。重复的有状态事件目标还需要 `key` 或显式 `id`。
+
+### `groupDragOver` 被拒绝
+
+`groupDragOver` 不作为 RSX 属性暴露，因为 GPUI 需要在调用点明确拖拽数据类型：
+
+```rust
+// 错误
+rsx! {
+    <div groupDragOver={("items", |style| style.opacity(0.75))} />
+}
+```
+
+通过 `when` 或 `base` 直接调用 GPUI，这样可以显式写出类型参数：
+
+```rust
+rsx! {
+    <div
+        when={(drag_enabled, |el| {
+            el.group_drag_over::<MyDragData>("items", |style| style.opacity(0.75))
+        })}
+    />
+}
+```
 
 ### 样式没有生效
 
