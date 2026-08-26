@@ -130,6 +130,11 @@ pub(crate) fn generate_attr_methods_with_mode(
                 return;
             }
 
+            if name_str == "ref" {
+                out.push(quote! { .track_focus(#value) });
+                return;
+            }
+
             // 默认：直接作为方法调用
             out.push(quote! { .#name(#value) });
         }

@@ -513,6 +513,7 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
 mod codegen;
+mod component;
 mod diagnostics;
 mod parser;
 
@@ -650,4 +651,17 @@ pub fn rsx_expand(input: TokenStream) -> TokenStream {
     let preview = generate_body_expansion_preview(&body, ClassMode::Permissive);
     let code = quote::quote! { #preview };
     TokenStream::from(code)
+}
+
+/// Generates a functional component builder for GPUI.
+///
+/// This macro transforms a stateless function into a fully-fledged GPUI element struct,
+/// allowing it to be used like `<Component prop="value" />` in `rsx!`.
+#[proc_macro_attribute]
+pub fn component(_args: TokenStream, item: TokenStream) -> TokenStream {
+    let input = parse_macro_input!(item as syn::ItemFn);
+    match component::generate_component(input) {
+        Ok(tokens) => tokens.into(),
+        Err(err) => err.to_compile_error().into(),
+    }
 }

@@ -8,10 +8,10 @@ use proc_macro2::{Delimiter, Span, TokenStream, TokenTree};
 use quote::ToTokens;
 use std::fmt;
 use syn::{
-    Expr, ExprLit, Ident, Lit, Pat, Result, Token,
+    ext::IdentExt,
     parse::{Parse, ParseStream, Parser},
     spanned::Spanned,
-    token,
+    token, Expr, ExprLit, Ident, Lit, Pat, Result, Token,
 };
 
 /// RSX 宏体
@@ -157,7 +157,7 @@ impl Parse for RsxElement {
         // 解析属性（预分配容量，典型元素有 3-8 个属性）
         let mut attributes = Vec::with_capacity(4);
         while !input.peek(Token![>]) && !input.peek(Token![/]) {
-            let attr_name: Ident = input.parse()?;
+            let attr_name = syn::Ident::parse_any(input)?;
 
             if input.peek(Token![=]) {
                 // 值属性: name={value}

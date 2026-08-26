@@ -207,6 +207,7 @@ fn generate_element_checked(
     let mut canvas_prepaint = None;
     let mut canvas_paint = None;
     let mut has_styled = false;
+    let is_component = tag_str.chars().next().map_or(false, |c| c.is_ascii_uppercase());
     let mut needs_id = false;
 
     // 预分配方法链容量：
@@ -237,6 +238,17 @@ fn generate_element_checked(
             RsxAttribute::Value { name, value } if tag_str == "canvas" && name == "paint" => {
                 canvas_paint = Some(value);
             }
+            RsxAttribute::Value { name, value } if tag_str == "Activity" && name == "mode" => {
+                methods.push(quote! {
+                    .map(|__el| {
+                        if #value == "visible" {
+                            __el.visible()
+                        } else {
+                            __el.invisible()
+                        }
+                    })
+                });
+            }
             RsxAttribute::Value { name, value } if tag_str == "svg" && name == "src" => {
                 methods.push(quote! { .path(#value) });
             }
@@ -245,7 +257,7 @@ fn generate_element_checked(
             }
             _ => {
                 let analysis = analyze_attr(attr);
-                if !needs_id && analysis.needs_id {
+                if !needs_id && analysis.needs_id && !is_component {
                     needs_id = true;
                 }
                 generate_attr_methods_with_mode(attr, analysis.hints(), &mut methods, mode);
@@ -388,7 +400,7 @@ fn generate_tag(
         // HTML 标签：统一映射为 div()
         "div" | "span" | "section" | "article" | "header" | "footer" | "main" | "nav" | "aside"
         | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "label" | "a" | "button" | "input"
-        | "textarea" | "select" | "form" | "ul" | "ol" | "li" => {
+        | "textarea" | "select" | "form" | "ul" | "ol" | "li" | "Activity" => {
             quote! { div() }
         }
         _ => quote! { #path() },
