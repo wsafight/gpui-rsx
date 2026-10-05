@@ -1,13 +1,13 @@
-//! 静态查找表和常量定义
+﻿//! Static lookup tables and constant definitions
 //!
-//! 本模块包含所有编译期常量表和 O(1) 查找函数，不依赖其他 codegen 子模块。
+//! This module contains all compile-time constant tables and O(1) lookup functions, independent of other codegen submodules.
 //!
-//! 优化策略：所有查找均使用 match 语句，
-//! 编译器可生成跳转表或 trie 结构，实现 O(1) 查找。
+//! Optimization strategy: All lookups use match statements,
+//! allowing the compiler to generate jump tables or trie structures for O(1) lookups.
 
-/// 查找颜色值（O(1) match 查找）
+/// Look up color value (O(1) match lookup)
 ///
-/// 完整 Tailwind 色板，编译器为 match 生成高效跳转表/trie。
+/// Complete Tailwind palette; compiler generates efficient jump tables/tries for match.
 pub(crate) fn lookup_color(name: &str) -> Option<u32> {
     match name {
         // amber
@@ -281,10 +281,10 @@ pub(crate) fn lookup_color(name: &str) -> Option<u32> {
     }
 }
 
-/// 查找属性的 GPUI 方法名（事件处理器 + camelCase 属性映射）
+/// Look up GPUI method name for an attribute (event handlers + camelCase attribute mapping)
 ///
-/// 使用 match 语句替代线性扫描，编译器生成高效跳转表。
-/// 合并了原 EVENT_HANDLERS 和 ATTRIBUTE_NAME_MAP 两张表。
+/// Uses match statements instead of linear scans so the compiler generates efficient jump tables.
+/// Merges the previous EVENT_HANDLERS and ATTRIBUTE_NAME_MAP tables.
 #[derive(Clone, Copy)]
 pub(crate) struct AttrMethodInfo {
     pub(crate) method: &'static str,
@@ -300,7 +300,7 @@ struct MethodProperties {
 
 pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
     match name {
-        // 事件处理器（camelCase 和 snake_case 均支持）
+        // Event handlers (both camelCase and snake_case supported)
         "onClick" | "on_click" => Some("on_click"),
         "onMouseDown" | "on_mouse_down" => Some("on_mouse_down"),
         "onMouseUp" | "on_mouse_up" => Some("on_mouse_up"),
@@ -323,7 +323,7 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "onDrop" | "on_drop" => Some("on_drop"),
         "onAction" | "on_action" => Some("on_action"),
         "onBoxedAction" | "on_boxed_action" => Some("on_boxed_action"),
-        // 捕获阶段事件处理器
+        // Capture phase event handlers
         "captureAnyMouseDown" | "capture_any_mouse_down" => Some("capture_any_mouse_down"),
         "captureAnyMouseUp" | "capture_any_mouse_up" => Some("capture_any_mouse_up"),
         "captureKeyDown" | "capture_key_down" => Some("capture_key_down"),
@@ -331,7 +331,7 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "captureAction" | "capture_action" => Some("capture_action"),
         "captureMousePressure" | "capture_mouse_pressure" => Some("capture_mouse_pressure"),
         "capturePinch" | "capture_pinch" => Some("capture_pinch"),
-        // 属性名称映射（camelCase → snake_case，仅非恒等映射）
+        // Attribute name mapping (camelCase -> snake_case, non-identity mappings only)
         "blockMouseExceptScroll" => Some("block_mouse_except_scroll"),
         "canDrop" => Some("can_drop"),
         "debugSelector" => Some("debug_selector"),
@@ -413,7 +413,7 @@ pub(crate) fn lookup_attr_method(name: &str) -> Option<&'static str> {
         "roundedBottomRight" => Some("rounded_br"),
         "boxShadow" => Some("shadow"),
         "externalDragPayload" => Some("external_drag_payload"),
-        // Grid 布局属性
+        // Grid layout attributes
         "gridCols" => Some("grid_cols"),
         "gridRows" => Some("grid_rows"),
         "gridColsMinContent" => Some("grid_cols_min_content"),
@@ -440,15 +440,17 @@ pub(crate) fn lookup_attr_method_info(name: &str) -> Option<AttrMethodInfo> {
     })
 }
 
-/// 查找 flag 属性的 GPUI 方法名。
+/// Look up GPUI method name for flag attributes.
 ///
-/// 绝大多数 flag 属性可直接复用 value 属性映射；方向性 border 是例外：
-/// `border_t={value}` 应调用 `.border_t(value)`，而 `border_t` flag 应调用
-/// GPUI 0.2 的预设宽度方法 `.border_t_1()`。
+/// Most flag attributes can directly reuse value attribute mappings; directional borders are an exception:
+/// `border_t={value}` should call `.border_t(value)`, while the `border_t` flag should call
+/// GPUI 0.2's preset width method `.border_t_1()`.
 pub(crate) fn lookup_attr_flag_method(name: &str) -> Option<&'static str> {
     match name {
         "flexGrow" => Some("flex_grow_1"),
         "flexShrink" => Some("flex_shrink_1"),
+        "border" => Some("border_1"),
+        "rounded" => Some("rounded_md"),
         "border_t" => Some("border_t_1"),
         "border_b" => Some("border_b_1"),
         "border_l" => Some("border_l_1"),
@@ -459,10 +461,10 @@ pub(crate) fn lookup_attr_flag_method(name: &str) -> Option<&'static str> {
     }
 }
 
-/// 检查属性是否需要 stateful element（需要 `.id()`）
+/// Check if an attribute requires a stateful element (requires `.id()`)
 ///
-/// GPUI 0.2 将大多数事件放在 `InteractiveElement` 上，不要求 stateful ID。
-/// 只有 `StatefulInteractiveElement` 方法需要先调用 `.id()`。
+/// GPUI 0.2 places most events on `InteractiveElement`, which does not require a stateful ID.
+/// Only `StatefulInteractiveElement` methods require calling `.id()` first.
 pub(crate) fn is_stateful_attr(name: &str) -> bool {
     if let Some(info) = lookup_attr_method_info(name) {
         return info.needs_id;
@@ -538,7 +540,7 @@ fn method_properties(method: &str) -> MethodProperties {
     }
 }
 
-/// 检查静态 class 是否会调用 `StatefulInteractiveElement` 方法。
+/// Check if a static class will call `StatefulInteractiveElement` methods.
 pub(crate) fn is_stateful_class(class: &str) -> bool {
     matches!(
         class,
@@ -546,9 +548,9 @@ pub(crate) fn is_stateful_class(class: &str) -> bool {
     )
 }
 
-/// 查找间距/尺寸 class 前缀对应的 GPUI 方法名
+/// Look up GPUI method name corresponding to spacing/sizing class prefix
 ///
-/// 使用 match 替代原 SPACING_PATTERNS 数组的线性扫描（17 项 → O(1)）。
+/// Uses match instead of linear scan over the original SPACING_PATTERNS array (17 items -> O(1)).
 pub(crate) fn lookup_spacing_method(prefix: &str) -> Option<&'static str> {
     match prefix {
         "gap_" => Some("gap"),
@@ -575,20 +577,26 @@ pub(crate) fn lookup_spacing_method(prefix: &str) -> Option<&'static str> {
         "max_w_" => Some("max_w"),
         "min_h_" => Some("min_h"),
         "max_h_" => Some("max_h"),
+        "inset_" => Some("inset"),
+        "top_" => Some("top"),
+        "bottom_" => Some("bottom"),
+        "left_" => Some("left"),
+        "translate_x_" => Some("left"),
+        "translate_y_" => Some("top"),
         _ => None,
     }
 }
 
-/// 完整 Tailwind 色系名列表（22 个），供 runtime.rs 和单元测试共享使用。
+/// Complete Tailwind color family list (22 total), shared between runtime.rs and unit tests.
 ///
-/// 单一数据源：修改此处即可同步影响动态 class 运行时匹配表和颜色覆盖率测试。
+/// Single source of truth: modifying here synchronously affects both dynamic class runtime matching tables and color coverage tests.
 pub(crate) const COLOR_FAMILIES: &[&str] = &[
     "amber", "blue", "cyan", "emerald", "fuchsia", "gray", "green", "indigo", "lime", "neutral",
     "orange", "pink", "purple", "red", "rose", "sky", "slate", "stone", "teal", "violet", "yellow",
     "zinc",
 ];
 
-/// 完整 Tailwind 色阶列表（11 个），供 runtime.rs 和单元测试共享使用。
+/// Complete Tailwind color shade list (11 total), shared between runtime.rs and unit tests.
 pub(crate) const COLOR_SHADES: &[&str] = &[
     "50", "100", "200", "300", "400", "500", "600", "700", "800", "900", "950",
 ];
@@ -663,6 +671,13 @@ pub(crate) const LENGTH_CLASS_SPECS: &[LengthClassSpec] = &[
     LengthClassSpec::sizing("h-", "h"),
     LengthClassSpec::spacing("p-", "p"),
     LengthClassSpec::spacing("m-", "m"),
+    LengthClassSpec::spacing("inset-", "inset"),
+    LengthClassSpec::spacing("top-", "top"),
+    LengthClassSpec::spacing("bottom-", "bottom"),
+    LengthClassSpec::spacing("left-", "left"),
+    LengthClassSpec::spacing("right-", "right"),
+    LengthClassSpec::spacing("translate-x-", "left"),
+    LengthClassSpec::spacing("translate-y-", "top"),
 ];
 
 pub(crate) fn split_length_class(class: &str) -> Option<(&'static str, &str, LengthClassFamily)> {
@@ -829,6 +844,8 @@ pub(crate) const COMMON_CLASS_SUPPORT: &[CommonClassSupport] = &[
     CommonClassSupport::strict_only("h-px"),
     CommonClassSupport::strict_only("size-px"),
     CommonClassSupport::strict_only("w-auto"),
+    CommonClassSupport::strict_only("w-fit"),
+    CommonClassSupport::strict_only("h-fit"),
     CommonClassSupport::strict_only("h-auto"),
     // Text
     CommonClassSupport::both("text-xs"),
@@ -838,6 +855,12 @@ pub(crate) const COMMON_CLASS_SUPPORT: &[CommonClassSupport] = &[
     CommonClassSupport::both("text-xl"),
     CommonClassSupport::both("text-2xl"),
     CommonClassSupport::both("text-3xl"),
+    CommonClassSupport::both("text-4xl"),
+    CommonClassSupport::both("text-5xl"),
+    CommonClassSupport::both("text-6xl"),
+    CommonClassSupport::both("text-7xl"),
+    CommonClassSupport::both("text-8xl"),
+    CommonClassSupport::both("text-9xl"),
     CommonClassSupport::both("text-left"),
     CommonClassSupport::both("text-center"),
     CommonClassSupport::both("text-right"),
@@ -993,16 +1016,30 @@ pub(crate) fn dynamic_common_classes() -> impl Iterator<Item = &'static str> {
         .map(|entry| entry.name)
 }
 
-/// 检查是否是有效的文本大小名称
+/// Check whether the name is a valid text size
 ///
-/// 使用 match 替代原 VALID_TEXT_SIZES 数组的 `.contains()` 线性扫描。
+/// Uses match instead of linear scan with `.contains()` over the original VALID_TEXT_SIZES array.
 pub(crate) fn is_valid_text_size(size: &str) -> bool {
-    matches!(size, "xs" | "sm" | "base" | "lg" | "xl" | "2xl" | "3xl")
+    matches!(
+        size,
+        "xs" | "sm"
+            | "base"
+            | "lg"
+            | "xl"
+            | "2xl"
+            | "3xl"
+            | "4xl"
+            | "5xl"
+            | "6xl"
+            | "7xl"
+            | "8xl"
+            | "9xl"
+    )
 }
 
-/// 查找标签默认样式（仅当元素带 `styled` 标志时使用）
+/// Look up default tag styles (only used when the element has the `styled` flag)
 ///
-/// 使用 match 替代原 TAG_DEFAULT_STYLES 数组的 `.iter().find()` 线性扫描。
+/// Uses match instead of linear scan with `.iter().find()` over the original TAG_DEFAULT_STYLES array.
 pub(crate) fn lookup_tag_default(tag: &str) -> Option<&'static str> {
     match tag {
         "h1" => Some("text-3xl font-bold"),
@@ -1015,6 +1052,7 @@ pub(crate) fn lookup_tag_default(tag: &str) -> Option<&'static str> {
         "a" => Some("cursor-pointer"),
         "input" => Some("px-2 py-1"),
         "textarea" => Some("px-2 py-1"),
+        "kbd" => Some("font-mono text-sm px-1.5 py-0.5 rounded border border-gray-300 bg-gray-100"),
         "ul" => Some("flex flex-col"),
         "ol" => Some("flex flex-col"),
         "li" => Some("flex items-center"),
@@ -1033,13 +1071,13 @@ mod tests {
 
     #[test]
     fn color_table_contains_full_tailwind_palette() {
-        // 验证完整 Tailwind 色板：22 色系 × 11 色阶（复用模块级常量，单一数据源）
+        // Verify complete Tailwind palette: 22 families x 11 shades (reuses module-level constants, single source of truth)
         for family in COLOR_FAMILIES {
             for shade in COLOR_SHADES {
                 let key = format!("{family}_{shade}");
                 assert!(
                     lookup_color(&key).is_some(),
-                    "缺少颜色: {key}（请在 lookup_color 中补充）"
+                    "Missing color: {key} (please add in lookup_color)"
                 );
             }
         }
@@ -1053,7 +1091,7 @@ mod tests {
 
     #[test]
     fn color_table_spot_check_values() {
-        // 抽检几个关键颜色值，防止复制粘贴错误
+        // Spot-check key color values to prevent copy-paste errors
         assert_eq!(lookup_color("red_500"), Some(0xef4444));
         assert_eq!(lookup_color("blue_500"), Some(0x3b82f6));
         assert_eq!(lookup_color("green_500"), Some(0x22c55e));
@@ -1287,7 +1325,7 @@ mod tests {
 
     #[test]
     fn stateful_attr_detects_interactive_attrs() {
-        // StatefulInteractiveElement 方法需要 ID。
+        // StatefulInteractiveElement methods require an ID.
         assert!(is_stateful_attr("active"));
         assert!(is_stateful_attr("focusable"));
         assert!(is_stateful_attr("overflow_scroll"));
@@ -1302,7 +1340,7 @@ mod tests {
 
     #[test]
     fn stateful_attr_ignores_styled_trait_methods() {
-        // hover / focus / group 是 Styled trait 的样式方法，不需要 ID
+        // hover / focus / group are Styled trait style methods and do not require an ID
         assert!(!is_stateful_attr("hover"));
         assert!(!is_stateful_attr("focus"));
         assert!(!is_stateful_attr("group"));
@@ -1431,17 +1469,18 @@ mod tests {
 
     #[test]
     fn text_size_validates_known_sizes() {
-        for size in ["xs", "sm", "base", "lg", "xl", "2xl", "3xl"] {
-            assert!(is_valid_text_size(size), "应接受文本大小: {size}");
+        for size in [
+            "xs", "sm", "base", "lg", "xl", "2xl", "3xl", "4xl", "5xl", "6xl", "7xl", "8xl", "9xl",
+        ] {
+            assert!(is_valid_text_size(size), "Should accept text size: {size}");
         }
     }
 
     #[test]
     fn text_size_rejects_unknown() {
         assert!(!is_valid_text_size("huge"));
-        assert!(!is_valid_text_size("4xl"));
-        assert!(!is_valid_text_size("5xl"));
-        assert!(!is_valid_text_size("6xl"));
+        assert!(!is_valid_text_size("10xl"));
         assert!(!is_valid_text_size(""));
     }
 }
+

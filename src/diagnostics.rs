@@ -1,10 +1,10 @@
-//! 统一诊断模块
+//! Unified diagnostics module
 //!
-//! 提供一致的错误消息和诊断助手函数
+//! Provides consistent error messages and diagnostic helper functions
 
 use syn::{Ident, spanned::Spanned};
 
-/// 报告标签不匹配错误
+/// Reports tag mismatch errors
 pub fn tag_mismatch_error<T: Spanned>(
     closing_span: &T,
     closing_name: &str,
@@ -21,7 +21,7 @@ pub fn tag_mismatch_error<T: Spanned>(
     )
 }
 
-/// 报告未闭合标签错误
+/// Reports unclosed tag errors
 pub fn unclosed_tag_error(span: proc_macro2::Span, tag_name: &str) -> syn::Error {
     syn::Error::new(
         span,
@@ -33,7 +33,7 @@ pub fn unclosed_tag_error(span: proc_macro2::Span, tag_name: &str) -> syn::Error
     )
 }
 
-/// 报告未闭合 Fragment 错误
+/// Reports unclosed Fragment errors
 pub fn unclosed_fragment_error(span: proc_macro2::Span) -> syn::Error {
     syn::Error::new(
         span,
@@ -43,7 +43,7 @@ pub fn unclosed_fragment_error(span: proc_macro2::Span) -> syn::Error {
     )
 }
 
-/// 报告命名标签中的无效子节点错误
+/// Reports invalid child node errors in named tags
 pub fn invalid_child_in_tag_error(span: proc_macro2::Span, tag_name: &str) -> syn::Error {
     syn::Error::new(
         span,
@@ -56,7 +56,7 @@ pub fn invalid_child_in_tag_error(span: proc_macro2::Span, tag_name: &str) -> sy
     )
 }
 
-/// 报告 Fragment 中的无效子节点错误
+/// Reports invalid child node errors in Fragment
 pub fn invalid_child_in_fragment_error(span: proc_macro2::Span) -> syn::Error {
     syn::Error::new(
         span,
@@ -65,7 +65,7 @@ pub fn invalid_child_in_fragment_error(span: proc_macro2::Span) -> syn::Error {
     )
 }
 
-/// 报告 for 循环缺少大括号错误
+/// Reports missing brace errors in for loops
 pub fn for_loop_missing_brace_error(span: proc_macro2::Span) -> syn::Error {
     syn::Error::new(
         span,
@@ -75,7 +75,7 @@ pub fn for_loop_missing_brace_error(span: proc_macro2::Span) -> syn::Error {
     )
 }
 
-/// 报告 for 循环体内容无效错误
+/// Reports invalid body errors in for loops
 pub fn for_loop_invalid_body_error(span: proc_macro2::Span) -> syn::Error {
     syn::Error::new(
         span,
@@ -85,7 +85,7 @@ pub fn for_loop_invalid_body_error(span: proc_macro2::Span) -> syn::Error {
     )
 }
 
-/// 报告条件属性元组元素数量错误
+/// Reports wrong element count errors in conditional attribute tuples
 pub fn condition_tuple_wrong_count_error<T: Spanned>(
     tuple: &T,
     attr_name: &str,
@@ -112,11 +112,11 @@ pub fn condition_tuple_wrong_count_error<T: Spanned>(
     )
 }
 
-/// 报告 for 循环内含 stateful 属性的元素缺少 `id` 或 `key` 的错误
+/// Reports missing `id` or `key` errors for elements with stateful attributes inside a for loop
 ///
-/// GPUI 要求同一视图中所有 stateful 元素的 ID 全局唯一。for 循环会将
-/// 同一段代码展开多次，造成多个元素共享相同的自动 ID，导致事件路由和
-/// 状态管理出现错误。
+/// GPUI requires IDs of all stateful elements in the same view to be globally unique. A for loop
+/// expands the same code segment multiple times, causing multiple elements to share the same auto ID,
+/// which leads to event routing and state management errors.
 pub fn for_loop_missing_key_error<T: Spanned>(tag_span: &T, tag_name: &str) -> syn::Error {
     syn::Error::new(
         tag_span.span(),
@@ -131,7 +131,7 @@ pub fn for_loop_missing_key_error<T: Spanned>(tag_span: &T, tag_name: &str) -> s
     )
 }
 
-/// 报告条件属性值类型错误
+/// Reports wrong type errors for conditional attribute values
 pub fn condition_tuple_wrong_type_error<T: Spanned>(value: &T, attr_name: &str) -> syn::Error {
     if attr_name == "whenClass" {
         return syn::Error::new(
@@ -152,7 +152,7 @@ pub fn condition_tuple_wrong_type_error<T: Spanned>(value: &T, attr_name: &str) 
     )
 }
 
-/// 报告暂不支持的 JSX 风格属性。
+/// Reports currently unsupported JSX-style attributes.
 pub fn unsupported_jsx_attribute_error(attr_name: &Ident) -> syn::Error {
     syn::Error::new_spanned(
         attr_name,
@@ -164,7 +164,7 @@ pub fn unsupported_jsx_attribute_error(attr_name: &Ident) -> syn::Error {
     )
 }
 
-/// 报告当前 RSX 属性语法无法表达的 GPUI 泛型属性。
+/// Reports GPUI generic attributes that cannot be expressed with current RSX attribute syntax.
 pub fn unsupported_generic_attribute_error(attr_name: &Ident) -> syn::Error {
     syn::Error::new_spanned(
         attr_name,
@@ -176,7 +176,7 @@ pub fn unsupported_generic_attribute_error(attr_name: &Ident) -> syn::Error {
     )
 }
 
-/// 报告 GPUI 标签缺少构造必需属性。
+/// Reports missing required construction attributes for GPUI tags.
 pub fn missing_required_attribute_error<T: Spanned>(
     tag_span: &T,
     tag_name: &str,
@@ -193,7 +193,7 @@ pub fn missing_required_attribute_error<T: Spanned>(
     )
 }
 
-/// 报告 whenClass 的 class 参数不是字符串字面量。
+/// Reports when the class parameter of `whenClass` is not a string literal.
 pub fn when_class_string_literal_error<T: Spanned>(value: &T) -> syn::Error {
     syn::Error::new(
         value.span(),
@@ -203,7 +203,7 @@ pub fn when_class_string_literal_error<T: Spanned>(value: &T) -> syn::Error {
     )
 }
 
-/// 报告 whenClass 中包含 stateful class。
+/// Reports stateful class inside `whenClass` error.
 pub fn when_class_stateful_error(lit: &syn::LitStr, class: &str) -> syn::Error {
     syn::Error::new(
         lit.span(),
@@ -215,7 +215,7 @@ pub fn when_class_stateful_error(lit: &syn::LitStr, class: &str) -> syn::Error {
     )
 }
 
-/// 报告状态 class 属性的 class 参数不是字符串字面量。
+/// Reports when the class parameter of a state class attribute is not a string literal.
 pub fn state_class_string_literal_error<T: Spanned>(attr_name: &Ident, value: &T) -> syn::Error {
     syn::Error::new(
         value.span(),
@@ -227,7 +227,7 @@ pub fn state_class_string_literal_error<T: Spanned>(attr_name: &Ident, value: &T
     )
 }
 
-/// 报告状态 class 属性中包含不适用于 StyleRefinement 的 class。
+/// Reports when a state class attribute contains a class not applicable to StyleRefinement.
 pub fn state_class_unsupported_class_error(
     attr_name: &Ident,
     lit: &syn::LitStr,
@@ -259,8 +259,8 @@ mod tests {
         let closing = make_ident("span");
         let err = tag_mismatch_error(&closing, "span", "div");
         let msg = err.to_string();
-        assert!(msg.contains("div"), "应包含开启标签名 div");
-        assert!(msg.contains("span"), "应包含关闭标签名 span");
+        assert!(msg.contains("div"), "Should contain opening tag name div");
+        assert!(msg.contains("span"), "Should contain closing tag name span");
     }
 
     #[test]
@@ -268,8 +268,8 @@ mod tests {
         let closing = make_ident("div");
         let err = tag_mismatch_error(&closing, "div", "section");
         let msg = err.to_string();
-        assert!(msg.contains("help:"), "应包含 help 提示");
-        assert!(msg.contains("note:"), "应包含 note 提示");
+        assert!(msg.contains("help:"), "Should contain help hint");
+        assert!(msg.contains("note:"), "Should contain note hint");
     }
 
     // --- unclosed_tag_error ---
@@ -279,8 +279,8 @@ mod tests {
         let tag = make_ident("nav");
         let err = unclosed_tag_error(Span::call_site(), &tag.to_string());
         let msg = err.to_string();
-        assert!(msg.contains("nav"), "应包含未闭合标签名");
-        assert!(msg.contains("help:"), "应包含 help 提示");
+        assert!(msg.contains("nav"), "Should contain unclosed tag name");
+        assert!(msg.contains("help:"), "Should contain help hint");
     }
 
     // --- unclosed_fragment_error ---
@@ -289,8 +289,8 @@ mod tests {
     fn unclosed_fragment_contains_help() {
         let err = unclosed_fragment_error(Span::call_site());
         let msg = err.to_string();
-        assert!(msg.contains("</>"), "应提示关闭 Fragment");
-        assert!(msg.contains("help:"), "应包含 help 提示");
+        assert!(msg.contains("</>"), "Should hint to close Fragment");
+        assert!(msg.contains("help:"), "Should contain help hint");
     }
 
     // --- invalid_child_in_tag_error ---
@@ -300,8 +300,8 @@ mod tests {
         let tag = make_ident("ul");
         let err = invalid_child_in_tag_error(Span::call_site(), &tag.to_string());
         let msg = err.to_string();
-        assert!(msg.contains("ul"), "应包含父标签名");
-        assert!(msg.contains("help:"), "应包含 help 提示");
+        assert!(msg.contains("ul"), "Should contain parent tag name");
+        assert!(msg.contains("help:"), "Should contain help hint");
     }
 
     // --- for_loop_missing_brace_error ---
@@ -310,22 +310,22 @@ mod tests {
     fn for_loop_missing_brace_has_example() {
         let err = for_loop_missing_brace_error(Span::call_site());
         let msg = err.to_string();
-        assert!(msg.contains("for"), "应提及 for 循环");
-        assert!(msg.contains("help:"), "应包含 help 提示");
+        assert!(msg.contains("for"), "Should mention for loop");
+        assert!(msg.contains("help:"), "Should contain help hint");
     }
 
     // --- condition_tuple_wrong_count_error ---
 
     #[test]
     fn condition_tuple_wrong_count_shows_found_and_expected() {
-        // 用一个简单元组模拟
+        // Simulate with a simple tuple
         let tokens: proc_macro2::TokenStream = "(a, b, c)".parse().unwrap();
         let expr: syn::ExprTuple = syn::parse2(tokens).unwrap();
         let err = condition_tuple_wrong_count_error(&expr, "when", 3);
         let msg = err.to_string();
-        assert!(msg.contains("when"), "应包含属性名");
-        assert!(msg.contains('3'), "应包含实际元素数");
-        assert!(msg.contains("help:"), "应包含 help 提示");
+        assert!(msg.contains("when"), "Should contain attribute name");
+        assert!(msg.contains('3'), "Should contain actual element count");
+        assert!(msg.contains("help:"), "Should contain help hint");
     }
 
     // --- condition_tuple_wrong_type_error ---
@@ -336,8 +336,8 @@ mod tests {
         let expr: syn::Expr = syn::parse2(tokens).unwrap();
         let err = condition_tuple_wrong_type_error(&expr, "whenSome");
         let msg = err.to_string();
-        assert!(msg.contains("whenSome"), "应包含属性名");
-        assert!(msg.contains("help:"), "应包含 help 提示");
+        assert!(msg.contains("whenSome"), "Should contain attribute name");
+        assert!(msg.contains("help:"), "Should contain help hint");
     }
 
     #[test]
@@ -345,9 +345,12 @@ mod tests {
         let attr = make_ident("whiteSpace");
         let err = unsupported_jsx_attribute_error(&attr);
         let msg = err.to_string();
-        assert!(msg.contains("whiteSpace"), "应包含属性名");
-        assert!(msg.contains("whitespace-nowrap"), "应提示 class 写法");
-        assert!(msg.contains("whitespace_nowrap"), "应提示 flag 写法");
+        assert!(msg.contains("whiteSpace"), "Should contain attribute name");
+        assert!(
+            msg.contains("whitespace-nowrap"),
+            "Should hint class syntax"
+        );
+        assert!(msg.contains("whitespace_nowrap"), "Should hint flag syntax");
     }
 
     #[test]
@@ -355,7 +358,10 @@ mod tests {
         let attr = make_ident("groupDragOver");
         let err = unsupported_generic_attribute_error(&attr);
         let msg = err.to_string();
-        assert!(msg.contains("groupDragOver"), "应包含属性名");
+        assert!(
+            msg.contains("groupDragOver"),
+            "Should contain attribute name"
+        );
         assert!(msg.contains("group_drag_over::<YourType>"));
         assert!(msg.contains("cannot infer"));
     }
@@ -366,7 +372,7 @@ mod tests {
         let expr: syn::Expr = syn::parse2(tokens).unwrap();
         let err = when_class_string_literal_error(&expr);
         let msg = err.to_string();
-        assert!(msg.contains("whenClass"), "应包含属性名");
-        assert!(msg.contains("string literal"), "应提示字符串字面量");
+        assert!(msg.contains("whenClass"), "Should contain attribute name");
+        assert!(msg.contains("string literal"), "Should hint string literal");
     }
 }

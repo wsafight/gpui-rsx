@@ -1,7 +1,7 @@
 use gpui::prelude::*;
 use gpui::*;
 use gpui_platform::application;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Filter {

@@ -81,7 +81,7 @@ gpui = "0.2.2"
 use gpui::*;
 use gpui::prelude::*;
 use gpui_platform::application;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 struct CounterView {
     count: i32,
@@ -203,6 +203,7 @@ rsx! {
 ```
 
 展开为：
+
 ```rust
 div().child("Hello GPUI")
 ```
@@ -222,6 +223,7 @@ rsx! {
 ```
 
 展开为：
+
 ```rust
 vec![
     div().child("第一个"),
@@ -241,6 +243,7 @@ rsx! {
 ```
 
 展开为：
+
 ```rust
 div().flex().flex_col()
 ```
@@ -254,6 +257,7 @@ rsx! {
 ```
 
 展开为：
+
 ```rust
 div().gap(px(16.0)).bg(rgb(0xffffff))
 ```
@@ -269,6 +273,7 @@ rsx! {
 ```
 
 展开为：
+
 ```rust
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
@@ -278,12 +283,14 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 #### 支持的 class 模式
 
 **布局：**
+
 - `flex`, `flex-col`, `flex-row`, `flex-wrap`, `flex-1`, `flex-none`, `flex-auto`
 - `flex-grow`, `flex-grow-0`, `flex-grow-1`, `flex-shrink`, `flex-shrink-0`, `flex-shrink-1`
 - `min-w-0`, `min-h-0`, `items-center`, `items-start`, `items-end`, `items-stretch`
 - `justify-center`, `justify-between`, `justify-around`, `justify-evenly`
 
 **间距**（数值自动转为 `px(n)`）：
+
 - `gap-4` → `.gap(px(4.0))`
 - `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`
 - `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, `ml-4`, `mr-4`
@@ -291,6 +298,7 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - `gap-[10%]` 这类百分比间距会报错，因为 GPUI 间距使用 definite length
 
 **尺寸：**
+
 - 数值尺寸保持项目原有语义：`w-64` → `.w(px(64.0))`, `h-32` → `.h(px(32.0))`
 - `w-full`, `h-full`, `size-full`, `aspect-square`
 - `w-px`, `h-px`, `w-auto`, `h-auto`, `w-1/2`, `h-1/3`, `size-1/2`
@@ -298,6 +306,7 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - 任意分母的分数尺寸：`w-6/24`, `min-w-1/3`, `size-3/4`
 
 **文本：**
+
 - `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`
 - `text-2xl`, `text-3xl`
 - `font-thin`, `font-extralight`, `font-light`, `font-normal`, `font-medium`, `font-semibold`, `font-bold`, `font-extrabold`, `font-black`
@@ -306,28 +315,33 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - `text-decoration-solid`, `text-decoration-wavy`, `text-decoration-0/1/2/4/8`
 
 **对齐：**
+
 - `content-normal`, `content-center`, `content-start`, `content-end`, `content-between`, `content-around`, `content-evenly`, `content-stretch`
 - `self-start`, `self-end`, `self-flex-start`, `self-flex-end`, `self-center`, `self-baseline`, `self-stretch`
 
 **边框：**
+
 - `border` → `.border_1()`
 - `border-2` → `.border_2()`, `border-4` → `.border_4()`
 - `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-2xl`, `rounded-3xl`, `rounded-full`, `rounded-none`
 - 方向圆角类，例如 `rounded-t-lg`, `rounded-b-lg`, `rounded-r-lg`, `rounded-l-lg`
 
 **颜色**（完整 Tailwind 色板）：
+
 - `text-red-500` → `.text_color(rgb(0xef4444))`
 - `bg-blue-600` → `.bg(rgb(0x2563eb))`
 - `border-green-500` → `.border_color(rgb(0x22c55e))`
 - 任意颜色：`bg-[#ff0000]`, `text-[#333]`, `border-[#11223344]`, `bg-[rgb(15,23,42)]`, `text-[rgba(15,23,42,0.8)]`
 
 **效果：**
+
 - `shadow-none`, `shadow-2xs`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
 - `overflow-hidden`, `overflow-x-hidden`, `overflow-y-hidden`, `overflow-scroll`
 - `cursor-pointer`, `cursor-default`, `cursor-text`, `cursor-move`, `cursor-grab`, `cursor-not-allowed`，以及 resize cursor 变体
 - `debug-outline` 在 debug 构建中启用 GPUI 调试边框，在 release 构建中为空操作
 
 **Grid 定位：**
+
 - `col-span-*`, `col-start-*`, `col-end-*`, `row-span-*`, `row-start-*`, `row-end-*`
 - `col-span-full`, `col-start-auto`, `col-end-auto`, `row-span-full`, `row-start-auto`, `row-end-auto`
 
@@ -347,31 +361,31 @@ rsx! {
 
 支持的事件（camelCase / snake_case）：
 
-| 事件 | 方法 |
-|------|------|
-| `onClick` / `on_click` | `.on_click(handler)` |
-| `onMouseDown` / `on_mouse_down` | `.on_mouse_down(button, handler)` |
-| `onMouseUp` / `on_mouse_up` | `.on_mouse_up(button, handler)` |
-| `onMouseMove` / `on_mouse_move` | `.on_mouse_move(handler)` |
-| `onMouseDownOut` / `on_mouse_down_out` | `.on_mouse_down_out(handler)` |
-| `onMouseUpOut` / `on_mouse_up_out` | `.on_mouse_up_out(button, handler)` |
-| `onAnyMouseDown` / `on_any_mouse_down` | `.on_any_mouse_down(handler)` |
-| `onAnyMouseUp` / `on_any_mouse_up` | `.on_any_mouse_up(handler)` |
-| `onKeyDown` / `on_key_down` | `.on_key_down(handler)` |
-| `onKeyUp` / `on_key_up` | `.on_key_up(handler)` |
-| `onModifiersChanged` / `on_modifiers_changed` | `.on_modifiers_changed(handler)` |
-| `onHover` / `on_hover` | `.on_hover(handler)` |
-| `onScrollWheel` / `on_scroll_wheel` | `.on_scroll_wheel(handler)` |
-| `onDrag` / `on_drag` | `.on_drag(value, constructor)` |
-| `onDragMove` / `on_drag_move` | `.on_drag_move(handler)` |
-| `onDrop` / `on_drop` | `.on_drop(handler)` |
-| `onAction` / `on_action` | `.on_action(handler)` |
-| `onBoxedAction` / `on_boxed_action` | `.on_boxed_action(action, handler)` |
-| `captureAnyMouseDown` / `capture_any_mouse_down` | `.capture_any_mouse_down(handler)` |
-| `captureAnyMouseUp` / `capture_any_mouse_up` | `.capture_any_mouse_up(handler)` |
-| `captureKeyDown` / `capture_key_down` | `.capture_key_down(handler)` |
-| `captureKeyUp` / `capture_key_up` | `.capture_key_up(handler)` |
-| `captureAction` / `capture_action` | `.capture_action(handler)` |
+| 事件                                             | 方法                                |
+| ------------------------------------------------ | ----------------------------------- |
+| `onClick` / `on_click`                           | `.on_click(handler)`                |
+| `onMouseDown` / `on_mouse_down`                  | `.on_mouse_down(button, handler)`   |
+| `onMouseUp` / `on_mouse_up`                      | `.on_mouse_up(button, handler)`     |
+| `onMouseMove` / `on_mouse_move`                  | `.on_mouse_move(handler)`           |
+| `onMouseDownOut` / `on_mouse_down_out`           | `.on_mouse_down_out(handler)`       |
+| `onMouseUpOut` / `on_mouse_up_out`               | `.on_mouse_up_out(button, handler)` |
+| `onAnyMouseDown` / `on_any_mouse_down`           | `.on_any_mouse_down(handler)`       |
+| `onAnyMouseUp` / `on_any_mouse_up`               | `.on_any_mouse_up(handler)`         |
+| `onKeyDown` / `on_key_down`                      | `.on_key_down(handler)`             |
+| `onKeyUp` / `on_key_up`                          | `.on_key_up(handler)`               |
+| `onModifiersChanged` / `on_modifiers_changed`    | `.on_modifiers_changed(handler)`    |
+| `onHover` / `on_hover`                           | `.on_hover(handler)`                |
+| `onScrollWheel` / `on_scroll_wheel`              | `.on_scroll_wheel(handler)`         |
+| `onDrag` / `on_drag`                             | `.on_drag(value, constructor)`      |
+| `onDragMove` / `on_drag_move`                    | `.on_drag_move(handler)`            |
+| `onDrop` / `on_drop`                             | `.on_drop(handler)`                 |
+| `onAction` / `on_action`                         | `.on_action(handler)`               |
+| `onBoxedAction` / `on_boxed_action`              | `.on_boxed_action(action, handler)` |
+| `captureAnyMouseDown` / `capture_any_mouse_down` | `.capture_any_mouse_down(handler)`  |
+| `captureAnyMouseUp` / `capture_any_mouse_up`     | `.capture_any_mouse_up(handler)`    |
+| `captureKeyDown` / `capture_key_down`            | `.capture_key_down(handler)`        |
+| `captureKeyUp` / `capture_key_up`                | `.capture_key_up(handler)`          |
+| `captureAction` / `capture_action`               | `.capture_action(handler)`          |
 
 多参数 GPUI 方法在 RSX 中使用 tuple 语法：
 `onMouseDown={(MouseButton::Left, handler)}`、`onDrag={(value, constructor)}`。
@@ -438,6 +452,7 @@ rsx! {
 ```
 
 展开为：
+
 ```rust
 div().children((&self.items).into_iter().map(|item| {
     div().child(item.name.clone())
@@ -513,6 +528,7 @@ rsx! {
 > 在 debug 构建中打印警告。
 >
 > **推荐替代方案**（按优先级排序）：
+>
 > 1. **字符串字面量**（最佳）：`class="flex gap-4"` — 编译期，支持文档列出的子集
 > 2. **条件 / match 字面量**：`class={if active { "flex gap-4" } else { "block" }}`
 >    或 `class={match state { State::Active => "flex", _ => "block" }}` — 仍会编译期展开
@@ -538,7 +554,7 @@ let classes = format!("flex gap-{} bg-[#ff0000]", spacing);  // gap-7、gap-32 �
 `rsx!` 默认是 permissive 模式：无法安全解析的不支持静态 class 会被忽略，而非法 arbitrary value 会报编译错误。使用 `rsx_strict!` 可以拒绝不支持的静态 class：
 
 ```rust
-use gpui_rsx::{rsx_expand, rsx_permissive, rsx_strict};
+use zopra_gpui_view::{rsx_expand, rsx_permissive, rsx_strict};
 
 rsx_strict! { <div class="flex w-[280px]" /> }
 rsx_permissive! { <div class="hover:bg-blue-500 flex" /> }
@@ -553,13 +569,13 @@ strict 模式下，动态 class 在运行时遇到不支持的 token 会 panic�
 
 动态 class 能力边界：
 
-| 能力 | 静态 `class="..."` | 动态 `class={expr}` |
-|------|--------------------|---------------------|
-| 布局、间距、尺寸 | 支持 | 支持子集 |
-| 颜色和透明度 | 支持 | 支持 |
-| 任意长度/颜色 | 支持 | 支持 |
-| 分数尺寸 | 支持 | 支持 |
-| stateful scroll class | 支持并自动注入 ID | 不支持 |
+| 能力                  | 静态 `class="..."`           | 动态 `class={expr}`           |
+| --------------------- | ---------------------------- | ----------------------------- |
+| 布局、间距、尺寸      | 支持                         | 支持子集                      |
+| 颜色和透明度          | 支持                         | 支持                          |
+| 任意长度/颜色         | 支持                         | 支持                          |
+| 分数尺寸              | 支持                         | 支持                          |
+| stateful scroll class | 支持并自动注入 ID            | 不支持                        |
 | 未知 Tailwind variant | permissive 忽略，strict 报错 | permissive 忽略，strict panic |
 
 ### 11. 桌面三栏布局
@@ -600,32 +616,32 @@ rsx! {
 
 大多数 camelCase 属性会映射为 GPUI 的 snake_case 方法；特殊标志行为见下表：
 
-| RSX 属性 | 生成的 GPUI 代码 |
-|----------|------------------|
-| `opacity` | `.opacity()` |
-| `visible` / `invisible` | `.visible()` / `.invisible()` |
-| `width` / `height` | `.w()` / `.h()` |
-| `minWidth` / `maxWidth` | `.min_w()` / `.max_w()` |
-| `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
-| `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
-| `flexBasis` | `.flex_basis()` |
-| `flexGrow` / `flexShrink`（标志） | `.flex_grow_1()` / `.flex_shrink_1()` |
-| `fontSize` | `.text_size()` |
-| `lineHeight` | `.line_height()` |
-| `fontWeight` | `.font_weight()` |
-| `fontFamily` | `.font_family()` |
-| `textAlign` | `.text_align()` |
-| `textColor` | `.text_color()` |
-| `backgroundColor` | `.bg()` |
-| `borderColor` | `.border_color()` |
-| `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
-| `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
+| RSX 属性                                                  | 生成的 GPUI 代码                                                      |
+| --------------------------------------------------------- | --------------------------------------------------------------------- |
+| `opacity`                                                 | `.opacity()`                                                          |
+| `visible` / `invisible`                                   | `.visible()` / `.invisible()`                                         |
+| `width` / `height`                                        | `.w()` / `.h()`                                                       |
+| `minWidth` / `maxWidth`                                   | `.min_w()` / `.max_w()`                                               |
+| `minHeight` / `maxHeight`                                 | `.min_h()` / `.max_h()`                                               |
+| `gapX` / `gapY`                                           | `.gap_x()` / `.gap_y()`                                               |
+| `flexBasis`                                               | `.flex_basis()`                                                       |
+| `flexGrow` / `flexShrink`（标志）                         | `.flex_grow_1()` / `.flex_shrink_1()`                                 |
+| `fontSize`                                                | `.text_size()`                                                        |
+| `lineHeight`                                              | `.line_height()`                                                      |
+| `fontWeight`                                              | `.font_weight()`                                                      |
+| `fontFamily`                                              | `.font_family()`                                                      |
+| `textAlign`                                               | `.text_align()`                                                       |
+| `textColor`                                               | `.text_color()`                                                       |
+| `backgroundColor`                                         | `.bg()`                                                               |
+| `borderColor`                                             | `.border_color()`                                                     |
+| `borderTop` / `borderBottom`                              | `.border_t(value)` / `.border_b(value)`                               |
+| `borderLeft` / `borderRight`                              | `.border_l(value)` / `.border_r(value)`                               |
 | `border_t` / `border_b` / `border_l` / `border_r`（标志） | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |
-| `roundedTop` / `roundedBottom` | `.rounded_t()` / `.rounded_b()` |
-| `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
-| `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
-| `boxShadow` | `.shadow()` |
-| `inset` | `.inset()` |
+| `roundedTop` / `roundedBottom`                            | `.rounded_t()` / `.rounded_b()`                                       |
+| `roundedTopLeft` / `roundedTopRight`                      | `.rounded_tl()` / `.rounded_tr()`                                     |
+| `roundedBottomLeft` / `roundedBottomRight`                | `.rounded_bl()` / `.rounded_br()`                                     |
+| `boxShadow`                                               | `.shadow()`                                                           |
+| `inset`                                                   | `.inset()`                                                            |
 
 不在此表中的属性将原样透传（如 `bg={color}` → `.bg(color)`）。
 
@@ -733,21 +749,21 @@ rsx! {
 
 各标签默认样式：
 
-| 标签 | 默认样式 |
-|------|---------|
-| `h1` | `text-3xl font-bold` |
-| `h2` | `text-2xl font-bold` |
-| `h3` | `text-xl font-bold` |
-| `h4` | `text-lg font-bold` |
-| `h5` | `text-base font-bold` |
-| `h6` | `text-sm font-bold` |
-| `button`, `a` | `cursor-pointer` |
-| `input`, `textarea` | `px-2 py-1` |
-| `ul`, `ol` | `flex flex-col` |
-| `li` | `flex items-center` |
-| `p` | `text-base` |
-| `label` | `text-sm` |
-| `form` | `flex flex-col gap-4` |
+| 标签                | 默认样式              |
+| ------------------- | --------------------- |
+| `h1`                | `text-3xl font-bold`  |
+| `h2`                | `text-2xl font-bold`  |
+| `h3`                | `text-xl font-bold`   |
+| `h4`                | `text-lg font-bold`   |
+| `h5`                | `text-base font-bold` |
+| `h6`                | `text-sm font-bold`   |
+| `button`, `a`       | `cursor-pointer`      |
+| `input`, `textarea` | `px-2 py-1`           |
+| `ul`, `ol`          | `flex flex-col`       |
+| `li`                | `flex items-center`   |
+| `p`                 | `text-base`           |
+| `label`             | `text-sm`             |
+| `form`              | `flex flex-col gap-4` |
 
 用户属性在默认样式之后应用，可以覆盖。
 
@@ -758,7 +774,7 @@ rsx! {
 ```rust
 use gpui::*;
 use gpui::prelude::*;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 struct TodoApp {
     todos: Vec<Todo>,
@@ -938,14 +954,15 @@ fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoE
 
 GPUI-RSX 是一个**编译时宏**，静态 RSX 会展开为直接的 GPUI builder 调用。静态标记没有运行时解析器；动态 `class={expr}` 会有意使用一个很小的运行时 matcher。
 
-| 指标 | 传统 GPUI | GPUI-RSX |
-|------|----------|----------|
-| 代码量 | 100 行 | 50 行 (-50%) |
-| 运行时性能 | 基准 | 相同 |
-| 类型安全 | ✅ | ✅ |
-| 编译时检查 | ✅ | ✅ |
+| 指标       | 传统 GPUI | GPUI-RSX     |
+| ---------- | --------- | ------------ |
+| 代码量     | 100 行    | 50 行 (-50%) |
+| 运行时性能 | 基准      | 相同         |
+| 类型安全   | ✅        | ✅           |
+| 编译时检查 | ✅        | ✅           |
 
 ### v0.3.2 修复与改进
+
 - **修复** `parse_single_class` 在 Tailwind 变体语法（如 `hover:bg-blue-500`）上的 panic：
   含非法字符的 class 名现在静默跳过，而非触发 `syn::Ident::new` panic
 - **新增** 7 个动态 class：`rounded-none`、`rounded-xl`、`cursor-default`、`cursor-text`、
@@ -954,6 +971,7 @@ GPUI-RSX 是一个**编译时宏**，静态 RSX 会展开为直接的 GPUI build
   移除不存在的 `text-4xl`/`text-5xl`；更新动态 class 说明
 
 ### v0.3.1 修复与新增
+
 - **修复** `is_stateful_attr`：`hover`/`active`/`focus`/`group` 是 `Styled` trait 方法，
   不再触发不必要的 `.id()` 注入
 - **新增** `key={expr}` 属性：为 for 循环内 stateful 元素生成复合自动 ID
@@ -961,6 +979,7 @@ GPUI-RSX 是一个**编译时宏**，静态 RSX 会展开为直接的 GPUI build
 - 非 stateful 元素上的 `key` 静默忽略（不改变 `Div` → `Stateful<Div>` 类型）
 
 ### v0.3.0 重构亮点
+
 - 消除 `tests/common/mod.rs` 中约 60 个重复方法定义（823 → 456 行）
 - 简化 `runtime.rs` black/white 条目生成（方法名直接编码进数据）
 - 在 `class.rs` 中提取 `is_directional_border()` 辅助函数，逻辑更清晰
@@ -968,34 +987,41 @@ GPUI-RSX 是一个**编译时宏**，静态 RSX 会展开为直接的 GPUI build
 ### v0.2.2 优化亮点
 
 **编译时性能：**
+
 - class 解析改用 `split_ascii_whitespace`
 - 统一 `text_` 前缀处理（单次 `strip_prefix` 调用）
 - 空元素提前快速路径
 - `Vec::with_capacity(attrs * 2 + children)` 减少重分配
 
 **运行时性能：**
+
 - `.children([...])` 聚合阈值 3 → 2
 
 **二进制体积：**
+
 - 应用可在自己的 release profile 中选择启用 `panic = "abort"` 以移除展开表
 
 ### v0.2.1 优化亮点
 
 **编译时性能：**
+
 - O(1) 颜色/属性/间距查找（`match` 跳转表，无线性扫描）
 - `generate_element` 单次属性扫描
 - 动态 class match 分支 thread_local 缓存（每进程只生成一次）
 
 **内存分配减少：**
+
 - `parse_class_string` 返回迭代器（无中间 `Vec`）
 - `generate_attr_methods` 直接推送到调用方缓冲区
 - `Cow<str>` 实现 class 名称转换（无连字符时零拷贝）
 - 全面使用 `Vec::with_capacity` 预分配
 
 **运行时性能：**
+
 - 动态 class 字符串通过 `AsRef<str>` 零拷贝传递（`&str` 无需分配）
 
 **二进制体积：**
+
 - 动态 class match 表通过 `#[inline(never)]` + LLVM ICF 去重
 - 同一组件内多个 `class={expr}` 共享同一函数体
 
@@ -1116,7 +1142,7 @@ rsx! {
 使用 `rsx_expand!` 查看局部字符串预览，或用 `cargo expand` 查看完整 crate 展开：
 
 ```rust
-let preview = gpui_rsx::rsx_expand! {
+let preview = zopra_gpui_view::rsx_expand! {
     <div class="flex w-[280px] bg-[rgba(15,23,42,0.8)]" />
 };
 ```
@@ -1201,6 +1227,7 @@ MIT License
 ## 🙏 致谢
 
 灵感来源于：
+
 - [Dioxus RSX](https://dioxuslabs.com/) - RSX 语法设计
 - [Yew html! macro](https://yew.rs/) - html! 宏
 - [React JSX](https://react.dev/) - JSX 语法

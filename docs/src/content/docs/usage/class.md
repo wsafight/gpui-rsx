@@ -26,7 +26,7 @@ rsx! {
 In permissive mode, unsupported static classes that cannot be emitted safely are ignored. Invalid arbitrary values still produce compile errors. In strict mode, unsupported static classes are compile errors:
 
 ```rust
-use gpui_rsx::rsx_strict;
+use zopra_gpui_view::rsx_strict;
 
 rsx_strict! {
     <div class="hover:bg-blue-500" />
@@ -86,29 +86,29 @@ Dynamic classes use a generated runtime matcher. The matcher supports common lay
 
 Unknown dynamic classes are ignored in permissive mode. In debug builds, each unknown class warning is emitted only once per generated call site. In strict mode, unsupported dynamic classes panic when evaluated.
 
-| Capability | Static class | Dynamic class |
-| --- | --- | --- |
-| Layout and alignment | Supported | Supported subset |
-| Numeric spacing and sizing | Supported | Supported |
-| Arbitrary lengths | Supported | Supported |
-| Percent and fraction sizing | Supported | Supported |
-| Full Tailwind color palette | Supported | Supported |
-| Arbitrary hex / RGB / RGBA colors | Supported | Supported |
-| Static stateful scroll classes | Supported with auto ID | Not supported |
+| Capability                          | Static class            | Dynamic class           |
+| ----------------------------------- | ----------------------- | ----------------------- |
+| Layout and alignment                | Supported               | Supported subset        |
+| Numeric spacing and sizing          | Supported               | Supported               |
+| Arbitrary lengths                   | Supported               | Supported               |
+| Percent and fraction sizing         | Supported               | Supported               |
+| Full Tailwind color palette         | Supported               | Supported               |
+| Arbitrary hex / RGB / RGBA colors   | Supported               | Supported               |
+| Static stateful scroll classes      | Supported with auto ID  | Not supported           |
 | Tailwind variants such as `hover:*` | Ignored or strict error | Ignored or strict panic |
 
 ## Supported Utility Areas
 
-| Area | Notes |
-| --- | --- |
-| Layout | `flex`, `flex-col`, `flex-row`, `flex-wrap`, `grid`, `hidden`, `absolute`, `relative`, grow/shrink helpers. |
-| Alignment | `items-*`, `justify-*`, `content-*`, and `self-*` helpers supported by GPUI. |
-| Spacing | `gap-*`, `gap-x-*`, `gap-y-*`, `p-*`, `px-*`, `m-*`, and directional variants. |
-| Sizing | `w-*`, `h-*`, `size-*`, `min-*`, `max-*`, `*-full`, `*-auto`, percentages, fractions, arbitrary lengths. |
-| Colors | Full Tailwind color names plus arbitrary `hex`, `rgb`, and `rgba` forms. |
-| Typography | Text sizes, font weights, text alignment, decoration, truncation, whitespace, and line clamp. |
-| Borders | Width, directional width, color, rounded utilities, and dashed border helpers. |
-| Misc | Cursor helpers, `debug-outline`, shadows, opacity, grid placement aliases. |
+| Area       | Notes                                                                                                       |
+| ---------- | ----------------------------------------------------------------------------------------------------------- |
+| Layout     | `flex`, `flex-col`, `flex-row`, `flex-wrap`, `grid`, `hidden`, `absolute`, `relative`, grow/shrink helpers. |
+| Alignment  | `items-*`, `justify-*`, `content-*`, and `self-*` helpers supported by GPUI.                                |
+| Spacing    | `gap-*`, `gap-x-*`, `gap-y-*`, `p-*`, `px-*`, `m-*`, and directional variants.                              |
+| Sizing     | `w-*`, `h-*`, `size-*`, `min-*`, `max-*`, `*-full`, `*-auto`, percentages, fractions, arbitrary lengths.    |
+| Colors     | Full Tailwind color names plus arbitrary `hex`, `rgb`, and `rgba` forms.                                    |
+| Typography | Text sizes, font weights, text alignment, decoration, truncation, whitespace, and line clamp.               |
+| Borders    | Width, directional width, color, rounded utilities, and dashed border helpers.                              |
+| Misc       | Cursor helpers, `debug-outline`, shadows, opacity, grid placement aliases.                                  |
 
 ## Length Semantics
 
@@ -165,7 +165,7 @@ rsx! {
 Use `rsx_strict!` when unsupported static classes should fail the build:
 
 ```rust
-use gpui_rsx::{rsx_expand, rsx_permissive, rsx_strict};
+use zopra_gpui_view::{rsx_expand, rsx_permissive, rsx_strict};
 
 rsx_strict! { <div class="flex w-[280px]" /> }
 rsx_permissive! { <div class="hover:bg-blue-500 flex" /> }

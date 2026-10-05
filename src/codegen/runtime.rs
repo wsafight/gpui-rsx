@@ -1,9 +1,9 @@
-//! 运行时 class 处理
+//! Runtime class handling
 //!
-//! 生成运行时动态 class 字符串解析和应用的代码。
-//! 当 class 属性的值是表达式而非字符串字面量时使用。
+//! Generates code for runtime dynamic class string parsing and application.
+//! Used when the value of a class attribute is an expression rather than a string literal.
 //!
-//! 优化：使用 thread_local 缓存完整 helper 源码，避免多个动态 class 重复生成和分段解析。
+//! Optimization: Use thread_local to cache the complete helper source code, avoiding repeated generation and segmented parsing for multiple dynamic classes.
 
 use super::class::{ClassMode, parse_single_class_with_mode};
 use super::tables::{
@@ -13,23 +13,23 @@ use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::cell::OnceCell;
 
-// 缓存所有 match 分支拼接后的字符串（thread_local 保证编译过程中只生成一次）
+// Cache the concatenated string of all match branches (thread_local guarantees generation only once during compilation)
 //
-// 注意：不能缓存 proc_macro2::TokenStream，因为它的 token handle 绑定到
-// 当前 proc macro 调用的 bridge 连接。每次调用结束后 bridge 失效，
-// 下次调用时旧 handle 变成悬垂引用，导致 "use-after-free" panic。
+// Note: Cannot cache proc_macro2::TokenStream because its token handles are bound to the
+// bridge connection of the current proc macro invocation. After each invocation ends, the bridge becomes invalid,
+// and in the next invocation the old handles become dangling references, causing a "use-after-free" panic.
 //
-// 优化：将完整 helper 缓存为单个字符串，每次宏调用只做 1 次 parse，
-// 避免 common/color/numeric 三段代码分别重建和解析。
+// Optimization: Cache the complete helper as a single string, doing only 1 parse per macro invocation,
+// avoiding rebuilding and parsing the three code segments (common/color/numeric) separately.
 thread_local! {
     static PERMISSIVE_HELPER_STR: OnceCell<String> = const { OnceCell::new() };
     static STRICT_HELPER_STR: OnceCell<String> = const { OnceCell::new() };
 }
 
-/// 获取完整动态 class helper。
+/// Get the complete dynamic class helper.
 ///
-/// 缓存字符串而非 `TokenStream`，避免跨 proc-macro bridge 保存失效的 token handle。
-/// 每个调用点只需解析一次完整 helper，取代 common/color/numeric 三次独立解析。
+/// Caches a string rather than `TokenStream` to avoid retaining invalid token handles across the proc-macro bridge.
+/// Each call site only needs to parse the complete helper once, replacing three separate parses for common/color/numeric.
 fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
     let parse_cached = |cell: &OnceCell<String>| {
         let source = cell.get_or_init(|| generate_dynamic_class_helper(mode).to_string());
@@ -44,33 +44,33 @@ fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
     }
 }
 
-/// 生成运行时 class 解析代码
+/// Generate runtime class parsing code
 ///
-/// 当 class 属性是动态表达式时，生成一个在运行时解析和应用 class 的闭包。
+/// When the class attribute is a dynamic expression, generates a closure that parses and applies classes at runtime.
 ///
-/// # 支持的 class
+/// # Supported classes
 ///
-/// 动态 class 支持两类解析：
-/// 1. **静态 match 表**（快速路径）：[`generate_common_class_matches`] 中的预编译常用 class
-/// 2. **颜色前缀解析**：完整 Tailwind 色板 + `[#rgb]` / `[#rrggbb]` arbitrary hex
-/// 3. **数值前缀解析**（通用路径）：对间距/尺寸/透明度类，支持任意数值
-///    - `gap-7`、`gap-x-3`、`p-5`、`px-7`、`m-3`、`ml-5`、`w-48`、`h-16` 等
-///    - `opacity-33` 等
-///    - 静态 match 未命中时自动回退到此路径，无需扩充预编译列表
-/// 4. **其余 class**（如 Tailwind variants、自定义 class）静默忽略
+/// Dynamic classes support parsing categories:
+/// 1. **Static match table** (fast path): Precompiled common classes in [`generate_common_class_matches`]
+/// 2. **Color prefix parsing**: Full Tailwind color palette + `[#rgb]` / `[#rrggbb]` arbitrary hex
+/// 3. **Numeric prefix parsing** (general path): For spacing/size/opacity classes, supports arbitrary numeric values
+///    - `gap-7`, `gap-x-3`, `p-5`, `px-7`, `m-3`, `ml-5`, `w-48`, `h-16`, etc.
+///    - `opacity-33`, etc.
+///    - Automatically falls back to this path when static match misses, without needing to expand the precompiled list
+/// 4. **Other classes** (such as Tailwind variants, custom classes) are silently ignored
 ///
-/// 推荐方案（按性能从高到低）：
-/// 1. **字符串字面量**（最佳）：`class="flex gap-4"` → 编译期展开，支持所有 class
-/// 2. **条件表达式**（次佳）：`class={if active { "flex" } else { "block" }}`
-/// 3. **动态表达式**：`class={dynamic_str}` → 支持间距/尺寸/透明度和 arbitrary hex 颜色
+/// Recommended options (in order of performance from highest to lowest):
+/// 1. **String literal** (best): `class="flex gap-4"` -> Expanded at compile-time, supports all classes
+/// 2. **Conditional expression** (second best): `class={if active { "flex" } else { "block" }}`
+/// 3. **Dynamic expression**: `class={dynamic_str}` -> Supports spacing/size/opacity and arbitrary hex colors
 ///
-/// # 代码体积优化
+/// # Code size optimization
 ///
-/// match 表被提取到 `#[inline(never)]` 泛型局部函数中，带来两个好处：
-/// 1. 同一元素类型的多个 `class={expr}` 共享同一份单态化实例（LLVM ICF 合并）
-/// 2. `#[inline(never)]` 阻止 match 表被内联到父函数，减少指令缓存压力
+/// The match table is extracted into an `#[inline(never)]` generic local function, bringing two benefits:
+/// 1. Multiple `class={expr}` of the same element type share the same monomorphized instance (LLVM ICF merging)
+/// 2. `#[inline(never)]` prevents the match table from being inlined into the parent function, reducing instruction cache pressure
 ///
-/// # 生成的代码模式
+/// # Generated code pattern
 ///
 /// ```ignore
 /// {
@@ -80,11 +80,11 @@ fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
 ///             "flex" => el.flex(),
 ///             "gap-4" => el.gap(px(4.0)),
 ///             _ => {
-///                 // 数值前缀回退：处理任意数值（gap-7、p-5 等）
+///                 // Numeric prefix fallback: handle arbitrary numeric values (gap-7, p-5, etc.)
 ///                 if let Some(rest) = class.strip_prefix("gap-") {
 ///                     if let Ok(n) = rest.parse::<f32>() { return el.gap(px(n)); }
 ///                 }
-///                 // ... 其余前缀 ...
+///                 // ... remaining prefixes ...
 ///                 el
 ///             }
 ///         }
@@ -104,11 +104,11 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
     quote! {
         {
             #helper
-            // AsRef<str>：&str、String、Cow<str> 均零拷贝通过
+            // AsRef<str>: &str, String, Cow<str> all pass zero-copy
             let __class_expr = #class_expr;
             let __class_str: &str = __class_expr.as_ref();
-            // 空字符串快速路径：跳过迭代器创建（常见于 class={if c { "flex" } else { "" }}）
-            // split_ascii_whitespace 比 split_whitespace 更快——class 名只含 ASCII 字符
+            // Empty string fast path: skip iterator creation (common in class={if c { "flex" } else { "" }})
+            // split_ascii_whitespace is faster than split_whitespace - class names only contain ASCII characters
             if __class_str.is_empty() {
                 __el
             } else {
@@ -124,8 +124,8 @@ fn generate_dynamic_class_helper(mode: ClassMode) -> TokenStream {
     let numeric_fallbacks = generate_numeric_fallback_code();
     let unknown_fallback = match mode {
         ClassMode::Permissive => quote! {
-            // 仅在 debug 构建中打印警告，避免 release 中每帧触发 syscall 污染日志。
-            // 同一生成点的同一未知 class 只提示一次，避免 render loop 反复刷 stderr。
+            // Only print warnings in debug builds to avoid syscalls polluting logs every frame in release.
+            // Warn only once for the same unknown class at the same generation site to prevent spamming stderr in render loops.
             #[cfg(debug_assertions)]
             if !class.is_empty() {
                 fn __rsx_warn_unknown_dynamic_class_once(class: &str) {
@@ -140,8 +140,8 @@ fn generate_dynamic_class_helper(mode: ClassMode) -> TokenStream {
                     };
                     if warned.insert(class.to_owned()) {
                         eprintln!(
-                            "[gpui-rsx] warning: 动态 class {:?} 被忽略（不支持的 class 类型）\n  \
-                             提示：改用字符串字面量 class=\"{}\" 可支持所有 class",
+                            "[gpui-rsx] warning: dynamic class {:?} ignored (unsupported class type)\n  \
+                             hint: use string literal class=\"{}\" instead to support all classes",
                             class, class
                         );
                     }
@@ -161,18 +161,19 @@ fn generate_dynamic_class_helper(mode: ClassMode) -> TokenStream {
     };
 
     quote! {
-        // match 表提取为 #[inline(never)] 局部函数：
-        // - 阻止内联膨胀，同一组件内多个 class={expr} 共享函数体
-        // - LLVM ICF 可合并同类型的单态化实例
+        // The match table is extracted into an #[inline(never)] local function:
+        // - Prevents inlining bloat; multiple class={expr} within the same component share the function body
+        // - LLVM ICF can merge monomorphized instances of the same type
         #[inline(never)]
         fn __rsx_apply_class<E: Styled>(el: E, class: &str) -> E {
+
             match class {
                 #(#common_classes)*
                 _ => {
-                    // 颜色前缀解析：覆盖完整 Tailwind 色板和 arbitrary hex。
+                    // Color prefix parsing: covers the full Tailwind color palette and arbitrary hex.
                     #color_fallbacks
-                    // 数值前缀回退：静态 match 未命中时，尝试前缀 + 数值解析
-                    // 覆盖 gap-7、px-5、ml-3、opacity-33 等任意数值
+                    // Numeric prefix fallback: when static match misses, try prefix + numeric parsing
+                    // Covers arbitrary numeric values such as gap-7, px-5, ml-3, opacity-33, etc.
                     #numeric_fallbacks
                     #unknown_fallback
                 }
@@ -181,10 +182,10 @@ fn generate_dynamic_class_helper(mode: ClassMode) -> TokenStream {
     }
 }
 
-/// 生成动态颜色解析回退代码。
+/// Generate fallback code for dynamic color parsing.
 ///
-/// 相比为 text/bg/border 三个前缀展开完整色板 match arm，这里只在动态路径中
-/// 解析 `prefix-family-shade`，把展开体积从 700+ 个颜色分支降到 22 个色系分支。
+/// Compared to expanding full color palette match arms for text/bg/border prefixes, here we only
+/// parse `prefix-family-shade` in the dynamic path, reducing the expansion size from 700+ color branches to 22 color family branches.
 fn generate_color_fallback_code() -> TokenStream {
     let shade_arms = COLOR_SHADES.iter().enumerate().map(|(idx, shade)| {
         quote! { #shade => #idx, }
@@ -302,6 +303,9 @@ fn generate_color_fallback_code() -> TokenStream {
         }
 
         fn __rsx_parse_color(color: &str) -> Option<(u32, bool)> {
+            if color == "transparent" {
+                return Some((0x00000000, true));
+            }
             if let Some(hex) = __rsx_parse_hex_color(color) {
                 let hex_inner = color.strip_prefix("[#")?.strip_suffix(']')?;
                 let is_rgba = hex_inner.len() == 8 || hex_inner.len() == 4;
@@ -315,37 +319,37 @@ fn generate_color_fallback_code() -> TokenStream {
             && let Some((color, is_rgba)) = __rsx_parse_color(rest)
         {
             if is_rgba {
-                return el.text_color(rgba(color));
+                return el.text_color(gpui_kit::rgba(color));
             }
-            return el.text_color(rgb(color));
+            return el.text_color(gpui_kit::rgb(color));
         }
         if let Some(rest) = class.strip_prefix("bg-")
             && let Some((color, is_rgba)) = __rsx_parse_color(rest)
         {
             if is_rgba {
-                return el.bg(rgba(color));
+                return el.bg(gpui_kit::rgba(color));
             }
-            return el.bg(rgb(color));
+            return el.bg(gpui_kit::rgb(color));
         }
         if let Some(rest) = class.strip_prefix("border-")
             && let Some((color, is_rgba)) = __rsx_parse_color(rest)
         {
             if is_rgba {
-                return el.border_color(rgba(color));
+                return el.border_color(gpui_kit::rgba(color));
             }
-            return el.border_color(rgb(color));
+            return el.border_color(gpui_kit::rgb(color));
         }
     }
 }
 
-/// 生成数值前缀的回退匹配代码
+/// Generate fallback match code for numeric prefixes.
 ///
-/// 在静态 match 表未命中时，通过前缀识别 + `parse::<f32>()` 处理任意数值 class。
-/// 每条 if-let 使用 `return` 提前返回；若全部未命中，执行流到达调用方的 `el`。
+/// When the static match table misses, handles arbitrary numeric classes through prefix identification + `parse::<f32>()`.
+/// Each if-let uses early `return`; if none match, execution flow falls through to caller's `el`.
 ///
-/// 优先检查较长前缀（`gap-x-` 先于 `gap-`），确保精确匹配：
-/// `gap-x-4` 的 `strip_prefix("gap-")` 得 `"x-4"`，`parse::<f32>()` 失败，
-/// 自然回退到 `gap-x-` 分支，无需额外排序。
+/// Longer prefixes are checked first (`gap-x-` before `gap-`) to ensure exact matching:
+/// For `gap-x-4`, `strip_prefix("gap-")` yields `"x-4"`, and `parse::<f32>()` fails,
+/// naturally falling back to the `gap-x-` branch without needing extra sorting.
 fn generate_numeric_fallback_code() -> TokenStream {
     let length_fallbacks = LENGTH_CLASS_SPECS.iter().map(generate_length_fallback);
     let usize_fallbacks = [("line-clamp-", "line_clamp")]
@@ -383,7 +387,7 @@ fn generate_numeric_fallback_code() -> TokenStream {
         }
 
         #(#length_fallbacks)*
-        // --- opacity: opacity-50 → 0.50 ---
+        // --- opacity: opacity-50 -> 0.50 ---
         if let Some(rest) = class.strip_prefix("opacity-") {
             if let Ok(n) = rest.parse::<f32>().__rsx_finite() {
                 if (0.0..=100.0).contains(&n) {
@@ -404,7 +408,7 @@ fn generate_length_fallback(spec: &super::tables::LengthClassSpec) -> TokenStrea
         quote! {
             if let Some(raw) = inner.strip_suffix('%') {
                 if let Ok(n) = raw.parse::<f32>().__rsx_finite() {
-                    return el.#method(relative(n / 100.0));
+                    return el.#method(gpui_kit::relative(n / 100.0));
                 }
             }
         }
@@ -419,7 +423,7 @@ fn generate_length_fallback(spec: &super::tables::LengthClassSpec) -> TokenStrea
                     den.parse::<f32>().__rsx_finite(),
                 ) {
                     if den > 0.0 {
-                        return el.#method(relative(num / den));
+                        return el.#method(gpui_kit::relative(num / den));
                     }
                 }
             }
@@ -433,19 +437,19 @@ fn generate_length_fallback(spec: &super::tables::LengthClassSpec) -> TokenStrea
             if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
                 if let Some(raw) = inner.strip_suffix("px") {
                     if let Ok(n) = raw.parse::<f32>().__rsx_finite() {
-                        return el.#method(px(n));
+                        return el.#method(gpui_kit::px(n));
                     }
                 }
                 if let Some(raw) = inner.strip_suffix("rem") {
                     if let Ok(n) = raw.parse::<f32>().__rsx_finite() {
-                        return el.#method(rems(n));
+                        return el.#method(gpui_kit::rems(n));
                     }
                 }
                 #percent
             }
             #fraction
             if let Ok(n) = rest.parse::<f32>().__rsx_finite() {
-                return el.#method(px(n));
+                return el.#method(rems(n * 0.25));
             }
         }
     }
@@ -464,10 +468,10 @@ fn generate_integer_fallback(prefix: &'static str, method: &'static str, ty: &st
     }
 }
 
-/// 生成常用 class 的 match 分支
+/// Generate match branches for common classes.
 ///
-/// 返回一个 match arm 列表，每个 arm 匹配一个 class 字符串并应用相应的方法。
-/// 通过 thread_local 缓存，整个编译过程只调用一次。
+/// Returns a list of match arms, each matching a class string and applying the corresponding method.
+/// Cached via thread_local, called only once throughout the compilation process.
 ///
 fn generate_common_class_matches() -> impl Iterator<Item = TokenStream> {
     dynamic_common_classes().map(|class_str| {

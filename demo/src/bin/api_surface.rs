@@ -2,7 +2,7 @@ use gpui::prelude::*;
 use gpui::*;
 use gpui_component::tooltip::Tooltip;
 use gpui_platform::application;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 use std::time::Duration;
 
 struct ApiSurfaceView {

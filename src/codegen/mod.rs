@@ -1,21 +1,22 @@
-//! 代码生成器
+//! Code generator
 //!
-//! 将解析后的 RSX 转换为 GPUI 代码
+//! Converts parsed RSX into GPUI code
 //!
-//! 生成惯用的 GPUI 方法链模式：
+//! Generates idiomatic GPUI method chaining patterns:
 //! ```ignore
 //! div().id("auto_0").flex().bg(rgb(0xff)).on_click(handler).child("text")
 //! ```
 //!
-//! # 模块结构
+//! # Module Structure
 //!
-//! - `tables`: 静态查找表（颜色、事件、属性映射等）
-//! - `class`: CSS class 字符串解析，含统一的颜色处理
-//! - `attribute`: RSX 属性到 GPUI 方法的转换
-//! - `element`: 元素和子节点的代码生成
+//! - `tables`: Static lookup tables (colors, events, attribute mappings, etc.)
+//! - `class`: CSS class string parsing, including unified color handling
+//! - `attribute`: RSX attribute to GPUI method conversion
+//! - `element`: Code generation for elements and child nodes
 
 pub(crate) mod attribute;
 pub(crate) mod class;
 pub(crate) mod element;
 pub(crate) mod runtime;
 pub(crate) mod tables;
+pub mod data_table_parser;

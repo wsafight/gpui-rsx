@@ -2,7 +2,7 @@
 mod common;
 
 use common::*;
-use gpui_rsx::{rsx_permissive, rsx_strict};
+use zopra_gpui_view::{rsx_permissive, rsx_strict};
 
 fn main() {
     let _strict = rsx_strict! { <div class="flex" /> };

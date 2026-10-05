@@ -1,6 +1,6 @@
-//! RSX 语法解析器
+//! RSX syntax parser
 //!
-//! 解析类似 JSX 的语法结构
+//! Parses JSX-like syntax structures
 
 use crate::codegen::tables::is_stateful_class;
 use crate::diagnostics::*;
@@ -9,31 +9,32 @@ use quote::ToTokens;
 use std::fmt;
 use syn::{
     Expr, ExprLit, Ident, Lit, Pat, Result, Token,
+    ext::IdentExt,
     parse::{Parse, ParseStream, Parser},
     spanned::Spanned,
     token,
 };
 
-/// RSX 宏体
+/// RSX macro body
 ///
-/// 可以是单个元素或 Fragment（多根节点）
+/// Can be a single element or a Fragment (multiple root nodes)
 pub enum RsxBody {
-    /// 单个元素，如 `<div>...</div>`
+    /// Single element, e.g. `<div>...</div>`
     Single(RsxElement),
-    /// Fragment，如 `<>.....</>`
+    /// Fragment, e.g. `<>.....</>`
     Fragment(Vec<RsxNode>),
 }
 
-/// RSX 元素
+/// RSX element
 ///
-/// 表示一个 HTML-like 元素，如 `<div class="container">...</div>`
+/// Represents an HTML-like element, e.g. `<div class="container">...</div>`
 pub struct RsxElement {
     pub name: RsxElementName,
     pub attributes: Vec<RsxAttribute>,
     pub children: Vec<RsxNode>,
 }
 
-/// RSX 元素名，支持单段 tag（`div`、`Button`）和路径型 tag（`ui::TaskCard`）。
+/// RSX element name, supporting single-segment tags (`div`, `Button`) and path-style tags (`ui::TaskCard`).
 pub struct RsxElementName {
     pub path: syn::Path,
 }
@@ -81,41 +82,41 @@ impl ToTokens for RsxElementName {
     }
 }
 
-/// RSX 属性
+/// RSX attribute
 ///
-/// 表示元素的属性，如 `class="container"` 或 `onClick={handler}`
+/// Represents an element attribute, e.g. `class="container"` or `onClick={handler}`
 pub enum RsxAttribute {
-    /// 布尔属性，如 `flex`
+    /// Boolean attribute, e.g. `flex`
     Flag(Ident),
-    /// 值属性，如 `gap={px(16.0)}`
+    /// Value attribute, e.g. `gap={px(16.0)}`
     Value { name: Ident, value: Expr },
-    /// when 条件渲染，如 `when={(condition, |this| this.bg(...))}`
+    /// `when` conditional rendering, e.g. `when={(condition, |this| this.bg(...))}`
     When { condition: Expr, closure: Expr },
-    /// when_some 条件渲染，如 `whenSome={(option, |this, value| ...)}`
+    /// `when_some` conditional rendering, e.g. `whenSome={(option, |this, value| ...)}`
     WhenSome { option: Expr, closure: Expr },
-    /// whenClass 条件 class，如 `whenClass={(active, "bg-blue-500 text-white")}`
+    /// `whenClass` conditional class, e.g. `whenClass={(active, "bg-blue-500 text-white")}`
     WhenClass {
         condition: Expr,
         class_lit: syn::LitStr,
     },
-    /// GPUI 状态样式 class，如 `hoverClass="bg-blue-500"`
+    /// GPUI state style class, e.g. `hoverClass="bg-blue-500"`
     StateClass {
         method: Ident,
         class_lit: syn::LitStr,
     },
 }
 
-/// RSX 节点
+/// RSX node
 ///
-/// 可以是元素、表达式、展开或 for 循环
+/// Can be an element, expression, spread, or for-loop
 pub enum RsxNode {
-    /// 子元素
+    /// Child element
     Element(RsxElement),
-    /// 表达式（文本或其他）
+    /// Expression (text or other)
     Expr(Expr),
-    /// 展开子节点列表，如 `{...iter}`
+    /// Spread child node list, e.g. `{...iter}`
     Spread(Expr),
-    /// for 循环语法糖，如 `{for item in iter { <child /> }}`
+    /// for-loop syntactic sugar, e.g. `{for item in iter { <child /> }}`
     For {
         binding: Box<Pat>,
         iter: Box<Expr>,
@@ -125,23 +126,23 @@ pub enum RsxNode {
 
 impl Parse for RsxBody {
     fn parse(input: ParseStream) -> Result<Self> {
-        // 检查是否是 Fragment: <>...</>
+        // Check if it is a Fragment: <>...</>
         if input.peek(Token![<]) && input.peek2(Token![>]) {
-            // 解析 <>
+            // Parse <>
             input.parse::<Token![<]>()?;
             input.parse::<Token![>]>()?;
 
-            // 解析子节点
+            // Parse child nodes
             let children = parse_children(input, None)?;
 
-            // 解析 </>
+            // Parse </>
             input.parse::<Token![<]>()?;
             input.parse::<Token![/]>()?;
             input.parse::<Token![>]>()?;
 
             Ok(RsxBody::Fragment(children))
         } else {
-            // 单个元素
+            // Single element
             let element: RsxElement = input.parse()?;
             Ok(RsxBody::Single(element))
         }
@@ -150,37 +151,52 @@ impl Parse for RsxBody {
 
 impl Parse for RsxElement {
     fn parse(input: ParseStream) -> Result<Self> {
-        // 解析开始标签 <tag
+        // Parse opening tag <tag
         input.parse::<Token![<]>()?;
         let name = RsxElementName::parse(input)?;
 
-        // 解析属性（预分配容量，典型元素有 3-8 个属性）
+        // Parse attributes (pre-allocated capacity; typical elements have 3-8 attributes)
         let mut attributes = Vec::with_capacity(4);
         while !input.peek(Token![>]) && !input.peek(Token![/]) {
-            let attr_name: Ident = input.parse()?;
+            let attr_name = syn::Ident::parse_any(input)?;
 
             if input.peek(Token![=]) {
-                // 值属性: name={value}
+                // Value attribute: name={value}
                 input.parse::<Token![=]>()?;
                 let value: Expr = if input.peek(token::Brace) {
-                    // {expression} — 大括号内解析完整表达式
+                    // {expression} - parse full expression inside braces
                     let content;
                     syn::braced!(content in input);
                     content.parse()?
                 } else {
-                    // 非大括号值只接受字面量（如 "string"、42）。
-                    // 不能用 Expr::parse，否则它会贪婪消费后续的 / > 等运算符。
+                    // Non-braced values only accept literals (e.g. "string", 42).
+                    // Cannot use Expr::parse, otherwise it greedily consumes trailing / > operators.
                     let lit: syn::Lit = input.parse()?;
                     syn::Expr::Lit(syn::ExprLit { attrs: vec![], lit })
                 };
 
-                // 特殊处理 when 和 whenSome 属性（直接比较 Ident，避免 to_string() 分配）
+                // Special handling for when and whenSome attributes (compare Ident directly to avoid to_string() allocation)
                 if is_group_drag_over_attr(&attr_name) {
                     return Err(unsupported_generic_attribute_error(&attr_name));
                 } else if attr_name == "whiteSpace" {
                     return Err(unsupported_jsx_attribute_error(&attr_name));
                 } else if attr_name == "when" {
-                    let (first, second) = parse_condition_tuple(value, "when")?;
+                    let (first, second) = if let Expr::Tuple(tuple) = &value {
+                        if tuple.elems.len() == 2 {
+                            let mut iter = tuple.elems.iter();
+                            (iter.next().unwrap().clone(), iter.next().unwrap().clone())
+                        } else {
+                            return Err(condition_tuple_wrong_count_error(
+                                &value,
+                                "when",
+                                tuple.elems.len(),
+                            ));
+                        }
+                    } else {
+                        let condition = value;
+                        let closure: Expr = syn::parse_quote!(|__el| __el);
+                        (condition, closure)
+                    };
                     attributes.push(RsxAttribute::When {
                         condition: first,
                         closure: second,
@@ -211,7 +227,7 @@ impl Parse for RsxElement {
                     });
                 }
             } else {
-                // 布尔属性: name
+                // Boolean attribute: name
                 if is_group_drag_over_attr(&attr_name) {
                     return Err(unsupported_generic_attribute_error(&attr_name));
                 }
@@ -222,7 +238,7 @@ impl Parse for RsxElement {
             }
         }
 
-        // 检查是否是自闭合标签 />
+        // Check if it is a self-closing tag />
         let self_closing = if input.peek(Token![/]) {
             input.parse::<Token![/]>()?;
             input.parse::<Token![>]>()?;
@@ -232,19 +248,19 @@ impl Parse for RsxElement {
             false
         };
 
-        // 解析子节点
+        // Parse child nodes
         let children = if self_closing {
             Vec::new()
         } else {
             let children = parse_children(input, Some(&name))?;
 
-            // 解析闭合标签 </tag>
+            // Parse closing tag </tag>
             input.parse::<Token![<]>()?;
             input.parse::<Token![/]>()?;
             let closing_name = RsxElementName::parse(input)?;
             input.parse::<Token![>]>()?;
 
-            // 验证标签名称匹配
+            // Verify tag names match
             let opening_display = name.to_string();
             let closing_display = closing_name.to_string();
             if opening_display != closing_display {
@@ -266,10 +282,10 @@ impl Parse for RsxElement {
     }
 }
 
-/// 解析子节点列表
+/// Parses child node list
 ///
-/// `parent_name` 为 None 时表示 Fragment 上下文，
-/// 为 Some 时表示某个命名元素的子节点。
+/// `parent_name` being None indicates a Fragment context,
+/// while Some indicates child nodes of a named element.
 fn parse_children(
     input: ParseStream,
     parent_name: Option<&RsxElementName>,
@@ -277,17 +293,28 @@ fn parse_children(
     let mut children = Vec::with_capacity(4);
 
     loop {
-        // 检查是否到达闭合标签
+        // Check if reaching the closing tag
         if input.peek(Token![<]) && input.peek2(Token![/]) {
             break;
         }
 
-        // 检查是否已经没有内容了
+        // Check if there is no more content
         if input.is_empty() {
             return Err(match parent_name {
                 Some(name) => unclosed_tag_error(input.span(), &name.to_string()),
                 None => unclosed_fragment_error(input.span()),
             });
+        }
+
+        if input.peek(Token![<]) && input.peek2(Token![>]) {
+            input.parse::<Token![<]>()?;
+            input.parse::<Token![>]>()?;
+            let nested = parse_children(input, None)?;
+            input.parse::<Token![<]>()?;
+            input.parse::<Token![/]>()?;
+            input.parse::<Token![>]>()?;
+            children.extend(nested);
+            continue;
         }
 
         if let Some(node) = try_parse_child_node(input)? {
@@ -303,18 +330,18 @@ fn parse_children(
     Ok(children)
 }
 
-/// 尝试从输入流中解析单个子节点
+/// Attempts to parse a single child node from the input stream
 ///
-/// 处理所有子节点类型：`{expr}`, `{...spread}`, `{for ...}`, `<element>`, `"string"`。
-/// 如果当前 token 不匹配任何已知类型，返回 `Ok(None)`，由调用方决定如何报错。
+/// Handles all child node types: `{expr}`, `{...spread}`, `{for ...}`, `<element>`, `"string"`.
+/// If the current token does not match any known type, returns `Ok(None)` and leaves error handling to caller.
 fn try_parse_child_node(input: ParseStream) -> Result<Option<RsxNode>> {
     if input.peek(token::Brace) {
         let content;
         syn::braced!(content in input);
 
         if content.peek(Token![..]) {
-            // Rust tokenizer 将 `...` 分割为 `..` (Range) 和 `.` (Dot)，
-            // 因此需要分两步解析，这是 proc-macro 中处理 `...` 的标准方式。
+            // The Rust tokenizer splits `...` into `..` (Range) and `.` (Dot),
+            // so it must be parsed in two steps; this is the standard way to handle `...` in proc-macros.
             content.parse::<Token![..]>()?;
             content.parse::<Token![.]>()?;
             let expr: Expr = content.parse()?;
@@ -338,17 +365,17 @@ fn try_parse_child_node(input: ParseStream) -> Result<Option<RsxNode>> {
     }
 }
 
-/// 解析 for 循环: `for item in iter { <child /> ... }`
+/// Parses a for-loop: `for item in iter { <child /> ... }`
 fn parse_for_loop(content: ParseStream) -> Result<RsxNode> {
     content.parse::<Token![for]>()?;
 
-    // 解析绑定模式（支持简单 ident 和元组解构等）
+    // Parse binding pattern (supports simple ident, tuple destructuring, etc.)
     let binding: Pat = Pat::parse_single(content)?;
 
     content.parse::<Token![in]>()?;
 
-    // 解析剩余 token：最后一个顶层 `{...}` 是 RSX body，前面的 token 是 iterator expr。
-    // 这样 `for item in { items.iter() } { ... }` 这类 iterator block 不会被提前截断。
+    // Parse remaining tokens: the last top-level `{...}` is the RSX body, preceding tokens form the iterator expr.
+    // This prevents iterator blocks like `for item in { items.iter() } { ... }` from being prematurely truncated.
     let mut remaining = Vec::new();
     while !content.is_empty() {
         remaining.push(content.parse::<TokenTree>()?);
@@ -382,12 +409,12 @@ fn parse_for_loop(content: ParseStream) -> Result<RsxNode> {
     })
 }
 
-/// 解析条件属性（when/whenSome）的元组值 `(first, second)`
+/// Parses the tuple value `(first, second)` of conditional attributes (when/whenSome)
 fn parse_condition_tuple(value: Expr, attr_name: &str) -> Result<(Expr, Expr)> {
     if let Expr::Tuple(tuple) = value {
         if tuple.elems.len() == 2 {
             let mut iter = tuple.elems.into_iter();
-            // len() == 2 已在上方确认，next() 不可能返回 None
+            // len() == 2 confirmed above, next() cannot return None
             let first = iter.next().unwrap();
             let second = iter.next().unwrap();
             Ok((first, second))

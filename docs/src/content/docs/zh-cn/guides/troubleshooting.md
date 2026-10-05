@@ -381,7 +381,7 @@ rsx! {
 使用 `rsx_expand!` 查看生成的方法：
 
 ```rust
-let preview = gpui_rsx::rsx_expand! {
+let preview = zopra_gpui_view::rsx_expand! {
     <div class="flex gap-4 bg-blue-500" />
 };
 ```

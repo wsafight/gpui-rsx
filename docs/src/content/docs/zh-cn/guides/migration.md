@@ -213,7 +213,7 @@ cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
 
 ## 渐进迁移计划
 
-1. 在一个 view module 中添加 `gpui_rsx::rsx` import。
+1. 在一个 view module 中添加 `zopra_gpui_view::rsx` import。
 2. 先转换小的静态子树。
 3. 静态结构通过编译后，再转换列表和重复行。
 4. 只给需要有状态 ID 的重复元素添加 `key={...}`。
@@ -234,13 +234,13 @@ rsx! {
 
 ## 常见迁移模式
 
-| 手写 GPUI | GPUI-RSX |
-| --- | --- |
-| `div().child("Hello")` | `rsx! { <div>{"Hello"}</div> }` |
+| 手写 GPUI                                | GPUI-RSX                                          |
+| ---------------------------------------- | ------------------------------------------------- |
+| `div().child("Hello")`                   | `rsx! { <div>{"Hello"}</div> }`                   |
 | `div().child(format!("Count: {count}"))` | `rsx! { <div>{format!("Count: {count}")}</div> }` |
-| `.w(px(200.0)).h(px(100.0))` | `<div w={px(200.0)} h={px(100.0)} />` |
-| `.flex().gap(px(4.0))` | `<div class="flex gap-4" />` |
-| 带参数的 builder 构造器 | `<Button base={Button::new("id")} />` |
+| `.w(px(200.0)).h(px(100.0))`             | `<div w={px(200.0)} h={px(100.0)} />`             |
+| `.flex().gap(px(4.0))`                   | `<div class="flex gap-4" />`                      |
+| 带参数的 builder 构造器                  | `<Button base={Button::new("id")} />`             |
 
 ## 检查清单
 
@@ -248,7 +248,7 @@ rsx! {
 - [ ] 应用启动方式使用 `gpui_platform::application()`。
 - [ ] 应用项目提交了 `Cargo.lock`。
 - [ ] 如果使用 `gpui-component`，它解析到同一份 GPUI source。
-- [ ] 新 RSX 模块引入了 `gpui_rsx::rsx`。
+- [ ] 新 RSX 模块引入了 `zopra_gpui_view::rsx`。
 - [ ] 重复的有状态元素有 `key={...}` 或显式 `id={...}`。
 - [ ] 迁移后的视图通过 `cargo check`。
 - [ ] 状态变化后仍然调用 `cx.notify()`。

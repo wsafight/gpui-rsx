@@ -1,4 +1,4 @@
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 struct MockElement;
 

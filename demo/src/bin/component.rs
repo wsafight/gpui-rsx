@@ -8,7 +8,7 @@ use gpui_component::label::Label;
 use gpui_component::popover::Popover;
 use gpui_component::tab::Tab;
 use gpui_platform::application;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 struct ComponentView;
 

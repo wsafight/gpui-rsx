@@ -193,7 +193,7 @@ This is primarily a maintainability move, but it also keeps incremental edits sm
 Use `rsx_expand!` to check whether a class path stayed static or went through the dynamic matcher:
 
 ```rust
-let preview = gpui_rsx::rsx_expand! {
+let preview = zopra_gpui_view::rsx_expand! {
     <div class={if active { "flex gap-4" } else { "block" }} />
 };
 ```

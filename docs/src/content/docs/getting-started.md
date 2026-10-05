@@ -26,7 +26,7 @@ If you are upgrading from the crates.io `gpui = "0.2.2"` package, read the [migr
 use gpui::*;
 use gpui::prelude::*;
 use gpui_platform::application;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 ```
 
 ## First Element
@@ -146,7 +146,7 @@ rsx! {
 use gpui::*;
 use gpui::prelude::*;
 use gpui_platform::application;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 struct HelloView;
 

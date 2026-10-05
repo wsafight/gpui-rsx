@@ -213,7 +213,7 @@ If `cargo tree` shows `git+https://github.com/zed-industries/zed#...`, the proje
 
 ## Incremental Migration Plan
 
-1. Add `gpui_rsx::rsx` imports in one view module.
+1. Add `zopra_gpui_view::rsx` imports in one view module.
 2. Convert a small static subtree first.
 3. Convert child lists and repeated rows after the static structure compiles.
 4. Add `key={...}` only to repeated elements that need stateful IDs.
@@ -234,13 +234,13 @@ rsx! {
 
 ## Common Migration Patterns
 
-| Manual GPUI | GPUI-RSX |
-| --- | --- |
-| `div().child("Hello")` | `rsx! { <div>{"Hello"}</div> }` |
+| Manual GPUI                              | GPUI-RSX                                          |
+| ---------------------------------------- | ------------------------------------------------- |
+| `div().child("Hello")`                   | `rsx! { <div>{"Hello"}</div> }`                   |
 | `div().child(format!("Count: {count}"))` | `rsx! { <div>{format!("Count: {count}")}</div> }` |
-| `.w(px(200.0)).h(px(100.0))` | `<div w={px(200.0)} h={px(100.0)} />` |
-| `.flex().gap(px(4.0))` | `<div class="flex gap-4" />` |
-| builder constructor with arguments | `<Button base={Button::new("id")} />` |
+| `.w(px(200.0)).h(px(100.0))`             | `<div w={px(200.0)} h={px(100.0)} />`             |
+| `.flex().gap(px(4.0))`                   | `<div class="flex gap-4" />`                      |
+| builder constructor with arguments       | `<Button base={Button::new("id")} />`             |
 
 ## Checklist
 
@@ -248,7 +248,7 @@ rsx! {
 - [ ] Application startup uses `gpui_platform::application()`.
 - [ ] `Cargo.lock` is committed for applications.
 - [ ] `gpui-component`, if present, resolves to the same GPUI source.
-- [ ] New RSX modules import `gpui_rsx::rsx`.
+- [ ] New RSX modules import `zopra_gpui_view::rsx`.
 - [ ] Repeated stateful elements have `key={...}` or explicit `id={...}`.
 - [ ] The migrated view passes `cargo check`.
 - [ ] Interactions still call `cx.notify()` after state changes.

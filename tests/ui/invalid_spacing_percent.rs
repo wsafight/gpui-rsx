@@ -2,7 +2,7 @@
 mod common;
 
 use common::*;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 fn main() {
     let _el = rsx! { <div class="gap-[10%]" /> };

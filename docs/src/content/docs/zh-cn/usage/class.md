@@ -26,7 +26,7 @@ rsx! {
 permissive 模式下，无法安全生成的未知静态 class 会被忽略；无效的任意值仍会编译时报错。strict 模式下，不支持的静态 class 会直接变成编译错误：
 
 ```rust
-use gpui_rsx::rsx_strict;
+use zopra_gpui_view::rsx_strict;
 
 rsx_strict! {
     <div class="hover:bg-blue-500" />
@@ -86,29 +86,29 @@ rsx! {
 
 permissive 模式下，未知动态 class 会被忽略。debug 构建中，每个生成调用点的未知 class 警告只输出一次。strict 模式下，不支持的动态 class 在求值时会 panic。
 
-| 能力 | 静态 class | 动态 class |
-| --- | --- | --- |
-| 布局和对齐 | 支持 | 支持子集 |
-| 数值间距和尺寸 | 支持 | 支持 |
-| 任意长度 | 支持 | 支持 |
-| 百分比和分数尺寸 | 支持 | 支持 |
-| 完整 Tailwind 色板 | 支持 | 支持 |
-| 任意 hex / RGB / RGBA 颜色 | 支持 | 支持 |
-| 静态有状态滚动 class | 支持并自动生成 ID | 不支持 |
+| 能力                          | 静态 class         | 动态 class          |
+| ----------------------------- | ------------------ | ------------------- |
+| 布局和对齐                    | 支持               | 支持子集            |
+| 数值间距和尺寸                | 支持               | 支持                |
+| 任意长度                      | 支持               | 支持                |
+| 百分比和分数尺寸              | 支持               | 支持                |
+| 完整 Tailwind 色板            | 支持               | 支持                |
+| 任意 hex / RGB / RGBA 颜色    | 支持               | 支持                |
+| 静态有状态滚动 class          | 支持并自动生成 ID  | 不支持              |
 | `hover:*` 等 Tailwind variant | 忽略或 strict 报错 | 忽略或 strict panic |
 
 ## 支持范围
 
-| 范围 | 说明 |
-| --- | --- |
+| 范围 | 说明                                                                                                        |
+| ---- | ----------------------------------------------------------------------------------------------------------- |
 | 布局 | `flex`、`flex-col`、`flex-row`、`flex-wrap`、`grid`、`hidden`、`absolute`、`relative`、grow/shrink 辅助类。 |
-| 对齐 | GPUI 支持的 `items-*`、`justify-*`、`content-*`、`self-*`。 |
-| 间距 | `gap-*`、`gap-x-*`、`gap-y-*`、`p-*`、`px-*`、`m-*` 以及方向变体。 |
-| 尺寸 | `w-*`、`h-*`、`size-*`、`min-*`、`max-*`、`*-full`、`*-auto`、百分比、分数和任意长度。 |
-| 颜色 | 完整 Tailwind 色名，以及任意 `hex`、`rgb`、`rgba` 形式。 |
-| 排版 | 字号、字重、文字对齐、装饰、截断、whitespace 和 line clamp。 |
-| 边框 | 宽度、方向宽度、颜色、圆角和 dashed border。 |
-| 其他 | cursor helper、`debug-outline`、阴影、透明度、grid placement alias。 |
+| 对齐 | GPUI 支持的 `items-*`、`justify-*`、`content-*`、`self-*`。                                                 |
+| 间距 | `gap-*`、`gap-x-*`、`gap-y-*`、`p-*`、`px-*`、`m-*` 以及方向变体。                                          |
+| 尺寸 | `w-*`、`h-*`、`size-*`、`min-*`、`max-*`、`*-full`、`*-auto`、百分比、分数和任意长度。                      |
+| 颜色 | 完整 Tailwind 色名，以及任意 `hex`、`rgb`、`rgba` 形式。                                                    |
+| 排版 | 字号、字重、文字对齐、装饰、截断、whitespace 和 line clamp。                                                |
+| 边框 | 宽度、方向宽度、颜色、圆角和 dashed border。                                                                |
+| 其他 | cursor helper、`debug-outline`、阴影、透明度、grid placement alias。                                        |
 
 ## 长度语义
 
@@ -165,7 +165,7 @@ rsx! {
 需要让未知静态 class 直接失败时，使用 `rsx_strict!`：
 
 ```rust
-use gpui_rsx::{rsx_expand, rsx_permissive, rsx_strict};
+use zopra_gpui_view::{rsx_expand, rsx_permissive, rsx_strict};
 
 rsx_strict! { <div class="flex w-[280px]" /> }
 rsx_permissive! { <div class="hover:bg-blue-500 flex" /> }

@@ -24,15 +24,15 @@ GPUI-RSX is not a browser renderer and it is not a Tailwind CSS runtime. Static 
 ## Main macros
 
 ```rust
-use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
+use zopra_gpui_view::{rsx, rsx_expand, rsx_permissive, rsx_strict};
 ```
 
-| Macro | Use case |
-| --- | --- |
-| `rsx!` | Default permissive RSX macro. |
-| `rsx_strict!` | Rejects unsupported static classes and panics on unsupported dynamic classes when evaluated. |
-| `rsx_permissive!` | Explicit permissive mode for unknown class handling. |
-| `rsx_expand!` | Returns a string preview of generated GPUI builder code for debugging. |
+| Macro             | Use case                                                                                     |
+| ----------------- | -------------------------------------------------------------------------------------------- |
+| `rsx!`            | Default permissive RSX macro.                                                                |
+| `rsx_strict!`     | Rejects unsupported static classes and panics on unsupported dynamic classes when evaluated. |
+| `rsx_permissive!` | Explicit permissive mode for unknown class handling.                                         |
+| `rsx_expand!`     | Returns a string preview of generated GPUI builder code for debugging.                       |
 
 ## Documentation Map
 

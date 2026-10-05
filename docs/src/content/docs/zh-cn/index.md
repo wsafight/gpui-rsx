@@ -24,15 +24,15 @@ GPUI-RSX 不是浏览器渲染器，也不是 Tailwind CSS 运行时。静态 RS
 ## 主要宏
 
 ```rust
-use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
+use zopra_gpui_view::{rsx, rsx_expand, rsx_permissive, rsx_strict};
 ```
 
-| 宏 | 用途 |
-| --- | --- |
-| `rsx!` | 默认 permissive 模式 RSX 宏。 |
-| `rsx_strict!` | 不支持的静态 class 编译时报错；不支持的动态 class 在求值时 panic。 |
-| `rsx_permissive!` | 显式 permissive 模式。 |
-| `rsx_expand!` | 返回生成 GPUI builder 代码的字符串预览，方便调试。 |
+| 宏                | 用途                                                               |
+| ----------------- | ------------------------------------------------------------------ |
+| `rsx!`            | 默认 permissive 模式 RSX 宏。                                      |
+| `rsx_strict!`     | 不支持的静态 class 编译时报错；不支持的动态 class 在求值时 panic。 |
+| `rsx_permissive!` | 显式 permissive 模式。                                             |
+| `rsx_expand!`     | 返回生成 GPUI builder 代码的字符串预览，方便调试。                 |
 
 ## 文档地图
 

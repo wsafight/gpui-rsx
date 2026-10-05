@@ -6,7 +6,7 @@
 mod common;
 
 use common::*;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 macro_rules! class_compile_tests {
     ($($name:ident => $classes:literal),+ $(,)?) => {
@@ -169,16 +169,19 @@ fn test_list_tags() {
 
 #[test]
 fn test_custom_component_self_closing() {
+    let (window, cx) = ((), ());
     let _el = rsx! { <MyComponent /> };
 }
 
 #[test]
 fn test_custom_component_with_children() {
+    let (window, cx) = ((), ());
     let _el = rsx! { <CustomWidget>{"content"}</CustomWidget> };
 }
 
 #[test]
 fn test_custom_component_with_attrs() {
+    let (window, cx) = ((), ());
     let _el = rsx! { <MyComponent flex bg={rgb(0xff0000)} /> };
 }
 
@@ -477,6 +480,12 @@ fn test_class_text_sizes() {
     let _b = rsx! { <div class="text-xl" /> };
     let _c = rsx! { <div class="text-2xl" /> };
     let _d = rsx! { <div class="text-3xl" /> };
+    let _e = rsx! { <div class="text-4xl" /> };
+    let _f = rsx! { <div class="text-5xl" /> };
+    let _g = rsx! { <div class="text-6xl" /> };
+    let _h = rsx! { <div class="text-7xl" /> };
+    let _i = rsx! { <div class="text-8xl" /> };
+    let _j = rsx! { <div class="text-9xl" /> };
 }
 
 // ===========================================================================
@@ -1439,53 +1448,53 @@ fn test_latest_stateful_attributes_inject_id_independently() {
     let cases = [
         (
             "accessibility_id",
-            gpui_rsx::rsx_expand! { <div accessibility_id={"platform-id"} /> },
-            gpui_rsx::rsx_expand! { <div accessibilityId={"platform-id"} /> },
+            zopra_gpui_view::rsx_expand! { <div accessibility_id={"platform-id"} /> },
+            zopra_gpui_view::rsx_expand! { <div accessibilityId={"platform-id"} /> },
         ),
         (
             "aria_description",
-            gpui_rsx::rsx_expand! { <div aria_description={"description"} /> },
-            gpui_rsx::rsx_expand! { <div ariaDescription={"description"} /> },
+            zopra_gpui_view::rsx_expand! { <div aria_description={"description"} /> },
+            zopra_gpui_view::rsx_expand! { <div ariaDescription={"description"} /> },
         ),
         (
             "aria_keyshortcuts",
-            gpui_rsx::rsx_expand! { <div aria_keyshortcuts={"Ctrl+K"} /> },
-            gpui_rsx::rsx_expand! { <div ariaKeyShortcuts={"Ctrl+K"} /> },
+            zopra_gpui_view::rsx_expand! { <div aria_keyshortcuts={"Ctrl+K"} /> },
+            zopra_gpui_view::rsx_expand! { <div ariaKeyShortcuts={"Ctrl+K"} /> },
         ),
         (
             "aria_active_descendant",
-            gpui_rsx::rsx_expand! { <div aria_active_descendant /> },
-            gpui_rsx::rsx_expand! { <div ariaActiveDescendant /> },
+            zopra_gpui_view::rsx_expand! { <div aria_active_descendant /> },
+            zopra_gpui_view::rsx_expand! { <div ariaActiveDescendant /> },
         ),
         (
             "a11y_synthetic_children",
-            gpui_rsx::rsx_expand! { <div a11y_synthetic_children={|| ()} /> },
-            gpui_rsx::rsx_expand! { <div a11ySyntheticChildren={|| ()} /> },
+            zopra_gpui_view::rsx_expand! { <div a11y_synthetic_children={|| ()} /> },
+            zopra_gpui_view::rsx_expand! { <div a11ySyntheticChildren={|| ()} /> },
         ),
         (
             "aria_numeric_value_step",
-            gpui_rsx::rsx_expand! { <div aria_numeric_value_step={1.0} /> },
-            gpui_rsx::rsx_expand! { <div ariaNumericValueStep={1.0} /> },
+            zopra_gpui_view::rsx_expand! { <div aria_numeric_value_step={1.0} /> },
+            zopra_gpui_view::rsx_expand! { <div ariaNumericValueStep={1.0} /> },
         ),
         (
             "aria_value",
-            gpui_rsx::rsx_expand! { <div aria_value={"value"} /> },
-            gpui_rsx::rsx_expand! { <div ariaValue={"value"} /> },
+            zopra_gpui_view::rsx_expand! { <div aria_value={"value"} /> },
+            zopra_gpui_view::rsx_expand! { <div ariaValue={"value"} /> },
         ),
         (
             "aria_placeholder",
-            gpui_rsx::rsx_expand! { <div aria_placeholder={"placeholder"} /> },
-            gpui_rsx::rsx_expand! { <div ariaPlaceholder={"placeholder"} /> },
+            zopra_gpui_view::rsx_expand! { <div aria_placeholder={"placeholder"} /> },
+            zopra_gpui_view::rsx_expand! { <div ariaPlaceholder={"placeholder"} /> },
         ),
         (
             "restrict_scroll_to_axis",
-            gpui_rsx::rsx_expand! { <div restrict_scroll_to_axis /> },
-            gpui_rsx::rsx_expand! { <div restrictScrollToAxis /> },
+            zopra_gpui_view::rsx_expand! { <div restrict_scroll_to_axis /> },
+            zopra_gpui_view::rsx_expand! { <div restrictScrollToAxis /> },
         ),
         (
             "external_drag_payload",
-            gpui_rsx::rsx_expand! { <div external_drag_payload={|_| ()} /> },
-            gpui_rsx::rsx_expand! { <div externalDragPayload={|_| ()} /> },
+            zopra_gpui_view::rsx_expand! { <div external_drag_payload={|_| ()} /> },
+            zopra_gpui_view::rsx_expand! { <div externalDragPayload={|_| ()} /> },
         ),
     ];
 
@@ -1509,7 +1518,7 @@ fn test_latest_stateful_value_is_evaluated_once_and_explicit_id_is_not_duplicate
     };
     assert_eq!(evaluations, 1);
 
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <div id="described-control" ariaDescription={"description"} />
     };
     let compact = expanded.split_whitespace().collect::<String>();
@@ -1521,20 +1530,23 @@ fn test_latest_interactive_event_aliases_do_not_inject_id() {
     let cases = [
         (
             "on_mouse_exit",
-            gpui_rsx::rsx_expand! { <div onMouseExit={h} /> },
+            zopra_gpui_view::rsx_expand! { <div onMouseExit={h} /> },
         ),
         (
             "on_mouse_pressure",
-            gpui_rsx::rsx_expand! { <div onMousePressure={h} /> },
+            zopra_gpui_view::rsx_expand! { <div onMousePressure={h} /> },
         ),
         (
             "capture_mouse_pressure",
-            gpui_rsx::rsx_expand! { <div captureMousePressure={h} /> },
+            zopra_gpui_view::rsx_expand! { <div captureMousePressure={h} /> },
         ),
-        ("on_pinch", gpui_rsx::rsx_expand! { <div onPinch={h} /> }),
+        (
+            "on_pinch",
+            zopra_gpui_view::rsx_expand! { <div onPinch={h} /> },
+        ),
         (
             "capture_pinch",
-            gpui_rsx::rsx_expand! { <div capturePinch={h} /> },
+            zopra_gpui_view::rsx_expand! { <div capturePinch={h} /> },
         ),
     ];
 
@@ -1551,7 +1563,7 @@ fn test_scrollbar_width_does_not_inject_id() {
     let _el = rsx! { <div scrollbarWidth={px(8.0)} /> };
     assert!(take_last_auto_id().is_none());
 
-    let expanded = gpui_rsx::rsx_expand! { <div scrollbarWidth={px(8.0)} /> };
+    let expanded = zopra_gpui_view::rsx_expand! { <div scrollbarWidth={px(8.0)} /> };
     let compact = expanded.split_whitespace().collect::<String>();
     assert!(compact.contains(".scrollbar_width("), "{compact}");
     assert!(!compact.contains(".id("), "{compact}");
@@ -1560,13 +1572,13 @@ fn test_scrollbar_width_does_not_inject_id() {
 #[test]
 fn test_ellipsis_classes_cover_static_strict_and_dynamic_paths() {
     let _static = rsx! { <div class="text-ellipsis-start text-ellipsis-middle" /> };
-    let _strict = gpui_rsx::rsx_strict! {
+    let _strict = zopra_gpui_view::rsx_strict! {
         <div class="text-ellipsis-start text-ellipsis-middle" />
     };
     let classes = "text-ellipsis-start text-ellipsis-middle";
     let _dynamic = rsx! { <div class={classes} /> };
 
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <div class="text-ellipsis-start text-ellipsis-middle" />
     };
     let compact = expanded.split_whitespace().collect::<String>();
@@ -1886,7 +1898,7 @@ fn test_class_overflow_scroll() {
 
 #[test]
 fn test_strict_class_overflow_scroll_is_supported_static_stateful_class() {
-    let _el = gpui_rsx::rsx_strict! { <div class="overflow-scroll" /> };
+    let _el = zopra_gpui_view::rsx_strict! { <div class="overflow-scroll" /> };
 }
 
 #[test]
@@ -2543,7 +2555,7 @@ fn test_auto_id_no_id_for_non_stateful() {
 
 #[test]
 fn test_keyed_auto_id_literal_uses_static_concat() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <button key="primary" onClick={h} />
     };
     let compact = expanded.split_whitespace().collect::<String>();
@@ -2555,7 +2567,7 @@ fn test_keyed_auto_id_literal_uses_static_concat() {
 
 #[test]
 fn test_keyed_auto_id_dynamic_key_keeps_format_fallback() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <button key={item.id} onClick={h} />
     };
     let compact = expanded.split_whitespace().collect::<String>();
@@ -2582,7 +2594,7 @@ fn test_dynamic_class_arbitrary_gap() {
 
     assert_eq!(
         take_length_calls(),
-        vec![("px", 7.0), ("px", 9.0), ("px", 16.0)]
+        vec![("rems", 1.75), ("rems", 2.25), ("rems", 4.0)]
     );
 }
 
@@ -2603,11 +2615,11 @@ fn test_dynamic_class_arbitrary_padding() {
     assert_eq!(
         take_length_calls(),
         vec![
-            ("px", 5.0),
-            ("px", 5.0),
-            ("px", 5.0),
-            ("px", 3.0),
-            ("px", 3.0)
+            ("rems", 1.25),
+            ("rems", 1.25),
+            ("rems", 1.25),
+            ("rems", 0.75),
+            ("rems", 0.75)
         ]
     );
 }
@@ -2626,7 +2638,7 @@ fn test_dynamic_class_arbitrary_margin() {
 
     assert_eq!(
         take_length_calls(),
-        vec![("px", 3.0), ("px", 3.0), ("px", 3.0)]
+        vec![("rems", 0.75), ("rems", 0.75), ("rems", 0.75)]
     );
 }
 
@@ -2655,7 +2667,7 @@ fn test_dynamic_class_sizing_arbitrary() {
 
     assert_eq!(
         take_length_calls(),
-        vec![("px", 48.0), ("px", 16.0), ("px", 8.0)]
+        vec![("rems", 12.0), ("rems", 4.0), ("rems", 2.0)]
     );
 }
 
@@ -2700,7 +2712,7 @@ fn test_dynamic_class_keeps_valid_lengths_when_neighbors_are_invalid() {
 
     assert_eq!(
         take_length_calls(),
-        vec![("px", 14.0), ("px", 4.0), ("relative", 0.25)]
+        vec![("px", 14.0), ("rems", 1.0), ("relative", 0.25)]
     );
 }
 
@@ -2747,7 +2759,7 @@ fn test_dynamic_class_gap_xy_arbitrary() {
     let cls = "gap-y-6";
     let _b = rsx! { <div class={cls} /> };
 
-    assert_eq!(take_length_calls(), vec![("px", 4.0), ("px", 6.0)]);
+    assert_eq!(take_length_calls(), vec![("rems", 1.0), ("rems", 1.5)]);
 }
 
 #[test]
@@ -2799,17 +2811,17 @@ fn test_strict_dynamic_class_supports_shared_fast_path_entries() {
     take_length_calls();
 
     let cls = "flex font-bold gap-4";
-    let _el = gpui_rsx::rsx_strict! { <div class={cls} /> };
+    let _el = zopra_gpui_view::rsx_strict! { <div class={cls} /> };
 
     assert_eq!(take_font_weight_calls(), vec![700.0]);
-    assert_eq!(take_length_calls(), vec![("px", 4.0)]);
+    assert_eq!(take_length_calls(), vec![("rems", 1.0)]);
 }
 
 #[test]
 #[should_panic(expected = "unsupported dynamic class")]
 fn test_strict_dynamic_class_rejects_strict_only_overflow_scroll() {
     let cls = "overflow-scroll";
-    let _el = gpui_rsx::rsx_strict! { <div class={cls} /> };
+    let _el = zopra_gpui_view::rsx_strict! { <div class={cls} /> };
 }
 
 #[test]
@@ -2859,7 +2871,7 @@ fn test_conditional_literal_class_static_path_evaluates_condition_once() {
     };
 
     assert_eq!(condition_calls, 1);
-    assert_eq!(take_length_calls(), vec![("px", 7.0)]);
+    assert_eq!(take_length_calls(), vec![("rems", 1.75)]);
 }
 
 #[test]
@@ -2875,7 +2887,7 @@ fn test_match_literal_class_static_path_evaluates_expr_once() {
     };
 
     assert_eq!(match_expr_calls, 1);
-    assert_eq!(take_length_calls(), vec![("px", 7.0)]);
+    assert_eq!(take_length_calls(), vec![("rems", 1.75)]);
 }
 
 #[test]
@@ -2895,7 +2907,7 @@ fn test_match_literal_class_stateful_generates_auto_id() {
 
 #[test]
 fn test_rsx_expand_preview_contains_generated_code() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <div class="flex w-[280px] bg-[rgba(15,23,42,0.8)]" />
     };
 
@@ -2907,7 +2919,7 @@ fn test_rsx_expand_preview_contains_generated_code() {
 
 #[test]
 fn test_rsx_expand_preview_staticizes_conditional_literal_class() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <div class={if active { "flex gap-7" } else { "block" }} />
     };
     let compact = expanded.split_whitespace().collect::<String>();
@@ -2920,7 +2932,7 @@ fn test_rsx_expand_preview_staticizes_conditional_literal_class() {
 
 #[test]
 fn test_rsx_expand_preview_staticizes_match_literal_class() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <div class={match state { 0 => "flex gap-7", _ => "block" }} />
     };
     let compact = expanded.split_whitespace().collect::<String>();
@@ -2933,7 +2945,7 @@ fn test_rsx_expand_preview_staticizes_match_literal_class() {
 
 #[test]
 fn test_rsx_expand_preview_uses_base_attribute() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <Button base={Button::new("save")} label={"保存"} small />
     };
     let compact = expanded.replace(' ', "");
@@ -2944,7 +2956,7 @@ fn test_rsx_expand_preview_uses_base_attribute() {
 
 #[test]
 fn test_rsx_expand_preview_uses_path_tag_constructor() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <ui::TaskCard flex />
     };
     let compact = expanded.replace(' ', "");
@@ -2954,7 +2966,7 @@ fn test_rsx_expand_preview_uses_path_tag_constructor() {
 
 #[test]
 fn test_rsx_expand_preview_uses_when_class() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <div whenClass={(active, "bg-neutral-900 text-white")} />
     };
     let compact = expanded.split_whitespace().collect::<String>();
@@ -2967,7 +2979,7 @@ fn test_rsx_expand_preview_uses_when_class() {
 
 #[test]
 fn test_rsx_expand_preview_uses_state_class_attributes() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <button
             hoverClass="bg-blue-600"
             focusClass="border-blue-500"
@@ -2985,7 +2997,7 @@ fn test_rsx_expand_preview_uses_state_class_attributes() {
 
 #[test]
 fn test_rsx_expand_preview_hover_focus_class_do_not_inject_id() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <button
             hoverClass="bg-blue-600"
             focusClass="border-blue-500"
@@ -3000,7 +3012,7 @@ fn test_rsx_expand_preview_hover_focus_class_do_not_inject_id() {
 
 #[test]
 fn test_rsx_expand_preview_expands_multi_arg_interactive_attrs() {
-    let expanded = gpui_rsx::rsx_expand! {
+    let expanded = zopra_gpui_view::rsx_expand! {
         <button
             onA11yAction={(AccessibleAction::Click, handler)}
             onAuxClick={aux}
@@ -3011,4 +3023,13 @@ fn test_rsx_expand_preview_expands_multi_arg_interactive_attrs() {
     assert!(compact.contains(".id("));
     assert!(compact.contains(".on_a11y_action(AccessibleAction::Click,handler)"));
     assert!(compact.contains(".on_aux_click(aux)"));
+}
+
+#[test]
+fn test_object_fit_classes() {
+    let _a = rsx! { <img src="test" class="object-cover" /> };
+    let _b = rsx! { <img src="test" class="object-contain" /> };
+    let _c = rsx! { <img src="test" class="object-fill" /> };
+    let _d = rsx! { <img src="test" class="object-scale-down" /> };
+    let _e = rsx! { <img src="test" class="object-none" /> };
 }

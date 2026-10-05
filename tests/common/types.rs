@@ -3,6 +3,12 @@
 #[derive(Debug)]
 pub struct MockElement;
 
+impl MockElement {
+    pub fn object_fit<T>(self, _v: T) -> Self {
+        self
+    }
+}
+
 #[derive(Debug)]
 pub struct AnyElement;
 
@@ -14,6 +20,15 @@ pub struct Window;
 
 #[derive(Debug)]
 pub struct App;
+
+#[derive(Clone, Copy, Debug)]
+pub enum ObjectFit {
+    Cover,
+    Contain,
+    Fill,
+    ScaleDown,
+    None,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct FontWeight(pub f32);
@@ -131,6 +146,12 @@ pub trait Styled: Sized {
     // --- alignment ---
     fn items_center(self) -> Self;
     fn items_start(self) -> Self;
+
+    // --- modifiers ---
+    fn hover(self, f: impl FnOnce(Self) -> Self) -> Self;
+    fn active(self, f: impl FnOnce(Self) -> Self) -> Self;
+    fn focus(self, f: impl FnOnce(Self) -> Self) -> Self;
+    fn group_hover(self, group: &str, f: impl FnOnce(Self) -> Self) -> Self;
     fn items_end(self) -> Self;
     fn items_baseline(self) -> Self;
     fn items_stretch(self) -> Self;
@@ -202,6 +223,7 @@ pub trait Styled: Sized {
     fn text_xl(self) -> Self;
     fn text_2xl(self) -> Self;
     fn text_3xl(self) -> Self;
+    fn text_size<T>(self, size: T) -> Self;
     // --- text alignment ---
     fn text_left(self) -> Self;
     fn text_center(self) -> Self;
@@ -265,6 +287,11 @@ pub trait Styled: Sized {
     fn overflow_y_hidden(self) -> Self;
     fn absolute(self) -> Self;
     fn relative(self) -> Self;
+    fn inset<T>(self, v: T) -> Self;
+    fn top<T>(self, v: T) -> Self;
+    fn bottom<T>(self, v: T) -> Self;
+    fn left<T>(self, v: T) -> Self;
+    fn right<T>(self, v: T) -> Self;
     // --- color / opacity ---
     fn bg<T>(self, v: T) -> Self;
     fn text_color<T>(self, v: T) -> Self;

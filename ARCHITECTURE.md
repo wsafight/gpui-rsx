@@ -467,7 +467,7 @@ full class support.
 ```
 flex, flex-col, flex-row, flex-1, items-center, justify-center,
 gap-1..gap-8, p-1..p-8, px-2, px-4, py-1..py-4, m-2, m-4,
-w-full, h-full, text-xs..text-3xl, font-bold, border, rounded-*,
+w-full, h-full, text-xs..text-9xl, font-bold, border, rounded-*,
 cursor-pointer, overflow-hidden, bg-white, bg-black, …
 ```
 

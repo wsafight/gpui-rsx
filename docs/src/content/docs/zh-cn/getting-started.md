@@ -26,7 +26,7 @@ gpui-rsx = "0.7"
 use gpui::*;
 use gpui::prelude::*;
 use gpui_platform::application;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 ```
 
 ## 第一个元素
@@ -146,7 +146,7 @@ rsx! {
 use gpui::*;
 use gpui::prelude::*;
 use gpui_platform::application;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 struct HelloView;
 

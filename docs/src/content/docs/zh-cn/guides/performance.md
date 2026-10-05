@@ -193,7 +193,7 @@ fn render_sidebar(&self) -> impl IntoElement {
 使用 `rsx_expand!` 检查 class 是否保持静态，还是进入了动态 matcher：
 
 ```rust
-let preview = gpui_rsx::rsx_expand! {
+let preview = zopra_gpui_view::rsx_expand! {
     <div class={if active { "flex gap-4" } else { "block" }} />
 };
 ```

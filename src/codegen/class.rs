@@ -1,18 +1,18 @@
-//! Class 字符串解析
+//! Class string parsing
 //!
-//! 将 CSS class 字符串解析为 GPUI 方法调用链，支持：
-//! - Tailwind 风格的实用类（flex, gap-4, text-red-500）
-//! - 任意 hex 颜色值（bg-[#ff0000]）
-//! - 间距/尺寸类
+//! Parses CSS class strings into GPUI method call chains, supporting:
+//! - Tailwind-style utility classes (flex, gap-4, text-red-500)
+//! - Arbitrary hex color values (bg-[#ff0000])
+//! - Spacing/sizing classes
 //!
-//! 核心优化：
-//! - 统一的颜色解析函数，避免代码重复
-//! - 间距前缀使用 rfind + match（O(1)）替代线性扫描（O(17)）
-//! - text_ 前缀只做一次 strip_prefix，颜色与文本大小分支合并处理
-//! - 文本大小使用 match 替代 contains 线性查找
-//! - 常见数值长度、颜色、opacity、line-clamp 类先在原始 class 上解析，减少字符串替换
-//! - 先检查 `contains('-')` 跳过无连字符类的堆分配，含连字符时用 `replace` 做完整替换
-//! - split_ascii_whitespace 替代 split_whitespace（class 名只含 ASCII）
+//! Core optimizations:
+//! - Unified color parsing function to avoid code duplication
+//! - Spacing prefixes use rfind + match (O(1)) instead of linear scanning (O(17))
+//! - `text_` prefix performs strip_prefix only once, consolidating color and text size branch handling
+//! - Text size uses match instead of contains linear search
+//! - Common numeric length, color, opacity, and line-clamp classes are parsed directly on the original class to reduce string allocations
+//! - Check `contains('-')` first to bypass heap allocation for hyphen-free classes; full replacement with `replace` when hyphens are present
+//! - split_ascii_whitespace replaces split_whitespace (class names contain ASCII only)
 
 use super::tables::*;
 use proc_macro2::{Span, TokenStream};
@@ -31,11 +31,11 @@ impl ClassMode {
     }
 }
 
-/// 解析 class 字符串为方法链片段迭代器
+/// Parses a class string into an iterator of method chain fragments
 ///
 /// `"flex flex-col gap-4"` → `[.flex(), .flex_col(), .gap(px(4.0))]`
 ///
-/// 返回迭代器而非 Vec，调用方通过 `extend` 消费时避免中间 Vec 分配。
+/// Returns an iterator instead of a Vec, avoiding intermediate Vec allocations when the caller consumes it via `extend`.
 pub(crate) fn parse_class_string_with_mode(
     class_str: &str,
     mode: ClassMode,
@@ -45,9 +45,30 @@ pub(crate) fn parse_class_string_with_mode(
         .map(move |class| parse_single_class_with_mode(class, mode))
 }
 
-/// 解析单个 CSS class 为方法调用
+/// Parses a single CSS class into a method call
 pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> TokenStream {
+    if let Some(rest) = class.strip_prefix("hover:") {
+        let inner = parse_single_class_with_mode(rest, mode);
+        return quote! { .hover(|style| style #inner) };
+    }
+    if let Some(rest) = class.strip_prefix("active:") {
+        let inner = parse_single_class_with_mode(rest, mode);
+        return quote! { .active(|style| style #inner) };
+    }
+    if let Some(rest) = class.strip_prefix("focus:") {
+        let inner = parse_single_class_with_mode(rest, mode);
+        return quote! { .focus(|style| style #inner) };
+    }
+    if let Some(rest) = class.strip_prefix("group-hover:") {
+        let inner = parse_single_class_with_mode(rest, mode);
+        return quote! { .group_hover(|style| style #inner) };
+    }
+
     if let Some(token) = parse_font_weight_class(class, mode) {
+        return token;
+    }
+
+    if let Some(token) = parse_object_fit_class(class) {
         return token;
     }
 
@@ -82,6 +103,10 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
         return token;
     }
 
+    if let Some(token) = parse_arbitrary_bracket_length_class(class) {
+        return token;
+    }
+
     if let Some(token) = parse_direct_color_class(class) {
         return token;
     }
@@ -98,7 +123,7 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
         return token;
     }
 
-    // 含 '-' 或 '/' 时分配新 String，不含则零拷贝借用原字符串。
+    // Allocate a new String when '-' or '/' is present; borrow the original string with zero-copy otherwise.
     // Tailwind fraction classes like `w-1/2` map to GPUI helpers like `w_1_2`.
     let method_name: Cow<str> = if class.contains(['-', '/']) {
         Cow::Owned(class.replace(['-', '/'], "_"))
@@ -106,41 +131,46 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
         Cow::Borrowed(class)
     };
 
-    // 间距/尺寸类：使用 rfind('_') + match 实现 O(1) 前缀查找
+    // Spacing/sizing classes: use rfind('_') + match for O(1) prefix lookup
     if let Some(underscore_pos) = method_name.rfind('_') {
         let suffix = &method_name[underscore_pos + 1..];
         if let Some(num) = parse_length_number(suffix) {
             let prefix = &method_name[..=underscore_pos];
             if let Some(method) = lookup_spacing_method(prefix) {
                 let method_ident = syn::Ident::new(method, Span::call_site());
-                return quote! { .#method_ident(px(#num)) };
+                let rem_val = num * 0.25;
+                return quote! { .#method_ident(rems(#rem_val)) };
             }
         }
     }
 
-    // GPUI 0.2 的方向性 border 无参宽度方法带 `_1` 后缀。
+    // Directional border zero-arg width methods in GPUI 0.2 carry a `_1` suffix.
     if let Some(method) = lookup_directional_border_method(&method_name) {
         let ident = syn::Ident::new(method, Span::call_site());
         return quote! { .#ident() };
     }
 
-    // border 特殊处理：
-    // "border" (纯) → .border_1()（GPUI 没有无参 .border()）
+    // Special handling for border:
+    // "border" (plain) → .border_1() (GPUI has no parameterless .border())
     // "border-2" → .border_2()
     if method_name == "border" {
         return quote! { .border_1() };
+    }
+
+    if method_name == "rounded" {
+        return quote! { .rounded_md() };
     }
 
     if method_name == "no_underline" {
         return quote! { .text_decoration_none() };
     }
 
-    // border-color 类：border-red-500 → .border_color(rgb(0xef4444))
+    // border-color class: border-red-500 → .border_color(rgb(0xef4444))
     if let Some(rest) = method_name.strip_prefix("border_")
         && !is_directional_border(rest)
     {
         if rest.as_bytes().first().is_some_and(|b| b.is_ascii_digit()) {
-            // 数值边框宽度 border-2, border-4 等
+            // Numeric border width: border-2, border-4, etc.
             let ident = syn::Ident::new(&method_name, Span::call_site());
             return quote! { .#ident() };
         } else if let Some(token) = parse_color_with_method(rest, "border_color", class) {
@@ -148,30 +178,40 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
         }
     }
 
-    // text_ 前缀：统一处理颜色类（text-red-600）和文本大小类（text-xl）
-    // 只做一次 strip_prefix("text_")，避免先在颜色分支、再在大小分支各做一次。
+    // text_ prefix: unified handling of color classes (text-red-600) and text size classes (text-xl)
+    // Strip prefix "text_" only once to avoid doing it separately in color and size branches.
     if let Some(rest) = method_name.strip_prefix("text_") {
-        // 先查颜色表（text-red-500 → .text_color(rgb(...))）
+        // Look up color table first (text-red-500 → .text_color(rgb(...)))
         if let Some(token) = parse_color_with_method(rest, "text_color", class) {
             return token;
         }
-        // 再查文本大小（text-xl → .text_xl()）
+        // Then look up text size (text-xl → .text_xl())
         if is_valid_text_size(rest) {
-            let size_ident = syn::Ident::new(&method_name, Span::call_site());
-            return quote! { .#size_ident() };
+            match rest {
+                "4xl" => return quote! { .text_size(rems(2.25)) },
+                "5xl" => return quote! { .text_size(rems(3.0)) },
+                "6xl" => return quote! { .text_size(rems(3.75)) },
+                "7xl" => return quote! { .text_size(rems(4.5)) },
+                "8xl" => return quote! { .text_size(rems(6.0)) },
+                "9xl" => return quote! { .text_size(rems(8.0)) },
+                _ => {
+                    let size_ident = syn::Ident::new(&method_name, Span::call_site());
+                    return quote! { .#size_ident() };
+                }
+            }
         }
-        // 不在白名单中的 text_ 前缀，fall through 到默认处理
+        // Non-whitelisted text_ prefixes fall through to default handling
     }
 
-    // bg_ 颜色类：bg-blue-500 → .bg(rgb(...))
+    // bg_ color class: bg-blue-500 → .bg(rgb(...))
     if let Some(rest) = method_name.strip_prefix("bg_")
         && let Some(token) = parse_color_with_method(rest, "bg", class)
     {
         return token;
     }
 
-    // opacity_ 类：opacity-50 → .opacity(0.5)
-    // 注意：GPUI 的 opacity 范围为 0.0–1.0，Tailwind 用 0–100 整数表示
+    // opacity_ class: opacity-50 → .opacity(0.5)
+    // Note: GPUI's opacity range is 0.0–1.0, while Tailwind uses 0–100 integers
     if let Some(rest) = method_name.strip_prefix("opacity_")
         && let Ok(n) = rest.parse::<u8>()
     {
@@ -190,7 +230,7 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
         return compile_error(unsupported_class_message(class));
     }
 
-    // 默认：无参方法调用（防御性检查：跳过含非标识符字符的 class，如 "hover:bg-blue-500"）
+    // Default: parameterless method call (defensive check: skip classes with non-identifier characters like "hover:bg-blue-500")
     if !method_name.is_empty()
         && method_name
             .chars()
@@ -207,8 +247,16 @@ pub(crate) fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> Toke
 
 fn parse_tailwind_alias_class(class: &str) -> Option<TokenStream> {
     match class {
-        "flex-grow" => Some(quote! { .flex_grow_1() }),
-        "flex-shrink" => Some(quote! { .flex_shrink_1() }),
+        "flex-grow" | "grow" => Some(quote! { .flex_grow_1() }),
+        "flex-shrink" | "shrink" => Some(quote! { .flex_shrink_1() }),
+        "grow-0" => Some(quote! { .flex_grow_0() }),
+        "shrink-0" => Some(quote! { .flex_shrink_0() }),
+        "w-fit" => Some(quote! { .w_auto() }),
+        "h-fit" => Some(quote! { .h_auto() }),
+        "min-w-fit" => Some(quote! { .min_w_auto() }),
+        "max-w-fit" => Some(quote! { .max_w_auto() }),
+        "min-h-fit" => Some(quote! { .min_h_auto() }),
+        "max-h-fit" => Some(quote! { .max_h_auto() }),
         _ => None,
     }
 }
@@ -238,6 +286,19 @@ fn parse_font_weight_class(class: &str, mode: ClassMode) -> Option<TokenStream> 
     };
     let weight_ident = syn::Ident::new(weight, Span::call_site());
     Some(quote! { .font_weight(FontWeight::#weight_ident) })
+}
+
+fn parse_object_fit_class(class: &str) -> Option<TokenStream> {
+    let fit = match class {
+        "object-cover" => "Cover",
+        "object-contain" => "Contain",
+        "object-fill" => "Fill",
+        "object-scale-down" => "ScaleDown",
+        "object-none" => "None",
+        _ => return None,
+    };
+    let fit_ident = syn::Ident::new(fit, Span::call_site());
+    Some(quote! { .object_fit(ObjectFit::#fit_ident) })
 }
 
 #[derive(Clone, Copy)]
@@ -339,7 +400,8 @@ fn parse_numeric_length_class(class: &str) -> Option<TokenStream> {
     if value.starts_with('[') || value.contains('/') {
         return None;
     }
-    parse_length_number(value).map(|value| length_method_call(method, LengthKind::Px(value)))
+    parse_length_number(value)
+        .map(|value| length_method_call(method, LengthKind::Rem(value * 0.25)))
 }
 
 fn parse_direct_color_class(class: &str) -> Option<TokenStream> {
@@ -415,19 +477,19 @@ fn compile_error(message: String) -> TokenStream {
     quote! { .map(|__el| { compile_error!(#message); __el }) }
 }
 
-/// 统一的颜色解析函数（核心去重逻辑）
+/// Unified color parsing function (core deduplication logic)
 ///
-/// 将颜色名称或任意 hex 值转换为方法调用。
+/// Converts a color name or arbitrary hex value into a method call.
 ///
-/// # 参数
-/// - `color`: 颜色字符串（如 "red_500", "[#ff0000]"）
-/// - `method`: 方法名（"text_color", "bg", "border_color"）
+/// # Arguments
+/// - `color`: Color string (e.g. "red_500", "[#ff0000]")
+/// - `method`: Method name ("text_color", "bg", "border_color")
 ///
-/// # 返回值
-/// - `Some(TokenStream)`: 成功解析，返回 `.method(rgb(value))`
-/// - `None`: 无法解析颜色
+/// # Returns
+/// - `Some(TokenStream)`: Successfully parsed, returning `.method(rgb(value))`
+/// - `None`: Unable to parse color
 fn parse_color_with_method(color: &str, method: &str, class: &str) -> Option<TokenStream> {
-    // 统一颜色表查找和任意 hex 解析，仅在匹配成功时创建 Ident
+    // Unified color table lookup and arbitrary hex parsing; create Ident only on successful match
     let parsed = lookup_color_key(color)
         .map(ColorValue::Rgb)
         .or_else(|| parse_arbitrary_color_value(color));
@@ -456,15 +518,15 @@ fn lookup_color_key(color: &str) -> Option<u32> {
     }
 }
 
-/// 判断 `border_` 之后的部分是否属于方向性边框类（而非颜色类）
+/// Determines whether the part after `border_` belongs to a directional border class (rather than a color class)
 ///
-/// 方向性边框（fall through 到默认方法调用）：
-/// - 纯方向：`border-t` → rest = `"t"`（len == 1）
-/// - 方向+数值：`border-t-2` → rest = `"t-2"` / `"t_2"`（首字节是方向）
+/// Directional borders (fall through to default method call):
+/// - Plain direction: `border-t` → rest = `"t"` (len == 1)
+/// - Direction + value: `border-t-2` → rest = `"t-2"` / `"t_2"` (first byte is direction)
 ///
-/// 颜色类（应生成 `.border_color(rgb(...))`）：
-/// - `border-red-500` → rest = `"red_500"`（首字节 `r` 虽在方向集合中，
-///   但第二字节 `e` ≠ `_`，故判定为颜色类）
+/// Color classes (should generate `.border_color(rgb(...))`):
+/// - `border-red-500` → rest = `"red_500"` (first byte `r` is in directional set,
+///   but second byte `e` != `_`, so it is classified as a color class)
 fn is_directional_border(rest: &str) -> bool {
     let bytes = rest.as_bytes();
     matches!(bytes.first(), Some(b't' | b'b' | b'l' | b'r' | b'x' | b'y'))
@@ -483,10 +545,10 @@ fn lookup_directional_border_method(class: &str) -> Option<&'static str> {
     }
 }
 
-/// 解析任意 hex 颜色值：`[#rrggbb]` 或 `[#rgb]`
+/// Parses arbitrary hex color values: `[#rrggbb]` or `[#rgb]`
 ///
-/// 输入已经过 `-` → `_` 替换，但 `[#...]` 中不含 `-`，所以保持原样。
-/// 返回解析后的 u32 颜色值。
+/// Input has already undergone `-` → `_` replacement, but `[#...]` contains no `-`, so it stays intact.
+/// Returns the parsed u32 color value.
 #[derive(Clone, Copy)]
 enum ColorValue {
     Rgb(u32),
@@ -498,7 +560,7 @@ fn parse_arbitrary_color_value(s: &str) -> Option<ColorValue> {
 }
 
 fn parse_arbitrary_hex(s: &str) -> Option<ColorValue> {
-    // 匹配 [#rrggbb]、[#rrggbbaa]、[#rgb] 或 [#rgba]
+    // Match [#rrggbb], [#rrggbbaa], [#rgb], or [#rgba]
     let inner = s.strip_prefix("[#")?.strip_suffix(']')?;
     match inner.len() {
         8 => u32::from_str_radix(inner, 16).ok().map(ColorValue::Rgba),
@@ -516,14 +578,14 @@ fn parse_arbitrary_hex(s: &str) -> Option<ColorValue> {
             ))
         }
         3 => {
-            // 3 位 hex 扩展为 6 位: #abc → #aabbcc
-            // 用位运算零分配实现，避免 String 堆分配
+            // Expand 3-digit hex to 6 digits: #abc → #aabbcc
+            // Implemented with bitwise operations for zero allocation, avoiding String heap allocation
             let b = inner.as_bytes();
             let d = |c: u8| -> Option<u32> { (c as char).to_digit(16) };
             let r = d(b[0])?;
             let g = d(b[1])?;
             let bl = d(b[2])?;
-            // 每个 4-bit 数字复制到高低 nibble: 0xA → 0xAA
+            // Duplicate each 4-bit digit to upper and lower nibbles: 0xA → 0xAA
             Some(ColorValue::Rgb(
                 r << 20 | r << 16 | g << 12 | g << 8 | bl << 4 | bl,
             ))
@@ -655,4 +717,35 @@ mod tests {
         assert_eq!(parse_length_number("inf"), None);
         assert_eq!(parse_length_number("-inf"), None);
     }
+}
+
+fn parse_arbitrary_bracket_length_class(class: &str) -> Option<TokenStream> {
+    if let Some(rest) = class.strip_prefix("text-[")
+        && let Some(inner) = rest.strip_suffix(']')
+    {
+        if let Some(num) = inner.strip_suffix("px")
+            && let Ok(v) = num.parse::<f32>()
+        {
+            return Some(quote! { .text_size(px(#v)) });
+        } else if let Some(num) = inner.strip_suffix("rem")
+            && let Ok(v) = num.parse::<f32>()
+        {
+            return Some(quote! { .text_size(rems(#v)) });
+        }
+    }
+
+    if let Some(rest) = class.strip_prefix("rounded-[")
+        && let Some(inner) = rest.strip_suffix(']')
+    {
+        if let Some(num) = inner.strip_suffix("px")
+            && let Ok(v) = num.parse::<f32>()
+        {
+            return Some(quote! { .rounded(px(#v)) });
+        } else if let Some(num) = inner.strip_suffix("rem")
+            && let Ok(v) = num.parse::<f32>()
+        {
+            return Some(quote! { .rounded(rems(#v)) });
+        }
+    }
+    None
 }

@@ -81,7 +81,7 @@ For applications, commit `Cargo.lock` to pin the exact resolved Zed revision. If
 use gpui::*;
 use gpui::prelude::*;
 use gpui_platform::application;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 struct CounterView {
     count: i32,
@@ -203,6 +203,7 @@ rsx! {
 ```
 
 Expands to:
+
 ```rust
 div().child("Hello GPUI")
 ```
@@ -222,6 +223,7 @@ rsx! {
 ```
 
 Expands to:
+
 ```rust
 vec![
     div().child("First"),
@@ -241,6 +243,7 @@ rsx! {
 ```
 
 Expands to:
+
 ```rust
 div().flex().flex_col()
 ```
@@ -254,6 +257,7 @@ rsx! {
 ```
 
 Expands to:
+
 ```rust
 div().gap(px(16.0)).bg(rgb(0xffffff))
 ```
@@ -269,6 +273,7 @@ rsx! {
 ```
 
 Expands to:
+
 ```rust
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
@@ -278,12 +283,14 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 #### Supported class patterns
 
 **Layout:**
+
 - `flex`, `flex-col`, `flex-row`, `flex-wrap`, `flex-1`, `flex-none`, `flex-auto`
 - `flex-grow`, `flex-grow-0`, `flex-grow-1`, `flex-shrink`, `flex-shrink-0`, `flex-shrink-1`
 - `min-w-0`, `min-h-0`, `items-center`, `items-start`, `items-end`, `items-stretch`
 - `justify-center`, `justify-between`, `justify-around`, `justify-evenly`
 
 **Spacing** (numeric values become `px(n)`):
+
 - `gap-4` → `.gap(px(4.0))`
 - `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`
 - `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, `ml-4`, `mr-4`
@@ -291,6 +298,7 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - Percent spacing such as `gap-[10%]` intentionally errors because GPUI spacing uses definite lengths
 
 **Sizing:**
+
 - Numeric values keep project semantics: `w-64` → `.w(px(64.0))`, `h-32` → `.h(px(32.0))`
 - `w-full`, `h-full`, `size-full`, `aspect-square`
 - `w-px`, `h-px`, `w-auto`, `h-auto`, `w-1/2`, `h-1/3`, `size-1/2`
@@ -298,36 +306,42 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 - Fraction sizing with arbitrary denominators: `w-6/24`, `min-w-1/3`, `size-3/4`
 
 **Text:**
+
 - `text-xs`, `text-sm`, `text-base`, `text-lg`, `text-xl`
-- `text-2xl`, `text-3xl`
+- `text-2xl`, `text-3xl`, `text-4xl`, `text-5xl`, `text-6xl`, `text-7xl`, `text-8xl`, `text-9xl`
 - `font-thin`, `font-extralight`, `font-light`, `font-normal`, `font-medium`, `font-semibold`, `font-bold`, `font-extrabold`, `font-black`
 - `whitespace-normal`, `whitespace-nowrap`, `line-clamp-*`
 - `text-ellipsis`, `truncate`, `no-underline`
 - `text-decoration-solid`, `text-decoration-wavy`, `text-decoration-0/1/2/4/8`
 
 **Alignment:**
+
 - `content-normal`, `content-center`, `content-start`, `content-end`, `content-between`, `content-around`, `content-evenly`, `content-stretch`
 - `self-start`, `self-end`, `self-flex-start`, `self-flex-end`, `self-center`, `self-baseline`, `self-stretch`
 
 **Border:**
+
 - `border` → `.border_1()`
 - `border-2` → `.border_2()`, `border-4` → `.border_4()`
 - `rounded-sm`, `rounded-md`, `rounded-lg`, `rounded-xl`, `rounded-2xl`, `rounded-3xl`, `rounded-full`, `rounded-none`
 - Directional radius classes such as `rounded-t-lg`, `rounded-b-lg`, `rounded-r-lg`, `rounded-l-lg`
 
 **Colors** (full Tailwind palette):
+
 - `text-red-500` → `.text_color(rgb(0xef4444))`
 - `bg-blue-600` → `.bg(rgb(0x2563eb))`
 - `border-green-500` → `.border_color(rgb(0x22c55e))`
 - Arbitrary colors: `bg-[#ff0000]`, `text-[#333]`, `border-[#11223344]`, `bg-[rgb(15,23,42)]`, `text-[rgba(15,23,42,0.8)]`
 
 **Effects:**
+
 - `shadow-none`, `shadow-2xs`, `shadow-xs`, `shadow-sm`, `shadow-md`, `shadow-lg`, `shadow-xl`, `shadow-2xl`
 - `overflow-hidden`, `overflow-x-hidden`, `overflow-y-hidden`, `overflow-scroll`
 - `cursor-pointer`, `cursor-default`, `cursor-text`, `cursor-move`, `cursor-grab`, `cursor-not-allowed`, resize cursor variants
 - `debug-outline` enables GPUI debug borders in debug builds and is a no-op in release builds
 
 **Grid placement:**
+
 - `col-span-*`, `col-start-*`, `col-end-*`, `row-span-*`, `row-start-*`, `row-end-*`
 - `col-span-full`, `col-start-auto`, `col-end-auto`, `row-span-full`, `row-start-auto`, `row-end-auto`
 
@@ -347,31 +361,31 @@ rsx! {
 
 Supported events (camelCase / snake_case):
 
-| Event | Method |
-|-------|--------|
-| `onClick` / `on_click` | `.on_click(handler)` |
-| `onMouseDown` / `on_mouse_down` | `.on_mouse_down(button, handler)` |
-| `onMouseUp` / `on_mouse_up` | `.on_mouse_up(button, handler)` |
-| `onMouseMove` / `on_mouse_move` | `.on_mouse_move(handler)` |
-| `onMouseDownOut` / `on_mouse_down_out` | `.on_mouse_down_out(handler)` |
-| `onMouseUpOut` / `on_mouse_up_out` | `.on_mouse_up_out(button, handler)` |
-| `onAnyMouseDown` / `on_any_mouse_down` | `.on_any_mouse_down(handler)` |
-| `onAnyMouseUp` / `on_any_mouse_up` | `.on_any_mouse_up(handler)` |
-| `onKeyDown` / `on_key_down` | `.on_key_down(handler)` |
-| `onKeyUp` / `on_key_up` | `.on_key_up(handler)` |
-| `onModifiersChanged` / `on_modifiers_changed` | `.on_modifiers_changed(handler)` |
-| `onHover` / `on_hover` | `.on_hover(handler)` |
-| `onScrollWheel` / `on_scroll_wheel` | `.on_scroll_wheel(handler)` |
-| `onDrag` / `on_drag` | `.on_drag(value, constructor)` |
-| `onDragMove` / `on_drag_move` | `.on_drag_move(handler)` |
-| `onDrop` / `on_drop` | `.on_drop(handler)` |
-| `onAction` / `on_action` | `.on_action(handler)` |
-| `onBoxedAction` / `on_boxed_action` | `.on_boxed_action(action, handler)` |
-| `captureAnyMouseDown` / `capture_any_mouse_down` | `.capture_any_mouse_down(handler)` |
-| `captureAnyMouseUp` / `capture_any_mouse_up` | `.capture_any_mouse_up(handler)` |
-| `captureKeyDown` / `capture_key_down` | `.capture_key_down(handler)` |
-| `captureKeyUp` / `capture_key_up` | `.capture_key_up(handler)` |
-| `captureAction` / `capture_action` | `.capture_action(handler)` |
+| Event                                            | Method                              |
+| ------------------------------------------------ | ----------------------------------- |
+| `onClick` / `on_click`                           | `.on_click(handler)`                |
+| `onMouseDown` / `on_mouse_down`                  | `.on_mouse_down(button, handler)`   |
+| `onMouseUp` / `on_mouse_up`                      | `.on_mouse_up(button, handler)`     |
+| `onMouseMove` / `on_mouse_move`                  | `.on_mouse_move(handler)`           |
+| `onMouseDownOut` / `on_mouse_down_out`           | `.on_mouse_down_out(handler)`       |
+| `onMouseUpOut` / `on_mouse_up_out`               | `.on_mouse_up_out(button, handler)` |
+| `onAnyMouseDown` / `on_any_mouse_down`           | `.on_any_mouse_down(handler)`       |
+| `onAnyMouseUp` / `on_any_mouse_up`               | `.on_any_mouse_up(handler)`         |
+| `onKeyDown` / `on_key_down`                      | `.on_key_down(handler)`             |
+| `onKeyUp` / `on_key_up`                          | `.on_key_up(handler)`               |
+| `onModifiersChanged` / `on_modifiers_changed`    | `.on_modifiers_changed(handler)`    |
+| `onHover` / `on_hover`                           | `.on_hover(handler)`                |
+| `onScrollWheel` / `on_scroll_wheel`              | `.on_scroll_wheel(handler)`         |
+| `onDrag` / `on_drag`                             | `.on_drag(value, constructor)`      |
+| `onDragMove` / `on_drag_move`                    | `.on_drag_move(handler)`            |
+| `onDrop` / `on_drop`                             | `.on_drop(handler)`                 |
+| `onAction` / `on_action`                         | `.on_action(handler)`               |
+| `onBoxedAction` / `on_boxed_action`              | `.on_boxed_action(action, handler)` |
+| `captureAnyMouseDown` / `capture_any_mouse_down` | `.capture_any_mouse_down(handler)`  |
+| `captureAnyMouseUp` / `capture_any_mouse_up`     | `.capture_any_mouse_up(handler)`    |
+| `captureKeyDown` / `capture_key_down`            | `.capture_key_down(handler)`        |
+| `captureKeyUp` / `capture_key_up`                | `.capture_key_up(handler)`          |
+| `captureAction` / `capture_action`               | `.capture_action(handler)`          |
 
 Methods with multiple GPUI parameters use tuple syntax in RSX:
 `onMouseDown={(MouseButton::Left, handler)}` and `onDrag={(value, constructor)}`.
@@ -438,6 +452,7 @@ rsx! {
 ```
 
 Expands to:
+
 ```rust
 div().children((&self.items).into_iter().map(|item| {
     div().child(item.name.clone())
@@ -523,6 +538,7 @@ rsx! {
 > in release builds and print a warning in debug builds.
 >
 > **Recommended alternatives** (in priority order):
+>
 > 1. **String literal** (best): `class="flex gap-4"` — compile-time, supports the documented subset
 > 2. **Conditional/match literal**: `class={if active { "flex gap-4" } else { "block" }}` or
 >    `class={match state { State::Active => "flex", _ => "block" }}` — still compile-time expanded
@@ -548,7 +564,7 @@ let classes = format!("flex gap-{} bg-[#ff0000]", spacing);  // gap-7, gap-32, e
 `rsx!` is permissive by default: unsupported static class names are ignored when they cannot be parsed safely, while invalid arbitrary values emit compile errors. Use `rsx_strict!` to reject unsupported static classes:
 
 ```rust
-use gpui_rsx::{rsx_expand, rsx_permissive, rsx_strict};
+use zopra_gpui_view::{rsx_expand, rsx_permissive, rsx_strict};
 
 rsx_strict! { <div class="flex w-[280px]" /> }
 rsx_permissive! { <div class="hover:bg-blue-500 flex" /> }
@@ -563,13 +579,13 @@ Strict dynamic classes panic when an unsupported runtime token is evaluated. `rs
 
 Dynamic class capability summary:
 
-| Capability | Static `class="..."` | Dynamic `class={expr}` |
-|------------|----------------------|-------------------------|
-| Layout, spacing, sizing | Supported | Supported subset |
-| Colors and opacity | Supported | Supported |
-| Arbitrary lengths/colors | Supported | Supported |
-| Fraction sizing | Supported | Supported |
-| Stateful scroll classes | Supported with auto ID | Not supported |
+| Capability                | Static `class="..."`                   | Dynamic `class={expr}`                 |
+| ------------------------- | -------------------------------------- | -------------------------------------- |
+| Layout, spacing, sizing   | Supported                              | Supported subset                       |
+| Colors and opacity        | Supported                              | Supported                              |
+| Arbitrary lengths/colors  | Supported                              | Supported                              |
+| Fraction sizing           | Supported                              | Supported                              |
+| Stateful scroll classes   | Supported with auto ID                 | Not supported                          |
 | Unknown Tailwind variants | Ignored in permissive, error in strict | Ignored in permissive, panic in strict |
 
 ### 12. Desktop Three-Column Layout
@@ -600,32 +616,32 @@ rsx! {
 
 Most camelCase attributes map to GPUI snake_case methods; special flag behavior is listed below:
 
-| RSX Attribute | Generated GPUI code |
-|---------------|---------------------|
-| `opacity` | `.opacity()` |
-| `visible` / `invisible` | `.visible()` / `.invisible()` |
-| `width` / `height` | `.w()` / `.h()` |
-| `minWidth` / `maxWidth` | `.min_w()` / `.max_w()` |
-| `minHeight` / `maxHeight` | `.min_h()` / `.max_h()` |
-| `gapX` / `gapY` | `.gap_x()` / `.gap_y()` |
-| `flexBasis` | `.flex_basis()` |
-| `flexGrow` / `flexShrink` (flags) | `.flex_grow_1()` / `.flex_shrink_1()` |
-| `fontSize` | `.text_size()` |
-| `lineHeight` | `.line_height()` |
-| `fontWeight` | `.font_weight()` |
-| `fontFamily` | `.font_family()` |
-| `textAlign` | `.text_align()` |
-| `textColor` | `.text_color()` |
-| `backgroundColor` | `.bg()` |
-| `borderColor` | `.border_color()` |
-| `borderTop` / `borderBottom` | `.border_t(value)` / `.border_b(value)` |
-| `borderLeft` / `borderRight` | `.border_l(value)` / `.border_r(value)` |
+| RSX Attribute                                             | Generated GPUI code                                                   |
+| --------------------------------------------------------- | --------------------------------------------------------------------- |
+| `opacity`                                                 | `.opacity()`                                                          |
+| `visible` / `invisible`                                   | `.visible()` / `.invisible()`                                         |
+| `width` / `height`                                        | `.w()` / `.h()`                                                       |
+| `minWidth` / `maxWidth`                                   | `.min_w()` / `.max_w()`                                               |
+| `minHeight` / `maxHeight`                                 | `.min_h()` / `.max_h()`                                               |
+| `gapX` / `gapY`                                           | `.gap_x()` / `.gap_y()`                                               |
+| `flexBasis`                                               | `.flex_basis()`                                                       |
+| `flexGrow` / `flexShrink` (flags)                         | `.flex_grow_1()` / `.flex_shrink_1()`                                 |
+| `fontSize`                                                | `.text_size()`                                                        |
+| `lineHeight`                                              | `.line_height()`                                                      |
+| `fontWeight`                                              | `.font_weight()`                                                      |
+| `fontFamily`                                              | `.font_family()`                                                      |
+| `textAlign`                                               | `.text_align()`                                                       |
+| `textColor`                                               | `.text_color()`                                                       |
+| `backgroundColor`                                         | `.bg()`                                                               |
+| `borderColor`                                             | `.border_color()`                                                     |
+| `borderTop` / `borderBottom`                              | `.border_t(value)` / `.border_b(value)`                               |
+| `borderLeft` / `borderRight`                              | `.border_l(value)` / `.border_r(value)`                               |
 | `border_t` / `border_b` / `border_l` / `border_r` (flags) | `.border_t_1()` / `.border_b_1()` / `.border_l_1()` / `.border_r_1()` |
-| `roundedTop` / `roundedBottom` | `.rounded_t()` / `.rounded_b()` |
-| `roundedTopLeft` / `roundedTopRight` | `.rounded_tl()` / `.rounded_tr()` |
-| `roundedBottomLeft` / `roundedBottomRight` | `.rounded_bl()` / `.rounded_br()` |
-| `boxShadow` | `.shadow()` |
-| `inset` | `.inset()` |
+| `roundedTop` / `roundedBottom`                            | `.rounded_t()` / `.rounded_b()`                                       |
+| `roundedTopLeft` / `roundedTopRight`                      | `.rounded_tl()` / `.rounded_tr()`                                     |
+| `roundedBottomLeft` / `roundedBottomRight`                | `.rounded_bl()` / `.rounded_br()`                                     |
+| `boxShadow`                                               | `.shadow()`                                                           |
+| `inset`                                                   | `.inset()`                                                            |
 
 Attributes not in this table are passed through as-is (e.g., `bg={color}` → `.bg(color)`).
 
@@ -728,21 +744,21 @@ rsx! {
 
 Default styles per tag:
 
-| Tag | Default Styles |
-|-----|---------------|
-| `h1` | `text-3xl font-bold` |
-| `h2` | `text-2xl font-bold` |
-| `h3` | `text-xl font-bold` |
-| `h4` | `text-lg font-bold` |
-| `h5` | `text-base font-bold` |
-| `h6` | `text-sm font-bold` |
-| `button`, `a` | `cursor-pointer` |
-| `input`, `textarea` | `px-2 py-1` |
-| `ul`, `ol` | `flex flex-col` |
-| `li` | `flex items-center` |
-| `p` | `text-base` |
-| `label` | `text-sm` |
-| `form` | `flex flex-col gap-4` |
+| Tag                 | Default Styles        |
+| ------------------- | --------------------- |
+| `h1`                | `text-3xl font-bold`  |
+| `h2`                | `text-2xl font-bold`  |
+| `h3`                | `text-xl font-bold`   |
+| `h4`                | `text-lg font-bold`   |
+| `h5`                | `text-base font-bold` |
+| `h6`                | `text-sm font-bold`   |
+| `button`, `a`       | `cursor-pointer`      |
+| `input`, `textarea` | `px-2 py-1`           |
+| `ul`, `ol`          | `flex flex-col`       |
+| `li`                | `flex items-center`   |
+| `p`                 | `text-base`           |
+| `label`             | `text-sm`             |
+| `form`              | `flex flex-col gap-4` |
 
 User attributes are applied after defaults and can override them.
 
@@ -753,7 +769,7 @@ User attributes are applied after defaults and can override them.
 ```rust
 use gpui::*;
 use gpui::prelude::*;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 struct TodoApp {
     todos: Vec<Todo>,
@@ -933,14 +949,15 @@ fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoE
 
 GPUI-RSX is a **compile-time macro** that expands static RSX into direct GPUI builder calls. Static markup has no parser at runtime; dynamic `class={expr}` intentionally uses a small runtime matcher.
 
-| Metric | Traditional GPUI | GPUI-RSX |
-|--------|------------------|----------|
-| Code Size | 100 lines | 50 lines (-50%) |
-| Runtime Performance | Baseline | Same |
-| Type Safety | ✅ | ✅ |
-| Compile-time Checking | ✅ | ✅ |
+| Metric                | Traditional GPUI | GPUI-RSX        |
+| --------------------- | ---------------- | --------------- |
+| Code Size             | 100 lines        | 50 lines (-50%) |
+| Runtime Performance   | Baseline         | Same            |
+| Type Safety           | ✅               | ✅              |
+| Compile-time Checking | ✅               | ✅              |
 
 ### v0.3.2 Fixes & Improvements
+
 - **Fixed** `parse_single_class` panic on Tailwind variant syntax (`hover:bg-blue-500`): invalid
   class names are now silently skipped instead of calling `syn::Ident::new` with illegal characters
 - **Added** 7 classes to dynamic match table: `rounded-none`, `rounded-xl`, `cursor-default`,
@@ -949,6 +966,7 @@ GPUI-RSX is a **compile-time macro** that expands static RSX into direct GPUI bu
   method names; removed unsupported `text-4xl`/`text-5xl`; updated dynamic class description
 
 ### v0.3.1 Fixes & Features
+
 - **Fixed** `is_stateful_attr`: `hover`/`active`/`focus`/`group` are `Styled` trait methods and
   no longer trigger unnecessary `.id()` injection
 - **Added** `key={expr}` attribute: composite auto ID for stateful elements in for-loops
@@ -956,6 +974,7 @@ GPUI-RSX is a **compile-time macro** that expands static RSX into direct GPUI bu
 - `key` on non-stateful elements is silently ignored (no unintended type change to `Stateful<Div>`)
 
 ### v0.3.0 Refactoring
+
 - Eliminated ~60 duplicate method definitions in `tests/common/mod.rs` (823 → 456 lines)
 - Simplified black/white color entry generation in `runtime.rs` (method names encoded in data)
 - Extracted `is_directional_border()` helper in `class.rs` for clearer border logic
@@ -963,34 +982,41 @@ GPUI-RSX is a **compile-time macro** that expands static RSX into direct GPUI bu
 ### v0.2.2 Optimizations
 
 **Compile-time Performance:**
+
 - `split_ascii_whitespace` replaces `split_whitespace` in class parsing
 - Unified `text_` prefix handling (single `strip_prefix` call)
 - Early fast-path for empty elements
 - `Vec::with_capacity(attrs * 2 + children)` for class-heavy elements
 
 **Runtime Performance:**
+
 - `.children([...])` batching threshold lowered 3 → 2
 
 **Binary Size:**
+
 - Applications may opt into `panic = "abort"` in their own release profile to remove unwind tables
 
 ### v0.2.1 Optimizations
 
 **Compile-time Performance:**
+
 - O(1) color / attribute / spacing lookups via `match` (jump table, no linear scan)
 - Single-pass attribute scanning in `generate_element`
 - Thread-local cache for dynamic class match arms (generated once per process)
 
 **Memory Allocation Reductions:**
+
 - `parse_class_string` returns an iterator (no intermediate `Vec`)
 - `generate_attr_methods` pushes directly into caller's buffer
 - `Cow<str>` for class name transformations (zero-copy when no `-` present)
 - `Vec::with_capacity` pre-allocation throughout
 
 **Runtime Performance:**
+
 - Zero-copy dynamic class strings via `AsRef<str>` (`&str` needs no allocation)
 
 **Binary Size:**
+
 - Dynamic class match table extracted to `#[inline(never)]` + LLVM ICF deduplication
 - Multiple `class={expr}` in same component share one function body
 
@@ -1111,7 +1137,7 @@ rsx! {
 Use `rsx_expand!` for a local string preview, or `cargo expand` to inspect the full crate:
 
 ```rust
-let preview = gpui_rsx::rsx_expand! {
+let preview = zopra_gpui_view::rsx_expand! {
     <div class="flex w-[280px] bg-[rgba(15,23,42,0.8)]" />
 };
 ```
@@ -1197,6 +1223,7 @@ MIT License
 ## 🙏 Acknowledgments
 
 Inspired by:
+
 - [Dioxus RSX](https://dioxuslabs.com/) - RSX syntax design
 - [Yew html! macro](https://yew.rs/) - html! macro
 - [React JSX](https://react.dev/) - JSX syntax

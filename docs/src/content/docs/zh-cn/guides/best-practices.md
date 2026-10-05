@@ -197,7 +197,7 @@ rsx! {
 本地预览可以使用 `rsx_expand!`：
 
 ```rust
-let preview = gpui_rsx::rsx_expand! {
+let preview = zopra_gpui_view::rsx_expand! {
     <div class="flex gap-4 bg-blue-500" />
 };
 ```

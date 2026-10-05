@@ -382,7 +382,7 @@ rsx! {
 Use `rsx_expand!` to inspect generated methods:
 
 ```rust
-let preview = gpui_rsx::rsx_expand! {
+let preview = zopra_gpui_view::rsx_expand! {
     <div class="flex gap-4 bg-blue-500" />
 };
 ```

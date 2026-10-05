@@ -1,13 +1,13 @@
 [package]
-name = "gpui-rsx"
-version = "0.7.0"
+name = "zopra-gpui-view"
+version = "0.1.115"
 edition = "2024"
 rust-version = "1.88"
 description = "A JSX-like macro for GPUI - simplify UI development with HTML-like syntax"
-authors = ["GPUI-RSX Contributors"]
+authors = ["WSA Flight", "PPMPreetham"]
 license = "MIT"
-repository = "https://github.com/wsafight/gpui-rsx"
-homepage = "https://github.com/wsafight/gpui-rsx"
+repository = "https://github.com/ppmpreetham/gpui-rsx"
+homepage = "https://github.com/ppmpreetham/gpui-rsx"
 documentation = "https://docs.rs/gpui-rsx"
 readme = "README.md"
 keywords = ["gpui", "rsx", "jsx", "macro", "ui"]
@@ -31,6 +31,8 @@ proc-macro2 = { version = "1.0.106", features = ["span-locations"] }
 [dev-dependencies]
 criterion = { version = "0.8.2", features = ["html_reports"] }
 trybuild = "1.0.116"
+# for the zopra-style component-tag mock expansion (render_at(window, cx))
+gpui-kit = "0.7"
 
 [[bench]]
 name = "class_performance"

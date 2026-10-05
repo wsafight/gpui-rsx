@@ -1,6 +1,6 @@
 use gpui::prelude::*;
 use gpui::*;
-use gpui_rsx::rsx;
+use zopra_gpui_view::rsx;
 
 use crate::domain::Scope;
 use crate::model::{ConsoleStats, IncidentConsole};

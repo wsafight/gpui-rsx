@@ -45,6 +45,18 @@ impl Styled for StyleRefinement {
     fn style(&mut self) -> &mut StyleRefinement {
         self
     }
+    fn hover(self, f: impl FnOnce(Self) -> Self) -> Self {
+        f(self)
+    }
+    fn active(self, f: impl FnOnce(Self) -> Self) -> Self {
+        f(self)
+    }
+    fn focus(self, f: impl FnOnce(Self) -> Self) -> Self {
+        f(self)
+    }
+    fn group_hover(self, _: &str, f: impl FnOnce(Self) -> Self) -> Self {
+        f(self)
+    }
 
     styled_no_arg_methods!(
         flex,
@@ -210,6 +222,11 @@ impl Styled for StyleRefinement {
     );
 
     styled_value_methods!(
+        inset,
+        top,
+        bottom,
+        left,
+        right,
         gap,
         gap_x,
         gap_y,
@@ -239,6 +256,7 @@ impl Styled for StyleRefinement {
         text_color,
         border_color,
         opacity,
+        text_size,
     );
 
     fn line_clamp(self, _: usize) -> Self {
@@ -346,14 +364,41 @@ pub fn auto() -> f32 {
     0.0
 }
 
-// 模拟自定义组件构造函数
 #[allow(non_snake_case, dead_code)]
-pub fn MyComponent() -> MockElement {
-    MockElement
+pub struct MyComponentProps;
+#[allow(non_snake_case, dead_code)]
+impl MyComponentProps {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self
+    }
+    pub fn render_at<W, C>(self, _site: gpui_kit::ElementId, _window: W, _cx: C) -> MockElement {
+        MockElement
+    }
+    pub fn children(self, _: Vec<impl Sized>) -> Self {
+        self
+    }
+    pub fn bg(self, _: impl Sized) -> Self {
+        self
+    }
+    pub fn flex(self) -> Self {
+        self
+    }
 }
 #[allow(non_snake_case, dead_code)]
-pub fn CustomWidget() -> MockElement {
-    MockElement
+pub struct CustomWidgetProps;
+#[allow(non_snake_case, dead_code)]
+impl CustomWidgetProps {
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        Self
+    }
+    pub fn render_at<W, C>(self, _site: gpui_kit::ElementId, _window: W, _cx: C) -> MockElement {
+        MockElement
+    }
+    pub fn children(self, _: Vec<impl Sized>) -> Self {
+        self
+    }
 }
 
 #[allow(dead_code)]
@@ -562,7 +607,6 @@ impl MockElement {
     mock_no_arg_methods!(debug);
     mock_value_methods!(
         path,
-        object_fit,
         with_fallback,
         with_loading,
         image_cache,
@@ -747,6 +791,11 @@ impl Styled for MockElement {
     );
 
     styled_value_methods!(
+        inset,
+        top,
+        bottom,
+        left,
+        right,
         gap,
         gap_x,
         gap_y,
@@ -776,6 +825,7 @@ impl Styled for MockElement {
         text_color,
         border_color,
         opacity,
+        text_size,
     );
 
     fn line_clamp(self, lines: usize) -> Self {
@@ -863,5 +913,17 @@ impl Styled for MockElement {
     fn row_end(self, v: i16) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_end", v as i32)));
         self
+    }
+    fn hover(self, f: impl FnOnce(Self) -> Self) -> Self {
+        f(self)
+    }
+    fn active(self, f: impl FnOnce(Self) -> Self) -> Self {
+        f(self)
+    }
+    fn focus(self, f: impl FnOnce(Self) -> Self) -> Self {
+        f(self)
+    }
+    fn group_hover(self, _: &str, f: impl FnOnce(Self) -> Self) -> Self {
+        f(self)
     }
 }
