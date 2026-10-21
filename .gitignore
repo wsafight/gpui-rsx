@@ -6,6 +6,8 @@
 *.pdb
 Cargo.lock
 !/demo/Cargo.lock
+!/Cargo.lock
+!/editors/zed/Cargo.lock
 
 # Code coverage
 lcov.info
