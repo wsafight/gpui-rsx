@@ -208,12 +208,12 @@ rsx! {
 |阶段|当前状态|后续工作|
 |---|---|---|
 |核心与语义|已拆分 core；状态前缀、Tailwind 刻度、组件 builder、主题令牌已有实现和测试|继续补真实应用示例，评估动态字符串的能力边界|
-|P0 自动化|生成器、5 trait 快照、生成校验 CI、双平台验证后提修复 PR、单一机器人追踪 Issue 已接线|合入后观察 GitHub Actions 首次运行，确认仓库允许 Actions 创建 PR，核实历史机器人 Issue 清理结果|
+|P0 自动化|生成器、5 trait 快照、生成校验 CI、双平台验证后提修复 PR、单一机器人追踪 Issue 已接线；仓库已允许 Actions 创建 PR，首次验证的 Linux 已通过，macOS 正在运行|核实 macOS 验证及历史机器人 Issue 清理结果；有上游差异时再验收实际修复 PR|
 |工程质量|默认/全 feature 测试、doctest、insta 快照、Clippy、Rust 1.88 检查通过；新增 cargo-fuzz 目标、Criterion 10% 回归门禁|持续积累 fuzz 语料和性能历史；快照已补显式完整类型签名与样式生成模板；持续跟踪实际类型契约|
 |规范与文档|spec/rsx-spec.json、提示词、双语兼容矩阵由 xtask 生成；迁移文档已更新|建立模型生成代码的编译评测集，验证 90% 目标|
-|GPUI Kit 迁移|demo 已使用 Kit 0.8.0 / gpui-pre 0.3.9；registry 源码生成、依赖图检查、全部 API/主题颜色契约、真实 demo 编译/Clippy/测试通过；更新器已验证本地正式版本解析|观察远程 Linux/macOS workflow；GPUI Fast 留作单独评估|
-|CLI 与 Playground|已实现 doctor/lint、fmt、migrate、SWC JSX/TSX convert、expand，以及复用 core 的 WASM Playground（分享/诊断/展开/预览）；本地 WASM/Worker 测试通过|发布 0.8.0 后验收线上 Pages|
-|编辑器与转换工具|LSP 支持补全、悬停、诊断、修复、色块与格式化；VS Code VSIX 已打包，Zed WASI 扩展构建通过；转换/格式化/迁移命令已实现|发布扩展附件；Marketplace 需要发布者认证，Zed 市场需要上游审核|
+|GPUI Kit 迁移|demo 已使用 Kit 0.8.0 / gpui-pre 0.3.9；registry 源码生成、依赖图检查、全部 API/主题颜色契约、真实 demo 编译/Clippy/测试通过；更新器已验证本地正式版本解析|主分支 Linux/macOS 真实 demo 已通过；继续跟踪上游 Kit 更新，GPUI Fast 留作单独评估|
+|CLI 与 Playground|已发布 cargo-rsx 0.8.0；doctor/lint、fmt、migrate、SWC JSX/TSX convert、expand 可用；中英文 Playground 已上线，线上 WASM/Worker 9 项协议检查通过|补充浏览器视觉验收|
+|编辑器与转换工具|LSP 支持补全、悬停、诊断、修复、色块与格式化；VS Code VSIX、Zed WASI 扩展及 SHA256SUMS 已作为 0.8.0 Release 附件发布|Marketplace 需要发布者认证，Zed 市场需要上游审核；本次先提供安装包|
 |热预览|已实现 cargo rsx preview --watch，本地服务读取文件变化，无需重编译；静态布局近似预览|表达式、事件、自定义组件和未支持样式为占位；原生 GPUI 行为需实际运行复核|
 
 本地验证已覆盖工作区默认/全 feature 测试、5 trait API 快照、生成文件一致性、Clippy、
@@ -221,7 +221,20 @@ rsx! {
 未发现崩溃；这不是无缺陷保证。性能门禁已用同一代码的两次测量和人为退化 fixture 验证，
 没有据此声称性能提升。CLI/LSP 协议、中文与 emoji 定位、迁移语义、JSX 转换、预览热更新已通过新增回归测试；
 真实 WASM 与 Worker 协议 9 项检查通过，文档站 33 页构建通过。当前环境无可用浏览器，未执行视觉验收。
-远程 workflow、市场发布及历史 Issue 结果待发布阶段验收。
+远程主分支三平台 stable/beta 测试、Clippy、MSRV、覆盖率、安全审计、生成文件检查、性能门禁、
+双平台真实 GPUI demo 和编辑器打包均已通过。Rust 文档构建日志已成功结束，GitHub 的 Documentation 检查状态仍未收尾，单独重跑中。
+Pages 已部署成功，中英文 Playground 页面及线上 WASM/Worker 9 项协议检查通过。
+兼容性首跑的 Linux 已通过，macOS 和历史 Issue 清理仍在验收；市场上架后补。
+
+### 0.8.0 发布记录
+
+- 已合入 main，并发布标签 `v0.8.0` 与 [GitHub Release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0)。
+- crates.io 已发布 `gpui-rsx-core`、`gpui-rsx-tools`、`gpui-rsx`、`cargo-rsx` 四个 0.8.0 包。
+- 从 crates.io 实际安装 CLI 成功，doctor、严格模式展开、JSX 转换及独立项目使用已发布宏包编译通过。
+- Release 的 VSIX、Zed ZIP 已通过公开下载和 SHA256 校验。Rust stable/beta 的诊断测试均通过。
+- 线上中英文 Playground 页面返回 200；下载线上 WASM/Worker 后，9 项协议检查全部通过。
+- 远程 Linux 链接验证发现缺少 XKB X11 开发库，已为 CI、兼容性工作流及 demo 文档补齐 `libxkbcommon-x11-dev`；主分支 Linux/macOS demo 链接及测试均已通过。
+- 后续运行结果见 [主分支 CI](https://github.com/wsafight/gpui-rsx/actions/runs/39617219787) 和 [兼容性首跑](https://github.com/wsafight/gpui-rsx/actions/runs/39617293839)。
 
 ---
 
@@ -241,7 +254,7 @@ rsx! {
 
 * [x] tables\.rs 里 80% 以上的内容由 xtask gen\-tables 生成，CI 校验重新生成后没有 diff
 
-* [ ] 兼容性工作流能自动开修复 PR，机器人 Issue 清零，最多只保留 1 个追踪 Issue（实现已接线，待远程首次运行验收）
+* [ ] 兼容性工作流能自动开修复 PR，机器人 Issue 清零，最多只保留 1 个追踪 Issue（仓库权限已开启；远程 Linux 已通过，macOS、历史 Issue 清理及有差异时的实际修复 PR 待验收）
 
 * [x] API 快照覆盖 4 个以上 trait，在 CI 中不再跳过
 
@@ -255,8 +268,8 @@ rsx! {
 
 * [x] 原有 doctest 已恢复；目前主 crate 共 30 个全部通过、0 ignored，并有 17 个 insta 展开快照
 
-* [ ] cargo rsx doctor / lint 和在线 Playground 上线
+* [x] cargo rsx doctor / lint 和在线 Playground 上线（CLI 已上架 crates.io；中英文 Playground 已部署，页面返回 200）
 
-* [ ] LSP 插件发布到 VS Code Marketplace 和 Zed 扩展市场
+* [ ] LSP 插件发布到 VS Code Marketplace 和 Zed 扩展市场（VSIX/Zed 安装包已发布，市场上架后补）
 
 参考：[gpui\-rsx 仓库](https://github.com/wsafight/gpui-rsx)、[gpui\-rsx Issues](https://github.com/wsafight/gpui-rsx/issues)、[gpui\-rsx 文档站](https://wsafight.github.io/gpui-rsx/)

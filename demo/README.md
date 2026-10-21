@@ -15,6 +15,15 @@ and open windows with `gpui::open_window(...)` to mount Kit's root.
 The demo toolchain is pinned to Rust 1.98.1. The macro/core MSRV remains Rust 1.88.
 Commit `Cargo.lock` to reproduce the complete dependency graph.
 
+On Debian/Ubuntu, install the native GPUI dependencies before building the demos:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y libfontconfig1-dev libwayland-dev libx11-dev libxcb1-dev \
+  libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+  libxkbcommon-dev libxkbcommon-x11-dev
+```
+
 ```bash
 cd demo
 cargo run --bin hello --locked
