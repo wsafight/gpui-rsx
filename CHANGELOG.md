@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-10-22
+
+### Changed
+
+- Cached parsed RSX document state in the LSP, including macro ranges, class literal ranges,
+  diagnostics and mode resolution, so completion, hover, colors and code actions reuse one parse.
+- Cached dynamic class helper source process-wide per spacing scale and switched unknown-class
+  reporting to `HashSet` deduplication.
+- Avoided re-rendering unchanged files during `cargo-rsx preview --watch`.
+- Added a bounded Playground worker cache and stale-result guard for repeated or superseded edits.
+- VS Code now starts the server only for workspaces that look like GPUI-RSX projects and provides
+  commands to install or restart `cargo-rsx`.
+
+### Fixed
+
+- Updated all installation examples and compatibility snippets to `gpui-rsx`/`cargo-rsx` 0.8.1.
+- Added CI validation that rejects stale `gpui-rsx` 0.x dependency examples in documentation.
+
 ## [0.8.0] - 2026-10-21
 
 ### Added
@@ -620,7 +638,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...v0.8.1
 [v0.8.0 GitHub Release]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
 [0.8.0]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
 [0.7.0]: https://github.com/wsafight/gpui-rsx/compare/v0.6.0...v0.7.0

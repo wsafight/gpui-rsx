@@ -3,7 +3,7 @@ use std::{
     io::{Read, Write},
     net::TcpListener,
     path::Path,
-    time::Duration,
+    time::{Duration, SystemTime},
 };
 
 fn content(opt: &Options, path: &Path) -> Result<String, String> {
@@ -45,6 +45,7 @@ pub fn run(opt: &Options) -> Result<i32, String> {
         output(opt, &gpui_rsx_tools::preview::page(&initial, false))?;
         return Ok(0);
     }
+    let mut cached = (file_modified(&path), initial);
     let listener = TcpListener::bind(("127.0.0.1", opt.port)).map_err(|e| e.to_string())?;
     eprintln!(
         "Static preview: http://{} ({}; Ctrl-C to stop)",
@@ -63,10 +64,17 @@ pub fn run(opt: &Options) -> Result<i32, String> {
         };
         let request = String::from_utf8_lossy(&buffer[..count]);
         let route = request.lines().next().unwrap_or("");
-        let fragment = match content(opt, &path) {
-            Ok(html) => html,
-            Err(e) => format!("<pre>{}</pre>", gpui_rsx_tools::preview::escape(&e)),
-        };
+        let modified = file_modified(&path);
+        if modified != cached.0 {
+            cached = (
+                modified,
+                match content(opt, &path) {
+                    Ok(html) => html,
+                    Err(e) => format!("<pre>{}</pre>", gpui_rsx_tools::preview::escape(&e)),
+                },
+            );
+        }
+        let fragment = cached.1.clone();
         let (status, body) = if route.starts_with("GET /content ") {
             ("200 OK", fragment)
         } else if route.starts_with("GET / ") {
@@ -81,4 +89,10 @@ pub fn run(opt: &Options) -> Result<i32, String> {
         let _ = stream.write_all(response.as_bytes());
     }
     Ok(0)
+}
+
+fn file_modified(path: &Path) -> Option<SystemTime> {
+    std::fs::metadata(path)
+        .and_then(|metadata| metadata.modified())
+        .ok()
 }

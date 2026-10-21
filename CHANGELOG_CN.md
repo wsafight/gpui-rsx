@@ -9,6 +9,22 @@
 
 ## [未发布]
 
+## [0.8.1] - 2026-10-22
+
+### 变更
+
+- LSP 缓存已解析的 RSX 文档状态，包括 macro 范围、class 字面量范围、诊断和模式解析，
+  使补全、悬停、颜色和 code action 复用同一次解析。
+- 动态 class helper 按间距刻度使用进程级源码缓存，未知 class 去重改用 `HashSet`。
+- `cargo-rsx preview --watch` 对未修改文件复用上一次渲染结果。
+- Playground Worker 增加有界结果缓存和过期结果保护，避免重复或已被新编辑替代的结果更新界面。
+- VS Code 只在看起来是 GPUI-RSX 项目的工作区启动服务，并提供安装和重启 `cargo-rsx` 的命令。
+
+### 修复
+
+- 所有安装示例和兼容性片段统一更新为 `gpui-rsx`/`cargo-rsx` 0.8.1。
+- CI 增加检查，禁止文档重新出现过期的 `gpui-rsx` 0.x 依赖示例。
+
 ## [0.8.0] - 2026-10-21
 
 ### 新增
@@ -565,7 +581,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...v0.8.1
 [v0.8.0 GitHub Release]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
 [0.8.0]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
 [0.7.0]: https://github.com/wsafight/gpui-rsx/compare/v0.6.0...v0.7.0

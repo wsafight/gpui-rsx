@@ -3,7 +3,7 @@
 //! 生成运行时动态 class 字符串解析和应用的代码。
 //! 当 class 属性的值是表达式而非字符串字面量时使用。
 //!
-//! 优化：使用 thread_local 缓存完整 helper 源码，避免多个动态 class 重复生成和分段解析。
+//! 优化：使用进程级缓存保存完整 helper 源码，避免多个动态 class 重复生成和分段解析。
 
 use super::class::{ClassMode, SpacingScale, parse_single_class_with_mode};
 use super::tables::{
@@ -11,9 +11,9 @@ use super::tables::{
 };
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
-use std::cell::OnceCell;
+use std::sync::OnceLock;
 
-// 缓存所有 match 分支拼接后的字符串（thread_local 保证编译过程中只生成一次）
+// 缓存所有 match 分支拼接后的字符串（每个进程和 spacing scale 只生成一次）
 //
 // 注意：不能缓存 proc_macro2::TokenStream，因为它的 token handle 绑定到
 // 当前 proc macro 调用的 bridge 连接。每次调用结束后 bridge 失效，
@@ -21,26 +21,21 @@ use std::cell::OnceCell;
 //
 // 优化：将完整 helper 缓存为单个字符串，每次宏调用只做 1 次 parse，
 // 避免 common/color/numeric 三段代码分别重建和解析。
-thread_local! {
-    static PX_HELPER_STR: OnceCell<String> = const { OnceCell::new() };
-    static TAILWIND_HELPER_STR: OnceCell<String> = const { OnceCell::new() };
-}
+static PX_HELPER_STR: OnceLock<String> = OnceLock::new();
+static TAILWIND_HELPER_STR: OnceLock<String> = OnceLock::new();
 
 /// 获取完整动态 class helper（只与数值刻度有关，未知 class 的处理由调用点注入）。
 ///
 /// 缓存字符串而非 `TokenStream`，避免跨 proc-macro bridge 保存失效的 token handle。
 fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
-    let parse_cached = |cell: &OnceCell<String>| {
-        let source = cell.get_or_init(|| generate_dynamic_class_helper(mode).to_string());
-        source
-            .parse::<TokenStream>()
-            .expect("cached dynamic class helper is valid")
+    let cell = match mode.scale {
+        SpacingScale::Px => &PX_HELPER_STR,
+        SpacingScale::Tailwind => &TAILWIND_HELPER_STR,
     };
-
-    match mode.scale {
-        SpacingScale::Px => PX_HELPER_STR.with(parse_cached),
-        SpacingScale::Tailwind => TAILWIND_HELPER_STR.with(parse_cached),
-    }
+    let source = cell.get_or_init(|| generate_dynamic_class_helper(mode).to_string());
+    source
+        .parse::<TokenStream>()
+        .expect("cached dynamic class helper is valid")
 }
 
 /// 生成运行时 class 解析代码
@@ -111,17 +106,20 @@ fn default_unknown_handler(mode: ClassMode) -> TokenStream {
 
     let report = if mode.report_dynamic_at_exit {
         quote! {
-            static __RSX_IGNORED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+            static __RSX_IGNORED: std::sync::LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
+                std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
             static __RSX_REGISTER: std::sync::Once = std::sync::Once::new();
 
             extern "C" fn __rsx_report_ignored_classes() {
                 if let Ok(ignored) = __RSX_IGNORED.lock() {
                     if !ignored.is_empty() {
+                        let mut names: Vec<_> = ignored.iter().cloned().collect();
+                        names.sort();
                         eprintln!(
                             "[gpui-rsx] {} dynamic class(es) ignored at {}: {}",
                             ignored.len(),
                             concat!(file!(), ":", line!()),
-                            ignored.join(", ")
+                            names.join(", ")
                         );
                     }
                 }
@@ -137,18 +135,16 @@ fn default_unknown_handler(mode: ClassMode) -> TokenStream {
                 }
             });
             if let Ok(mut ignored) = __RSX_IGNORED.lock() {
-                if !ignored.iter().any(|seen| seen == __class) {
-                    ignored.push(__class.to_owned());
-                }
+                ignored.insert(__class.to_owned());
             }
         }
     } else {
         quote! {
             // 同一生成点的同一未知 class 只提示一次，避免 render loop 反复刷 stderr。
-            static __RSX_WARNED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+            static __RSX_WARNED: std::sync::LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
+                std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
             if let Ok(mut warned) = __RSX_WARNED.lock() {
-                if !warned.iter().any(|seen| seen == __class) {
-                    warned.push(__class.to_owned());
+                if warned.insert(__class.to_owned()) {
                     eprintln!(
                         "[gpui-rsx] warning: dynamic class {:?} ignored at {} (unsupported class)\n  \
                          hint: static literals such as class=\"{}\" are checked at compile time",

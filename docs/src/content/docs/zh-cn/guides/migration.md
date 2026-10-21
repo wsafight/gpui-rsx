@@ -12,7 +12,7 @@ description: 从手写 GPUI builder 链迁移，并升级到 GPUI-RSX 0.6 的 GP
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.0" }
-gpui-rsx = "0.7"
+gpui-rsx = "0.8.1"
 ```
 
 Kit 0.8.0 固定 `gpui-pre = 0.3.9`。从 `gpui::component` 导入带样式控件，

@@ -46,6 +46,13 @@ jobs:
       - run: node --test .github/scripts/*.test.cjs
       - run: bash -n scripts/check.sh
 
+      - name: Check documentation dependency examples
+        run: |
+          if rg -n 'gpui-rsx = "0\.7"' README.md README_CN.md docs/src/content/docs/getting-started.md docs/src/content/docs/zh-cn/getting-started.md docs/src/content/docs/compatibility.md docs/src/content/docs/zh-cn/compatibility.md docs/src/content/docs/guides/migration.md docs/src/content/docs/zh-cn/guides/migration.md; then
+            echo 'Documentation contains an outdated gpui-rsx dependency example.' >&2
+            exit 1
+          fi
+
   msrv:
     name: Root MSRV
     runs-on: ubuntu-latest

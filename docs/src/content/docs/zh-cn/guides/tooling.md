@@ -6,7 +6,7 @@ description: 检查、格式化、迁移和预览 RSX，并接入 VS Code、Zed�
 使用 Rust 1.98 或更新版本安装 CLI；宏库仍支持 Rust 1.88：
 
 ```sh
-cargo install cargo-rsx --version 0.8.0
+cargo install cargo-rsx --version 0.8.1
 cargo rsx doctor --manifest-path demo/Cargo.toml
 cargo rsx lint --deny-warnings
 cargo rsx lint --json

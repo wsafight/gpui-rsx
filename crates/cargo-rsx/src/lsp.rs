@@ -5,7 +5,56 @@ use std::{
     collections::HashMap,
     io::{self, BufRead, Write},
     path::PathBuf,
+    sync::OnceLock,
 };
+
+struct Document {
+    source: String,
+    mode: ClassMode,
+    calls: Vec<gpui_rsx_tools::MacroCall>,
+    /// Absolute byte ranges for static class string contents.
+    literals: Vec<(usize, usize)>,
+    diagnostics: Vec<gpui_rsx_tools::Diagnostic>,
+}
+
+impl Document {
+    fn new(uri: &str, source: &str) -> Self {
+        let mode = mode(uri);
+        let calls = gpui_rsx_tools::macro_calls(source).unwrap_or_default();
+        let mut literals = Vec::new();
+        for call in &calls {
+            if let Ok(ranges) = gpui_rsx_tools::class_literal_ranges(&source[call.start..call.end])
+            {
+                literals.extend(
+                    ranges
+                        .into_iter()
+                        .map(|(start, end)| (call.start + start, call.start + end)),
+                );
+            }
+        }
+        let diagnostics = gpui_rsx_tools::analyze_rust(source, mode);
+        Self {
+            source: source.to_owned(),
+            mode,
+            calls,
+            literals,
+            diagnostics,
+        }
+    }
+}
+
+fn completion_classes() -> &'static [String] {
+    static CLASSES: OnceLock<Vec<String>> = OnceLock::new();
+    CLASSES.get_or_init(|| {
+        let mut classes = known_classes().to_vec();
+        classes.extend(
+            gpui_rsx_core::SUPPORTED_VARIANTS
+                .iter()
+                .map(|variant| format!("{variant}:")),
+        );
+        classes
+    })
+}
 
 fn send(out: &mut impl Write, message: Value) -> Result<(), String> {
     let body = message.to_string();
@@ -98,37 +147,37 @@ fn mode(uri: &str) -> ClassMode {
     let path = uri_path(uri);
     super::mode(&super::Options::default(), path.as_deref()).unwrap_or(ClassMode::PERMISSIVE)
 }
-fn mode_at(source: &str, cursor: usize, uri: &str) -> ClassMode {
-    let base = mode(uri);
-    gpui_rsx_tools::macro_calls(source)
-        .ok()
-        .and_then(|calls| {
-            calls
-                .into_iter()
+fn mode_at(document: Option<&Document>, cursor: usize, uri: &str) -> ClassMode {
+    let base = document.map_or_else(|| mode(uri), |document| document.mode);
+    document
+        .and_then(|document| {
+            document
+                .calls
+                .iter()
                 .find(|call| cursor >= call.start && cursor <= call.end)
         })
         .map(|call| gpui_rsx_tools::mode_for(&call.name, base))
         .unwrap_or(base)
 }
 
-fn diagnostics(source: &str, uri: &str) -> Vec<Value> {
-    gpui_rsx_tools::analyze_rust(source, mode(uri)).into_iter().map(|d| json!({
-        "range":range(source,d.start,d.end),"severity": match d.severity.as_str() {"error"=>1,"warning"=>2,_=>3},
+fn diagnostics(document: &Document) -> Vec<Value> {
+    document.diagnostics.iter().map(|d| json!({
+        "range":range(&document.source,d.start,d.end),"severity": match d.severity.as_str() {"error"=>1,"warning"=>2,_=>3},
         "source":"gpui-rsx","message":d.message,"data":{"suggestion":d.suggestion}
     })).collect()
 }
 
 /// A class token under the cursor; refuses text outside an RSX macro or class literal.
-fn class_at(source: &str, cursor: usize) -> Option<(usize, usize, String)> {
-    let calls = gpui_rsx_tools::macro_calls(source).ok()?;
-    let call = calls
+fn class_at(document: &Document, cursor: usize) -> Option<(usize, usize, String)> {
+    let source = &document.source;
+    if !document
+        .calls
         .iter()
-        .find(|c| cursor >= c.start && cursor <= c.end)?;
-    let raw = &source[call.start..call.end];
-    let body = syn_body_literals(raw)?;
-    for (start, end) in body {
-        let start = call.start + start;
-        let end = call.start + end;
+        .any(|call| cursor >= call.start && cursor <= call.end)
+    {
+        return None;
+    }
+    for &(start, end) in &document.literals {
         if cursor < start || cursor > end {
             continue;
         }
@@ -146,13 +195,15 @@ fn class_at(source: &str, cursor: usize) -> Option<(usize, usize, String)> {
     }
     None
 }
-fn syn_body_literals(source: &str) -> Option<Vec<(usize, usize)>> {
-    gpui_rsx_tools::class_literal_ranges(source).ok()
-}
 
-fn request(method: &str, params: &Value, docs: &HashMap<String, String>) -> Result<Value, String> {
+fn request(
+    method: &str,
+    params: &Value,
+    docs: &HashMap<String, Document>,
+) -> Result<Value, String> {
     let uri = params["textDocument"]["uri"].as_str().unwrap_or("");
-    let source = docs.get(uri).map(String::as_str).unwrap_or("");
+    let document = docs.get(uri);
+    let source = document.map_or("", |document| document.source.as_str());
     let cursor = offset(source, &params["position"]);
     match method {
         "initialize" => Ok(json!({"capabilities":{
@@ -162,19 +213,17 @@ fn request(method: &str, params: &Value, docs: &HashMap<String, String>) -> Resu
         },"serverInfo":{"name":"gpui-rsx","version":env!("CARGO_PKG_VERSION")}})),
         "shutdown" => Ok(Value::Null),
         "textDocument/completion" => {
-            let Some((start, _, word)) = class_at(source, cursor) else {
+            let Some(document) = document else {
+                return Ok(json!({"isIncomplete":false,"items":[]}));
+            };
+            let Some((start, _, word)) = class_at(document, cursor) else {
                 return Ok(json!({"isIncomplete":false,"items":[]}));
             };
             let prefix = &source[start..cursor];
-            let mut classes = known_classes().to_vec();
-            if let Some(theme) = mode(uri).theme {
+            let mut classes = completion_classes().to_vec();
+            if let Some(theme) = document.mode.theme {
                 classes.extend(theme.class_names());
             }
-            classes.extend(
-                gpui_rsx_core::SUPPORTED_VARIANTS
-                    .iter()
-                    .map(|v| format!("{v}:")),
-            );
             let variant = prefix.rsplit_once(':').map(|(v, _)| format!("{v}:"));
             if let Some(variant) = variant {
                 classes = classes
@@ -190,7 +239,7 @@ fn request(method: &str, params: &Value, docs: &HashMap<String, String>) -> Resu
                     c.starts_with(prefix)
                         && (c.ends_with(':')
                             || matches!(
-                                analyze_class(c, mode_at(source, cursor, uri)).outcome,
+                                analyze_class(c, mode_at(Some(document), cursor, uri)).outcome,
                                 ClassOutcome::Supported(_)
                             ))
                 })
@@ -201,8 +250,12 @@ fn request(method: &str, params: &Value, docs: &HashMap<String, String>) -> Resu
             )
         }
         "textDocument/hover" => {
-            if let Some((start, end, class)) = class_at(source, cursor) {
-                let tokens = match analyze_class(&class, mode_at(source, cursor, uri)).outcome {
+            if let Some(document) = document
+                && let Some((start, end, class)) = class_at(document, cursor)
+            {
+                let tokens = match analyze_class(&class, mode_at(Some(document), cursor, uri))
+                    .outcome
+                {
                     ClassOutcome::Supported(t) | ClassOutcome::PassThrough { tokens: t, .. } => {
                         t.to_string()
                     }
@@ -211,12 +264,15 @@ fn request(method: &str, params: &Value, docs: &HashMap<String, String>) -> Resu
                 Ok(
                     json!({"contents":{"kind":"markdown","value":format!("```rust\n{tokens}\n```")},"range":range(source,start,end)}),
                 )
-            } else if let Ok(calls) = gpui_rsx_tools::macro_calls(source)
-                && let Some(call) = calls.iter().find(|c| cursor >= c.start && cursor <= c.end)
+            } else if let Some(document) = document
+                && let Some(call) = document
+                    .calls
+                    .iter()
+                    .find(|c| cursor >= c.start && cursor <= c.end)
             {
                 let expansion = gpui_rsx_tools::expand(
                     &source[call.start..call.end],
-                    gpui_rsx_tools::mode_for(&call.name, mode(uri)),
+                    gpui_rsx_tools::mode_for(&call.name, document.mode),
                 )?;
                 Ok(
                     json!({"contents":{"kind":"markdown","value":format!("```rust\n{expansion}\n```")}}),
@@ -231,23 +287,20 @@ fn request(method: &str, params: &Value, docs: &HashMap<String, String>) -> Resu
         }
         "textDocument/documentColor" => {
             let mut colors = Vec::new();
-            if let Ok(calls) = gpui_rsx_tools::macro_calls(source) {
-                for call in calls {
-                    let raw = &source[call.start..call.end];
-                    for (start, end) in syn_body_literals(raw).unwrap_or_default() {
-                        let value = &raw[start..end];
-                        let mut at = 0;
-                        for class in value.split_ascii_whitespace() {
-                            let begin = value[at..].find(class).unwrap_or(0) + at;
-                            at = begin + class.len();
-                            let base = class.rsplit(':').next().unwrap_or(class);
-                            let color = ["bg-", "text-", "border-"]
-                                .iter()
-                                .find_map(|prefix| base.strip_prefix(prefix))
-                                .and_then(color);
-                            if let Some((red, green, blue, alpha)) = color {
-                                colors.push(json!({"range":range(source,call.start+start+begin,call.start+start+at),"color":{"red":red,"green":green,"blue":blue,"alpha":alpha}}));
-                            }
+            if let Some(document) = document {
+                for &(start, end) in &document.literals {
+                    let value = &source[start..end];
+                    let mut at = 0;
+                    for class in value.split_ascii_whitespace() {
+                        let begin = value[at..].find(class).unwrap_or(0) + at;
+                        at = begin + class.len();
+                        let base = class.rsplit(':').next().unwrap_or(class);
+                        let color = ["bg-", "text-", "border-"]
+                            .iter()
+                            .find_map(|prefix| base.strip_prefix(prefix))
+                            .and_then(color);
+                        if let Some((red, green, blue, alpha)) = color {
+                            colors.push(json!({"range":range(source,start+begin,start+at),"color":{"red":red,"green":green,"blue":blue,"alpha":alpha}}));
                         }
                     }
                 }
@@ -279,8 +332,8 @@ fn request(method: &str, params: &Value, docs: &HashMap<String, String>) -> Resu
         }
         "textDocument/codeAction" => {
             let mut actions = Vec::new();
-            for d in gpui_rsx_tools::analyze_rust(source, mode(uri)) {
-                if let Some(suggestion) = d.suggestion {
+            for d in document.map_or(&[][..], |document| document.diagnostics.as_slice()) {
+                if let Some(suggestion) = d.suggestion.clone() {
                     let mut changes = serde_json::Map::new();
                     changes.insert(
                         uri.into(),
@@ -324,7 +377,7 @@ fn color(value: &str) -> Option<(f64, f64, f64, f64)> {
 pub fn run() -> Result<(), String> {
     let mut input = io::BufReader::new(io::stdin().lock());
     let mut out = io::stdout().lock();
-    let mut docs = HashMap::new();
+    let mut docs: HashMap<String, Document> = HashMap::new();
     let mut shutdown = false;
     while let Some(message) = read(&mut input)? {
         let method = message["method"].as_str().unwrap_or("");
@@ -348,11 +401,25 @@ pub fn run() -> Result<(), String> {
                     .and_then(|c| c["text"].as_str())
             };
             if let Some(text) = text {
-                docs.insert(uri.clone(), text.to_owned());
+                let document = Document::new(&uri, text);
                 send(
                     &mut out,
-                    json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"version":doc["version"],"diagnostics":diagnostics(text,&uri)}}),
+                    json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"version":doc["version"],"diagnostics":diagnostics(&document)}}),
                 )?;
+                docs.insert(uri, document);
+            }
+        } else if method == "workspace/didChangeWatchedFiles" {
+            let uris: Vec<_> = docs.keys().cloned().collect();
+            for uri in uris {
+                if let Some(document) = docs.get(&uri) {
+                    let refreshed = Document::new(&uri, &document.source);
+                    let diagnostics = diagnostics(&refreshed);
+                    docs.insert(uri.clone(), refreshed);
+                    send(
+                        &mut out,
+                        json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"diagnostics":diagnostics}}),
+                    )?;
+                }
             }
         } else if method == "textDocument/didClose" {
             let uri = params["textDocument"]["uri"].as_str().unwrap_or("");

@@ -11,7 +11,7 @@ impl zed::Extension for GpuiRsx {
         worktree: &zed::Worktree,
     ) -> Result<zed::Command> {
         let command = worktree.which("cargo-rsx").ok_or(
-            "Install the GPUI RSX server with `cargo install cargo-rsx`, then restart Zed.",
+            "Install the GPUI RSX server with `cargo install cargo-rsx --version 0.8.1 --locked`, then restart Zed.",
         )?;
         Ok(zed::Command {
             command,

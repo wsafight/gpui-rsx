@@ -2,7 +2,7 @@
   "name": "gpui-rsx",
   "displayName": "GPUI RSX",
   "description": "Class completion, diagnostics, expansion hover and formatting for GPUI RSX macros.",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "publisher": "wsafight",
   "license": "MIT",
   "engines": { "vscode": "^1.96.0" },
@@ -20,10 +20,14 @@
     "configuration": {
       "title": "GPUI RSX",
       "properties": {
-        "gpuiRsx.serverPath": { "type": "string", "default": "cargo-rsx", "description": "Path to cargo-rsx (install with cargo install cargo-rsx)." }
+        "gpuiRsx.serverPath": { "type": "string", "default": "cargo-rsx", "description": "Path to cargo-rsx (install with cargo install cargo-rsx)." },
+        "gpuiRsx.autoStart": { "type": "boolean", "default": true, "description": "Start the GPUI RSX language server only in workspaces that contain gpui-rsx or rsx.toml." }
       }
     },
-    "commands": [{ "command": "gpuiRsx.restart", "title": "GPUI RSX: Restart language server" }]
+    "commands": [
+      { "command": "gpuiRsx.restart", "title": "GPUI RSX: Restart language server" },
+      { "command": "gpuiRsx.install", "title": "GPUI RSX: Install cargo-rsx" }
+    ]
   },
   "dependencies": { "vscode-languageclient": "^9.0.1" },
   "devDependencies": { "@types/vscode": "^1.96.0", "@types/node": "^22.0.0", "@vscode/vsce": "^3.0.0", "esbuild": "^0.25.0", "typescript": "^5.8.0" }
