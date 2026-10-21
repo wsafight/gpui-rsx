@@ -34,6 +34,8 @@
 - JSX 转换和浏览器预览需要用原生应用复核行为；格式化保留带注释的宏体；
   间距迁移需在启用 Tailwind 刻度前显式执行一次。扩展市场审核与扩展包分发分别记录。
 - 模型生成代码成功率、兼容修复时效需要持续测量，本版本不声称已证明这些结果指标。
+- VS Code VSIX 和 Zed 扩展压缩包已附在 [v0.8.0 GitHub Release]；市场发布仍需发布者认证和
+  registry 审核。
 
 
 ## [0.7.0] - 2026-08-25
@@ -563,7 +565,9 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.7.0...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...HEAD
+[v0.8.0 GitHub Release]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
+[0.8.0]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
 [0.7.0]: https://github.com/wsafight/gpui-rsx/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/wsafight/gpui-rsx/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/wsafight/gpui-rsx/compare/v0.5.0...v0.5.1

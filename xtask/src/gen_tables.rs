@@ -96,11 +96,7 @@ pub fn generate(
     ));
     files.push((
         workspace.join("benches/support/generated_styled.rs"),
-        mock_styled_defaults(
-            &methods,
-            revs,
-            &workspace.join("benches/class_performance.rs"),
-        )?,
+        mock_styled_defaults(&methods, revs, &workspace.join("benches/support/styled.rs"))?,
     ));
     Ok(Outputs { files })
 }

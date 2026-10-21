@@ -38,6 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   once before enabling Tailwind scale. Extension marketplace review is separate from
   the downloadable packages. Model-generation success rate and repair latency require
   continued measurement; this release does not claim those outcome targets are proven.
+- The VS Code VSIX and Zed extension archive are attached to the [v0.8.0 GitHub Release].
+  Marketplace publication remains subject to publisher authentication and registry review.
 
 
 ## [0.7.0] - 2026-08-25
@@ -618,7 +620,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...HEAD
+[v0.8.0 GitHub Release]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
+[0.8.0]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
 [0.7.0]: https://github.com/wsafight/gpui-rsx/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/wsafight/gpui-rsx/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/wsafight/gpui-rsx/compare/v0.5.0...v0.5.1
