@@ -1,6 +1,5 @@
 use gpui::prelude::*;
 use gpui::*;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 
 struct Swatch {
@@ -72,11 +71,14 @@ impl Render for PaletteView {
 }
 
 fn main() {
-    application().run(|cx: &mut App| {
-        cx.open_window(WindowOptions::default(), |_, cx| {
-            cx.new(|_| PaletteView::default())
-        })
-        .expect("failed to open palette window");
-        cx.activate(true);
-    });
+    application()
+        .with_assets(assets::Assets)
+        .run(|cx: &mut App| {
+            gpui::init(cx);
+            gpui::open_window(WindowOptions::default(), cx, |_, cx| {
+                cx.new(|_| PaletteView::default())
+            })
+            .expect("failed to open palette window");
+            cx.activate(true);
+        });
 }

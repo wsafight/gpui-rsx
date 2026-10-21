@@ -1,0 +1,19 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<ul>{for item in items { <li key={item.id} onClick={handler}>{item.name.clone()}</li> }}</ul>"
+---
+fn expanded() {
+    let _ = div()
+        .children(
+            (items)
+                .into_iter()
+                .map(|item| {
+                    div()
+                        .id(
+                            format!(concat!(file!(), "::__rsx_li_L1C26_", "{}"), item.id),
+                        )
+                        .on_click(handler)
+                        .child(item.name.clone())
+                }),
+        );
+}

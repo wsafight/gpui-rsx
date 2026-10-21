@@ -1,0 +1,19 @@
+error: use of deprecated unit struct `main::{closure#0}::unsupported_rsx_class`: Responsive variant `md:` is not supported: GPUI windows have no CSS breakpoints.
+         help: compute the condition from the window size and use `when={(is_wide, |el| ...)}`
+  --> tests/ui/permissive_unknown_class_warning.rs:11:33
+   |
+11 |     let _el = rsx! { <div class="flex md:flex-row hovr:flex" /> };
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: the lint level is defined here
+ --> tests/ui/permissive_unknown_class_warning.rs:2:9
+  |
+2 | #![deny(deprecated)]
+  |         ^^^^^^^^^^
+
+error: use of deprecated unit struct `main::{closure#1}::unsupported_rsx_class`: Unsupported variant `hovr:`. Did you mean `hover:`?
+         note: supported variants are hover:, focus:, focus-visible:, active:, group-hover:, group-active:
+  --> tests/ui/permissive_unknown_class_warning.rs:11:33
+   |
+11 |     let _el = rsx! { <div class="flex md:flex-row hovr:flex" /> };
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^

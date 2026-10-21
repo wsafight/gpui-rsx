@@ -1,5 +1,15 @@
 use std::cell::RefCell;
 
+/// Expected pixel value of a numeric spacing/sizing class in the active feature mode.
+pub fn scaled_px(units: f32) -> f32 {
+    units
+        * if cfg!(feature = "tailwind-scale") {
+            4.0
+        } else {
+            1.0
+        }
+}
+
 // 捕获最近一次自动生成的 ID（以 `__rsx_` 开头）。
 // 供 auto-ID 格式验证测试使用。
 thread_local! {

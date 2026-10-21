@@ -1,10 +1,13 @@
 # Rust
 /target/
 /demo/target/
+**/target/
 **/*.rs.bk
 *.pdb
 Cargo.lock
 !/demo/Cargo.lock
+!/Cargo.lock
+!/editors/zed/Cargo.lock
 
 # Code coverage
 lcov.info
@@ -23,3 +26,11 @@ lcov.info
 # OS
 .DS_Store
 Thumbs.db
+
+# Generated distributable artifacts
+/docs/public/playground/pkg/
+/editors/vscode/node_modules/
+/editors/vscode/dist/
+/editors/vscode/*.vsix
+/editors/zed/extension.wasm
+/dist/

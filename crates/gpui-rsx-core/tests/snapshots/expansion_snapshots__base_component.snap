@@ -1,0 +1,7 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<Button base={Button::new(\"save\")} label={\"Save\"} small />"
+---
+fn expanded() {
+    let _ = Button::new("save").label("Save").small();
+}

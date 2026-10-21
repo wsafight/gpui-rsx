@@ -1,0 +1,46 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div class=\"flex flex-colum md:flex-row dark:bg-black h-flex\" />"
+---
+fn expanded() {
+    let _ = div()
+        .flex()
+        .map(|__el| {
+            #[deprecated(
+                note = "`flex-colum` is not a known GPUI class and is passed through as `.flex_colum()`. Did you mean `flex-col`?\n help: for an extension method, use the explicit flag attribute `flex_colum` or `base={...}`; otherwise use a supported class"
+            )]
+            #[allow(non_camel_case_types)]
+            struct unsupported_rsx_class;
+            let _ = unsupported_rsx_class;
+            __el
+        })
+        .flex_colum()
+        .map(|__el| {
+            #[deprecated(
+                note = "Responsive variant `md:` is not supported: GPUI windows have no CSS breakpoints.\n  help: compute the condition from the window size and use `when={(is_wide, |el| ...)}`"
+            )]
+            #[allow(non_camel_case_types)]
+            struct unsupported_rsx_class;
+            let _ = unsupported_rsx_class;
+            __el
+        })
+        .map(|__el| {
+            #[deprecated(
+                note = "`dark:` variants are not supported: GPUI has no color-scheme media query.\n  help: define the color as a theme token in rsx.toml (e.g. `bg-surface`), or use `when={(is_dark, |el| ...)}`"
+            )]
+            #[allow(non_camel_case_types)]
+            struct unsupported_rsx_class;
+            let _ = unsupported_rsx_class;
+            __el
+        })
+        .map(|__el| {
+            #[deprecated(
+                note = "`h-flex` is not a known GPUI class and is passed through as `.h_flex()`.\n help: for an extension method, use the explicit flag attribute `h_flex` or `base={...}`; otherwise use a supported class"
+            )]
+            #[allow(non_camel_case_types)]
+            struct unsupported_rsx_class;
+            let _ = unsupported_rsx_class;
+            __el
+        })
+        .h_flex();
+}

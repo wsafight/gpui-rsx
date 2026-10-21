@@ -5,5 +5,5 @@ use common::*;
 use gpui_rsx::rsx_strict;
 
 fn main() {
-    let _el = rsx_strict! { <div class="hover:bg-blue-500" /> };
+    let _el = rsx_strict! { <div class="flex flex-colum" /> };
 }

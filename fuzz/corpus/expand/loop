@@ -1,0 +1,1 @@
+<ul>{for row in rows { <li key={row.id} onClick={handler}>{row.name}</li> }}</ul>

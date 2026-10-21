@@ -1,0 +1,11 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<h1 styled class=\"text-zinc-100\">{\"Title\"}</h1>"
+---
+fn expanded() {
+    let _ = div()
+        .text_3xl()
+        .font_weight(FontWeight::BOLD)
+        .text_color(rgb(16053493u32))
+        .child("Title");
+}

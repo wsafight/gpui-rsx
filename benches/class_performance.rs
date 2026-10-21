@@ -9,6 +9,8 @@ use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 
+include!("support/generated_styled.rs");
+
 // Mock GPUI 类型（与 tests/macro_tests.rs 相同）
 #[derive(Debug, Default)]
 struct MockElement {
@@ -201,6 +203,7 @@ impl MockElement {
 // 必须与 generate_common_class_matches 生成的所有方法调用保持一致。
 #[allow(dead_code)] // benchmark 中并非所有 trait 方法都被使用
 trait Styled: Sized {
+    generated_styled_defaults!();
     fn style(&mut self) -> &mut StyleRefinement;
 
     // --- flex ---

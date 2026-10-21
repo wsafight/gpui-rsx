@@ -1,13 +1,12 @@
+use gpui::component::Sizable as _;
+use gpui::component::StyledExt as _;
+use gpui::component::button::{Button, ButtonVariants as _};
+use gpui::component::input::{Input, InputState};
+use gpui::component::label::Label;
+use gpui::component::popover::Popover;
+use gpui::component::tab::Tab;
 use gpui::prelude::*;
 use gpui::*;
-use gpui_component::Sizable as _;
-use gpui_component::StyledExt as _;
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::input::{Input, InputState};
-use gpui_component::label::Label;
-use gpui_component::popover::Popover;
-use gpui_component::tab::Tab;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 
 struct ComponentView;
@@ -20,7 +19,7 @@ fn stateful_input_contract(window: &mut Window, cx: &mut App) -> impl IntoElemen
 
 #[allow(dead_code)]
 fn facade_reexport_contract() -> impl IntoElement {
-    let _edges: gpui_component::Edges<Pixels> = gpui_component::Edges::all(px(4.0));
+    let _edges: gpui::component::Edges<Pixels> = gpui::component::Edges::all(px(4.0));
     rsx! { <div base={div().h_flex()} /> }
 }
 
@@ -83,10 +82,14 @@ impl Render for ComponentView {
 }
 
 fn main() {
-    application().run(|cx: &mut App| {
-        gpui_component::init(cx);
-        cx.open_window(WindowOptions::default(), |_, cx| cx.new(|_| ComponentView))
+    application()
+        .with_assets(assets::Assets)
+        .run(|cx: &mut App| {
+            gpui::init(cx);
+            gpui::open_window(WindowOptions::default(), cx, |_, cx| {
+                cx.new(|_| ComponentView)
+            })
             .expect("failed to open component window");
-        cx.activate(true);
-    });
+            cx.activate(true);
+        });
 }

@@ -537,3 +537,46 @@ fn parse_element(input: ParseStream) -> Result<Element> {
 Thank you for contributing to GPUI-RSX! 🎉
 
 感谢你为 GPUI-RSX 做出贡献！🎉
+
+## Generated contracts and performance
+
+After changing GPUI dependencies in `demo/Cargo.lock`, regenerate the API facts and
+verify the real contracts before accepting the revision:
+
+```sh
+cargo xtask gen-tables
+cargo xtask spec
+cargo xtask compat-matrix
+GPUI_API_SNAPSHOT_REQUIRED=1 cargo test -p xtask --test gpui_api_snapshot
+cargo test --workspace
+cargo test --workspace --all-features
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo check --manifest-path demo/Cargo.toml --bins --locked
+```
+
+All three generators accept `--check`; CI requires their committed outputs to be
+current. The daily compatibility workflow regenerates against upstream, validates
+one patch on Linux/macOS, and proposes a PR. Failures are consolidated into a single
+bot tracker. GitHub repository settings must allow Actions to create pull requests.
+
+The syntax package lives in `spec/rsx-spec.json` with a matching `spec/prompt.md`.
+It describes supported syntax; an application's `cargo check` is still required to
+verify types, callbacks and imports.
+
+Measure the base and candidate revisions on the same machine with the same target
+and benchmark parameters:
+
+```sh
+cargo bench -p gpui-rsx-core --bench expansion -- --save-baseline base
+# Switch to the candidate revision, preserving target/criterion.
+cargo bench -p gpui-rsx-core --bench expansion -- --baseline base
+cargo xtask bench-check --threshold 0.10
+```
+
+`bench-check` fails when the lower confidence bound of a Criterion mean relative
+change exceeds 10%. Missing comparison data is an error. `--criterion-dir <dir>`
+selects another output directory. CI measures the base revision on the same runner;
+when the base has no expansion benchmark yet, it records an initial baseline.
+
+Coverage-guided parser/expansion fuzzing is documented in [fuzz/README.md](fuzz/README.md).
+The stable workspace tests also exercise deterministic random token and class input.

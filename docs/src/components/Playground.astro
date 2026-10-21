@@ -1,0 +1,120 @@
+---
+const example = '<div class="flex flex-col gap-4 p-6 bg-zinc-900 rounded-lg">\n    <h1 class="text-2xl font-bold text-white">{"Build with GPUI"}</h1>\n    <p class="text-zinc-300">{"Edit the source to see its expansion."}</p>\n    <button class="p-3 bg-blue-500 text-white rounded-md hover:bg-blue-600">{"Continue"}</button>\n</div>';
+---
+<div class="rsx-playground">
+  <div class="toolbar">
+    <label><input id="rsx-strict" type="checkbox" checked /> Strict diagnostics</label>
+    <label><input id="rsx-tailwind" type="checkbox" /> Tailwind scale</label>
+    <button id="rsx-format" type="button">Format RSX</button>
+    <button id="rsx-convert" type="button">Convert JSX / TSX</button>
+    <button id="rsx-share" type="button">Copy share link</button>
+  </div>
+  <label class="editor-label" for="rsx-source">RSX source · paste JSX to convert</label>
+  <textarea id="rsx-source" spellcheck="false" aria-describedby="rsx-status">{example}</textarea>
+  <p id="rsx-status" role="status" aria-live="polite">Loading the Rust parser…</p>
+  <div class="outputs">
+    <section><h2>Expanded Rust</h2><pre><code id="rsx-expansion"></code></pre></section>
+    <section><h2>Static layout preview</h2><p class="preview-note">Approximate layout. Expressions, events and custom components appear as placeholders.</p><iframe id="rsx-preview" title="Static RSX layout preview" sandbox=""></iframe></section>
+  </div>
+  <section><h2>Diagnostics</h2><ul id="rsx-diagnostics" aria-label="RSX diagnostics"></ul></section>
+</div>
+
+<script>
+  const source = document.querySelector<HTMLTextAreaElement>('#rsx-source')!;
+  const strict = document.querySelector<HTMLInputElement>('#rsx-strict')!;
+  const tailwind = document.querySelector<HTMLInputElement>('#rsx-tailwind')!;
+  const status = document.querySelector<HTMLElement>('#rsx-status')!;
+  const expansion = document.querySelector<HTMLElement>('#rsx-expansion')!;
+  const diagnostics = document.querySelector<HTMLUListElement>('#rsx-diagnostics')!;
+  const preview = document.querySelector<HTMLIFrameElement>('#rsx-preview')!;
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  const worker = new Worker(`${base}/playground/worker.js`, { type: 'module' });
+  let sequence = 0;
+  let timer: ReturnType<typeof setTimeout>;
+  const request = (operation = 'analyze') => {
+    if (source.value.length > 100_000) { status.textContent = 'Source exceeds the 100 KB playground limit.'; return; }
+    status.textContent = 'Checking…';
+    worker.postMessage({ id: ++sequence, operation, source: source.value, strict: strict.checked, tailwind: tailwind.checked });
+  };
+  const showDiagnostics = (items: Array<{start:number;end:number;message:string;severity?:string}>) => {
+    diagnostics.replaceChildren();
+    for (const item of items) {
+      const li = document.createElement('li');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = `${item.severity ?? 'review'}: ${item.message}`;
+      button.addEventListener('click', () => {
+        const bytes = new TextEncoder().encode(source.value);
+        const decoder = new TextDecoder();
+        source.focus();
+        source.setSelectionRange(decoder.decode(bytes.slice(0,item.start)).length, decoder.decode(bytes.slice(0,item.end)).length);
+      });
+      li.append(button); diagnostics.append(li);
+    }
+    if (!items.length) { const li = document.createElement('li'); li.textContent = 'No diagnostics.'; diagnostics.append(li); }
+  };
+  worker.onmessage = ({ data }) => {
+    if (data.id !== sequence) return;
+    if (data.error) { status.textContent = data.error; return; }
+    if (data.operation === 'format') { source.value = data.result; request(); return; }
+    if (data.operation === 'convert') {
+      if (data.result.Err) { status.textContent = data.result.Err; return; }
+      source.value = data.result.Ok.rsx;
+      request();
+      status.textContent = `Converted. ${data.result.Ok.diagnostics.length} item(s) need review; see conversion notes.`;
+      // Preserve conversion notes after the next analysis result.
+      source.dataset.conversion = JSON.stringify(data.result.Ok.diagnostics);
+      return;
+    }
+    const result = data.result;
+    expansion.textContent = result.expansion.Ok ?? result.expansion.Err;
+    const html = result.preview.Ok ?? `<pre>${String(result.preview.Err).replace(/[&<>]/g, (c:string) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]!))}</pre>`;
+    preview.srcdoc = `<!doctype html><meta charset="utf-8"><style>body{font:14px system-ui;margin:12px}.rsx-placeholder{font:11px monospace;background:#fef3c7;color:#92400e;padding:2px}</style>${html}`;
+    const notes = source.dataset.conversion ? JSON.parse(source.dataset.conversion) : [];
+    showDiagnostics([...result.diagnostics,...notes.map((note:{message:string}) => ({start:0,end:0,message:note.message,severity:'conversion'}))]);
+    status.textContent = `${result.diagnostics.length} diagnostic(s). ${tailwind.checked ? 'Tailwind: 4 px per unit.' : 'Default: 1 px per unit.'}`;
+  };
+  worker.onerror = () => { status.textContent = 'The parser could not load. Reload to retry.'; };
+  source.addEventListener('input', () => { delete source.dataset.conversion; clearTimeout(timer); timer = setTimeout(() => request(), 200); });
+  strict.addEventListener('change', () => request());
+  tailwind.addEventListener('change', () => request());
+  document.querySelector('#rsx-format')!.addEventListener('click', () => request('format'));
+  document.querySelector('#rsx-convert')!.addEventListener('click', () => request('convert'));
+  document.querySelector('#rsx-share')!.addEventListener('click', async () => {
+    const encoded = btoa(Array.from(new TextEncoder().encode(JSON.stringify({source:source.value,strict:strict.checked,tailwind:tailwind.checked})), byte => String.fromCharCode(byte)).join(''));
+    if (encoded.length > 16_000) { status.textContent = 'Source is too long for a share link.'; return; }
+    const url = new URL(location.href); url.hash = encoded;
+    history.replaceState(null,'',url);
+    try { await navigator.clipboard.writeText(url.href); status.textContent = 'Share link copied.'; }
+    catch { status.textContent = 'Share link is in the address bar.'; }
+  });
+  if (location.hash.length > 1 && location.hash.length < 16_001) {
+    try {
+      const shared = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(location.hash.slice(1)),c => c.charCodeAt(0))));
+      if (typeof shared.source === 'string' && shared.source.length <= 100_000) {
+        source.value = shared.source; strict.checked = shared.strict !== false; tailwind.checked = shared.tailwind === true;
+      }
+    } catch { status.textContent = 'Invalid share link; using the example.'; }
+  }
+  request();
+</script>
+
+<style>
+  .rsx-playground { --panel: var(--sl-color-gray-6); margin-block:1.5rem; }
+  .toolbar { display:flex; flex-wrap:wrap; gap:.65rem 1rem; align-items:center; padding:.9rem; background:var(--panel); border:1px solid var(--sl-color-gray-5); border-radius:.6rem .6rem 0 0; }
+  .toolbar label { display:flex; gap:.4rem; align-items:center; font-size:.85rem; }
+  button { cursor:pointer; background:var(--sl-color-gray-7); color:var(--sl-color-text); border:1px solid var(--sl-color-gray-4); border-radius:.35rem; padding:.3rem .6rem; font:inherit; font-size:.8rem; }
+  button:hover { border-color:var(--sl-color-accent); }
+  .editor-label { display:block; font-size:.8rem; padding:.5rem .9rem; background:var(--panel); }
+  textarea { display:block; width:100%; min-height:22rem; resize:vertical; font:13px/1.7 ui-monospace,monospace; color:var(--sl-color-text); background:var(--sl-color-black); border:1px solid var(--sl-color-gray-4); border-radius:0 0 .6rem .6rem; padding:1rem; tab-size:4; }
+  #rsx-status { font-size:.85rem; color:var(--sl-color-gray-2); min-height:1.5rem; }
+  .outputs { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  .outputs section { min-width:0; }
+  h2 { font-size:1rem; margin:0 0 .5rem; }
+  pre { height:24rem; overflow:auto; font-size:12px; border-radius:.5rem; }
+  iframe { width:100%; height:20rem; background:white; border:1px solid var(--sl-color-gray-4); border-radius:.5rem; }
+  .preview-note { font-size:.75rem; margin:0 0 .5rem; }
+  #rsx-diagnostics { padding-left:1rem; font-size:.85rem; }
+  #rsx-diagnostics :global(button) { text-align:left; white-space:pre-wrap; }
+  @media (max-width:800px) { .outputs { grid-template-columns:1fr; } }
+</style>

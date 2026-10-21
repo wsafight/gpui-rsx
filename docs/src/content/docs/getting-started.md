@@ -7,25 +7,23 @@ GPUI-RSX is a procedural macro for writing GPUI views with JSX-like syntax. Stat
 
 ## Install
 
-Add GPUI from the Zed repository and GPUI-RSX to your application:
+Add GPUI Kit, aliased as `gpui` for macro-generated paths, and GPUI-RSX:
 
 ```toml
 [dependencies]
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
+gpui = { package = "gpui-kit", version = "=0.8.0" }
 gpui-rsx = "0.7"
 ```
 
-Applications should commit `Cargo.lock` so the exact GPUI git revision is pinned.
+Kit pins its matching `gpui-pre` snapshot and re-exports GPUI, components and assets. Commit `Cargo.lock` to reproduce the complete dependency graph.
 
-If you are upgrading from the crates.io `gpui = "0.2.2"` package, read the [migration guide](/gpui-rsx/guides/migration/#05x--cratesio-gpui-022--060--zed-git-gpui) before changing dependencies.
+If you are upgrading from Zed Git or the official `gpui = "0.2.2"` package, follow the current Kit section in the [migration guide](/gpui-rsx/guides/migration/).
 
 ## Imports
 
 ```rust
 use gpui::*;
 use gpui::prelude::*;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 ```
 
@@ -145,7 +143,6 @@ rsx! {
 ```rust
 use gpui::*;
 use gpui::prelude::*;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 
 struct HelloView;
@@ -162,8 +159,9 @@ impl Render for HelloView {
 }
 
 fn main() {
-    application().run(|cx: &mut App| {
-        cx.open_window(WindowOptions::default(), |_, cx| {
+    application().with_assets(assets::Assets).run(|cx: &mut App| {
+        gpui::init(cx);
+        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
             cx.new(|_cx| HelloView)
         }).unwrap();
         cx.activate(true);
@@ -179,7 +177,7 @@ The repository includes a demo crate that exercises real GPUI integration:
 cargo check --manifest-path demo/Cargo.toml --bins --locked
 ```
 
-The demo lockfile pins GPUI and `gpui-component` so compatibility problems are reproducible.
+The demo lockfile pins Kit, its GPUI snapshot and `gpui-component` so compatibility problems are reproducible.
 
 Run the complete multi-pane example directly:
 

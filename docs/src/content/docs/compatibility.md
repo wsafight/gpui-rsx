@@ -1,50 +1,69 @@
 ---
 title: Compatibility
-description: GPUI, gpui-component, Rust, and demo lockfile compatibility notes.
+description: GPUI Kit, gpui-pre, gpui-component, Rust, and demo lockfile compatibility notes.
 ---
 
-GPUI-RSX `0.7.x` targets GPUI from the Zed repository instead of the crates.io `gpui = "0.2.2"` package.
+The current verified target is GPUI Kit and its exact `gpui-pre` snapshot.
+Longbridge publishes the `gpui-pre-*` family as snapshots of Zed GPUI; its version
+numbers are independent of the official `gpui` crate.
 
-The Zed git dependency currently still reports its crate package version as `gpui v0.2.2`, but it exposes a different API surface from the crates.io release. This is why `cargo tree` can show `gpui v0.2.2` even when the project is correctly using Zed git GPUI.
+The macro and core crates have no GPUI runtime dependency. The demo names
+`gpui-kit` as `gpui` to preserve paths used by RSX expansions and GPUI derives.
+
+<!-- gpui-rsx:compat:start -->
+### Verified Compatibility
+
+| GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
+| --- | --- | --- | --- |
+| `0.8.0` | `0.8.0` | `gpui-pre@0.3.9` | `gpui-component@0.8.0` |
+
+This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
+
+```toml
+[dependencies]
+gpui = { package = "gpui-kit", version = "=0.8.0" }
+gpui-rsx = "0.8.0"
+```
+<!-- gpui-rsx:compat:end -->
 
 ## Current Demo Matrix
 
 | Item | Value |
 | --- | --- |
-| GPUI-RSX | `0.7.0` |
-| GPUI source | `https://github.com/zed-industries/zed` |
-| GPUI resolved revision | `e973593455af18719be22b0455c3f928c6ccc24d` |
-| `gpui-component` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |
-| `gpui-base` revision | `7885c41663c7a6cc68ad0c99b1ba33550f807ff0` |
+| Rendering backend | Kit's default `gpui-pre`, published on crates.io |
 | GPUI-RSX root MSRV | `1.88.0` |
-| Demo Rust toolchain | `1.95.0` |
-| Demo check | `cargo +1.95.0 check --manifest-path demo/Cargo.toml --bins --locked` |
+| Demo Rust toolchain | `1.98.1` |
+| Demo check | `cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked` |
 
-The root MSRV is a lower bound, not a required day-to-day toolchain. Newer stable Rust versions are
-supported; this locked demo revision was also verified with Rust `1.98.0`. Rust `1.95.0` remains the
-explicit reproducibility lane for the demo.
+The root MSRV and demo toolchain are managed separately. Working on the macro does
+not require GPUI platform dependencies.
 
-## Avoid Duplicate GPUI Crates
+## Share One GPUI Type Identity
 
-When using `gpui-component`, keep all direct GPUI dependencies on the same source and revision as `gpui-component`.
+Use Kit's exports through `gpui::component`, `gpui::base` and `gpui::platform`.
+Call `gpui::init(cx)` before opening windows and use `gpui::open_window(...)` to
+mount the root. Load icons with `application().with_assets(gpui::assets::Assets)`.
 
-Bad dependency graphs often look like this:
-
-- one `gpui` crate from a bare Zed git dependency,
-- another `gpui` crate from a pinned `rev`,
-- component types that no longer match because they came from different crate instances.
-
-Pinning the application lockfile and using the demo as a reference keeps the graph deterministic.
-
-The current gpui-component main branch splits lower-level controls into `gpui-base`. Applications
-normally keep depending on the `gpui-component` facade; its public re-exports cover supported base
-types. Add a direct `gpui-base` dependency only when using an API that the facade does not export,
-and keep it on the same source revision.
-
-## Inspect the Resolved GPUI
+Applications no longer need direct dependencies on the old Zed Git `gpui`,
+`gpui_platform`, or Git component library. Each crate instance owns distinct Rust
+types; types from different GPUI instances cannot be interchanged.
 
 ```bash
-cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
+cargo xtask check-gpui
+cargo tree --manifest-path demo/Cargo.toml --locked -i gpui-pre
 ```
 
-If the source is `git+https://github.com/zed-industries/zed#...`, the demo is using Zed git GPUI even if the displayed package version is `0.2.2`.
+`check-gpui` requires one rendering engine, matching platform/macros snapshot
+versions, and the same GPUI instance in Kit, base and component. It prints the
+verified package versions as JSON for CI.
+
+## Update the Matching Set
+
+Follow Kit's published releases. The compatibility workflow selects the latest
+stable, non-yanked Kit on crates.io, updates the exact demo pin, and regenerates
+the lockfile, API tables, snapshots, specification and this matrix. Linux and
+macOS validate the same patch before a repair PR is created; failures update one
+tracking issue.
+
+GPUI Fast is optional. The demo and compatibility matrix cover Kit's default
+gpui-pre backend.

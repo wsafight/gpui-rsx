@@ -9,14 +9,14 @@ description: 发布 GPUI-RSX 前应运行的命令和检查项。
 scripts/check.sh --release
 ```
 
-如果 Zed GPUI git 依赖需要本地代理，使用：
+如果 registry 下载需要本地代理，使用：
 
 ```bash
 scripts/check.sh --proxy --release
 ```
 
 该脚本会运行根 crate 格式、测试、clippy，以及基于固定 lockfile 的真实 GPUI demo
-check/clippy。`--release` 模式还会检查 benchmark 目标、确认 demo 中只有一个 `gpui`
+check/clippy/test。`--release` 模式还会检查 benchmark 目标、确认 demo 中只有一个 `gpui-pre`
 实例、构建文档站，并执行 cargo publish dry-run。
 
 ## 发布包内容
@@ -34,7 +34,8 @@ cargo package --list --allow-dirty
 
 ```bash
 cargo bench --bench class_performance --no-run
-cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
+cargo xtask check-gpui
+cargo tree --manifest-path demo/Cargo.toml --locked -i gpui-pre
 cargo package --list --allow-dirty
 bun install --cwd docs --frozen-lockfile
 bun run --cwd docs check
@@ -46,5 +47,13 @@ cargo publish --dry-run --allow-dirty
 
 - 更新 `CHANGELOG.md` 和 `CHANGELOG_CN.md`；
 - 确认 `Cargo.toml` 版本和 README 安装片段；
-- 确认 demo lockfile 仍指向预期 GPUI revision；
+- 确认 demo lockfile 仍指向预期的 Kit 与 GPUI 快照版本；
 - 合并后确认 GitHub Pages 部署成功。
+
+## 0.8 tooling packages
+
+Publish in dependency order: `gpui-rsx-core`, `gpui-rsx-tools`, `gpui-rsx`, `cargo-rsx`.
+The release check script verifies all packages with local patches before registry publication.
+Also run `node scripts/test-playground.mjs` after building WASM; build the VSIX and
+`editors/zed` for `wasm32-wasip1`. Attach both editor packages to the GitHub release.
+Track Marketplace authentication and Zed registry review separately from crate publication.

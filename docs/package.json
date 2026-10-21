@@ -7,9 +7,10 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "bun run build:wasm && astro build",
     "preview": "astro preview",
-    "check": "astro check"
+    "check": "astro check",
+    "build:wasm": "../scripts/build-playground.sh"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",

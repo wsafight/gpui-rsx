@@ -1,0 +1,8 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div class={if active { \"flex gap-2\" } else { \"hidden\" }} />"
+---
+fn expanded() {
+    let _ = div()
+        .map(|__el| if active { __el.flex().gap(px(2f32)) } else { __el.hidden() });
+}

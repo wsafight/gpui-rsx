@@ -1,0 +1,12 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<button class=\"bg-blue-500 hover:bg-blue-600 hover:text-white active:opacity-75 group-hover/row:underline\" />"
+---
+fn expanded() {
+    let _ = div()
+        .id(concat!(file!(), "::", "__rsx_button_L1C1"))
+        .bg(rgb(3900150u32))
+        .hover(|__style| __style.bg(rgb(2450411u32)).text_color(rgb(16777215u32)))
+        .active(|__style| __style.opacity(0.75f32))
+        .group_hover("row", |__style| __style.underline());
+}

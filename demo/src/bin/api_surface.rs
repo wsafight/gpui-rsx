@@ -1,7 +1,6 @@
+use gpui::component::tooltip::Tooltip;
 use gpui::prelude::*;
 use gpui::*;
-use gpui_component::tooltip::Tooltip;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 use std::time::Duration;
 
@@ -113,11 +112,14 @@ impl Render for ApiSurfaceView {
 }
 
 fn main() {
-    application().run(|cx: &mut App| {
-        cx.open_window(WindowOptions::default(), |_, cx| {
-            cx.new(|_| ApiSurfaceView::default())
-        })
-        .expect("failed to open API surface window");
-        cx.activate(true);
-    });
+    application()
+        .with_assets(assets::Assets)
+        .run(|cx: &mut App| {
+            gpui::init(cx);
+            gpui::open_window(WindowOptions::default(), cx, |_, cx| {
+                cx.new(|_| ApiSurfaceView::default())
+            })
+            .expect("failed to open API surface window");
+            cx.activate(true);
+        });
 }

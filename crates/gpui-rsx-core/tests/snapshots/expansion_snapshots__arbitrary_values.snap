@@ -1,0 +1,12 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div class=\"w-[280px] h-[18rem] w-6/24 bg-[#f00] text-[rgba(15,23,42,0.8)]\" />"
+---
+fn expanded() {
+    let _ = div()
+        .w(px(280f32))
+        .h(rems(18f32))
+        .w(relative(0.25f32))
+        .bg(rgb(16711680u32))
+        .text_color(rgba(253176524u32));
+}

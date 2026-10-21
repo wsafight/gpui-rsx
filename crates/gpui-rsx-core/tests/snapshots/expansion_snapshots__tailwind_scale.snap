@@ -1,0 +1,7 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div class=\"gap-4 p-2.5 w-64 gap-[14px]\" />"
+---
+fn expanded() {
+    let _ = div().gap(px(16f32)).p(px(10f32)).w(px(256f32)).gap(px(14f32));
+}

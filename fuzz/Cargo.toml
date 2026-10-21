@@ -1,0 +1,23 @@
+[package]
+name = "gpui-rsx-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+gpui-rsx-core = { path = "../crates/gpui-rsx-core" }
+proc-macro2 = "1"
+
+[[bin]]
+name = "expand"
+path = "fuzz_targets/expand.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]
+members = ["."]

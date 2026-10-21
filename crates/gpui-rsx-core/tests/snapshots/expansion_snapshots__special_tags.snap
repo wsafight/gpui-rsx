@@ -1,0 +1,7 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div><img src={\"logo.png\"} /><svg src={\"icon.svg\"} class=\"size-4\" /></div>"
+---
+fn expanded() {
+    let _ = div().child(img("logo.png")).child(svg().path("icon.svg").size(px(4f32)));
+}

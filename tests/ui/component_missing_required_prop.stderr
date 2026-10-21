@@ -1,0 +1,45 @@
+error[E0277]: the trait bound `CardBuilder: gpui::IntoElement` is not satisfied
+  --> tests/ui/component_missing_required_prop.rs:23:21
+   |
+23 |     require_element(rsx! { <Card elevated /> });
+   |     --------------- ^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |     |
+   |     required by a bound introduced by this call
+   |
+help: the trait `gpui::IntoElement` is not implemented for `CardBuilder`
+  --> tests/ui/component_missing_required_prop.rs:5:1
+   |
+ 5 | #[component]
+   | ^^^^^^^^^^^^
+help: the trait `gpui::IntoElement` is conditionally implemented for `CardBuilder<__Title>`
+  --> tests/ui/component_missing_required_prop.rs:5:1
+   |
+ 5 | #[component]
+   | ^^^^^^^^^^^^ unsatisfied requirement introduced here: `MissingRequiredProp: title`
+note: required by a bound in `require_element`
+  --> tests/ui/component_missing_required_prop.rs:20:28
+   |
+20 | fn require_element(_: impl IntoElement) {}
+   |                            ^^^^^^^^^^^ required by this bound in `require_element`
+   = note: this error originates in the attribute macro `component` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: the method `build` exists for struct `CardBuilder`, but its trait bounds were not satisfied
+  --> tests/ui/component_missing_required_prop.rs:24:35
+   |
+ 5 | #[component]
+   | ------------ method `build` not found for this struct because it doesn't satisfy `MissingRequiredProp: title`
+...
+24 |     let _card = Card().elevated().build();
+   |                                   ^^^^^ method cannot be called on `CardBuilder` due to unsatisfied trait bounds
+   |
+note: trait bound `MissingRequiredProp: title` was not satisfied
+  --> tests/ui/component_missing_required_prop.rs:5:1
+   |
+ 5 | #[component]
+   | ^^^^^^^^^^^^
+note: the trait `title` must be implemented
+  --> tests/ui/component_missing_required_prop.rs:5:1
+   |
+ 5 | #[component]
+   | ^^^^^^^^^^^^
+   = note: this error originates in the attribute macro `component` (in Nightly builds, run with -Z macro-backtrace for more info)

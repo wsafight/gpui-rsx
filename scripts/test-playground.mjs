@@ -1,0 +1,29 @@
+// Exercise the actual browser-target WASM and worker protocol without a native GPUI runtime.
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import { initSync, analyze, format, convert } from '../docs/public/playground/pkg/gpui_rsx_wasm.js';
+
+initSync({ module: await readFile(new URL('../docs/public/playground/pkg/gpui_rsx_wasm_bg.wasm',import.meta.url)) });
+let result = JSON.parse(analyze('<div class="gap-4"/>',true,true));
+assert.match(result.expansion.Ok,/16f32/);
+result = JSON.parse(analyze('<div class="flex-colum"/>',true,false));
+assert.ok(result.diagnostics.some(d=>d.severity==='error' && d.suggestion==='flex-col'));
+assert.match(format('<div><span>{"中文😀"}</span></div>'),/中文😀/);
+const converted = JSON.parse(convert('<div className="flex" onClick={()=>alert(1)}>Hi <span>{name}</span></div>'));
+assert.ok(converted.Ok.rsx.includes('flex'));
+assert.ok(converted.Ok.diagnostics.length>=2);
+result = JSON.parse(analyze('<div>{"<script>bad()</script>"}{run()}</div>',false,false));
+assert.ok(!result.preview.Ok.includes('<script>'));
+assert.ok(!result.preview.Ok.includes('run()'));
+assert.ok(JSON.parse(analyze('<div>',true,false)).diagnostics.some(d=>d.severity==='error'));
+let message;
+globalThis.self = { postMessage(value){message=value;} };
+await import('../docs/public/playground/worker.js');
+await self.onmessage({data:{id:12,operation:'analyze',source:'<div class="p-4"/>',strict:true,tailwind:false}});
+assert.equal(message.id,12);
+assert.match(message.result.expansion.Ok,/4f32/);
+await self.onmessage({data:{id:13,operation:'convert',source:'<div>hello</div>'}});
+assert.ok(message.result.Ok.rsx.includes('hello'));
+await self.onmessage({data:{id:14,operation:'format',source:'<div>'}});
+assert.equal(message.id,14);assert.ok(message.error);
+console.log('Playground WASM + worker: 9 checks passed');

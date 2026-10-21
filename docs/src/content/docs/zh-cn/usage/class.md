@@ -23,7 +23,7 @@ rsx! {
 }
 ```
 
-permissive 模式下，无法安全生成的未知静态 class 会被忽略；无效的任意值仍会编译时报错。strict 模式下，不支持的静态 class 会直接变成编译错误：
+permissive 模式下，不能展开的静态 class 会给出编译期警告；未知标识符形式也会警告并透传为 GPUI 方法，疑似拼写错误附带建议。第三方扩展方法建议改用显式属性（如 `h_flex`）或 `base={...}`。无效的任意值仍会编译时报错。strict 模式下，不支持的静态 class 会直接变成编译错误：
 
 ```rust
 use gpui_rsx::rsx_strict;
@@ -84,7 +84,7 @@ rsx! {
 
 动态 class 使用生成的运行时 matcher。matcher 支持常用布局、间距、尺寸、颜色、透明度、排版和边框工具类，也支持文档列出的任意长度和颜色格式。
 
-permissive 模式下，未知动态 class 会被忽略。debug 构建中，每个生成调用点的未知 class 警告只输出一次。strict 模式下，不支持的动态 class 在求值时会 panic。
+permissive 模式下，未知动态 class 会被忽略。debug 构建中，每个生成调用点的未知 class 警告只输出一次。strict 模式下，不支持的动态 class 默认 panic，可通过 `onUnknownClass={|class: &str| ...}` 自定义处理。开启 `dynamic-class-report` 后，debug 提示会在进程退出时汇总。
 
 | 能力 | 静态 class | 动态 class |
 | --- | --- | --- |
@@ -95,7 +95,8 @@ permissive 模式下，未知动态 class 会被忽略。debug 构建中，每�
 | 完整 Tailwind 色板 | 支持 | 支持 |
 | 任意 hex / RGB / RGBA 颜色 | 支持 | 支持 |
 | 静态有状态滚动 class | 支持并自动生成 ID | 不支持 |
-| `hover:*` 等 Tailwind variant | 忽略或 strict 报错 | 忽略或 strict panic |
+| `hover:` / `focus:` / `active:` / group 状态前缀 | 支持 | 不支持 |
+| 响应式 / `dark:` 前缀 | 警告或 strict 报错 | debug 提示或 strict panic / 自定义回调 |
 
 ## 支持范围
 
@@ -186,3 +187,15 @@ let preview = rsx_expand! {
 - 少量条件变体优先使用 `when` 或 `whenClass`，不要拼接很长的运行时 class 字符串。
 
 关于 render 循环分配、ID/key 行为和验证命令，见[性能优化](/gpui-rsx/zh-cn/guides/performance/)。
+
+## 刻度与主题
+
+默认 `gap-4` 是 4px。`rsx_tw!`、`tailwind-scale` feature 或 `rsx.toml` 中的
+`[options] spacing-scale = "tailwind"` 可将数值间距和尺寸改为每单位 4px。
+任意值、分数和 GPUI 预设不受影响。已有界面的迁移步骤见
+[迁移指南](/gpui-rsx/zh-cn/guides/migration/)。
+
+静态字面量支持 `hover:`、`focus:`、`focus-visible:`、`active:`、`group-hover:` 和
+`group-active:`，也可写具名组 `group-hover/menu:`。有状态的前缀会注入 ID，循环内要提供稳定 key。
+主题令牌通过 `rsx.toml` 的 `[colors]`、`[radius]`、`[spacing]` 定义；gpui-component
+预设可将 `bg-primary` 等映射为 `cx.theme()` 调用。状态前缀和主题令牌不支持动态字符串。

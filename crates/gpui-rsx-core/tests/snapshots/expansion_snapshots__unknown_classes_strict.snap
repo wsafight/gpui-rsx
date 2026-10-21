@@ -1,0 +1,14 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div class=\"flex flex-colum\" />"
+---
+fn expanded() {
+    let _ = div()
+        .flex()
+        .map(|__el| {
+            compile_error!(
+                "Unsupported class `flex-colum` in strict mode. Did you mean `flex-col`?\n  help: use `rsx!` or `rsx_permissive!` to pass unknown classes through, or replace this with a supported GPUI class or attribute"
+            );
+            __el
+        });
+}

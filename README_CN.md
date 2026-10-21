@@ -54,24 +54,35 @@ bun run dev
 
 ```toml
 [dependencies]
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
+gpui = { package = "gpui-kit", version = "=0.8.0" }
 gpui-rsx = "0.7"
 ```
 
 ### GPUI 版本目标
 
-`gpui-rsx` 0.6 及后续版本使用 Zed 仓库中的 GPUI，而不是 crates.io 发布的 `gpui = "0.2.2"` 包。这个 git 依赖仍然显示为 `gpui v0.2.2`，但 API 面与 crates.io 的版本不同，并包含这些版本使用的 helper 方法。
+demo 使用 GPUI Kit 0.8.0 及其固定的 `gpui-pre 0.3.9` 快照。Cargo 中的 `gpui`
+别名保留了 RSX 展开和 GPUI derive 所需的路径；Kit 统一导出配套的渲染引擎、
+平台入口、组件和资源。宏与 core crate 不依赖 GPUI 运行时。
 
-如果你从旧版 `gpui-rsx` 升级，请将：
+通过 `gpui::component` 导入组件，在打开窗口前调用 `gpui::init(cx)`，使用
+`gpui::open_window(...)` 挂载 Kit 的根视图。应用应提交 lockfile，并随 Kit 一起
+更新配套快照。已有 Zed Git 应用请阅读[迁移指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/migration/)。
+
+<!-- gpui-rsx:compat:start -->
+### 已验证的兼容版本
+
+| GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
+| --- | --- | --- | --- |
+| `0.8.0` | `0.8.0` | `gpui-pre@0.3.9` | `gpui-component@0.8.0` |
+
+此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
-gpui = "0.2.2"
+[dependencies]
+gpui = { package = "gpui-kit", version = "=0.8.0" }
+gpui-rsx = "0.8.0"
 ```
-
-替换为上方的 Zed git `gpui` 和 `gpui_platform` 依赖，并把应用启动方式更新为 `gpui_platform::application()`。
-
-应用项目应提交 `Cargo.lock` 来固定实际解析到的 Zed revision。如果同时使用 `gpui-component`，请保持直接依赖的 `gpui` / `gpui_platform` source 与 `gpui-component` 使用的 GPUI source 完全一致；混用 bare git 和 `rev = "..."` 会生成两份 GPUI crate，导致组件类型不兼容。
+<!-- gpui-rsx:compat:end -->
 
 ## 🚀 快速开始
 
@@ -80,7 +91,6 @@ gpui = "0.2.2"
 ```rust
 use gpui::*;
 use gpui::prelude::*;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 
 struct CounterView {
@@ -126,8 +136,9 @@ impl Render for CounterView {
 }
 
 fn main() {
-    application().run(|cx: &mut App| {
-        cx.open_window(WindowOptions::default(), |_, cx| {
+    application().with_assets(assets::Assets).run(|cx: &mut App| {
+        gpui::init(cx);
+        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
             cx.new(|_cx| CounterView { count: 0 })
         }).unwrap();
         cx.activate(true);
@@ -274,6 +285,25 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
 > **注意：** `class` 同时支持静态字符串（编译时处理）和动态表达式（运行时解析）。GPUI-RSX 实现的是 Tailwind-like 子集，不是完整 Tailwind CSS 引擎。静态 class 会直接展开为 GPUI builder 调用；动态 class 表达式使用一个很小的运行时 matcher。详见 [FAQ Q5](#q5-可以使用动态-class-值吗)。
+
+#### 刻度、状态前缀、组件与主题
+
+使用 `rsx_tw!` 或 `tailwind-scale` feature 可启用 Tailwind 每单位 4px 的数值刻度：
+`gap-4` 变成 16px，`gap-[14px]` 仍是 14px。也可在 `rsx.toml` 的 `[options]` 中设置
+`spacing-scale = "tailwind"`，仅影响当前 crate。已有布局请先阅读
+[迁移指南](docs/src/content/docs/zh-cn/guides/migration.md)。
+
+```rust
+rsx! { <button class="bg-blue-500 hover:bg-blue-600 active:opacity-75" /> }
+```
+
+静态字面量支持 `hover:`、`focus:`、`focus-visible:`、`active:`、`group-hover:` 和
+`group-active:`。`#[component]` 生成带必填属性检查和 children 的 builder。
+`rsx.toml` 支持语义颜色、圆角、间距及 gpui-component 主题预设。完整用法见
+[Rust API 文档](https://docs.rs/gpui-rsx)。
+
+提供给代码生成工具的 [语法规范](spec/rsx-spec.json) 和 [提示词模板](spec/prompt.md)
+由当前支持表生成，包含 class 白名单与能力边界。
 
 #### 支持的 class 模式
 
@@ -510,7 +540,8 @@ rsx! {
 > 任意间距和尺寸长度（如 `w-[280px]`、`h-[50%]`、`gap-[14px]`、`mx-[1.25rem]`）、
 > 分数尺寸（如 `w-6/24`），以及数值前缀回退（如 `gap-7`、`p-5`、`opacity-33`）。
 > 真正不受支持的 class（如 Tailwind variants 或未知工具类）在 release 构建中**静默忽略**，
-> 在 debug 构建中打印警告。
+> 在 debug 构建中按调用点去重警告；`dynamic-class-report` 可在退出时汇总，
+> 也可通过 `onUnknownClass` 显式处理。
 >
 > **推荐替代方案**（按优先级排序）：
 > 1. **字符串字面量**（最佳）：`class="flex gap-4"` — 编译期，支持文档列出的子集
@@ -535,7 +566,7 @@ let classes = format!("flex gap-{} bg-[#ff0000]", spacing);  // gap-7、gap-32 �
 
 ### 10. 宏模式与展开预览
 
-`rsx!` 默认是 permissive 模式：无法安全解析的不支持静态 class 会被忽略，而非法 arbitrary value 会报编译错误。使用 `rsx_strict!` 可以拒绝不支持的静态 class：
+`rsx!` 默认是 permissive 模式：不能展开的静态 class 会在编译期警告。标识符形式会透传为 GPUI 方法，疑似拼写错误附带建议；非法 arbitrary value 会报编译错误。使用 `rsx_strict!` 可以拒绝不支持的静态 class：
 
 ```rust
 use gpui_rsx::{rsx_expand, rsx_permissive, rsx_strict};
@@ -549,7 +580,7 @@ let preview = rsx_expand! {
 assert!(preview.contains("rgba"));
 ```
 
-strict 模式下，动态 class 在运行时遇到不支持的 token 会 panic。`rsx_expand!` 返回字符串预览用于调试，不会对生成的 GPUI 表达式做类型检查。
+strict 模式下，动态 class 在运行时遇到不支持的 token 默认 panic；可用 `onUnknownClass={|class: &str| ...}` 提供自定义处理。`rsx_expand!` 返回字符串预览用于调试，不会对生成的 GPUI 表达式做类型检查。
 
 动态 class 能力边界：
 
@@ -560,7 +591,8 @@ strict 模式下，动态 class 在运行时遇到不支持的 token 会 panic�
 | 任意长度/颜色 | 支持 | 支持 |
 | 分数尺寸 | 支持 | 支持 |
 | stateful scroll class | 支持并自动注入 ID | 不支持 |
-| 未知 Tailwind variant | permissive 忽略，strict 报错 | permissive 忽略，strict panic |
+| 状态前缀（`hover:`、`focus:`、`active:`、group） | 支持 | 不支持 |
+| 响应式 / `dark:` 前缀 | permissive 警告，strict 报错 | permissive 在 debug 提示；strict panic 或自定义回调 |
 
 ### 11. 桌面三栏布局
 
@@ -887,8 +919,8 @@ rsx! {
 混用 `gpui-component` 时，保持 import 显式，并用 `base` 表达需要 ID 或自定义参数的构造函数：
 
 ```rust
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::Sizable as _;
+use gpui::component::button::{Button, ButtonVariants as _};
+use gpui::component::Sizable as _;
 
 rsx! {
     <Button
@@ -1146,7 +1178,8 @@ rsx! { <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} /> }
 // ✅ 含数值、任意长度和任意颜色的动态表达式
 let classes = if active { "flex gap-4" } else { "block" };
 rsx! { <div class={classes} /> }
-// Tailwind variants 或未知工具类在 permissive 模式中会被忽略。
+// 动态前缀和未知工具类在 debug 构建中提示。
+// 状态前缀请使用静态字面量，或用 onUnknownClass 自定义处理。
 ```
 
 **建议：** 需要动态样式时，优先使用 `when`/`whenSome` 或独立值属性（如 `bg={color}`）——它们是编译期处理，支持所有 GPUI 提供的功能。
@@ -1209,3 +1242,10 @@ MIT License
 ---
 
 **让 GPUI 开发更加愉快！** 🎉
+
+## 开发工具
+
+安装 `cargo-rsx` 0.8.0（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
+`convert`、`preview --watch` 和 `lsp`。参见[工具指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/tooling/)
+与 [WASM Playground](https://wsafight.github.io/gpui-rsx/zh-cn/playground/)。
+编辑器适配位于 `editors/`，发布附件包含可安装的 VSIX，市场上架状态另行记录。

@@ -395,10 +395,10 @@ let preview = gpui_rsx::rsx_expand! {
 如果 `gpui-component` 类型和应用类型不匹配，先检查依赖树：
 
 ```bash
-cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
+cargo tree --manifest-path demo/Cargo.toml --locked -i gpui-pre
 ```
 
-保持所有直接 `gpui` 和 `gpui_platform` 依赖与组件库使用同一个 Zed source 和 revision。
+采用[兼容性说明](/gpui-rsx/zh-cn/compatibility/)中的单一 Kit 依赖，通过 `gpui::component` 导入组件。仓库内可用 `cargo xtask check-gpui` 检查配套快照和共享的 GPUI 类型。
 
 ### 更新依赖后 Demo 检查失败
 
@@ -408,14 +408,14 @@ cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
 cargo check --manifest-path demo/Cargo.toml --bins --locked
 ```
 
-如果 `--locked` 因 lockfile 需要变化而失败，需要明确判断是否真的要移动 GPUI 目标 revision。不要在应用兼容性检查中随意更新 lockfile。
+如果 `--locked` 因 lockfile 需要变化而失败，需要明确判断是否真的要移动 GPUI 目标快照版本。不要在应用兼容性检查中随意更新 lockfile。
 
 ## 获取帮助
 
 提交 issue 时请包含：
 
 - GPUI-RSX 版本。
-- `cargo tree -i gpui` 中解析到的 GPUI source 和 revision。
+- `cargo tree -i gpui-pre` 中解析到的 GPUI 快照版本和 source。
 - 最小 RSX 片段。
 - 完整编译错误或运行时现象。
 - 问题是否能在 `demo/` crate 中复现。

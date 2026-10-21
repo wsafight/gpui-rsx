@@ -1,44 +1,52 @@
 # GPUI-RSX Demos
 
-These demos target GPUI from the Zed repository:
+The demos use GPUI Kit 0.8.0 and its pinned `gpui-pre 0.3.9` snapshot:
 
 ```toml
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
-gpui-component = { git = "https://github.com/longbridge/gpui-component" }
+gpui = { package = "gpui-kit", version = "=0.8.0" }
 gpui-rsx = { path = ".." }
 ```
 
-`gpui` and `gpui_platform` intentionally use the same unqualified Zed git source as `gpui-component` so all components share one GPUI type universe. `demo/Cargo.lock` pins the exact resolved Zed commit; do not add a direct `rev` to only the top-level GPUI dependencies unless `gpui-component` is moved to the same source.
+The Cargo alias keeps `gpui::` available to RSX expansions and GPUI derives.
+Kit supplies the matching engine, components, platform entry point and assets.
+Import components through `gpui::component`; initialize with `gpui::init(cx)`
+and open windows with `gpui::open_window(...)` to mount Kit's root.
 
-The resolved Zed dependency requires Rust 1.95.0 or newer. This demo pins its toolchain to Rust 1.95.0 so local checks and CI use the same compiler.
-
-```bash
-cd demo
-cargo run --bin hello
-cargo run --bin counter
-cargo run --bin palette
-cargo run --bin task_list
-cargo run --bin project_dashboard
-cargo run --bin incident_console
-cargo run --bin api_surface
-cargo run --bin component
-```
-
-`api_contract` is a compile-only binary for API compatibility checks:
+The demo toolchain is pinned to Rust 1.98.1. The macro/core MSRV remains Rust 1.88.
+Commit `Cargo.lock` to reproduce the complete dependency graph.
 
 ```bash
 cd demo
-cargo check --bin api_contract
+cargo run --bin hello --locked
+cargo run --bin counter --locked
+cargo run --bin palette --locked
+cargo run --bin task_list --locked
+cargo run --bin project_dashboard --locked
+cargo run --bin incident_console --locked
+cargo run --bin api_surface --locked
+cargo run --bin component --locked
 ```
 
-`project_dashboard` is the most complete interactive example. It includes filtered keyed lists, selection state, conditional classes, dynamic progress, density controls, and item mutations.
+`project_dashboard` demonstrates keyed lists, selection, conditional classes,
+progress, density controls and item mutations. `incident_console` combines
+filters, sorting, incident lifecycle transitions, a timeline and empty states;
+its model and UI modules live under `src/bin/incident_console/`.
 
-`incident_console` is the complex application example. It combines a multi-pane operations layout, data-driven filters, sorting, selection, incident lifecycle transitions, a timeline, mutable sample data, and empty states. Its source is split by model and UI responsibility under `src/bin/incident_console/`.
+`api_contract`, `generated_api_contract` and `semantics_contract` are compile-only
+contracts. They cover GPUI methods, every generated theme color, the Kit alias,
+component props, state variants, spacing scales and dynamic classes. `rsx.toml`
+enables semantic colors; the preset reads `cx.theme().colors.*` so a color such
+as `list` remains distinct from `Theme.list` settings.
 
-The committed `Cargo.lock` and Rust toolchain pin the resolved `gpui-component` and Zed revisions so demo builds are reproducible. When updating either git dependency, regenerate `Cargo.lock`, check the generated GPUI APIs, and run:
+From the repository root, verify or update the matching dependency set:
 
 ```bash
-cd demo
-cargo check --bins
+cargo xtask check-gpui
+cargo xtask gen-tables --check
+cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
+cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
+cargo +1.98.1 test --manifest-path demo/Cargo.toml --bins --locked
 ```
+
+The compatibility workflow follows stable, non-yanked Kit releases and verifies
+the matching snapshot before proposing an update. GPUI Fast is not enabled.
