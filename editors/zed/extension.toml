@@ -1,0 +1,11 @@
+id = "gpui-rsx"
+name = "GPUI RSX"
+version = "0.8.0"
+schema_version = 1
+authors = ["wsafight"]
+description = "Class diagnostics, completion and expansion hover for GPUI RSX macros"
+repository = "https://github.com/wsafight/gpui-rsx"
+
+[language_servers.gpui-rsx]
+name = "GPUI RSX"
+languages = ["Rust"]

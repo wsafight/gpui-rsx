@@ -7,25 +7,23 @@ GPUI-RSX 是一个用于编写 GPUI 视图的过程宏。静态标记会在编�
 
 ## 安装
 
-在应用的 `Cargo.toml` 中添加 Zed 仓库的 GPUI 和 GPUI-RSX：
+在应用的 `Cargo.toml` 中添加 GPUI Kit 和 GPUI-RSX；将 Kit 命名为 `gpui`，供宏展开使用：
 
 ```toml
 [dependencies]
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
+gpui = { package = "gpui-kit", version = "=0.8.0" }
 gpui-rsx = "0.7"
 ```
 
-应用项目应提交 `Cargo.lock`，以固定实际解析到的 GPUI git revision。
+Kit 固定配套的 `gpui-pre` 快照，并导出 GPUI、组件和资源。应用应提交 `Cargo.lock`，固定完整依赖图。
 
-如果你从 crates.io 的 `gpui = "0.2.2"` 迁移，请先阅读[迁移指南](/gpui-rsx/zh-cn/guides/migration/#05x--cratesio-gpui-022--060--zed-git-gpui)。
+如果你从 Zed Git 或官方 `gpui = "0.2.2"` 迁移，请采用[迁移指南](/gpui-rsx/zh-cn/guides/migration/)中的当前 Kit 迁移章节。
 
 ## 引入
 
 ```rust
 use gpui::*;
 use gpui::prelude::*;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 ```
 
@@ -145,7 +143,6 @@ rsx! {
 ```rust
 use gpui::*;
 use gpui::prelude::*;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 
 struct HelloView;
@@ -162,8 +159,9 @@ impl Render for HelloView {
 }
 
 fn main() {
-    application().run(|cx: &mut App| {
-        cx.open_window(WindowOptions::default(), |_, cx| {
+    application().with_assets(assets::Assets).run(|cx: &mut App| {
+        gpui::init(cx);
+        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
             cx.new(|_cx| HelloView)
         }).unwrap();
         cx.activate(true);
@@ -179,7 +177,7 @@ fn main() {
 cargo check --manifest-path demo/Cargo.toml --bins --locked
 ```
 
-demo lockfile 会固定 GPUI 和 `gpui-component`，方便复现兼容性问题。
+demo lockfile 会固定 Kit、GPUI 快照和 `gpui-component`，方便复现兼容性问题。
 
 可以直接运行完整的多面板示例：
 

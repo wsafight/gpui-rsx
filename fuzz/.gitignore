@@ -1,0 +1,7 @@
+/target/
+/artifacts/
+/coverage/
+/corpus/expand/*
+!/corpus/expand/layout
+!/corpus/expand/loop
+!/corpus/expand/arbitrary

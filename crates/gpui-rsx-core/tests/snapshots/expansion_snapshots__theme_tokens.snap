@@ -1,0 +1,12 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div class=\"bg-brand text-surface rounded-card p-gutter hover:bg-surface\" />"
+---
+fn expanded() {
+    let _ = div()
+        .bg(rgb(2450411u32))
+        .text_color(cx.theme().background)
+        .rounded(px(12.0))
+        .p(px(18.0))
+        .hover(|__style| __style.bg(cx.theme().background));
+}

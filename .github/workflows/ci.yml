@@ -35,6 +35,17 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  automation:
+    name: Compatibility Automation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test .github/scripts/*.test.cjs
+      - run: bash -n scripts/check.sh
+
   msrv:
     name: Root MSRV
     runs-on: ubuntu-latest
@@ -83,7 +94,9 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run tests
-        run: cargo test --all-features
+        run: |
+          cargo test --workspace
+          cargo test --workspace --all-features
 
   demo:
     name: Demo GPUI Check
@@ -97,7 +110,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: 1.95.0
+          toolchain: 1.98.1
 
       - name: Install Linux GPUI dependencies
         if: runner.os == 'Linux'
@@ -125,6 +138,9 @@ jobs:
 
       - name: Check demo bins
         run: cargo check --manifest-path demo/Cargo.toml --bins --locked
+
+      - name: Link and test demo bins
+        run: cargo test --manifest-path demo/Cargo.toml --bins --locked
 
   fmt:
     name: Rustfmt
@@ -170,7 +186,7 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   docs:
     name: Documentation
@@ -200,7 +216,7 @@ jobs:
           key: ${{ runner.os }}-cargo-build-target-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build documentation
-        run: cargo doc --no-deps --all-features
+        run: cargo doc --workspace --no-deps --all-features
         env:
           RUSTDOCFLAGS: -D warnings
 
@@ -256,3 +272,99 @@ jobs:
           files: lcov.info
           fail_ci_if_error: false
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  gpui-api:
+    name: Generated Outputs and GPUI API
+    runs-on: ubuntu-latest
+    env:
+      GPUI_API_SNAPSHOT_REQUIRED: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            .
+            demo
+      - name: Verify the locked Kit and GPUI dependency graph
+        run: cargo xtask check-gpui
+      - name: Require all five API snapshots
+        run: cargo test -p xtask --test gpui_api_snapshot
+      - name: Require reproducible generated outputs
+        run: |
+          cargo xtask gen-tables --check
+          cargo xtask spec --check
+          cargo xtask compat-matrix --check
+
+  benchmarks:
+    name: Expansion Performance
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      BASE_REV: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Measure the base revision on this runner
+        id: baseline
+        shell: bash
+        run: |
+          if test -n "$BASE_REV" && git cat-file -e "$BASE_REV:crates/gpui-rsx-core/benches/expansion.rs" 2>/dev/null; then
+            git worktree add --detach "$RUNNER_TEMP/rsx-bench-base" "$BASE_REV"
+            cargo bench --manifest-path "$RUNNER_TEMP/rsx-bench-base/Cargo.toml" -p gpui-rsx-core --bench expansion -- --save-baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+            echo 'comparable=true' >> "$GITHUB_OUTPUT"
+          else
+            echo 'No expansion benchmark in the base revision; recording the initial baseline.'
+            echo 'comparable=false' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Compare expansion costs
+        if: steps.baseline.outputs.comparable == 'true'
+        run: |
+          cargo bench -p gpui-rsx-core --bench expansion -- --baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+          cargo xtask bench-check --threshold 0.10
+      - name: Record initial baseline
+        if: steps.baseline.outputs.comparable != 'true'
+        run: cargo bench -p gpui-rsx-core --bench expansion -- --save-baseline initial --sample-size 30 --warm-up-time 1 --measurement-time 2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: expansion-benchmarks
+          path: target/criterion
+          retention-days: 7
+
+  tooling:
+    name: Playground and Editor Packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
+          targets: wasm32-unknown-unknown,wasm32-wasip1
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - name: Build the WASM playground
+        run: scripts/build-playground.sh
+      - name: Test browser WASM and worker protocol
+        run: node scripts/test-playground.mjs
+      - name: Build VS Code extension
+        run: |
+          bun install --cwd editors/vscode --frozen-lockfile
+          bun run --cwd editors/vscode check
+          bun run --cwd editors/vscode package
+      - name: Build Zed extension
+        run: cargo +1.98.1 build --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1 --release --locked
+      - uses: actions/upload-artifact@v4
+        with:
+          name: editor-extensions
+          path: |
+            editors/vscode/*.vsix
+            editors/zed/target/wasm32-wasip1/release/*.wasm

@@ -1,0 +1,14 @@
+---
+title: Playground
+description: 在浏览器中展开 RSX、检查 class 并预览静态布局。
+---
+import Playground from '../../../components/Playground.astro';
+
+输入 RSX 宏体即可查看 Rust 展开结果与诊断。解析在浏览器本地通过 WebAssembly 执行，
+复用宏的 Rust core，不会将源码发送到服务器。分享链接将源码保存在 URL 片段中。
+
+<Playground />
+
+粘贴 JSX 表达式或 TSX 模块后，点击 **Convert JSX / TSX**。
+转换提示会列出需要手动改写为 Rust 的行为。预览只近似展示静态样式，
+表达式、事件、自定义组件与不支持的样式会显示为占位；请用原生 GPUI 应用验证实际效果。

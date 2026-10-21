@@ -1,0 +1,14 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div class=\"flex flex-col gap-4 p-4 bg-blue-500 text-white rounded-md\" />"
+---
+fn expanded() {
+    let _ = div()
+        .flex()
+        .flex_col()
+        .gap(px(4f32))
+        .p(px(4f32))
+        .bg(rgb(3900150u32))
+        .text_color(rgb(16777215u32))
+        .rounded_md();
+}

@@ -1,0 +1,9 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div hoverClass=\"bg-zinc-800\" focusClass=\"border-blue-500\" />"
+---
+fn expanded() {
+    let _ = div()
+        .hover(|__style| __style.bg(rgb(2565930u32)))
+        .focus(|__style| __style.border_color(rgb(3900150u32)));
+}

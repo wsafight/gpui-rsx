@@ -23,7 +23,7 @@ rsx! {
 }
 ```
 
-In permissive mode, unsupported static classes that cannot be emitted safely are ignored. Invalid arbitrary values still produce compile errors. In strict mode, unsupported static classes are compile errors:
+In permissive mode, static classes that cannot be expanded produce compile-time warnings. Unknown identifier-like classes also warn and pass through to GPUI methods; likely typos include suggestions. For third-party extension methods, prefer explicit flag attributes (for example, `h_flex`) or `base={...}`. Invalid arbitrary values still produce compile errors. In strict mode, unsupported static classes are compile errors:
 
 ```rust
 use gpui_rsx::rsx_strict;
@@ -84,7 +84,7 @@ rsx! {
 
 Dynamic classes use a generated runtime matcher. The matcher supports common layout, spacing, sizing, color, opacity, typography, and border utilities, including arbitrary lengths and colors in the supported formats.
 
-Unknown dynamic classes are ignored in permissive mode. In debug builds, each unknown class warning is emitted only once per generated call site. In strict mode, unsupported dynamic classes panic when evaluated.
+Unknown dynamic classes are ignored in permissive mode. In debug builds, each unknown class warning is emitted only once per generated call site. In strict mode, unsupported dynamic classes panic by default; supply `onUnknownClass={|class: &str| ...}` for custom handling. With `dynamic-class-report`, debug reports are collected until process exit.
 
 | Capability | Static class | Dynamic class |
 | --- | --- | --- |
@@ -95,7 +95,8 @@ Unknown dynamic classes are ignored in permissive mode. In debug builds, each un
 | Full Tailwind color palette | Supported | Supported |
 | Arbitrary hex / RGB / RGBA colors | Supported | Supported |
 | Static stateful scroll classes | Supported with auto ID | Not supported |
-| Tailwind variants such as `hover:*` | Ignored or strict error | Ignored or strict panic |
+| State variants (`hover:`, `focus:`, `active:`, group variants) | Supported | Not supported |
+| Responsive / `dark:` variants | Warning or strict error | Debug report or strict panic / custom handler |
 
 ## Supported Utility Areas
 
@@ -186,3 +187,17 @@ let preview = rsx_expand! {
 - Use `when` or `whenClass` for small conditional variants instead of concatenating long runtime class strings.
 
 For render-loop allocation, ID/key behavior, and validation commands, see the [Performance guide](/gpui-rsx/guides/performance/).
+
+## Scale and theme tokens
+
+By default `gap-4` is 4px. `rsx_tw!`, the `tailwind-scale` feature, or
+`[options] spacing-scale = "tailwind"` in `rsx.toml` makes numeric spacing and sizing
+use 4px units. Arbitrary values, fractions and GPUI presets are unchanged. See the
+[migration guide](/gpui-rsx/guides/migration/) before changing existing layouts.
+
+Static literals support `hover:`, `focus:`, `focus-visible:`, `active:`, `group-hover:`
+and `group-active:`, including named groups such as `group-hover/menu:`. Stateful
+variants inject IDs; supply stable keys in loops. Theme tokens in `rsx.toml` support
+`[colors]`, `[radius]`, `[spacing]` and a gpui-component preset that maps semantic
+classes such as `bg-primary` to `cx.theme()` calls. Dynamic strings cannot use
+state variants or theme tokens.

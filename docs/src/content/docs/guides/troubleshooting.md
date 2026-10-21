@@ -396,10 +396,10 @@ Remember that GPUI-RSX is not Tailwind CSS. Unsupported variants such as `hover:
 If `gpui-component` types do not match your application types, inspect the dependency tree:
 
 ```bash
-cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
+cargo tree --manifest-path demo/Cargo.toml --locked -i gpui-pre
 ```
 
-Keep all direct `gpui` and `gpui_platform` dependencies on the same Zed source and revision as the component library.
+Use the single Kit dependency shown in [Compatibility](/gpui-rsx/compatibility/) and import components through `gpui::component`. In this repository, `cargo xtask check-gpui` validates the matching snapshot and shared engine types.
 
 ### Demo Check Fails After Updating Dependencies
 
@@ -416,7 +416,7 @@ If `--locked` fails because the lockfile needs changes, decide whether the GPUI 
 When filing an issue, include:
 
 - GPUI-RSX version.
-- The resolved GPUI source and revision from `cargo tree -i gpui`.
+- The resolved GPUI snapshot version and source from `cargo tree -i gpui-pre`.
 - Minimal RSX snippet.
 - Full compiler error or runtime symptom.
 - Whether the issue reproduces in the `demo/` crate.

@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-21
+
+### Added
+
+- A reusable `gpui-rsx-core` parser/code generator, generated GPUI method tables, five
+  live API snapshots, expansion snapshots, fuzz target and Criterion regression gate.
+- Tailwind spacing scale, static state variants, component props builders, theme tokens,
+  and compile-time diagnostics for every unknown static class, including extension hints.
+- `cargo-rsx`: project dependency doctor, workspace lint (text/JSON), RSX formatting,
+  spacing migration, SWC-based JSX/TSX conversion, static preview with live refresh,
+  and a stdio language server with completion, hover, quick fixes and color previews.
+- A local WASM Playground with expansion, diagnostics, sharing, conversion and preview;
+  installable VS Code and Zed extension packages.
+- Generated syntax specification/prompt and bilingual compatibility matrices.
+
+### Changed
+
+- Demo now uses GPUI Kit 0.8.0 with its pinned gpui-pre 0.3.9 backend. The macro crate
+  keeps Rust 1.88 and has no GPUI runtime dependency. CLI tools require Rust 1.98.
+- Compatibility automation follows published Kit releases, verifies Linux/macOS before
+  opening repair PRs, and consolidates historical bot issues into one tracker.
+
+### Notes
+
+- JSX conversion and browser preview require native application review for behavior.
+  Formatting preserves commented macro bodies unchanged. Migration is explicit and runs
+  once before enabling Tailwind scale. Extension marketplace review is separate from
+  the downloadable packages. Model-generation success rate and repair latency require
+  continued measurement; this release does not claim those outcome targets are proven.
+
+
 ## [0.7.0] - 2026-08-25
 
 ### Added

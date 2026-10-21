@@ -9,15 +9,15 @@ Run the extended pre-release validation suite:
 scripts/check.sh --release
 ```
 
-If the Zed GPUI git dependency needs the local proxy, use:
+If registry downloads need the local proxy, use:
 
 ```bash
 scripts/check.sh --proxy --release
 ```
 
-The script runs root crate formatting, tests, clippy, and the real GPUI demo check/clippy against
+The script runs root crate formatting, tests, clippy, and the real GPUI demo check/clippy/tests against
 the pinned lockfile. In `--release` mode it also checks the benchmark target, confirms the demo uses
-a single `gpui` instance, builds the docs site, and runs a cargo publish dry-run.
+a single `gpui-pre` instance, builds the docs site, and runs a cargo publish dry-run.
 
 ## Package Contents
 
@@ -35,7 +35,8 @@ If the local environment cannot run docs or package validation, split those chec
 
 ```bash
 cargo bench --bench class_performance --no-run
-cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
+cargo xtask check-gpui
+cargo tree --manifest-path demo/Cargo.toml --locked -i gpui-pre
 cargo package --list --allow-dirty
 bun install --cwd docs --frozen-lockfile
 bun run --cwd docs check
@@ -47,5 +48,13 @@ Before publishing:
 
 - update `CHANGELOG.md` and `CHANGELOG_CN.md`,
 - verify `Cargo.toml` version and README install snippets,
-- ensure the demo lockfile still reflects the intended GPUI revision,
+- ensure the demo lockfile still reflects the intended Kit and GPUI snapshot versions,
 - confirm GitHub Pages deployment succeeds after merge.
+
+## 0.8 tooling packages
+
+Publish in dependency order: `gpui-rsx-core`, `gpui-rsx-tools`, `gpui-rsx`, `cargo-rsx`.
+The release check script verifies all packages with local patches before registry publication.
+Also run `node scripts/test-playground.mjs` after building WASM; build the VSIX and
+`editors/zed` for `wasm32-wasip1`. Attach both editor packages to the GitHub release.
+Track Marketplace authentication and Zed registry review separately from crate publication.

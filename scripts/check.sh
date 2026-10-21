@@ -7,18 +7,23 @@ Usage: scripts/check.sh [--proxy] [--skip-demo] [--release] [--skip-docs] [--ski
 
 Runs the standard local validation suite:
   cargo fmt --all -- --check
-  cargo test --all-features
-  cargo clippy --all-targets --all-features -- -D warnings
-  cargo +1.95.0 check --manifest-path demo/Cargo.toml --bins --locked
-  cargo +1.95.0 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
+  cargo xtask spec --check
+  cargo xtask compat-matrix --check
+  cargo xtask check-gpui
+  cargo test --workspace
+  cargo test --workspace --all-features
+  cargo clippy --workspace --all-targets --all-features -- -D warnings
+  cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
+  cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
+  cargo +1.98.1 test --manifest-path demo/Cargo.toml --bins --locked
 
 With --release, also runs:
   cargo bench --bench class_performance --no-run
-  cargo +1.95.0 tree --manifest-path demo/Cargo.toml --locked -i gpui
+  cargo +1.98.1 tree --manifest-path demo/Cargo.toml --locked -i gpui-pre
   bun install --cwd docs --frozen-lockfile
   bun run --cwd docs check
   bun run --cwd docs build
-  cargo publish --dry-run --allow-dirty
+  cargo publish --dry-run --allow-dirty (all four packages, local dependency patches)
 
 Options:
   --proxy         Set http_proxy/https_proxy/all_proxy to 127.0.0.1:7890 for git/registry deps.
@@ -73,19 +78,26 @@ run() {
 }
 
 run cargo fmt --all -- --check
-run cargo test --all-features
-run cargo clippy --all-targets --all-features -- -D warnings
+run cargo xtask spec --check
+run cargo xtask compat-matrix --check
+run cargo test --workspace
+run cargo test --workspace --all-features
+run cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 if [[ "$skip_demo" -eq 0 ]]; then
-    run cargo +1.95.0 check --manifest-path demo/Cargo.toml --bins --locked
-    run cargo +1.95.0 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
+    run cargo xtask check-gpui
+    run cargo xtask gen-tables --check
+    GPUI_API_SNAPSHOT_REQUIRED=1 run cargo test -p xtask --test gpui_api_snapshot
+    run cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
+    run cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
+    run cargo +1.98.1 test --manifest-path demo/Cargo.toml --bins --locked
 fi
 
 if [[ "$release" -eq 1 ]]; then
     run cargo bench --bench class_performance --no-run
 
     if [[ "$skip_demo" -eq 0 ]]; then
-        run cargo +1.95.0 tree --manifest-path demo/Cargo.toml --locked -i gpui
+        run cargo +1.98.1 tree --manifest-path demo/Cargo.toml --locked -i gpui-pre
     fi
 
     if [[ "$skip_docs" -eq 0 ]]; then
@@ -95,6 +107,12 @@ if [[ "$release" -eq 1 ]]; then
     fi
 
     if [[ "$skip_package" -eq 0 ]]; then
-        run cargo publish --dry-run --allow-dirty
+        rsx_release_root="$(pwd)"
+        rsx_core_patch="patch.crates-io.gpui-rsx-core.path=\"$rsx_release_root/crates/gpui-rsx-core\""
+        rsx_tools_patch="patch.crates-io.gpui-rsx-tools.path=\"$rsx_release_root/crates/gpui-rsx-tools\""
+        run cargo publish -p gpui-rsx-core --dry-run --allow-dirty
+        run cargo publish -p gpui-rsx-tools --dry-run --allow-dirty --config "$rsx_core_patch"
+        run cargo publish -p gpui-rsx --dry-run --allow-dirty --config "$rsx_core_patch"
+        run cargo publish -p cargo-rsx --dry-run --allow-dirty --config "$rsx_core_patch" --config "$rsx_tools_patch"
     fi
 fi

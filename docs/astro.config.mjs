@@ -57,6 +57,7 @@ export default defineConfig({
               },
               slug: 'compatibility',
             },
+            { label: 'Playground', slug: 'playground' },
           ],
         },
         {
@@ -144,6 +145,7 @@ export default defineConfig({
               },
               slug: 'guides/troubleshooting',
             },
+            { label: 'CLI & Editors', translations: { 'zh-CN': 'CLI 与编辑器' }, slug: 'guides/tooling' },
           ],
         },
         {

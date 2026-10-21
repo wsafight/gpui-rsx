@@ -1,0 +1,6 @@
+error: `dark:` variants are not supported: GPUI has no color-scheme media query.
+         help: define the color as a theme token in rsx.toml (e.g. `bg-surface`), or use `when={(is_dark, |el| ...)}`
+ --> tests/ui/strict_unsupported_variant.rs:8:40
+  |
+8 |     let _el = rsx_strict! { <div class="flex dark:bg-black" /> };
+  |                                        ^^^^^^^^^^^^^^^^^^^^

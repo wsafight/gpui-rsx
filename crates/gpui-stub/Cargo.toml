@@ -1,0 +1,12 @@
+[package]
+name = "gpui-rsx-gpui-stub"
+version = "0.0.0"
+edition = "2024"
+publish = false
+description = "Minimal GPUI stand-in so gpui-rsx doctests compile and run without the real GPUI"
+
+[lib]
+name = "gpui"
+
+[dependencies]
+gpui-rsx-gpui-stub-macros = { path = "../gpui-stub-macros" }

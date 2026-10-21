@@ -1,6 +1,11 @@
+[workspace]
+members = [".", "crates/gpui-rsx-core", "crates/gpui-stub", "crates/gpui-stub-macros", "xtask", "crates/gpui-rsx-tools", "crates/cargo-rsx", "crates/gpui-rsx-wasm"]
+exclude = ["demo", "fuzz", "editors/zed"]
+resolver = "3"
+
 [package]
 name = "gpui-rsx"
-version = "0.7.0"
+version = "0.8.0"
 edition = "2024"
 rust-version = "1.88"
 description = "A JSX-like macro for GPUI - simplify UI development with HTML-like syntax"
@@ -18,17 +23,28 @@ include = [
     "/README.md",
     "/src/**",
     "/benches/class_performance.rs",
+    "/benches/support/**",
 ]
 
 [lib]
 proc-macro = true
 
 [dependencies]
+gpui-rsx-core = { version = "0.8.0", path = "crates/gpui-rsx-core" }
 syn = { version = "2.0.117", features = ["full"] }
 quote = "1.0.45"
 proc-macro2 = { version = "1.0.106", features = ["span-locations"] }
 
+[features]
+default = []
+# Numeric spacing/sizing classes use Tailwind's 4px scale (`gap-4` → 16px) in `rsx!`.
+tailwind-scale = []
+# Debug builds print ignored dynamic classes once, at process exit, instead of as they occur.
+dynamic-class-report = []
+
 [dev-dependencies]
+# Doctests compile against a GPUI stand-in so documentation examples are verified.
+gpui = { package = "gpui-rsx-gpui-stub", path = "crates/gpui-stub" }
 criterion = { version = "0.8.2", features = ["html_reports"] }
 trybuild = "1.0.116"
 

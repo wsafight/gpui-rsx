@@ -1,0 +1,10 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div when={(active, |el| el.flex())} whenSome={(width, |el, w| el.w(px(w)))} whenClass={(selected, \"bg-blue-50\")} />"
+---
+fn expanded() {
+    let _ = div()
+        .when(active, |el| el.flex())
+        .when_some(width, |el, w| el.w(px(w)))
+        .when(selected, |__el| __el.bg(rgb(15726335u32)));
+}

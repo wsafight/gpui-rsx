@@ -1,0 +1,3 @@
+# Semantic colors resolve through Kit's component theme at render time.
+[options]
+preset = "gpui-component"

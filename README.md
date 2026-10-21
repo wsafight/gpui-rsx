@@ -54,24 +54,37 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-gpui = { git = "https://github.com/zed-industries/zed" }
-gpui_platform = { git = "https://github.com/zed-industries/zed", features = ["font-kit", "runtime_shaders", "wayland", "x11"] }
+gpui = { package = "gpui-kit", version = "=0.8.0" }
 gpui-rsx = "0.7"
 ```
 
 ### GPUI Version Target
 
-`gpui-rsx` 0.6 and later target GPUI from the Zed repository instead of the crates.io `gpui = "0.2.2"` package. The git dependency still reports `gpui v0.2.2`, but its API surface differs from the crates.io release and includes the helper methods used by these versions.
+The demo uses GPUI Kit 0.8.0 and its exact `gpui-pre 0.3.9` snapshot. The Cargo
+alias `gpui` preserves the paths used by RSX expansions and GPUI derives. Kit
+re-exports the matching engine, platform entry point, components and assets.
+The macro and core crates have no GPUI runtime dependency.
 
-If you are upgrading from earlier `gpui-rsx` versions, replace:
+Import components through `gpui::component`, call `gpui::init(cx)` before opening
+windows, and use `gpui::open_window(...)` to mount Kit's root. Commit the
+application lockfile; update Kit and its matching snapshot together. See the
+[migration guide](https://wsafight.github.io/gpui-rsx/guides/migration/) for existing Zed Git apps.
+
+<!-- gpui-rsx:compat:start -->
+### Verified Compatibility
+
+| GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
+| --- | --- | --- | --- |
+| `0.8.0` | `0.8.0` | `gpui-pre@0.3.9` | `gpui-component@0.8.0` |
+
+This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
-gpui = "0.2.2"
+[dependencies]
+gpui = { package = "gpui-kit", version = "=0.8.0" }
+gpui-rsx = "0.8.0"
 ```
-
-with the Zed git `gpui` and `gpui_platform` dependencies shown above, and update application startup to use `gpui_platform::application()`.
-
-For applications, commit `Cargo.lock` to pin the exact resolved Zed revision. If you also use `gpui-component`, keep your direct `gpui` and `gpui_platform` source identical to `gpui-component`'s GPUI source; mixing a bare git dependency with `rev = "..."` creates duplicate GPUI crate instances and incompatible component types.
+<!-- gpui-rsx:compat:end -->
 
 ## 🚀 Quick Start
 
@@ -80,7 +93,6 @@ For applications, commit `Cargo.lock` to pin the exact resolved Zed revision. If
 ```rust
 use gpui::*;
 use gpui::prelude::*;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 
 struct CounterView {
@@ -126,8 +138,9 @@ impl Render for CounterView {
 }
 
 fn main() {
-    application().run(|cx: &mut App| {
-        cx.open_window(WindowOptions::default(), |_, cx| {
+    application().with_assets(assets::Assets).run(|cx: &mut App| {
+        gpui::init(cx);
+        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
             cx.new(|_cx| CounterView { count: 0 })
         }).unwrap();
         cx.activate(true);
@@ -274,6 +287,26 @@ div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
 > **Note:** `class` accepts both static strings (compiled at build time) and dynamic expressions (parsed at runtime). GPUI-RSX implements a Tailwind-like subset, not the full Tailwind CSS engine. Static classes expand directly to GPUI builder calls; dynamic class expressions use a small runtime matcher. See [Dynamic Class](#10-dynamic-class-) for details.
+
+#### Scale, state variants, components and themes
+
+`rsx_tw!` or the `tailwind-scale` feature enables Tailwind's 4px numeric units:
+`gap-4` becomes 16px; `gap-[14px]` stays 14px. An `rsx.toml` with
+`[options] spacing-scale = "tailwind"` selects this per crate. See the
+[migration guide](docs/src/content/docs/guides/migration.md) before switching existing layouts.
+
+```rust
+rsx! { <button class="bg-blue-500 hover:bg-blue-600 active:opacity-75" /> }
+```
+
+Static literals support `hover:`, `focus:`, `focus-visible:`, `active:`,
+`group-hover:` and `group-active:`. `#[component]` builds typed props and children;
+missing required props are compile errors. `rsx.toml` defines semantic colors,
+radii and spacing, with a `gpui-component` theme preset. These APIs and examples
+are covered by the crate's [Rust documentation](https://docs.rs/gpui-rsx).
+
+The generated [syntax specification](spec/rsx-spec.json) and [prompt template](spec/prompt.md)
+provide the current class vocabulary and limitations for code-generation tools.
 
 #### Supported class patterns
 
@@ -520,7 +553,8 @@ rsx! {
 > arbitrary spacing and sizing lengths (`w-[280px]`, `h-[50%]`, `gap-[14px]`, `mx-[1.25rem]`),
 > fraction sizing (`w-6/24`), and numeric prefix fallback (e.g. `gap-7`, `p-5`, `opacity-33`).
 > Truly unsupported classes (e.g. Tailwind variants or unknown utilities) are **silently ignored**
-> in release builds and print a warning in debug builds.
+> in release builds and print each warning once per call site in debug builds. Enable
+> `dynamic-class-report` for an exit summary, or supply `onUnknownClass` for explicit handling.
 >
 > **Recommended alternatives** (in priority order):
 > 1. **String literal** (best): `class="flex gap-4"` — compile-time, supports the documented subset
@@ -545,7 +579,7 @@ let classes = format!("flex gap-{} bg-[#ff0000]", spacing);  // gap-7, gap-32, e
 
 ### 11. Macro Modes and Expansion Preview
 
-`rsx!` is permissive by default: unsupported static class names are ignored when they cannot be parsed safely, while invalid arbitrary values emit compile errors. Use `rsx_strict!` to reject unsupported static classes:
+`rsx!` is permissive by default: unsupported static class names produce warnings when they cannot be expanded. Identifier-like names pass through to GPUI methods, with suggestions for likely typos. Invalid arbitrary values emit compile errors. Use `rsx_strict!` to reject unsupported static classes:
 
 ```rust
 use gpui_rsx::{rsx_expand, rsx_permissive, rsx_strict};
@@ -559,7 +593,7 @@ let preview = rsx_expand! {
 assert!(preview.contains("rgba"));
 ```
 
-Strict dynamic classes panic when an unsupported runtime token is evaluated. `rsx_expand!` returns a string preview for debugging and does not type-check the generated GPUI expression.
+Strict dynamic classes panic when an unsupported runtime token is evaluated unless you supply `onUnknownClass={|class: &str| ...}`. `rsx_expand!` returns a string preview for debugging and does not type-check the generated GPUI expression.
 
 Dynamic class capability summary:
 
@@ -570,7 +604,8 @@ Dynamic class capability summary:
 | Arbitrary lengths/colors | Supported | Supported |
 | Fraction sizing | Supported | Supported |
 | Stateful scroll classes | Supported with auto ID | Not supported |
-| Unknown Tailwind variants | Ignored in permissive, error in strict | Ignored in permissive, panic in strict |
+| State variants (`hover:`, `focus:`, `active:`, group variants) | Supported | Not supported |
+| Responsive / `dark:` variants | Warning in permissive, error in strict | Debug report in permissive; strict panic or custom handler |
 
 ### 12. Desktop Three-Column Layout
 
@@ -882,8 +917,8 @@ rsx! {
 For `gpui-component`, keep imports explicit and use `base` for constructors that need IDs or custom arguments:
 
 ```rust
-use gpui_component::button::{Button, ButtonVariants as _};
-use gpui_component::Sizable as _;
+use gpui::component::button::{Button, ButtonVariants as _};
+use gpui::component::Sizable as _;
 
 rsx! {
     <Button
@@ -1141,7 +1176,8 @@ rsx! { <div when={(is_active, |this| this.bg(rgb(0x3b82f6)))} /> }
 // ✅ Dynamic expression with numeric prefix, arbitrary lengths, and arbitrary colors
 let classes = if active { "flex gap-4" } else { "block" };
 rsx! { <div class={classes} /> }
-// Tailwind variants and unknown utilities are ignored in permissive mode.
+// Dynamic variants and unknown utilities are reported in debug builds.
+// Use static literals for state variants, or onUnknownClass for a custom handler.
 ```
 
 **Tip:** When you need dynamic styling, prefer `when`/`whenSome` or individual value
@@ -1205,3 +1241,10 @@ Inspired by:
 ---
 
 **Make GPUI development more enjoyable!** 🎉
+
+## Development tools
+
+Install `cargo-rsx` 0.8.0 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
+`preview --watch`, and the `lsp` server. See the [tooling guide](https://wsafight.github.io/gpui-rsx/guides/tooling/)
+and [WASM Playground](https://wsafight.github.io/gpui-rsx/playground/). VS Code and Zed adapters
+live in `editors/`; release assets include an installable VSIX.

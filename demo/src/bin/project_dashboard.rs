@@ -1,6 +1,5 @@
 use gpui::prelude::*;
 use gpui::*;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -404,16 +403,20 @@ impl Render for ProjectDashboard {
 }
 
 fn main() {
-    application().run(|cx: &mut App| {
-        let bounds = Bounds::centered(None, size(px(1180.0), px(760.0)), cx);
-        cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..WindowOptions::default()
-            },
-            |_, cx| cx.new(|_| ProjectDashboard::default()),
-        )
-        .expect("failed to open project dashboard window");
-        cx.activate(true);
-    });
+    application()
+        .with_assets(assets::Assets)
+        .run(|cx: &mut App| {
+            gpui::init(cx);
+            let bounds = Bounds::centered(None, size(px(1180.0), px(760.0)), cx);
+            gpui::open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(bounds)),
+                    ..WindowOptions::default()
+                },
+                cx,
+                |_, cx| cx.new(|_| ProjectDashboard::default()),
+            )
+            .expect("failed to open project dashboard window");
+            cx.activate(true);
+        });
 }

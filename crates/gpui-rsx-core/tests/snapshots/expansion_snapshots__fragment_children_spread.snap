@@ -1,0 +1,7 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<><div>{\"a\"}{\"b\"}</div><div>{...rows}</div></>"
+---
+fn expanded() {
+    let _ = vec![div().child("a").child("b"), div().children(rows)];
+}

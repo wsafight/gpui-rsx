@@ -1,3 +1,5 @@
+include!("generated_styled.rs");
+
 /// Mock Element，模拟 GPUI 的 Div / Stateful<Div>。
 /// 所有 builder 方法返回 Self 以支持方法链。
 #[derive(Debug)]
@@ -325,4 +327,7 @@ pub trait Styled: Sized {
     // --- rounded extra ---
     fn rounded_none(self) -> Self;
     fn rounded_xl(self) -> Self;
+
+    // Every other zero-argument GPUI `Styled` method (generated, no-op).
+    generated_styled_defaults!();
 }

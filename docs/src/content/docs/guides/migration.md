@@ -1,7 +1,86 @@
 ---
 title: Migration Guide
-description: Migrate from manual GPUI builder chains and upgrade to the GPUI-RSX 0.6 GPUI target.
+description: Adopt RSX and migrate existing Zed Git applications to GPUI Kit.
 ---
+
+
+## Zed Git to GPUI Kit 0.8
+
+Replace the separate Zed Git `gpui`, `gpui_platform` and Git `gpui-component`
+dependencies with Kit, preserving the `gpui` crate name for generated code:
+
+```toml
+[dependencies]
+gpui = { package = "gpui-kit", version = "=0.8.0" }
+gpui-rsx = "0.7"
+```
+
+Kit 0.8.0 pins `gpui-pre = 0.3.9`. Use `gpui::component` for styled controls and
+`gpui::base` for unstyled behavior. Replace `gpui_platform::application()` with
+`gpui::application()`, initialize Kit before opening a window, and mount its root:
+
+```rust
+gpui::application().with_assets(gpui::assets::Assets).run(|cx| {
+    gpui::init(cx);
+    gpui::open_window(gpui::WindowOptions::default(), cx, |_, cx| {
+        cx.new(|_| MyView)
+    }).expect("failed to open window");
+});
+```
+
+Regenerate and commit the application lockfile after the dependency change. The
+repository demo uses Rust 1.98.1; the macro/core MSRV remains Rust 1.88. Check
+`cargo xtask check-gpui` and the real demo bins before merging the update. GPUI
+Fast is a separate optional backend, outside the current compatibility target.
+
+The `gpui-component` theme preset now emits `cx.theme().colors.<field>`. This
+keeps colors such as `list` distinct from Kit settings such as `Theme.list`.
+Import `gpui::component::ActiveTheme` when using the preset.
+
+The 0.5-to-0.6 section below documents the historical Zed Git target; use the
+current [compatibility matrix](/gpui-rsx/compatibility/) for new dependencies.
+
+## Spacing scale, state variants and components
+
+Numeric spacing/sizing remains in pixels by default: `gap-4` is 4px. To use
+Tailwind units (4px per unit), choose `rsx_tw!`, enable the `tailwind-scale` Cargo
+feature, or put the following in an `rsx.toml` next to your crate's `Cargo.toml`:
+
+```toml
+[options]
+spacing-scale = "tailwind"
+```
+
+| Class | Default | Tailwind scale |
+| --- | --- | --- |
+| `gap-4` | 4px | 16px |
+| `p-2.5` | 2.5px | 10px |
+| `w-64` | 64px | 256px |
+| `gap-[14px]` | 14px | 14px |
+
+To preserve an existing layout when switching, replace numeric values with explicit
+pixels (`gap-4` → `gap-[4px]`) or divide by four (`gap-4` → `gap-1`). Check static
+literals, conditional branches and dynamic strings. Typed attributes (`gap={px(4.0)}`),
+fractions, arbitrary values, colors, opacity and GPUI presets (`rounded-md`, `border-2`)
+are unchanged. Prefer crate-local `rsx.toml` in libraries because Cargo features unify
+across the dependency graph.
+
+Static class literals now accept `hover:`, `focus:`, `focus-visible:`, `active:`,
+`group-hover:` and `group-active:` (including named groups). Stateful variants inject
+IDs; supply stable keys in loops. Responsive and `dark:` variants emit warnings in
+permissive mode and errors in strict mode. Dynamic class strings cannot use variants
+or theme tokens. `onUnknownClass={|class: &str| ...}` handles unsupported dynamic classes
+without the strict mode's default panic; `dynamic-class-report` collects debug reports
+until process exit.
+
+`#[component]` generates a props builder for named structs. Plain fields are required;
+`#[prop(default)]` and `#[prop(default = expr)]` are optional. A `#[children]` field
+collects children. Third-party constructors continue to work with `base={...}`.
+
+Theme tokens in `rsx.toml` support `[colors]`, `[radius]` and `[spacing]`. Use
+`[options] preset = "gpui-component"` for semantic colors; import the theme extension
+trait and keep `cx` in scope. Tokens with `{ expr = "cx.theme().background" }` read the
+current theme during rendering. Literal hex tokens remain fixed colors.
 
 ## From Manual GPUI to RSX
 
@@ -23,7 +102,7 @@ After:
 
 ```rust
 rsx! {
-    <div class="flex flex-col gap-4 bg-blue-500" />
+    <div class="flex flex-col gap-[16px] bg-blue-500" />
 }
 ```
 
@@ -202,11 +281,12 @@ application().run(|cx: &mut App| {
 
 ### Verify the Dependency Graph
 
-Use the demo crate as a known-good integration target:
+For the historical Zed Git target, inspect the application dependency tree. The current demo uses Kit; see the compatibility matrix above:
 
 ```bash
 cargo check --manifest-path demo/Cargo.toml --bins --locked
-cargo tree --manifest-path demo/Cargo.toml --locked -i gpui
+cargo tree --manifest-path demo/Cargo.toml --locked -i gpui-pre
+cargo xtask check-gpui
 ```
 
 If `cargo tree` shows `git+https://github.com/zed-industries/zed#...`, the project is using Zed git GPUI even if the displayed package version is `0.2.2`.
@@ -244,10 +324,10 @@ rsx! {
 
 ## Checklist
 
-- [ ] Dependencies use Zed git GPUI for `gpui` and `gpui_platform`.
-- [ ] Application startup uses `gpui_platform::application()`.
+- [ ] The current Kit release is aliased as `gpui` and uses its matching snapshot.
+- [ ] Startup uses `gpui::application()`, `gpui::init(cx)` and `gpui::open_window(...)`.
 - [ ] `Cargo.lock` is committed for applications.
-- [ ] `gpui-component`, if present, resolves to the same GPUI source.
+- [ ] Components are imported through `gpui::component` and share the GPUI instance.
 - [ ] New RSX modules import `gpui_rsx::rsx`.
 - [ ] Repeated stateful elements have `key={...}` or explicit `id={...}`.
 - [ ] The migrated view passes `cargo check`.

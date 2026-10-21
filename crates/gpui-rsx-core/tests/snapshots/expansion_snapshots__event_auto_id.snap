@@ -1,0 +1,10 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<button onClick={handler}>{\"Save\"}</button>"
+---
+fn expanded() {
+    let _ = div()
+        .id(concat!(file!(), "::", "__rsx_button_L1C1"))
+        .on_click(handler)
+        .child("Save");
+}

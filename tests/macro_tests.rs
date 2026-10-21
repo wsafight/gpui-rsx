@@ -2582,7 +2582,11 @@ fn test_dynamic_class_arbitrary_gap() {
 
     assert_eq!(
         take_length_calls(),
-        vec![("px", 7.0), ("px", 9.0), ("px", 16.0)]
+        vec![
+            ("px", scaled_px(7.0)),
+            ("px", scaled_px(9.0)),
+            ("px", scaled_px(16.0))
+        ]
     );
 }
 
@@ -2603,11 +2607,11 @@ fn test_dynamic_class_arbitrary_padding() {
     assert_eq!(
         take_length_calls(),
         vec![
-            ("px", 5.0),
-            ("px", 5.0),
-            ("px", 5.0),
-            ("px", 3.0),
-            ("px", 3.0)
+            ("px", scaled_px(5.0)),
+            ("px", scaled_px(5.0)),
+            ("px", scaled_px(5.0)),
+            ("px", scaled_px(3.0)),
+            ("px", scaled_px(3.0))
         ]
     );
 }
@@ -2626,7 +2630,11 @@ fn test_dynamic_class_arbitrary_margin() {
 
     assert_eq!(
         take_length_calls(),
-        vec![("px", 3.0), ("px", 3.0), ("px", 3.0)]
+        vec![
+            ("px", scaled_px(3.0)),
+            ("px", scaled_px(3.0)),
+            ("px", scaled_px(3.0))
+        ]
     );
 }
 
@@ -2655,7 +2663,11 @@ fn test_dynamic_class_sizing_arbitrary() {
 
     assert_eq!(
         take_length_calls(),
-        vec![("px", 48.0), ("px", 16.0), ("px", 8.0)]
+        vec![
+            ("px", scaled_px(48.0)),
+            ("px", scaled_px(16.0)),
+            ("px", scaled_px(8.0))
+        ]
     );
 }
 
@@ -2747,7 +2759,10 @@ fn test_dynamic_class_gap_xy_arbitrary() {
     let cls = "gap-y-6";
     let _b = rsx! { <div class={cls} /> };
 
-    assert_eq!(take_length_calls(), vec![("px", 4.0), ("px", 6.0)]);
+    assert_eq!(
+        take_length_calls(),
+        vec![("px", scaled_px(4.0)), ("px", scaled_px(6.0))]
+    );
 }
 
 #[test]
@@ -2802,7 +2817,7 @@ fn test_strict_dynamic_class_supports_shared_fast_path_entries() {
     let _el = gpui_rsx::rsx_strict! { <div class={cls} /> };
 
     assert_eq!(take_font_weight_calls(), vec![700.0]);
-    assert_eq!(take_length_calls(), vec![("px", 4.0)]);
+    assert_eq!(take_length_calls(), vec![("px", scaled_px(4.0))]);
 }
 
 #[test]
@@ -2859,7 +2874,7 @@ fn test_conditional_literal_class_static_path_evaluates_condition_once() {
     };
 
     assert_eq!(condition_calls, 1);
-    assert_eq!(take_length_calls(), vec![("px", 7.0)]);
+    assert_eq!(take_length_calls(), vec![("px", scaled_px(7.0))]);
 }
 
 #[test]
@@ -2875,7 +2890,7 @@ fn test_match_literal_class_static_path_evaluates_expr_once() {
     };
 
     assert_eq!(match_expr_calls, 1);
-    assert_eq!(take_length_calls(), vec![("px", 7.0)]);
+    assert_eq!(take_length_calls(), vec![("px", scaled_px(7.0))]);
 }
 
 #[test]
@@ -2914,7 +2929,7 @@ fn test_rsx_expand_preview_staticizes_conditional_literal_class() {
 
     assert!(!expanded.contains("__rsx_apply_class"));
     assert!(compact.contains("ifactive"));
-    assert!(compact.contains(".flex().gap(px(7"));
+    assert!(compact.contains(&format!(".flex().gap(px({}", scaled_px(7.0))));
     assert!(compact.contains(".block()"));
 }
 
@@ -2927,7 +2942,7 @@ fn test_rsx_expand_preview_staticizes_match_literal_class() {
 
     assert!(!expanded.contains("__rsx_apply_class"));
     assert!(compact.contains("matchstate"));
-    assert!(compact.contains("0=>__el.flex().gap(px(7"));
+    assert!(compact.contains(&format!("0=>__el.flex().gap(px({}", scaled_px(7.0))));
     assert!(compact.contains("_=>__el.block()"));
 }
 

@@ -1,0 +1,34 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: tail
+---
+            fn __rsx_unknown_class_handler<F: FnMut(&str)>(handler: F) -> F {
+                handler
+            }
+            #[allow(unused_mut)]
+            let mut __on_unknown = __rsx_unknown_class_handler(|__class: &str| {
+                panic!(
+                    "[gpui-rsx] unsupported dynamic class {:?} in strict mode. \
+                     Pass onUnknownClass={{|class| ...}} to handle it without panicking, \
+                     or use rsx! / rsx_permissive! to ignore unsupported dynamic classes.",
+                    __class
+                );
+            });
+            let __class_expr = classes;
+            let __class_str: &str = __class_expr.as_ref();
+            if __class_str.is_empty() {
+                __el
+            } else {
+                __class_str
+                    .split_ascii_whitespace()
+                    .fold(
+                        __el,
+                        |__el, __class| __rsx_apply_class(
+                            __el,
+                            __class,
+                            &mut __on_unknown,
+                        ),
+                    )
+            }
+        });
+}

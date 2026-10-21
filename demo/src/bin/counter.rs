@@ -1,6 +1,5 @@
 use gpui::prelude::*;
 use gpui::*;
-use gpui_platform::application;
 use gpui_rsx::rsx;
 
 #[derive(Default)]
@@ -69,11 +68,14 @@ impl Render for CounterView {
 }
 
 fn main() {
-    application().run(|cx: &mut App| {
-        cx.open_window(WindowOptions::default(), |_, cx| {
-            cx.new(|_| CounterView::default())
-        })
-        .expect("failed to open counter window");
-        cx.activate(true);
-    });
+    application()
+        .with_assets(assets::Assets)
+        .run(|cx: &mut App| {
+            gpui::init(cx);
+            gpui::open_window(WindowOptions::default(), cx, |_, cx| {
+                cx.new(|_| CounterView::default())
+            })
+            .expect("failed to open counter window");
+            cx.activate(true);
+        });
 }
