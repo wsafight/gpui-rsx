@@ -17,7 +17,9 @@ impl RenderOnce for Card {
     }
 }
 
+fn require_element(_: impl IntoElement) {}
+
 fn main() {
-    let _el = rsx! { <div><Card elevated /></div> };
+    require_element(rsx! { <Card elevated /> });
     let _card = Card().elevated().build();
 }

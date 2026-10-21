@@ -1,8 +1,10 @@
 error[E0277]: the trait bound `CardBuilder: gpui::IntoElement` is not satisfied
-  --> tests/ui/component_missing_required_prop.rs:21:15
+  --> tests/ui/component_missing_required_prop.rs:23:21
    |
-21 |     let _el = rsx! { <div><Card elevated /></div> };
-   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+23 |     require_element(rsx! { <Card elevated /> });
+   |     --------------- ^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |     |
+   |     required by a bound introduced by this call
    |
 help: the trait `gpui::IntoElement` is not implemented for `CardBuilder`
   --> tests/ui/component_missing_required_prop.rs:5:1
@@ -14,20 +16,20 @@ help: the trait `gpui::IntoElement` is conditionally implemented for `CardBuilde
    |
  5 | #[component]
    | ^^^^^^^^^^^^ unsatisfied requirement introduced here: `MissingRequiredProp: title`
-note: required by a bound in `child`
-  --> crates/gpui-stub/src/lib.rs
+note: required by a bound in `require_element`
+  --> tests/ui/component_missing_required_prop.rs:20:28
    |
-   |     fn child(self, child: impl IntoElement) -> Self {
-   |                                ^^^^^^^^^^^ required by this bound in `ParentElement::child`
-   = note: this error originates in the macro `rsx` which comes from the expansion of the attribute macro `component` (in Nightly builds, run with -Z macro-backtrace for more info)
+20 | fn require_element(_: impl IntoElement) {}
+   |                            ^^^^^^^^^^^ required by this bound in `require_element`
+   = note: this error originates in the attribute macro `component` (in Nightly builds, run with -Z macro-backtrace for more info)
 
 error[E0599]: the method `build` exists for struct `CardBuilder`, but its trait bounds were not satisfied
-  --> tests/ui/component_missing_required_prop.rs:22:35
+  --> tests/ui/component_missing_required_prop.rs:24:35
    |
  5 | #[component]
    | ------------ method `build` not found for this struct because it doesn't satisfy `MissingRequiredProp: title`
 ...
-22 |     let _card = Card().elevated().build();
+24 |     let _card = Card().elevated().build();
    |                                   ^^^^^ method cannot be called on `CardBuilder` due to unsatisfied trait bounds
    |
 note: trait bound `MissingRequiredProp: title` was not satisfied
