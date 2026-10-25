@@ -16,7 +16,7 @@ async function hasRsxProject(): Promise<boolean> {
 function installServer(): void {
   const terminal = vscode.window.createTerminal('GPUI RSX');
   terminal.show();
-  terminal.sendText('cargo install cargo-rsx --version 0.8.1 --locked');
+  terminal.sendText('cargo install cargo-rsx --version 0.8.2 --locked');
 }
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {

@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-10-25
+
 ### Fixed
 
 - `rsx!` no longer panics on raw-identifier attributes with capitals (`r#myAttr`), on lengths
@@ -663,7 +665,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...v0.8.1
 [v0.8.0 GitHub Release]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
 [0.8.0]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0

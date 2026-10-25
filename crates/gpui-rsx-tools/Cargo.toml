@@ -1,6 +1,6 @@
 [package]
 name = "gpui-rsx-tools"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2024"
 rust-version = "1.98"
 description = "Shared diagnostics, formatting, migration and preview for GPUI-RSX tools"
@@ -8,7 +8,7 @@ license = "MIT"
 repository = "https://github.com/wsafight/gpui-rsx"
 
 [dependencies]
-gpui-rsx-core = { version = "0.8.1", path = "../gpui-rsx-core" }
+gpui-rsx-core = { version = "0.8.2", path = "../gpui-rsx-core" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
 syn = { version = "2", features = ["full", "visit"] }

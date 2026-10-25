@@ -6,7 +6,7 @@ description: Diagnose, format, migrate and preview RSX; connect VS Code or Zed.
 Install the CLI with Rust 1.98 or newer (the macro library still supports Rust 1.88):
 
 ```sh
-cargo install cargo-rsx --version 0.8.1
+cargo install cargo-rsx --version 0.8.2
 cargo rsx doctor --manifest-path demo/Cargo.toml
 cargo rsx lint --deny-warnings
 cargo rsx lint --json

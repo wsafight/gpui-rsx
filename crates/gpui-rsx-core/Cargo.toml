@@ -1,6 +1,6 @@
 [package]
 name = "gpui-rsx-core"
-version = "0.8.1"
+version = "0.8.2"
 edition = "2024"
 rust-version = "1.88"
 description = "Parser and code generator behind gpui-rsx, usable from tools (CLI, LSP, playground)"

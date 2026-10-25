@@ -9,6 +9,8 @@
 
 ## [未发布]
 
+## [0.8.2] - 2026-10-25
+
 ### 修复
 
 - `rsx!` 不再因以下输入 panic：含大写字母的原始标识符属性（`r#myAttr`）、缩放后超出 `f32` 的长度
@@ -603,7 +605,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...v0.8.1
 [v0.8.0 GitHub Release]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0
 [0.8.0]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0

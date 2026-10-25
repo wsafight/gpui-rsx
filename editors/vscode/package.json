@@ -2,7 +2,7 @@
   "name": "gpui-rsx",
   "displayName": "GPUI RSX",
   "description": "Class completion, diagnostics, expansion hover and formatting for GPUI RSX macros.",
-  "version": "0.8.1",
+  "version": "0.8.2",
   "publisher": "wsafight",
   "license": "MIT",
   "engines": { "vscode": "^1.96.0" },

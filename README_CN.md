@@ -55,7 +55,7 @@ bun run dev
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.0" }
-gpui-rsx = "0.8.1"
+gpui-rsx = "0.8.2"
 ```
 
 ### GPUI 版本目标
@@ -73,14 +73,14 @@ demo 使用 GPUI Kit 0.8.0 及其固定的 `gpui-pre 0.3.9` 快照。Cargo 中�
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.8.1` | `0.8.0` | `gpui-pre@0.3.9` | `gpui-component@0.8.0` |
+| `0.8.2` | `0.8.0` | `gpui-pre@0.3.9` | `gpui-component@0.8.0` |
 
 此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.0" }
-gpui-rsx = "0.8.1"
+gpui-rsx = "0.8.2"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -1245,7 +1245,7 @@ MIT License
 
 ## 开发工具
 
-安装 `cargo-rsx` 0.8.1（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
+安装 `cargo-rsx` 0.8.2（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
 `convert`、`preview --watch` 和 `lsp`。参见[工具指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/tooling/)
 与 [WASM Playground](https://wsafight.github.io/gpui-rsx/zh-cn/playground/)。
 编辑器适配位于 `editors/`，发布附件包含可安装的 VSIX，市场上架状态另行记录。
