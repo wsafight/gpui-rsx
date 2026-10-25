@@ -86,3 +86,116 @@ pub fn expand_macro(input: TokenStream, options: MacroOptions) -> TokenStream {
         None => code,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `CARGO_MANIFEST_DIR` is process-wide, so tests that change it must not overlap.
+    fn with_manifest_dir<T>(dir: Option<&std::path::Path>, f: impl FnOnce() -> T) -> T {
+        static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+        let _guard = LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let previous = std::env::var_os("CARGO_MANIFEST_DIR");
+        // SAFETY: the mutex above serializes every test that touches this variable.
+        unsafe {
+            match dir {
+                Some(dir) => std::env::set_var("CARGO_MANIFEST_DIR", dir),
+                None => std::env::remove_var("CARGO_MANIFEST_DIR"),
+            }
+        }
+        let result = f();
+        unsafe {
+            match previous {
+                Some(value) => std::env::set_var("CARGO_MANIFEST_DIR", value),
+                None => std::env::remove_var("CARGO_MANIFEST_DIR"),
+            }
+        }
+        result
+    }
+
+    fn temp_dir(name: &str) -> std::path::PathBuf {
+        let dir = std::env::temp_dir().join(format!("rsx-core-{name}-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        dir
+    }
+
+    fn options() -> MacroOptions {
+        MacroOptions::default()
+    }
+
+    #[test]
+    fn expand_macro_without_a_theme_uses_the_default_scale() {
+        let dir = temp_dir("no-theme");
+        let code = with_manifest_dir(Some(&dir), || {
+            expand_macro(quote::quote! { <div class="gap-4"/> }, options())
+        })
+        .to_string();
+        assert!(code.contains("gap (px (4f32))"), "{code}");
+        assert!(!code.contains("include_bytes"), "{code}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn expand_macro_uses_the_theme_scale_and_tracks_the_config_file() {
+        let dir = temp_dir("theme-scale");
+        std::fs::write(
+            dir.join("rsx.toml"),
+            "[options]\nspacing-scale = \"tailwind\"\n",
+        )
+        .unwrap();
+
+        let code = with_manifest_dir(Some(&dir), || {
+            expand_macro(quote::quote! { <div class="gap-4 bg-brand"/> }, options())
+        })
+        .to_string();
+        assert!(code.contains("gap (px (16f32))"), "{code}");
+        assert!(code.contains("include_bytes"), "{code}");
+        assert!(code.contains("rsx.toml"), "{code}");
+
+        // An explicit `rsx_tw!` scale wins over the config file.
+        let forced = with_manifest_dir(Some(&dir), || {
+            expand_macro(
+                quote::quote! { <div class="gap-4"/> },
+                MacroOptions {
+                    forced_scale: Some(SpacingScale::Px),
+                    ..options()
+                },
+            )
+        })
+        .to_string();
+        assert!(forced.contains("gap (px (4f32))"), "{forced}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn expand_macro_reports_broken_configs_as_compile_errors() {
+        let dir = temp_dir("broken-theme");
+        std::fs::write(dir.join("rsx.toml"), "[nope]\n").unwrap();
+        let code = with_manifest_dir(Some(&dir), || {
+            expand_macro(quote::quote! { <div/> }, options())
+        })
+        .to_string();
+        assert!(code.contains("compile_error"), "{code}");
+        assert!(code.contains("unknown section"), "{code}");
+        std::fs::remove_dir_all(dir).unwrap();
+    }
+
+    #[test]
+    fn expand_macro_without_a_manifest_dir_skips_theme_loading() {
+        let code = with_manifest_dir(None, || {
+            expand_macro(quote::quote! { <div class="flex"/> }, options())
+        })
+        .to_string();
+        assert!(code.contains(". flex ()"), "{code}");
+        assert!(!code.contains("compile_error"), "{code}");
+    }
+
+    #[test]
+    fn macro_options_default_to_pixel_units_without_reporting() {
+        let options = MacroOptions::default();
+        assert!(!options.strict);
+        assert_eq!(options.forced_scale, None);
+        assert_eq!(options.default_scale, SpacingScale::Px);
+        assert!(!options.report_dynamic_at_exit);
+    }
+}

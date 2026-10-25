@@ -33,7 +33,17 @@ impl Converter {
     }
     fn element(&mut self, el: &JSXElement) -> String {
         let name = match &el.opening.name {
-            JSXElementName::Ident(name) => name.sym.to_string(),
+            JSXElementName::Ident(name) if is_rust_ident(&name.sym) => name.sym.to_string(),
+            JSXElementName::Ident(name) => {
+                self.note(
+                    el.span,
+                    format!(
+                        "`<{}>` is not a valid Rust tag name; replaced with div",
+                        name.sym
+                    ),
+                );
+                "div".into()
+            }
             _ => {
                 self.note(
                     el.span,
@@ -57,6 +67,14 @@ impl Converter {
                         }
                     };
                     let key = if key == "className" { "class" } else { &key };
+                    // `aria-label` or `type` would make the whole output unparsable.
+                    if !is_rust_ident(key) {
+                        self.note(
+                            attr.span,
+                            format!("`{key}` is not a valid Rust attribute name; omitted"),
+                        );
+                        continue;
+                    }
                     if key.starts_with("on")
                         || matches!(key, "style" | "ref" | "dangerouslySetInnerHTML")
                     {
@@ -71,11 +89,12 @@ impl Converter {
                         if key == "class" {
                             let mut supported = Vec::new();
                             for class in value.split_ascii_whitespace() {
+                                let class = &tailwind_to_px(class);
                                 if matches!(
                                     analyze_class(class, ClassMode::STRICT).outcome,
                                     ClassOutcome::Supported(_)
                                 ) {
-                                    supported.push(class);
+                                    supported.push(class.clone());
                                 } else {
                                     self.note(attr.span,format!("Unsupported class `{class}` omitted; use a GPUI method or theme token"));
                                 }
@@ -235,4 +254,24 @@ pub fn convert(source: &str) -> Result<Conversion, String> {
         rsx,
         diagnostics: converter.diagnostics,
     })
+}
+
+/// RSX tags and attributes parse as plain Rust identifiers (no `-`, no keywords).
+fn is_rust_ident(name: &str) -> bool {
+    syn::parse_str::<syn::Ident>(name).is_ok()
+}
+
+/// JSX uses Tailwind's 4px scale (`p-4` is 16px) while `rsx!` defaults to pixels, so numeric
+/// length classes are rescaled to keep the same size (`p-4` → `p-16`).
+fn tailwind_to_px(class: &str) -> String {
+    let (variant, base) = class.rsplit_once(':').map_or(("", class), |(v, b)| (v, b));
+    if let Some((_, value, _)) = gpui_rsx_core::codegen::tables::split_length_class(base)
+        && let Ok(n) = value.parse::<f32>()
+        && n.is_finite()
+    {
+        let prefix = &base[..base.len() - value.len()];
+        let separator = if variant.is_empty() { "" } else { ":" };
+        return format!("{variant}{separator}{prefix}{}", n * 4.0);
+    }
+    class.to_owned()
 }

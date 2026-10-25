@@ -510,3 +510,31 @@ fn test_keyed_auto_id_dynamic_key_keeps_format_fallback() {
     assert!(compact.contains("format!(concat!(file!(),"));
     assert!(compact.contains("item.id"));
 }
+
+#[test]
+fn test_dynamic_class_hex_colors_require_hex_digits() {
+    // `from_str_radix` alone accepts a leading `+`; the dynamic path must reject it
+    // just like the static path does, and hand the class to the unknown handler.
+    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let sink = seen.clone();
+    let cls = String::from("bg-[#+ff0000] text-[#12345g] border-[#ff0000]");
+    take_rgb_calls();
+    take_rgba_calls();
+    let _el = rsx! {
+        <div class={cls} onUnknownClass={move |class: &str| sink.borrow_mut().push(class.to_owned())} />
+    };
+
+    assert_eq!(*seen.borrow(), ["bg-[#+ff0000]", "text-[#12345g]"]);
+    assert_eq!(take_rgb_calls(), vec![0xff0000]);
+    assert!(take_rgba_calls().is_empty());
+}
+
+#[test]
+fn test_dynamic_class_accepts_short_hex_with_alpha() {
+    take_rgb_calls();
+    take_rgba_calls();
+    let cls = String::from("bg-[#1234] text-[#abcd]");
+    let _el = rsx! { <div class={cls} /> };
+    assert!(take_rgb_calls().is_empty());
+    assert_eq!(take_rgba_calls(), vec![0x11223344, 0xaabbccdd]);
+}

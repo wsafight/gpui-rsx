@@ -90,12 +90,14 @@ pub(super) fn suggest<'a>(
         _ => 3,
     };
     let mut best: Option<(usize, &str)> = None;
+    // One distance table reused across all candidates instead of one allocation each.
+    let mut table = Vec::new();
     for candidate in candidates {
         if candidate == input || candidate.len().abs_diff(input.len()) > max {
             continue;
         }
         let limit = best.map_or(max, |(d, _)| d.saturating_sub(1));
-        let distance = bounded_distance(input, candidate, limit);
+        let distance = bounded_distance(input, candidate, limit, &mut table);
         if distance <= limit && best.is_none_or(|(d, _)| distance < d) {
             best = Some((distance, candidate));
         }
@@ -105,10 +107,11 @@ pub(super) fn suggest<'a>(
 
 /// Optimal-string-alignment distance (Levenshtein plus adjacent transpositions, so
 /// `gpa` → `gap` is 1). Returns `limit + 1` as soon as the distance must exceed `limit`.
-fn bounded_distance(a: &str, b: &str, limit: usize) -> usize {
+fn bounded_distance(a: &str, b: &str, limit: usize, d: &mut Vec<usize>) -> usize {
     let (a, b) = (a.as_bytes(), b.as_bytes());
     let width = b.len() + 1;
-    let mut d = vec![0usize; (a.len() + 1) * width];
+    d.clear();
+    d.resize((a.len() + 1) * width, 0);
     for i in 0..=a.len() {
         d[i * width] = i;
     }

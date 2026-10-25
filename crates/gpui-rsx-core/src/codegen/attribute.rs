@@ -307,7 +307,9 @@ fn block_tail_expr(block: &syn::Block) -> Option<&syn::Expr> {
 
 /// `elevatedIf` → `elevated_if`; snake_case names are returned unchanged.
 fn snake_case_ident(name: &syn::Ident) -> syn::Ident {
-    let text = name.to_string();
+    use syn::ext::IdentExt;
+    // Convert the unraw text: `Ident::new` rejects a `r#` prefix.
+    let text = name.unraw().to_string();
     if !text.bytes().any(|b| b.is_ascii_uppercase()) {
         return name.clone();
     }
@@ -322,5 +324,197 @@ fn snake_case_ident(name: &syn::Ident) -> syn::Ident {
             snake.push(c);
         }
     }
-    syn::Ident::new(&snake, name.span())
+    if name.to_string().starts_with("r#") {
+        syn::Ident::new_raw(&snake, name.span())
+    } else {
+        syn::Ident::new(&snake, name.span())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::codegen::element::generate_body_with_mode;
+
+    fn expand(source: &str) -> String {
+        let body = syn::parse_str::<crate::parser::RsxBody>(source).expect("valid RSX body");
+        generate_body_with_mode(&body, ClassMode::PERMISSIVE).to_string()
+    }
+
+    #[test]
+    fn snake_case_ident_handles_camel_raw_and_plain_names() {
+        let ident = |source: &str| -> syn::Ident { syn::parse_str(source).unwrap() };
+        assert_eq!(
+            snake_case_ident(&ident("elevatedIf")).to_string(),
+            "elevated_if"
+        );
+        assert_eq!(snake_case_ident(&ident("plain")).to_string(), "plain");
+        // Raw identifiers keep their `r#` prefix; `Ident::new` would panic on it.
+        assert_eq!(
+            snake_case_ident(&ident("r#myAttr")).to_string(),
+            "r#my_attr"
+        );
+        assert_eq!(snake_case_ident(&ident("r#type")).to_string(), "r#type");
+    }
+
+    #[test]
+    fn raw_identifier_attributes_expand_without_panicking() {
+        assert_eq!(expand("<div r#myAttr={1} />"), "div () . r#my_attr (1)");
+        assert_eq!(expand("<div r#onFoo />"), "div () . r#on_foo ()");
+        // A raw keyword keeps working as a method name.
+        assert_eq!(expand(r#"<div r#type="x" />"#), r#"div () . r#type ("x")"#);
+    }
+
+    #[test]
+    fn grayscale_flag_takes_a_boolean_argument() {
+        assert_eq!(expand("<div grayscale />"), "div () . grayscale (true)");
+    }
+
+    #[test]
+    fn static_class_branches_expand_each_arm_at_compile_time() {
+        // `if` / `else` branches become one `.map` with a static expansion per branch.
+        let conditional = expand(r#"<div class={if active {"flex"} else {"grid"}} />"#);
+        assert!(conditional.contains(". map ("), "{conditional}");
+        assert!(conditional.contains(". flex ()"), "{conditional}");
+        assert!(conditional.contains(". grid ()"), "{conditional}");
+        assert!(!conditional.contains("__rsx_apply_class"), "{conditional}");
+
+        // `match` arms (including guards and attributes) keep their patterns.
+        let matched =
+            expand(r#"<div class={match size { 0 => "p-0", n if n > 4 => "p-4", _ => "p-2" }} />"#);
+        assert!(matched.contains("match size"), "{matched}");
+        assert!(matched.contains("if n > 4"), "{matched}");
+        assert!(matched.contains(". p (px (0f32))"), "{matched}");
+        assert!(matched.contains(". p (px (4f32))"), "{matched}");
+        assert!(matched.contains(". p (px (2f32))"), "{matched}");
+
+        // Parentheses, groups and plain blocks are unwrapped before expansion.
+        for source in [
+            r#"<div class={("flex")} />"#,
+            r#"<div class={{ "flex" }} />"#,
+            r#"<div class={("grid")} />"#,
+        ] {
+            let expanded = expand(source);
+            assert!(
+                !expanded.contains("__rsx_apply_class"),
+                "{source}: {expanded}"
+            );
+            assert!(
+                expanded.contains(". flex ()") || expanded.contains(". grid ()"),
+                "{source}: {expanded}"
+            );
+        }
+    }
+
+    #[test]
+    fn dynamic_class_expressions_fall_back_to_the_runtime_matcher() {
+        // A non-literal expression cannot be expanded statically.
+        let dynamic = expand("<div class={classes} />");
+        assert!(dynamic.contains("__rsx_apply_class"), "{dynamic}");
+
+        // A branch mixing literals with a runtime call is dynamic as a whole.
+        let mixed = expand(r#"<div class={if active {"flex"} else {compute()}} />"#);
+        assert!(mixed.contains("__rsx_apply_class"), "{mixed}");
+    }
+
+    #[test]
+    fn static_class_literals_collect_every_leaf() {
+        let literals = |source: &str| -> Option<Vec<String>> {
+            let expr: syn::Expr = syn::parse_str(source).unwrap();
+            static_class_literals(&expr).map(|lits| lits.iter().map(|l| l.value()).collect())
+        };
+        assert_eq!(literals(r#""flex""#).unwrap(), ["flex"]);
+        assert_eq!(
+            literals(r#"if a {"flex"} else {"grid"}"#).unwrap(),
+            ["flex", "grid"]
+        );
+        assert_eq!(
+            literals(r#"match n { 0 => "p-0", _ => "p-2" }"#).unwrap(),
+            ["p-0", "p-2"]
+        );
+        assert_eq!(literals(r#"("flex")"#).unwrap(), ["flex"]);
+        assert_eq!(literals(r#"{ "flex" }"#).unwrap(), ["flex"]);
+        // Missing else branches and non-literals are not static.
+        assert_eq!(literals(r#"if a {"flex"}"#), None);
+        assert_eq!(literals("compute()"), None);
+    }
+
+    #[test]
+    fn static_class_expressions_detect_stateful_classes() {
+        let needs_id = |source: &str| -> Option<bool> {
+            let expr: syn::Expr = syn::parse_str(source).unwrap();
+            static_class_expr_needs_id(&expr).into()
+        };
+        assert_eq!(needs_id(r#""flex""#), Some(false));
+        assert_eq!(needs_id(r#""active:opacity-75""#), Some(true));
+        assert_eq!(
+            needs_id(r#"if a {"flex"} else {"active:opacity-75"}"#),
+            Some(true)
+        );
+        assert_eq!(
+            needs_id(r#"match n { 0 => "flex", _ => "grid" }"#),
+            Some(false)
+        );
+        assert_eq!(
+            needs_id(r#"if a {"active:opacity-75"} else {"flex"}"#),
+            Some(true)
+        );
+        assert_eq!(needs_id("classes"), Some(false));
+
+        // Stateful branches inside an element still trigger an auto ID.
+        let expanded = expand(r#"<div class={if a {"flex"} else {"active:opacity-75"}} />"#);
+        assert!(expanded.contains(". id ("), "{expanded}");
+    }
+
+    #[test]
+    fn block_tail_expr_requires_a_single_trailing_expression() {
+        let tail = |source: &str| {
+            let block: syn::Block = syn::parse_str(source).unwrap();
+            block_tail_expr(&block).map(|e| quote! { #e }.to_string())
+        };
+        assert_eq!(tail(r#"{ "flex" }"#).as_deref(), Some("\"flex\""));
+        // Only a single trailing expression counts; statements make it dynamic.
+        assert_eq!(tail(r#"{ let x = 1; "flex" }"#), None);
+        assert_eq!(tail("{ let x = 1; }"), None);
+    }
+
+    #[test]
+    fn when_and_state_class_attributes_reuse_static_expansion() {
+        let when = expand(r#"<div whenClass={(active, "p-4 text-white")} />"#);
+        assert!(when.contains(". when (active"), "{when}");
+        assert!(when.contains(". p (px (4f32))"), "{when}");
+        assert!(when.contains(". text_color"), "{when}");
+
+        let state = expand(r#"<div hoverClass="bg-blue-500" />"#);
+        assert!(state.contains(". hover (| __style |"), "{state}");
+        assert!(state.contains("__style . bg"), "{state}");
+    }
+
+    #[test]
+    fn visible_value_attribute_uses_a_boolean_branch() {
+        let expanded = expand("<div visible={is_visible} />");
+        assert!(expanded.contains(". visible ()"), "{expanded}");
+        assert!(expanded.contains(". invisible ()"), "{expanded}");
+        assert!(expanded.contains("if __visible"), "{expanded}");
+    }
+
+    #[test]
+    fn multi_argument_attributes_expand_tuple_elements() {
+        let expanded = expand("<div on_mouse_down={(button, handler)} />");
+        assert!(
+            expanded.contains(". on_mouse_down (button , handler)"),
+            "{expanded}"
+        );
+    }
+
+    #[test]
+    fn id_key_base_and_unknown_handler_attributes_are_not_methods() {
+        // These are consumed by element generation, so no stray `.id()`/`.key()` appears twice.
+        let expanded =
+            expand(r#"<div id="x" key={k} base={custom} onUnknownClass={|c| report(c)} />"#);
+        assert_eq!(expanded.matches(". id (").count(), 1, "{expanded}");
+        assert!(!expanded.contains(". key ("), "{expanded}");
+        assert!(!expanded.contains(". base ("), "{expanded}");
+        assert!(!expanded.contains(". on_unknown_class ("), "{expanded}");
+    }
 }

@@ -356,7 +356,7 @@ mod values;
 mod variants;
 
 pub use suggestions::{known_classes, suggest_class};
-pub use values::{LengthKind, invalid_length_value_message, parse_length_number};
+pub use values::{LengthKind, color_rgba, invalid_length_value_message, parse_length_number};
 pub use variants::{SUPPORTED_VARIANTS, Variant};
 
 use values::expand_known_class;

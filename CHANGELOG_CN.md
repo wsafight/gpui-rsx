@@ -9,6 +9,28 @@
 
 ## [未发布]
 
+### 修复
+
+- `rsx!` 不再因以下输入 panic：含大写字母的原始标识符属性（`r#myAttr`）、缩放后超出 `f32` 的长度
+  （`rsx_tw!` 下的 `w-1e38`）、`#[component]` 中的原始标识符 prop（`r#type`）；PascalCase 后同名的
+  prop 会生成不同的泛型参数。
+- `for` 循环体中直接嵌套的 `for` 或 `{...spread}` 现在会被拍平，而不是生成“迭代器的迭代器”。
+- LSP 与 wasm Playground 在每次请求后释放 proc-macro2 的 span 内存，编辑时内存不再持续增长；
+  格式错误的 LSP 消息返回 `-32700` 而不是终止服务，`initialize` 之前 / `shutdown` 之后的请求返回规范错误码。
+- `cargo rsx fmt` 原样保留 Rust 表达式文本（不再把每个 token 用空格隔开），字面量属性不加花括号，
+  保留 CRLF，跳过无法解析或含多行字符串字面量的宏，并且只在所有文件都格式化成功后才写盘。
+- `cargo rsx fmt`/`lint` 支持用 `-` 读取 stdin；`lint` 的列号按字符而非字节计算。
+- `cargo rsx convert` 把 Tailwind 数值 class 换算为像素（`p-4` → `p-16`），并丢弃不是 Rust 标识符的
+  属性名或标签名（`aria-label`、`type`）且给出提示。
+- 主题 token 对所有长度前缀（`pt-`、`min-w-` 等）提供补全和建议；`rsx.toml` 中转义引号后的注释能正确解析；
+  `#+12345` 不再被当作合法颜色。
+- 预览服务器在单个连接失败后继续运行。
+
+### 变更
+
+- 编辑器颜色预览与静态预览复用宏的颜色解析逻辑。
+- for 循环缺少 key 的错误信息同时说明 stateful class 也是原因之一。
+
 ## [0.8.1] - 2026-10-22
 
 ### 变更

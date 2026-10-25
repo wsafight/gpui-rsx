@@ -17,7 +17,7 @@
 use super::attribute::{AttrHints, generate_attr_methods_with_mode, static_class_expr_needs_id};
 use super::class::{ClassMode, parse_class_string_with_mode};
 use super::tables::{
-    is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
+    HTML_TAGS, is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
 };
 use crate::diagnostics::{for_loop_missing_key_error, missing_required_attribute_error};
 
@@ -152,7 +152,8 @@ fn generate_node_checked(node: &RsxNode, require_loop_key: bool, mode: ClassMode
 
 /// 生成 for 循环的迭代器代码
 ///
-/// 单个子节点 → `.map()`，多个子节点 → `.flat_map()` + `AnyElement` 数组
+/// 单个子节点 → `.map()`，多个子节点 → `.flat_map()` + `AnyElement` 数组；
+/// 循环体中含嵌套 `for` 或展开 `{...iter}` 时改用 `.flat_map()` 拍平（多子节点时用 `chain`）。
 ///
 /// 多子节点使用 `AnyElement` 做类型擦除后放入数组，避免每轮循环分配 `Vec`，
 /// 同时允许循环体内混合不同具体元素类型（如 `div()` 和自定义组件）。
@@ -169,9 +170,30 @@ fn generate_for_loop_checked(
         .iter()
         .map(|node| generate_node_checked(node, true, mode))
         .collect::<Result<_, _>>()?;
-    if body_exprs.len() == 1 {
-        let single = &body_exprs[0];
-        Ok(quote! { (#iter).into_iter().map(|#binding| #single) })
+    // A nested `for` or a spread yields an iterator of elements rather than one element.
+    let yields_many = |node: &RsxNode| matches!(node, RsxNode::For { .. } | RsxNode::Spread(_));
+    if let [single] = body_exprs.as_slice() {
+        if yields_many(&body[0]) {
+            Ok(quote! { (#iter).into_iter().flat_map(|#binding| #single) })
+        } else {
+            Ok(quote! { (#iter).into_iter().map(|#binding| #single) })
+        }
+    } else if body.iter().any(yields_many) {
+        let pieces = body.iter().zip(&body_exprs).map(|(node, expr)| {
+            if yields_many(node) {
+                quote! {
+                    ::core::iter::IntoIterator::into_iter(#expr)
+                        .map(|__rsx_child| __rsx_child.into_any_element())
+                }
+            } else {
+                quote! { ::core::iter::once((#expr).into_any_element()) }
+            }
+        });
+        let mut chained = pieces;
+        let first = chained.next().expect("multi-child body is non-empty");
+        Ok(quote! {
+            (#iter).into_iter().flat_map(|#binding| #first #(.chain(#chained))*)
+        })
     } else {
         Ok(quote! {
             (#iter).into_iter().flat_map(|#binding| [#((#body_exprs).into_any_element()),*])
@@ -396,12 +418,8 @@ fn generate_tag(
             };
             quote! { canvas(#prepaint, #paint) }
         }
-        // HTML 标签：统一映射为 div()
-        "div" | "span" | "section" | "article" | "header" | "footer" | "main" | "nav" | "aside"
-        | "h1" | "h2" | "h3" | "h4" | "h5" | "h6" | "p" | "label" | "a" | "button" | "input"
-        | "textarea" | "select" | "form" | "ul" | "ol" | "li" => {
-            quote! { div() }
-        }
+        // HTML 标签：统一映射为 div()（与 spec/工具共用同一份 HTML_TAGS 列表）
+        tag if HTML_TAGS.contains(&tag) => quote! { div() },
         _ => quote! { #path() },
     })
 }
@@ -539,5 +557,70 @@ mod tests {
 
         assert_eq!(static_key_suffix(&dynamic), None);
         assert_eq!(static_key_suffix(&non_integer_negative), None);
+    }
+
+    fn expand(source: &str) -> String {
+        let body = syn::parse_str::<RsxBody>(source).expect("valid RSX body");
+        generate_body_with_mode(&body, ClassMode::PERMISSIVE).to_string()
+    }
+
+    #[test]
+    fn every_html_tag_maps_to_div() {
+        for tag in HTML_TAGS {
+            let tokens = generate_tag(tag, &element_name(tag), None, None, None)
+                .expect("HTML tags need no attributes")
+                .to_string();
+            assert_eq!(tokens, "div ()", "<{tag}> should map to div()");
+        }
+    }
+
+    #[test]
+    fn unknown_tags_stay_function_calls() {
+        let cases = [
+            ("marquee", "marquee ()"),
+            ("MyWidget", "MyWidget ()"),
+            ("ui::Card", "ui :: Card ()"),
+        ];
+        for (tag, expected) in cases {
+            let tokens = generate_tag(tag, &element_name(tag), None, None, None)
+                .expect("custom tags need no attributes")
+                .to_string();
+            assert_eq!(tokens, expected, "<{tag}>");
+        }
+    }
+
+    #[test]
+    fn nested_and_spread_loop_bodies_are_flattened() {
+        // A nested `for` as the only body node must flat_map, not produce iterators of iterators.
+        let nested = expand("<ul>{for row in rows {{for cell in row {<li>{cell}</li>}}}}</ul>");
+        assert_eq!(
+            nested,
+            "div () . children ((rows) . into_iter () . flat_map (| row | (row) . into_iter () . map (| cell | div () . child (cell))))"
+        );
+
+        // A spread body yields an iterator too.
+        let spread = expand("<ul>{for row in rows {{...row}}}</ul>");
+        assert_eq!(
+            spread,
+            "div () . children ((rows) . into_iter () . flat_map (| row | row))"
+        );
+
+        // Mixed bodies chain the per-iteration pieces instead of building a Vec.
+        let mixed = expand("<ul>{for row in rows {<li/> {...row}}}</ul>");
+        assert!(mixed.contains("flat_map"), "{mixed}");
+        assert!(mixed.contains(". chain ("), "{mixed}");
+        assert!(mixed.contains("once ("), "{mixed}");
+        assert!(!mixed.contains("vec !"), "{mixed}");
+    }
+
+    #[test]
+    fn plain_loop_bodies_keep_map_and_arrays() {
+        let single = expand("<ul>{for row in rows {<li>{row}</li>}}</ul>");
+        assert!(single.contains(". map (| row |"), "{single}");
+        assert!(!single.contains("flat_map"), "{single}");
+
+        let multiple = expand("<ul>{for row in rows {<li>{row}</li><li>{row}</li>}}</ul>");
+        assert!(multiple.contains("flat_map"), "{multiple}");
+        assert!(multiple.contains("into_any_element ()"), "{multiple}");
     }
 }

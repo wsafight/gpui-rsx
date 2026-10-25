@@ -20,11 +20,18 @@ pub struct Diagnostic {
     pub suggestion: Option<String>,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MacroCall {
     pub name: String,
     pub start: usize,
     pub end: usize,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct RustAnalysis {
+    pub calls: Vec<MacroCall>,
+    pub literals: Vec<(usize, usize)>,
+    pub diagnostics: Vec<Diagnostic>,
 }
 
 pub const MACROS: &[&str] = &[
@@ -35,19 +42,17 @@ pub const MACROS: &[&str] = &[
     "rsx_expand",
 ];
 
+/// Byte offset of `span` within `source`, which must be the string the span was parsed from.
+///
+/// `Span::byte_range` resolves through proc-macro2's cached char-to-byte table, so this
+/// doesn't rescan `source` from the start for every literal and diagnostic.
 pub fn byte_offset(source: &str, span: Span, end: bool) -> usize {
-    let loc = if end { span.end() } else { span.start() };
-    let line = source
-        .split_inclusive('\n')
-        .take(loc.line.saturating_sub(1))
-        .map(str::len)
-        .sum::<usize>();
-    let rest = &source[line.min(source.len())..];
-    line + rest
-        .char_indices()
-        .nth(loc.column)
-        .map(|(i, _)| i)
-        .unwrap_or(rest.len())
+    let range = span.byte_range();
+    let mut offset = if end { range.end } else { range.start }.min(source.len());
+    while !source.is_char_boundary(offset) {
+        offset -= 1;
+    }
+    offset
 }
 
 pub fn macro_calls(source: &str) -> Result<Vec<MacroCall>, String> {
@@ -103,56 +108,108 @@ fn error(source: &str, e: syn::Error) -> Diagnostic {
     }
 }
 
+/// Frees the per-thread source map that `span-locations` parsing appends to on every parse.
+///
+/// Long-lived hosts (LSP, wasm) must call this between requests or memory grows without
+/// bound until span offsets overflow `u32`. Any `Span` created before the call becomes invalid,
+/// so only call it once results have been reduced to byte offsets.
+pub fn release_span_memory() {
+    proc_macro2::extra::invalidate_current_thread_spans();
+}
+
 pub fn analyze_rust(source: &str, mode: ClassMode) -> Vec<Diagnostic> {
+    analyze_rust_document(source, mode).diagnostics
+}
+
+/// Scans a Rust document once, then parses each RSX macro body once to collect editor state.
+pub fn analyze_rust_document(source: &str, mode: ClassMode) -> RustAnalysis {
     let calls = match macro_calls(source) {
         Ok(calls) => calls,
         Err(message) => {
-            return vec![Diagnostic {
-                start: 0,
-                end: source.len().min(1),
-                severity: "error".into(),
-                message,
-                suggestion: None,
-            }];
+            return RustAnalysis {
+                diagnostics: vec![Diagnostic {
+                    start: 0,
+                    end: source.len().min(1),
+                    severity: "error".into(),
+                    message,
+                    suggestion: None,
+                }],
+                ..RustAnalysis::default()
+            };
         }
     };
-    let mut out = Vec::new();
-    for call in calls {
-        out.extend(
-            analyze_body(&source[call.start..call.end], mode_for(&call.name, mode))
+    let mut analysis = RustAnalysis {
+        calls,
+        ..RustAnalysis::default()
+    };
+    for call in &analysis.calls {
+        let body = &source[call.start..call.end];
+        let body_analysis = analyze_body_with_ranges(body, mode_for(&call.name, mode));
+        analysis.literals.extend(
+            body_analysis
+                .literals
                 .into_iter()
-                .map(|mut d| {
-                    d.start += call.start;
-                    d.end += call.start;
-                    d
-                }),
+                .map(|(start, end)| (call.start + start, call.start + end)),
         );
+        analysis
+            .diagnostics
+            .extend(body_analysis.diagnostics.into_iter().map(|mut diagnostic| {
+                diagnostic.start += call.start;
+                diagnostic.end += call.start;
+                diagnostic
+            }));
     }
-    out
+    analysis
 }
 
 pub fn analyze_body(source: &str, mode: ClassMode) -> Vec<Diagnostic> {
+    analyze_body_with_ranges(source, mode).diagnostics
+}
+
+struct BodyAnalysis {
+    literals: Vec<(usize, usize)>,
+    diagnostics: Vec<Diagnostic>,
+}
+
+fn analyze_body_with_ranges(source: &str, mode: ClassMode) -> BodyAnalysis {
     let body = match syn::parse_str::<RsxBody>(source) {
         Ok(body) => body,
-        Err(e) => return vec![error(source, e)],
+        Err(e) => {
+            return BodyAnalysis {
+                literals: Vec::new(),
+                diagnostics: vec![error(source, e)],
+            };
+        }
     };
-    let mut out = Vec::new();
+    let mut analysis = BodyAnalysis {
+        literals: Vec::new(),
+        diagnostics: Vec::new(),
+    };
     walk_body(&body, &mut |el| {
         for attr in &el.attributes {
             match attr {
                 RsxAttribute::Value { name, value } if name == "class" => {
-                    if let Some(literals) = static_class_literals(value) {
+                    if let Some(literals) = class_literals(attr) {
                         for lit in literals {
-                            lint_literal(source, lit, mode, &mut out);
+                            if let Some(range) =
+                                lint_literal(source, lit, mode, &mut analysis.diagnostics)
+                            {
+                                analysis.literals.push(range);
+                            }
                         }
                     } else {
-                        out.push(Diagnostic { start: byte_offset(source, value.span(), false), end: byte_offset(source, value.span(), true),
+                        analysis.diagnostics.push(Diagnostic { start: byte_offset(source, value.span(), false), end: byte_offset(source, value.span(), true),
                             severity: "information".into(), message: "Dynamic class expression: values are checked at runtime; variants and theme tokens require static strings.".into(), suggestion: None });
                     }
                 }
-                RsxAttribute::WhenClass { class_lit, .. }
-                | RsxAttribute::StateClass { class_lit, .. } => {
-                    lint_literal(source, class_lit, mode, &mut out)
+                RsxAttribute::WhenClass { .. } | RsxAttribute::StateClass { .. } => {
+                    for lit in class_literals(attr).into_iter().flatten() {
+                        if let Some(range) =
+                            lint_literal(source, lit, mode, &mut analysis.diagnostics)
+                        {
+                            analysis.literals.push(range);
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -184,30 +241,52 @@ pub fn analyze_body(source: &str, mode: ClassMode) -> Vec<Diagnostic> {
             }
         }
     }
-    semantic_errors(expanded, source, &mut out);
-    out
+    semantic_errors(expanded, source, &mut analysis.diagnostics);
+    analysis
 }
 
-fn lint_literal(source: &str, lit: &syn::LitStr, mode: ClassMode, out: &mut Vec<Diagnostic>) {
-    let value = lit.value();
+pub(crate) fn class_literals(attr: &RsxAttribute) -> Option<Vec<&syn::LitStr>> {
+    match attr {
+        RsxAttribute::Value { name, value } if name == "class" => static_class_literals(value),
+        RsxAttribute::WhenClass { class_lit, .. } | RsxAttribute::StateClass { class_lit, .. } => {
+            Some(vec![class_lit])
+        }
+        _ => None,
+    }
+}
+
+/// Returns the literal's source span and, when the content maps byte-for-byte (no escapes),
+/// the span of its content. `value` must be `lit.value()`, passed in to avoid re-allocating it.
+fn literal_source_range(
+    source: &str,
+    lit: &syn::LitStr,
+    value: &str,
+) -> (usize, usize, Option<(usize, usize)>) {
     let start = byte_offset(source, lit.span(), false);
     let end = byte_offset(source, lit.span(), true);
     let raw = &source[start..end];
-    let prefix = raw.find('"').map(|i| i + 1).unwrap_or(0);
-    // Escaped strings do not have a one-to-one mapping to source bytes; highlight the literal.
-    let exact = raw.get(prefix..prefix + value.len()) == Some(&value);
+    let range = raw
+        .find('"')
+        .map(|i| i + 1)
+        .filter(|&prefix| raw.get(prefix..prefix + value.len()) == Some(value))
+        .map(|prefix| (start + prefix, start + prefix + value.len()));
+    (start, end, range)
+}
+
+fn lint_literal(
+    source: &str,
+    lit: &syn::LitStr,
+    mode: ClassMode,
+    out: &mut Vec<Diagnostic>,
+) -> Option<(usize, usize)> {
+    let value = lit.value();
+    let (start, end, exact_range) = literal_source_range(source, lit, &value);
     for d in class_diagnostics(&value, mode) {
         out.push(Diagnostic {
-            start: if exact {
-                start + prefix + d.offset
-            } else {
-                start
-            },
-            end: if exact {
-                start + prefix + d.offset + d.class.len()
-            } else {
-                end
-            },
+            start: exact_range.map_or(start, |(content_start, _)| content_start + d.offset),
+            end: exact_range.map_or(end, |(content_start, _)| {
+                content_start + d.offset + d.class.len()
+            }),
             severity: if d.severity == Severity::Error {
                 "error"
             } else {
@@ -215,9 +294,14 @@ fn lint_literal(source: &str, lit: &syn::LitStr, mode: ClassMode, out: &mut Vec<
             }
             .into(),
             message: d.message,
-            suggestion: if exact { d.suggestion } else { None },
+            suggestion: if exact_range.is_some() {
+                d.suggestion
+            } else {
+                None
+            },
         });
     }
+    exact_range
 }
 
 pub fn walk_body(body: &RsxBody, visitor: &mut impl FnMut(&RsxElement)) {
@@ -267,22 +351,11 @@ pub fn class_literal_ranges(source: &str) -> Result<Vec<(usize, usize)>, String>
     let mut ranges = Vec::new();
     walk_body(&body, &mut |el| {
         for attr in &el.attributes {
-            let literals = match attr {
-                RsxAttribute::Value { name, value } if name == "class" => {
-                    static_class_literals(value).unwrap_or_default()
-                }
-                RsxAttribute::WhenClass { class_lit, .. }
-                | RsxAttribute::StateClass { class_lit, .. } => vec![class_lit],
-                _ => vec![],
-            };
-            for lit in literals {
-                let start = byte_offset(source, lit.span(), false);
-                let end = byte_offset(source, lit.span(), true);
-                let raw = &source[start..end];
-                if let Some(prefix) = raw.find('"').map(|i| i + 1)
-                    && raw.get(prefix..prefix + lit.value().len()) == Some(lit.value().as_str())
-                {
-                    ranges.push((start + prefix, start + prefix + lit.value().len()));
+            if let Some(literals) = class_literals(attr) {
+                for lit in literals {
+                    if let Some(range) = literal_source_range(source, lit, &lit.value()).2 {
+                        ranges.push(range);
+                    }
                 }
             }
         }

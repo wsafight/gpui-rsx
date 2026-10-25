@@ -135,7 +135,13 @@ impl LengthKind {
             ));
         }
 
-        Ok(Self::Relative(numerator / denominator))
+        let ratio = numerator / denominator;
+        if !ratio.is_finite() {
+            return Err(format!(
+                "Invalid fraction `{class}`: value is out of range."
+            ));
+        }
+        Ok(Self::Relative(ratio))
     }
 }
 
@@ -184,8 +190,11 @@ fn parse_numeric_length_class(class: &str, scale: SpacingScale) -> Option<TokenS
     if value.starts_with('[') || value.contains('/') {
         return None;
     }
+    // Scaling can overflow f32 (`w-1e38` × 4); `quote` panics on non-finite literals.
     parse_length_number(value)
-        .map(|value| length_method_call(method, LengthKind::Px(value * scale.factor())))
+        .map(|value| value * scale.factor())
+        .filter(|px| px.is_finite())
+        .map(|px| length_method_call(method, LengthKind::Px(px)))
 }
 
 fn parse_direct_color_class(class: &str) -> Option<Result<TokenStream, String>> {
@@ -279,6 +288,18 @@ fn parse_color_with_method(
         ColorValue::Rgb(hex) => quote! { .#ident(rgb(#hex)) },
         ColorValue::Rgba(hex) => quote! { .#ident(rgba(#hex)) },
     }))
+}
+
+/// `0xRRGGBBAA` for a color class value (`red-500`, `[#f00]`, `[rgba(...)]`), as the class
+/// expansion would interpret it. Shared by editor tooling so colors never disagree.
+pub fn color_rgba(color: &str) -> Option<u32> {
+    match lookup_color_key(color)
+        .map(ColorValue::Rgb)
+        .or_else(|| parse_arbitrary_color_value(color))?
+    {
+        ColorValue::Rgb(hex) => Some((hex << 8) | 0xff),
+        ColorValue::Rgba(hex) => Some(hex),
+    }
 }
 
 fn lookup_color_key(color: &str) -> Option<u32> {

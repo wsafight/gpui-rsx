@@ -187,14 +187,10 @@ fn css(class: &str, mode: ClassMode) -> Option<String> {
         ("text-", "color"),
         ("border-", "border-color"),
     ] {
-        if let Some(value) = class.strip_prefix(prefix) {
-            if let Some(color) = gpui_rsx_core::codegen::tables::lookup_color(value) {
-                return Some(format!("{prop}:#{color:06x}"));
-            }
-            let raw = value.trim_matches(['[', ']']);
-            if raw.starts_with('#') && raw[1..].bytes().all(|c| c.is_ascii_hexdigit()) {
-                return Some(format!("{prop}:{raw}"));
-            }
+        if let Some(value) = class.strip_prefix(prefix)
+            && let Some(color) = gpui_rsx_core::codegen::class::color_rgba(value)
+        {
+            return Some(format!("{prop}:#{color:08x}"));
         }
     }
     class

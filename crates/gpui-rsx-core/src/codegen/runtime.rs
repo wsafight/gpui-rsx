@@ -54,8 +54,10 @@ fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
 ///
 /// # 代码体积优化
 ///
-/// match 表被提取到 `#[inline(never)]` 泛型局部函数中：同一元素类型的多个
-/// `class={expr}` 共享单态化实例，且不会内联膨胀父函数。
+/// match 表被提取到 `#[inline(never)]` 泛型局部函数中，不会内联膨胀父函数。
+/// 注意：局部函数在每次展开处都是独立的 item，多个 `class={expr}` 并不共享实例，
+/// 每处都会完整生成并类型检查整份 helper。要真正共享，需要把 helper 移到一个
+/// 运行时支持 crate（proc-macro crate 本身不能导出普通函数）。
 pub(crate) fn generate_dynamic_class_code_with_mode(
     class_expr: &syn::Expr,
     mode: ClassMode,
@@ -227,6 +229,10 @@ fn generate_color_fallback_code() -> TokenStream {
         fn __rsx_parse_hex_color(color: &str) -> Option<u32> {
             let inner = color.strip_prefix("[#")?.strip_suffix(']')?;
             let bytes = inner.as_bytes();
+            // `from_str_radix` alone would also accept a leading `+`.
+            if !bytes.iter().all(u8::is_ascii_hexdigit) {
+                return None;
+            }
             match bytes.len() {
                 8 => u32::from_str_radix(inner, 16).ok(),
                 6 => u32::from_str_radix(inner, 16).ok(),

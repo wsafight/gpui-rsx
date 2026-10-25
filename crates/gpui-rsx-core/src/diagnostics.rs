@@ -121,7 +121,7 @@ pub fn for_loop_missing_key_error<T: Spanned>(tag_span: &T, tag_name: &str) -> s
     syn::Error::new(
         tag_span.span(),
         format!(
-            "Element `<{tag_name}>` inside a for-loop has event handlers but no `id` or `key` attribute.\n\
+            "Element `<{tag_name}>` inside a for-loop needs a unique ID (event handlers or stateful classes such as `active:`) but has no `id` or `key` attribute.\n\
              \x20 help: Add a `key={{unique_value}}` attribute so each iteration gets a unique ID:\n\
              \x20        for item in &self.items {{ <{tag_name} key={{item.id}} onClick={{...}}>...</{tag_name}> }}\n\
              \x20 note: Elements in loops share the same source location, so the auto-generated ID\n\

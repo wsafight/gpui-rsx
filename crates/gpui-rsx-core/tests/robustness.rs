@@ -176,3 +176,25 @@ fn random_classes_never_panic() {
         }
     }
 }
+
+/// Inputs that previously panicked inside `Ident::new` or `Literal::f32_suffixed`.
+#[test]
+fn known_panic_inputs_expand_without_panicking() {
+    let tailwind = ClassMode::PERMISSIVE.with_scale(SpacingScale::Tailwind);
+    let cases = [
+        ("<div r#myAttr={1} />", ClassMode::PERMISSIVE),
+        ("<div r#onFoo />", ClassMode::PERMISSIVE),
+        ("<div class=\"w-1e38\" />", tailwind),
+        ("<div class=\"w-3e38/0.001\" />", ClassMode::PERMISSIVE),
+    ];
+    for (source, mode) in cases {
+        let tokens: proc_macro2::TokenStream = source.parse().unwrap();
+        assert_no_panic("expand", source, || {
+            let _ = expand(tokens, mode);
+        });
+        let class = source.split('"').nth(1).unwrap_or("");
+        assert_no_panic("analyze_class", class, || {
+            let _ = analyze_class(class, mode);
+        });
+    }
+}

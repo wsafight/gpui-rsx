@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `rsx!` no longer panics on raw-identifier attributes with capitals (`r#myAttr`), on lengths
+  that overflow `f32` after scaling (`w-1e38` under `rsx_tw!`), or on raw-identifier props in
+  `#[component]` (`r#type`); props whose names collide after PascalCase get distinct generics.
+- A nested `for` or a `{...spread}` directly inside a `for` body is now flattened instead of
+  producing an iterator of iterators.
+- The LSP and wasm playground release proc-macro2 span memory after each request, so memory no
+  longer grows on every edit; a malformed LSP message returns `-32700` instead of stopping the
+  server, and requests before `initialize`/after `shutdown` get the spec's error codes.
+- `cargo rsx fmt` copies Rust expressions verbatim instead of re-spacing every token, keeps
+  literal attributes unbraced, preserves CRLF, skips macros it cannot parse or that contain
+  multi-line string literals, and only writes files once every file has formatted.
+- `cargo rsx fmt`/`lint` accept `-` for stdin; `lint` reports character (not byte) columns.
+- `cargo rsx convert` rescales Tailwind numeric classes to px (`p-4` → `p-16`) and drops
+  attribute or tag names that are not Rust identifiers (`aria-label`, `type`) with a note.
+- Theme tokens complete and suggest for every length prefix (`pt-`, `min-w-`, ...), `rsx.toml`
+  comments after escaped quotes parse correctly, and `#+12345` is no longer accepted as a color.
+- The preview server keeps running after a failed connection.
+
+### Changed
+
+- Editor color swatches and the static preview share the macro's color parser.
+- The for-loop missing-key error now also names stateful classes as a cause.
+
 ## [0.8.1] - 2026-10-22
 
 ### Changed

@@ -1,4 +1,5 @@
 use super::*;
+use crate::{ClassMode, ClassOutcome, analyze_class};
 
 // --- lookup_color ---
 
@@ -459,4 +460,75 @@ fn text_size_rejects_unknown() {
     assert!(!is_valid_text_size("5xl"));
     assert!(!is_valid_text_size("6xl"));
     assert!(!is_valid_text_size(""));
+}
+
+// --- lookup_tag_default / HTML_TAGS ---
+
+#[test]
+fn tag_defaults_are_valid_class_strings() {
+    for (tag, classes) in [
+        ("h1", "text-3xl font-bold"),
+        ("h6", "text-sm font-bold"),
+        ("button", "cursor-pointer"),
+        ("input", "px-2 py-1"),
+        ("form", "flex flex-col gap-4"),
+    ] {
+        assert_eq!(lookup_tag_default(tag), Some(classes), "{tag}");
+        // Every default must itself be a supported class.
+        for class in classes.split_ascii_whitespace() {
+            assert!(
+                matches!(
+                    analyze_class(class, ClassMode::STRICT).outcome,
+                    ClassOutcome::Supported(_)
+                ),
+                "{tag}: `{class}` is not supported"
+            );
+        }
+    }
+    assert_eq!(lookup_tag_default("div"), None);
+    assert_eq!(lookup_tag_default("MyWidget"), None);
+}
+
+#[test]
+fn html_tags_are_unique_and_never_shadow_special_tags() {
+    for (index, tag) in HTML_TAGS.iter().enumerate() {
+        assert!(
+            !HTML_TAGS[..index].contains(tag),
+            "duplicate HTML tag {tag}"
+        );
+        assert!(
+            !matches!(*tag, "img" | "svg" | "canvas"),
+            "{tag} must stay a dedicated constructor"
+        );
+    }
+    assert!(HTML_TAGS.contains(&"div"));
+    assert!(HTML_TAGS.contains(&"li"));
+    assert!(!HTML_TAGS.contains(&"marquee"));
+}
+
+#[test]
+fn length_specs_are_unique_and_prefer_long_prefixes() {
+    for (index, spec) in LENGTH_CLASS_SPECS.iter().enumerate() {
+        assert!(
+            !LENGTH_CLASS_SPECS[..index]
+                .iter()
+                .any(|other| other.prefix == spec.prefix),
+            "duplicate prefix {}",
+            spec.prefix
+        );
+        // A longer prefix that starts with this one must be listed first.
+        for other in &LENGTH_CLASS_SPECS[..index] {
+            assert!(
+                !(spec.prefix.starts_with(other.prefix) && spec.prefix != other.prefix),
+                "{} must come before {}",
+                spec.prefix,
+                other.prefix
+            );
+        }
+        assert!(
+            gpui_no_arg_class_method(spec.method).is_none(),
+            "{} is a no-arg class",
+            spec.method
+        );
+    }
 }

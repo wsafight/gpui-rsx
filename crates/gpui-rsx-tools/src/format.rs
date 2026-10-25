@@ -1,26 +1,73 @@
 //! Formatting and explicit, behavior-preserving spacing migration.
-use crate::{byte_offset, macro_calls, walk_body};
-use gpui_rsx_core::codegen::attribute::static_class_literals;
+use crate::{byte_offset, class_literals, macro_calls, walk_body};
 use gpui_rsx_core::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use quote::ToTokens;
+use syn::spanned::Spanned;
 
-fn expression(value: &impl ToTokens) -> String {
-    value.to_token_stream().to_string()
+/// Copies an embedded Rust expression from the source instead of re-printing its tokens,
+/// which would space out every token (`cx . listener (| this |`). Continuation lines are
+/// re-based onto `indent`, so formatting twice is a no-op.
+fn expression(source: &str, value: &(impl ToTokens + Spanned), indent: &str) -> String {
+    let span = value.span();
+    let (start, end) = (
+        byte_offset(source, span, false),
+        byte_offset(source, span, true),
+    );
+    let Some(text) = source
+        .get(start..end)
+        .filter(|text| !text.trim().is_empty())
+    else {
+        return value.to_token_stream().to_string();
+    };
+    let indentation = |line: &str| line.len() - line.trim_start_matches([' ', '\t']).len();
+    let continuation = text
+        .split('\n')
+        .skip(1)
+        .filter(|line| !line.trim().is_empty())
+        .map(indentation)
+        .min()
+        .unwrap_or(0);
+    // On the body's first line (`rsx!{<div on_click={...`) the line's own indentation is
+    // not the template's, so only the continuation lines can provide a base.
+    let base = match source[..start].rfind('\n') {
+        Some(i) => continuation.min(indentation(&source[i + 1..])),
+        None => continuation,
+    };
+    let mut out = String::new();
+    for (i, line) in text.split('\n').enumerate() {
+        let line = line.trim_end_matches('\r');
+        if i == 0 {
+            out.push_str(line);
+            continue;
+        }
+        out.push('\n');
+        let rest = &line[indentation(line).min(base)..];
+        if !rest.trim().is_empty() {
+            out.push_str(indent);
+            out.push_str(rest);
+        }
+    }
+    out
 }
 
 pub fn body(source: &str) -> Result<String, String> {
     let body = syn::parse_str::<RsxBody>(source).map_err(|e| e.to_string())?;
-    // Comments are not represented by syn's AST. Refuse rather than discard them.
-    if has_comments(source)? {
-        return Err("RSX body contains comments; leave this macro unchanged or move comments outside it before formatting".into());
+    if let Some(reason) = unformattable(source)? {
+        return Err(reason.into());
     }
     let mut out = String::new();
-    fn element(el: &RsxElement, depth: usize, out: &mut String) {
+    fn element(source: &str, el: &RsxElement, depth: usize, out: &mut String) {
         let indent = "    ".repeat(depth);
+        let expression = |value: &dyn ExprLike| value.text(source, &indent);
         out.push_str(&format!("{indent}<{}", el.name));
         for attr in &el.attributes {
             let attr = match attr {
                 RsxAttribute::Flag(name) => name.to_string(),
+                // Literals need no braces (`class="flex"`), matching how they are usually written.
+                RsxAttribute::Value {
+                    name,
+                    value: value @ syn::Expr::Lit(lit),
+                } if lit.attrs.is_empty() => format!("{name}={}", expression(value)),
                 RsxAttribute::Value { name, value } => format!("{name}={{{}}}", expression(value)),
                 RsxAttribute::When { condition, closure } => format!(
                     "when={{({}, {})}}",
@@ -57,15 +104,16 @@ pub fn body(source: &str) -> Result<String, String> {
             out.push_str(" />\n");
         } else {
             out.push_str(">\n");
-            nodes(&el.children, depth + 1, out);
+            nodes(source, &el.children, depth + 1, out);
             out.push_str(&format!("{indent}</{}>\n", el.name));
         }
     }
-    fn nodes(children: &[RsxNode], depth: usize, out: &mut String) {
+    fn nodes(source: &str, children: &[RsxNode], depth: usize, out: &mut String) {
+        let indent = "    ".repeat(depth);
+        let expression = |value: &dyn ExprLike| value.text(source, &indent);
         for child in children {
-            let indent = "    ".repeat(depth);
             match child {
-                RsxNode::Element(el) => element(el, depth, out),
+                RsxNode::Element(el) => element(source, el, depth, out),
                 RsxNode::Expr(expr) => out.push_str(&format!("{indent}{{{}}}\n", expression(expr))),
                 RsxNode::Spread(expr) => {
                     out.push_str(&format!("{indent}{{...{}}}\n", expression(expr)))
@@ -80,17 +128,17 @@ pub fn body(source: &str) -> Result<String, String> {
                         expression(binding),
                         expression(iter)
                     ));
-                    nodes(body, depth + 1, out);
+                    nodes(source, body, depth + 1, out);
                     out.push_str(&format!("{indent}}}}}\n"));
                 }
             }
         }
     }
     match body {
-        RsxBody::Single(el) => element(&el, 0, &mut out),
+        RsxBody::Single(el) => element(source, &el, 0, &mut out),
         RsxBody::Fragment(children) => {
             out.push_str("<>\n");
-            nodes(&children, 1, &mut out);
+            nodes(source, &children, 1, &mut out);
             out.push_str("</>\n");
         }
     }
@@ -98,7 +146,37 @@ pub fn body(source: &str) -> Result<String, String> {
     Ok(out.trim_end().into())
 }
 
-fn has_comments(source: &str) -> Result<bool, String> {
+/// Object-safe view of the syn nodes `expression` accepts.
+trait ExprLike {
+    fn text(&self, source: &str, indent: &str) -> String;
+}
+
+impl<T: ToTokens + Spanned> ExprLike for T {
+    fn text(&self, source: &str, indent: &str) -> String {
+        expression(source, self, indent)
+    }
+}
+
+/// Why a body can't be reformatted losslessly, if it can't.
+fn unformattable(source: &str) -> Result<Option<&'static str>, String> {
+    let (comments, multiline_literal) = scan_literals(source)?;
+    // Comments are not represented by syn's AST. Refuse rather than discard them.
+    if comments {
+        return Ok(Some(
+            "RSX body contains comments; leave this macro unchanged or move comments outside it before formatting",
+        ));
+    }
+    // Re-indenting would change the literal's contents.
+    if multiline_literal {
+        return Ok(Some(
+            "RSX body contains a multi-line string literal; leave this macro unchanged",
+        ));
+    }
+    Ok(None)
+}
+
+/// Returns (has comments, has a literal spanning several lines).
+fn scan_literals(source: &str) -> Result<(bool, bool), String> {
     use proc_macro2::{TokenStream, TokenTree};
     fn literals(tokens: TokenStream, source: &str, ranges: &mut Vec<(usize, usize)>) {
         for token in tokens {
@@ -120,20 +198,32 @@ fn has_comments(source: &str) -> Result<bool, String> {
         source,
         &mut ranges,
     );
-    Ok(source.as_bytes().windows(2).enumerate().any(|(i, pair)| {
+    let comments = source.as_bytes().windows(2).enumerate().any(|(i, pair)| {
         (pair == b"//" || pair == b"/*") && !ranges.iter().any(|&(s, e)| i >= s && i < e)
-    }))
+    });
+    let multiline = ranges.iter().any(|&(s, e)| source[s..e].contains('\n'));
+    Ok((comments, multiline))
 }
 
 /// Only rewrites RSX macro bodies, preserving surrounding Rust byte for byte.
+///
+/// Bodies that don't parse are left as they are, so one broken macro (reported by lint)
+/// doesn't block formatting the rest of the file.
 pub fn rust(source: &str) -> Result<String, String> {
+    let newline = if source.contains("\r\n") {
+        "\r\n"
+    } else {
+        "\n"
+    };
     let mut out = source.to_owned();
     for call in macro_calls(source)?.into_iter().rev() {
         let raw = &source[call.start..call.end];
-        if has_comments(raw)? {
+        if !matches!(unformattable(raw), Ok(None)) {
             continue;
         }
-        let formatted = body(raw)?;
+        let Ok(formatted) = body(raw) else {
+            continue;
+        };
         let line_start = source[..call.start].rfind('\n').map(|i| i + 1).unwrap_or(0);
         let indent: String = source[line_start..call.start]
             .chars()
@@ -141,10 +231,19 @@ pub fn rust(source: &str) -> Result<String, String> {
             .collect();
         let formatted = formatted
             .lines()
-            .map(|line| format!("{indent}    {line}"))
+            .map(|line| {
+                if line.is_empty() {
+                    String::new()
+                } else {
+                    format!("{indent}    {line}")
+                }
+            })
             .collect::<Vec<_>>()
-            .join("\n");
-        out.replace_range(call.start..call.end, &format!("\n{formatted}\n{indent}"));
+            .join(newline);
+        out.replace_range(
+            call.start..call.end,
+            &format!("{newline}{formatted}{newline}{indent}"),
+        );
     }
     Ok(out)
 }
@@ -161,15 +260,7 @@ pub fn migrate_rust(source: &str) -> Result<String, String> {
         let body = syn::parse_str::<RsxBody>(raw).map_err(|e| e.to_string())?;
         walk_body(&body, &mut |el| {
             for attr in &el.attributes {
-                let literals = match attr {
-                    RsxAttribute::Value { name, value } if name == "class" => {
-                        static_class_literals(value).unwrap_or_default()
-                    }
-                    RsxAttribute::WhenClass { class_lit, .. }
-                    | RsxAttribute::StateClass { class_lit, .. } => vec![class_lit],
-                    _ => vec![],
-                };
-                for lit in literals {
+                for lit in class_literals(attr).into_iter().flatten() {
                     let value = lit.value();
                     let converted = value
                         .split_ascii_whitespace()

@@ -23,7 +23,7 @@
 //! and `#` comments) so the macro does not need a TOML dependency.
 
 use crate::codegen::class::SpacingScale;
-use crate::codegen::tables::{GPUI_COMPONENT_THEME_COLORS, split_length_class};
+use crate::codegen::tables::{GPUI_COMPONENT_THEME_COLORS, LENGTH_CLASS_SPECS, split_length_class};
 use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeMap;
@@ -244,9 +244,10 @@ impl Theme {
         for name in self.radius.keys() {
             out.push(format!("rounded-{name}"));
         }
+        // Every length prefix `expand_class` accepts (`pt-`, `min-w-`, ...), not a subset.
         for name in self.spacing.keys() {
-            for prefix in ["p-", "px-", "py-", "m-", "mx-", "my-", "gap-", "w-", "h-"] {
-                out.push(format!("{prefix}{name}"));
+            for spec in LENGTH_CLASS_SPECS {
+                out.push(format!("{}{name}", spec.prefix));
             }
         }
         out
@@ -290,8 +291,12 @@ fn parse_string(value: &str) -> Result<String, String> {
 
 fn strip_comment(line: &str) -> &str {
     let mut in_string = false;
+    let mut escaped = false;
     for (index, c) in line.char_indices() {
         match c {
+            // `\"` inside a string (which `parse_string` unescapes) does not close it.
+            _ if escaped => escaped = false,
+            '\\' if in_string => escaped = true,
             '"' => in_string = !in_string,
             '#' if !in_string => return &line[..index],
             _ => {}
@@ -307,7 +312,9 @@ fn validate_expr(expr: &str, line_no: usize) -> Result<String, String> {
 }
 
 fn parse_color(color: &str) -> Option<TokenValue> {
-    let hex = color.strip_prefix('#')?;
+    let hex = color
+        .strip_prefix('#')
+        .filter(|hex| hex.bytes().all(|b| b.is_ascii_hexdigit()))?;
     let digits = |s: &str| u32::from_str_radix(s, 16).ok();
     match hex.len() {
         6 => Some(TokenValue::Color {
@@ -446,5 +453,201 @@ mod tests {
         assert!(err.contains("not a Rust expression"), "{err}");
         let err = Theme::parse("[themes]\n").unwrap_err();
         assert!(err.contains("unknown section"), "{err}");
+    }
+
+    #[test]
+    fn escaped_quotes_do_not_end_strings_before_comments() {
+        let theme = Theme::parse(
+            r##"
+            [colors]
+            brand = { expr = "f(\"#a\")" } # trailing comment
+            "##,
+        )
+        .unwrap();
+        assert!(matches!(
+            theme.colors.get("brand"),
+            Some(TokenValue::Expr(expr)) if expr == r##"f("#a")"##
+        ));
+    }
+
+    #[test]
+    fn class_names_cover_every_length_prefix() {
+        let theme = Theme::parse("[spacing]\ngutter = \"12px\"\n").unwrap();
+        let names = theme.class_names();
+        for class in ["pt-gutter", "min-w-gutter", "gap-x-gutter", "p-gutter"] {
+            assert!(names.iter().any(|n| n == class), "{class}");
+            assert!(theme.expand_class(class).is_some(), "{class}");
+        }
+    }
+
+    #[test]
+    fn class_names_are_derived_from_the_length_prefix_table() {
+        let theme = Theme::parse("[spacing]\ngutter = \"12px\"\n").unwrap();
+        let names = theme.class_names();
+        for spec in LENGTH_CLASS_SPECS {
+            let class = format!("{}{}", spec.prefix, "gutter");
+            assert!(names.contains(&class), "{class} is missing from completion");
+            assert!(
+                theme.expand_class(&class).is_some(),
+                "{class} does not expand"
+            );
+        }
+        assert_eq!(
+            names.iter().filter(|name| name.contains("gutter")).count(),
+            LENGTH_CLASS_SPECS.len()
+        );
+    }
+
+    #[test]
+    fn color_values_require_only_hex_digits() {
+        for color in ["#+12345", "#12345g", "#1234567", "#"] {
+            let err = Theme::parse(&format!("[colors]\nbrand = \"{color}\"\n")).unwrap_err();
+            assert!(
+                err.contains("not a #rgb/#rrggbb/#rrggbbaa color"),
+                "{color}: {err}"
+            );
+        }
+        // All accepted spellings still parse, and alpha is tracked.
+        let theme = Theme::parse(
+            "[colors]\nshort = \"#abc\"\nplain = \"#123456\"\nwith-alpha = \"#12345678\"\n",
+        )
+        .unwrap();
+        assert!(matches!(
+            theme.colors.get("short"),
+            Some(TokenValue::Color {
+                hex: 0xaabbcc,
+                alpha: false
+            })
+        ));
+        assert!(matches!(
+            theme.colors.get("with-alpha"),
+            Some(TokenValue::Color {
+                hex: 0x12345678,
+                alpha: true
+            })
+        ));
+        assert!(matches!(
+            theme.colors.get("plain"),
+            Some(TokenValue::Color {
+                hex: 0x123456,
+                alpha: false
+            })
+        ));
+    }
+
+    #[test]
+    fn comments_after_escaped_backslashes_and_hashes_parse() {
+        // A `\` inside a string escapes the next quote, so `#` after it is still a comment.
+        let theme = Theme::parse(
+            r##"
+            [colors]
+            first = { expr = "f(\"x\")" } # comment
+            second = { expr = "g(\"#y\")" } # another
+            "##,
+        )
+        .unwrap();
+        assert_eq!(theme.colors.len(), 2, "{:?}", theme.colors);
+        assert!(matches!(
+            theme.colors.get("second"),
+            Some(TokenValue::Expr(expr)) if expr == r##"g("#y")"##
+        ));
+
+        // A `#` inside a string is not a comment.
+        let theme = Theme::parse("[colors]\nbrand = \"#123456\" # real comment\n").unwrap();
+        assert_eq!(theme.colors.len(), 1);
+    }
+
+    #[test]
+    fn rejects_malformed_lines_with_line_numbers() {
+        let cases = [
+            ("[colors]\nbrand blue\n", "expected `key = value`"),
+            ("[colors]\n\"\" = \"#123456\"\n", "invalid key"),
+            ("[colors]\nbr and = \"#123456\"\n", "invalid key"),
+            (
+                "[options]\nspacing-scale = \"ems\"\n",
+                "must be \"px\" or \"tailwind\"",
+            ),
+            ("[options]\nnope = \"x\"\n", "unknown option `nope`"),
+            (
+                "[options]\nspacing-scale = { expr = \"x\" }\n",
+                "expects a string",
+            ),
+            ("[radius]\ncard = \"big\"\n", "must be a length"),
+            (
+                "[colors]\nbrand = { colour = \"x\" }\n",
+                "unknown inline key",
+            ),
+            (
+                "[colors]\nbrand = { expr }\n",
+                "inline tables must look like",
+            ),
+            ("[colors]\nbrand = #123456\n", "expected a quoted string"),
+            ("brand = \"#123456\"\n", "must be inside a section"),
+            ("[options]\npreset = \"other\"\n", "unknown preset"),
+            (
+                "[options]\npreset = \"gpui-component\"\ncontext = \"cx.(\"\n",
+                "not a Rust expression",
+            ),
+        ];
+        for (source, expected) in cases {
+            let error = Theme::parse(source).unwrap_err();
+            assert!(error.contains(expected), "{source:?}: {error}");
+            assert!(error.starts_with("rsx.toml"), "{source:?}: {error}");
+        }
+    }
+
+    #[test]
+    fn explicit_colors_override_preset_values() {
+        let theme = Theme::parse(
+            "[options]\npreset = \"gpui-component\"\n[colors]\nprimary = \"#123456\"\n",
+        )
+        .unwrap();
+        assert!(matches!(
+            theme.colors.get("primary"),
+            Some(TokenValue::Color {
+                hex: 0x123456,
+                alpha: false
+            })
+        ));
+        // Preset colors that were not overridden still resolve through the context.
+        assert!(matches!(
+            theme.colors.get("muted-foreground"),
+            Some(TokenValue::Expr(_))
+        ));
+    }
+
+    #[test]
+    fn class_names_include_radius_tokens() {
+        let theme = Theme::parse("[radius]\ncard = \"12px\"\n").unwrap();
+        assert!(theme.class_names().contains(&"rounded-card".to_owned()));
+    }
+
+    #[test]
+    fn load_from_dir_reads_once_and_tracks_the_path() {
+        let root = std::env::temp_dir().join(format!("rsx-theme-load-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+
+        // No config file: no theme, no error.
+        assert!(Theme::load_from_dir(&root).unwrap().is_none());
+
+        std::fs::write(root.join(CONFIG_FILE), "[colors]\nbrand = \"#123456\"\n").unwrap();
+        let theme = Theme::load_from_dir(&root).unwrap().unwrap();
+        assert_eq!(
+            theme.path.as_deref(),
+            Some(root.join(CONFIG_FILE).as_path())
+        );
+        assert!(theme.expand_class("bg-brand").is_some());
+
+        // A second call hits the cache and returns the same leaked instance.
+        let again = Theme::load_from_dir(&root).unwrap().unwrap();
+        assert!(std::ptr::eq(theme, again));
+
+        // Rebuild tracking points at the config file.
+        let tracker = rebuild_tracker(theme).unwrap().to_string();
+        assert!(tracker.contains("include_bytes"), "{tracker}");
+        assert!(tracker.contains("rsx.toml"), "{tracker}");
+        assert!(rebuild_tracker(&Theme::default()).is_none());
+
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

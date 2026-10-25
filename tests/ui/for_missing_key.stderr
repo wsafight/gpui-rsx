@@ -1,4 +1,4 @@
-error: Element `<li>` inside a for-loop has event handlers but no `id` or `key` attribute.
+error: Element `<li>` inside a for-loop needs a unique ID (event handlers or stateful classes such as `active:`) but has no `id` or `key` attribute.
          help: Add a `key={unique_value}` attribute so each iteration gets a unique ID:
                 for item in &self.items { <li key={item.id} onClick={...}>...</li> }
          note: Elements in loops share the same source location, so the auto-generated ID

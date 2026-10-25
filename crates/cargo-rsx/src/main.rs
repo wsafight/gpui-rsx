@@ -257,13 +257,35 @@ pub(crate) fn mode(opt: &Options, path: Option<&Path>) -> Result<ClassMode, Stri
     })
 }
 
+fn is_stdin(opt: &Options) -> bool {
+    opt.path.as_deref() == Some(Path::new("-"))
+}
+
+/// Every input file with its contents; `-` reads a single document from stdin.
+fn sources(opt: &Options) -> Result<Vec<(PathBuf, String)>, String> {
+    if is_stdin(opt) {
+        return Ok(vec![(PathBuf::from("-"), input(None)?)]);
+    }
+    files(opt)?
+        .into_iter()
+        .map(|path| {
+            let source =
+                std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+            Ok((path, source))
+        })
+        .collect()
+}
+
+/// The path to resolve `rsx.toml` from; stdin falls back to `--manifest-path`.
+fn mode_path(path: &Path) -> Option<&Path> {
+    (path != Path::new("-")).then_some(path)
+}
+
 fn lint(opt: &Options) -> Result<i32, String> {
     let mut reports = Vec::new();
     let mut failed = false;
-    for path in files(opt)? {
-        let source =
-            std::fs::read_to_string(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        for diagnostic in gpui_rsx_tools::analyze_rust(&source, mode(opt, Some(&path))?) {
+    for (path, source) in sources(opt)? {
+        for diagnostic in gpui_rsx_tools::analyze_rust(&source, mode(opt, mode_path(&path))?) {
             failed |= diagnostic.severity == "error"
                 || (opt.deny_warnings && diagnostic.severity == "warning");
             let line = source[..diagnostic.start]
@@ -271,10 +293,9 @@ fn lint(opt: &Options) -> Result<i32, String> {
                 .filter(|&b| b == b'\n')
                 .count()
                 + 1;
-            let column = source[..diagnostic.start]
-                .rfind('\n')
-                .map(|n| diagnostic.start - n)
-                .unwrap_or(diagnostic.start + 1);
+            // Columns count characters, as editors and rustc do, not bytes.
+            let line_start = source[..diagnostic.start].rfind('\n').map_or(0, |n| n + 1);
+            let column = source[line_start..diagnostic.start].chars().count() + 1;
             if !opt.json {
                 println!(
                     "{}:{line}:{column}: {}: {}",
@@ -295,30 +316,42 @@ fn lint(opt: &Options) -> Result<i32, String> {
 }
 
 fn rewrite(opt: &Options, migrate: bool) -> Result<i32, String> {
-    let mut changed = false;
-    for path in files(opt)? {
-        let source = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
-        if migrate && mode(opt, Some(&path))?.scale == SpacingScale::Tailwind {
+    if opt.write && is_stdin(opt) {
+        return Err("--write cannot be used with stdin".into());
+    }
+    // Rewrite everything in memory first so an error never leaves the tree half-written.
+    let mut rewritten = Vec::new();
+    for (path, source) in sources(opt)? {
+        if migrate && mode(opt, mode_path(&path))?.scale == SpacingScale::Tailwind {
             return Err(format!(
                 "{} already uses Tailwind scale; refusing a second migration",
                 path.display()
             ));
         }
         let result = if migrate {
-            gpui_rsx_tools::format::migrate_rust(&source)?
+            gpui_rsx_tools::format::migrate_rust(&source)
         } else {
-            gpui_rsx_tools::format::rust(&source)?
-        };
+            gpui_rsx_tools::format::rust(&source)
+        }
+        .map_err(|e| format!("{}: {e}", path.display()))?;
         if result != source {
-            changed = true;
-            if opt.write {
-                std::fs::write(&path, result).map_err(|e| e.to_string())?;
-                eprintln!("updated {}", path.display());
-            } else if opt.check {
-                eprintln!("would change {}", path.display());
-            } else {
-                println!("// {}\n{result}", path.display());
-            }
+            rewritten.push((path, result));
+        } else if is_stdin(opt) && !opt.check {
+            // As a filter, stdin input is echoed even when already formatted.
+            print!("{result}");
+        }
+    }
+    let changed = !rewritten.is_empty();
+    for (path, result) in rewritten {
+        if opt.write {
+            std::fs::write(&path, result).map_err(|e| format!("{}: {e}", path.display()))?;
+            eprintln!("updated {}", path.display());
+        } else if opt.check {
+            eprintln!("would change {}", path.display());
+        } else if is_stdin(opt) {
+            print!("{result}");
+        } else {
+            println!("// {}\n{result}", path.display());
         }
     }
     if migrate {

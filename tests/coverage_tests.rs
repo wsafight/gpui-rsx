@@ -400,6 +400,38 @@ fn test_for_loop_nested() {
 }
 
 #[test]
+fn test_for_loop_directly_nested_and_spread_bodies() {
+    // A `for` or spread as the loop body yields iterators; they must be flattened.
+    let outer = vec![vec![1, 2], vec![3, 4]];
+    let _nested = rsx! {
+        <ul>
+            {for row in &outer {
+                {for cell in row {
+                    <li>{*cell}</li>
+                }}
+            }}
+        </ul>
+    };
+    let _spread = rsx! {
+        <ul>
+            {for row in &outer {
+                {...row.iter().map(|cell| rsx! { <li>{*cell}</li> })}
+            }}
+        </ul>
+    };
+    let _mixed = rsx! {
+        <ul>
+            {for row in &outer {
+                <li>{"row"}</li>
+                {for cell in row {
+                    <li>{*cell}</li>
+                }}
+            }}
+        </ul>
+    };
+}
+
+#[test]
 fn test_for_loop_with_filter() {
     // for 循环与迭代器链
     let items = [1, 2, 3, 4, 5];

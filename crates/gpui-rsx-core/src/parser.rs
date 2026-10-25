@@ -458,3 +458,163 @@ fn parse_state_class_lit(value: Expr, attr_name: &Ident) -> Result<syn::LitStr> 
         Err(state_class_string_literal_error(attr_name, &value))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn parse(source: &str) -> Result<RsxBody> {
+        syn::parse_str::<RsxBody>(source)
+    }
+
+    #[test]
+    fn element_names_display_paths_and_leading_colons() {
+        let body = parse("<ui::Card/>").unwrap();
+        let RsxBody::Single(element) = body else {
+            panic!("expected a single element");
+        };
+        assert_eq!(element.name.to_string(), "ui::Card");
+        assert!(element.name.as_single_ident().is_none());
+
+        let body = parse("<div/>").unwrap();
+        let RsxBody::Single(element) = body else {
+            panic!("expected a single element");
+        };
+        assert_eq!(element.name.to_string(), "div");
+        assert_eq!(
+            element.name.as_single_ident().map(Ident::to_string),
+            Some("div".into())
+        );
+
+        // A leading `::` marks an absolute path, which is never a single ident.
+        let name: RsxElementName = RsxElementName {
+            path: syn::parse_quote!(::ui::Card),
+        };
+        assert_eq!(name.to_string(), "::ui::Card");
+        assert!(name.as_single_ident().is_none());
+    }
+
+    #[test]
+    fn rejects_jsx_attributes_that_gpui_cannot_express() {
+        for source in [
+            "<div whiteSpace={\"nowrap\"} />",
+            "<div groupDragOver={(\"items\", |style| style.opacity(0.75))} />",
+            "<div group_drag_over={(\"items\", |style| style.opacity(0.75))} />",
+        ] {
+            assert!(parse(source).is_err(), "{source}");
+        }
+    }
+
+    #[test]
+    fn rejects_mismatched_and_unclosed_tags() {
+        let error = parse("<div></span>")
+            .err()
+            .expect("expected a parse error")
+            .to_string();
+        assert!(error.contains("does not match"), "{error}");
+        let error = parse("<div><span></div>")
+            .err()
+            .expect("expected a parse error")
+            .to_string();
+        assert!(
+            error.contains("</span>") || error.contains("Unclosed"),
+            "{error}"
+        );
+        let error = parse("<>")
+            .err()
+            .expect("expected a parse error")
+            .to_string();
+        assert!(
+            error.to_lowercase().contains("fragment") || error.contains("Unclosed"),
+            "{error}"
+        );
+        let error = parse("").err().expect("expected a parse error").to_string();
+        assert!(!error.is_empty());
+    }
+
+    #[test]
+    fn rejects_malformed_for_loops() {
+        for (source, expected) in [
+            ("<ul>{for x in xs <li/>}</ul>", "expected '{'"),
+            (
+                "<ul>{for x in xs { 42 }}</ul>",
+                "unexpected token in for-loop body",
+            ),
+            (
+                "<ul>{for x in xs {...r}}</ul>",
+                "expected element, expression, or spread",
+            ),
+        ] {
+            let error = parse(source)
+                .err()
+                .expect("expected a parse error")
+                .to_string();
+            assert!(
+                error.to_lowercase().contains(&expected.to_lowercase()),
+                "{source}: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_conditional_attributes() {
+        let error = parse("<div when={active} />")
+            .err()
+            .expect("expected a parse error")
+            .to_string();
+        assert!(error.contains("tuple"), "{error}");
+        let error = parse("<div whenClass={(a, \"bg-red-500\", \"x\")} />")
+            .err()
+            .expect("expected a parse error")
+            .to_string();
+        assert!(error.contains("exactly 2 values"), "{error}");
+    }
+
+    #[test]
+    fn when_class_requires_a_static_string_without_stateful_classes() {
+        let error = parse("<div whenClass={(a, classes)} />")
+            .err()
+            .expect("expected a parse error")
+            .to_string();
+        assert!(error.contains("string literal"), "{error}");
+        let error = parse("<div whenClass={(a, \"overflow-scroll\")} />")
+            .err()
+            .expect("expected a parse error")
+            .to_string();
+        assert!(error.contains("stateful"), "{error}");
+        // A static, non-stateful class is accepted.
+        assert!(parse("<div whenClass={(a, \"bg-red-500\")} />").is_ok());
+    }
+
+    #[test]
+    fn state_class_attributes_require_static_non_stateful_classes() {
+        let error = parse("<div hoverClass={classes} />")
+            .err()
+            .expect("expected a parse error")
+            .to_string();
+        assert!(error.contains("string literal"), "{error}");
+        let error = parse("<div hoverClass=\"debug-outline\" />")
+            .err()
+            .expect("expected a parse error")
+            .to_string();
+        assert!(error.contains("debug-outline"), "{error}");
+        for attribute in ["hoverClass", "focusClass", "activeClass"] {
+            assert!(
+                parse(&format!("<div {attribute}=\"bg-red-500\" />")).is_ok(),
+                "{attribute}"
+            );
+        }
+    }
+
+    #[test]
+    fn parses_fragments_spreads_and_nested_loops() {
+        let body = parse("<><div/>{...rows}{for x in xs {<span/>}}</>").unwrap();
+        let RsxBody::Fragment(nodes) = body else {
+            panic!("expected a fragment");
+        };
+        assert_eq!(nodes.len(), 3);
+        assert!(matches!(nodes[0], RsxNode::Element(_)));
+        assert!(matches!(nodes[1], RsxNode::Spread(_)));
+        assert!(matches!(nodes[2], RsxNode::For { .. }));
+    }
+}

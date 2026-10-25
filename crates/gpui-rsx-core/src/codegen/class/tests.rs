@@ -137,10 +137,120 @@ fn digit_leading_classes_never_become_identifiers() {
 }
 
 #[test]
+fn mode_builders_only_change_the_selected_field() {
+    let mode = ClassMode::PERMISSIVE
+        .with_scale(SpacingScale::Tailwind)
+        .with_dynamic_report(true);
+    assert_eq!(mode.scale, SpacingScale::Tailwind);
+    assert!(mode.report_dynamic_at_exit);
+    assert!(!mode.is_strict());
+    assert!(mode.theme.is_none());
+
+    let strict = ClassMode::STRICT.with_theme(None);
+    assert!(strict.is_strict());
+    assert_eq!(strict.scale, SpacingScale::Px);
+
+    // `ClassMode` is `Copy`, so helpers can take it by value.
+    fn takes_by_value(mode: ClassMode) -> bool {
+        mode.is_strict()
+    }
+    assert!(takes_by_value(ClassMode::STRICT));
+}
+
+#[test]
 fn diagnostics_report_offsets() {
     let diagnostics = class_diagnostics("flex  dark:bg-black flex-colum", ClassMode::PERMISSIVE);
     assert_eq!(diagnostics.len(), 2);
     assert_eq!(diagnostics[0].class, "dark:bg-black");
     assert_eq!(diagnostics[0].offset, 6);
     assert_eq!(diagnostics[1].suggestion.as_deref(), Some("flex-col"));
+}
+
+#[test]
+fn color_rgba_matches_what_the_class_expands_to() {
+    // Palette names, short/long hex and color functions all resolve to `0xRRGGBBAA`.
+    let cases = [
+        ("red-500", Some(0xef44_44ff)),
+        ("black", Some(0x0000_00ff)),
+        ("white", Some(0xffff_ffff)),
+        ("[#f00]", Some(0xff00_00ff)),
+        ("[#abc]", Some(0xaabb_ccff)),
+        ("[#112233]", Some(0x1122_33ff)),
+        ("[#11223344]", Some(0x1122_3344)),
+        ("[#1234]", Some(0x1122_3344)),
+        ("[rgb(1,2,3)]", Some(0x0102_03ff)),
+        ("[rgba(1,2,3,0.5)]", Some(0x0102_0380)),
+        ("[rgba(1,2,3,1)]", Some(0x0102_03ff)),
+    ];
+    for (color, expected) in cases {
+        assert_eq!(color_rgba(color), expected, "{color}");
+    }
+
+    // Anything the macro rejects must not get a swatch either.
+    for color in [
+        "[#+123]",
+        "[#12345]",
+        "[#12345g]",
+        "[rgba(1,2,3,1.5)]",
+        "[rgba(1,2,3)]",
+        "not-a-color",
+        "red-1000",
+        "",
+    ] {
+        assert_eq!(color_rgba(color), None, "{color}");
+    }
+}
+
+#[test]
+fn overflowing_lengths_are_never_emitted_as_infinite_literals() {
+    // `1e38 * 4` overflows f32; the class must fall back to pass-through instead of
+    // generating `px(inf)` (which `quote` cannot represent).
+    let mode = ClassMode::PERMISSIVE.with_scale(SpacingScale::Tailwind);
+    let tokens = expand("w-1e38 gap-1e38", mode);
+    assert!(tokens.contains(". w_1e38 ()"), "{tokens}");
+    assert!(tokens.contains(". gap_1e38 ()"), "{tokens}");
+    assert!(!tokens.contains("px ("), "{tokens}");
+
+    // The same value stays valid without scaling.
+    assert!(expand("w-1e38", ClassMode::PERMISSIVE).contains("px ("));
+}
+
+#[test]
+fn fraction_ratio_out_of_range_reports_compile_error() {
+    let tokens = expand("w-1e38/1e-38", ClassMode::PERMISSIVE);
+    assert!(tokens.contains("value is out of range"), "{tokens}");
+    assert!(tokens.contains("compile_error"), "{tokens}");
+}
+
+#[test]
+fn suggestions_cover_theme_tokens_for_every_length_prefix() {
+    static THEME: std::sync::OnceLock<Theme> = std::sync::OnceLock::new();
+    let theme = THEME.get_or_init(|| {
+        Theme::parse("[colors]\naccent = \"#123456\"\n[spacing]\ngutter = \"12px\"\n").unwrap()
+    });
+    let mode = ClassMode::PERMISSIVE.with_theme(Some(theme));
+
+    assert_eq!(
+        suggest_class("bg-acent", mode).as_deref(),
+        Some("bg-accent")
+    );
+    assert_eq!(
+        suggest_class("hover:bg-acent", mode).as_deref(),
+        Some("hover:bg-accent")
+    );
+    for typo in ["p-guttr", "pt-guttr", "min-w-guttr", "gap-x-guttr"] {
+        let expected = typo.replace("guttr", "gutter");
+        assert_eq!(
+            suggest_class(typo, mode).as_deref(),
+            Some(expected.as_str())
+        );
+    }
+    // Correct tokens need no suggestion for the color family.
+    assert_eq!(suggest_class("bg-accent", mode), None);
+    // Length prefixes are one edit apart from each other, so a valid `pt-gutter` may still
+    // suggest `px-gutter`; the typo itself must always resolve to the right prefix.
+    assert_eq!(
+        suggest_class("pt-guttr", mode).as_deref(),
+        Some("pt-gutter")
+    );
 }

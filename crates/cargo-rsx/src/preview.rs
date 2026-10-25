@@ -53,10 +53,16 @@ pub fn run(opt: &Options) -> Result<i32, String> {
         path.display()
     );
     for stream in listener.incoming() {
-        let mut stream = stream.map_err(|e| e.to_string())?;
-        stream
+        // A failed or reset connection affects only that client; keep serving.
+        let Ok(mut stream) = stream else {
+            continue;
+        };
+        if stream
             .set_read_timeout(Some(Duration::from_secs(2)))
-            .map_err(|e| e.to_string())?;
+            .is_err()
+        {
+            continue;
+        }
         let mut buffer = [0; 4096];
         let count = match stream.read(&mut buffer) {
             Ok(n) => n,

@@ -24,6 +24,7 @@
 
 use proc_macro2::TokenStream;
 use quote::{format_ident, quote};
+use syn::ext::IdentExt;
 use syn::spanned::Spanned;
 
 enum PropKind {
@@ -116,9 +117,21 @@ fn expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
         .iter()
         .filter(|p| matches!(p.kind, PropKind::Required))
         .collect();
+    // `a_b` and `a__b` both PascalCase to `AB`; suffix a counter on a clash so the
+    // generated generics stay distinct.
+    let mut seen = std::collections::HashSet::new();
     let type_params: Vec<syn::Ident> = required
         .iter()
-        .map(|p| format_ident!("__{}", to_pascal(&p.ident.to_string())))
+        .map(|p| {
+            let pascal = to_pascal(&p.ident.unraw().to_string());
+            let mut name = pascal.clone();
+            let mut n = 1;
+            while !seen.insert(name.clone()) {
+                name = format!("{pascal}{n}");
+                n += 1;
+            }
+            format_ident!("__{}", name)
+        })
         .collect();
     // rustc reports a missing prop as "`MissingRequiredProp: title` was not satisfied",
     // so the marker trait is named exactly like the prop.
@@ -418,5 +431,17 @@ mod tests {
         assert!(out.contains("pub fn elevated_if"));
         assert!(!out.contains("# [prop"));
         assert!(!out.contains("# [children]"));
+    }
+
+    #[test]
+    fn raw_and_colliding_prop_names_get_distinct_valid_generics() {
+        let out = expand_component(
+            TokenStream::new(),
+            quote! { struct Input { r#type: u8, a_b: u8, a__b: u8 } },
+        )
+        .to_string();
+        assert!(out.contains("__Type"));
+        assert!(out.contains("__AB ,") || out.contains("__AB>"));
+        assert!(out.contains("__AB1"));
     }
 }
