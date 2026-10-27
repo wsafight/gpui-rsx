@@ -636,7 +636,7 @@ fn directory_lint_recurses_but_skips_generated_folders() {
         .as_array()
         .unwrap()
         .iter()
-        .map(|d| d["file"].as_str().unwrap().to_owned())
+        .map(|d| std::path::PathBuf::from(d["file"].as_str().unwrap()))
         .collect();
     assert_eq!(files.len(), 2, "{files:?}");
     assert!(files.iter().any(|f| f.ends_with("src/a.rs")), "{files:?}");
