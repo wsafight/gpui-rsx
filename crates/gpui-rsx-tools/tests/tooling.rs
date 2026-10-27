@@ -1,3 +1,5 @@
+#![cfg(feature = "convert")]
+
 use gpui_rsx_core::{ClassMode, SpacingScale};
 use gpui_rsx_tools::{
     analyze_body, analyze_rust, analyze_rust_document, class_literal_ranges, convert, expand,

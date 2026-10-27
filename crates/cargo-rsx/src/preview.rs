@@ -1,5 +1,6 @@
 use super::{Options, input, mode, output};
 use std::{
+    borrow::Cow,
     io::{Read, Write},
     net::TcpListener,
     path::Path,
@@ -85,13 +86,15 @@ pub fn run(opt: &Options) -> Result<i32, String> {
                 }),
             );
         }
-        let fragment = cached.1.clone();
-        let (status, body) = if route.starts_with("GET /content ") {
-            ("200 OK", fragment)
+        let (status, body): (&str, Cow<'_, str>) = if route.starts_with("GET /content ") {
+            ("200 OK", Cow::Borrowed(cached.1.as_str()))
         } else if route.starts_with("GET / ") {
-            ("200 OK", gpui_rsx_tools::preview::page(&fragment, true))
+            (
+                "200 OK",
+                Cow::Owned(gpui_rsx_tools::preview::page(&cached.1, true)),
+            )
         } else {
-            ("404 Not Found", "Not found".into())
+            ("404 Not Found", Cow::Borrowed("Not found"))
         };
         let response = format!(
             "HTTP/1.1 {status}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n{body}",

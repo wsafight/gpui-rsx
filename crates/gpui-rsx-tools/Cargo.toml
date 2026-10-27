@@ -7,6 +7,17 @@ description = "Shared diagnostics, formatting, migration and preview for GPUI-RS
 license = "MIT"
 repository = "https://github.com/wsafight/gpui-rsx"
 
+[features]
+# Keep JSX/TSX conversion available by default for the CLI and existing users.
+# Consumers that only need linting, formatting or preview can opt out of SWC.
+default = ["convert"]
+convert = [
+    "dep:swc_common",
+    "dep:swc_ecma_ast",
+    "dep:swc_ecma_parser",
+    "dep:swc_ecma_visit",
+]
+
 [dependencies]
 gpui-rsx-core = { version = "0.8.2", path = "../gpui-rsx-core" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
@@ -16,7 +27,7 @@ serde = { version = "=1.0.228", features = ["derive"] }
 serde_json = "1"
 prettyplease = "0.2"
 
-swc_common = "26.0.0"
-swc_ecma_ast = "29.0.2"
-swc_ecma_parser = { version = "46.1.2", default-features = false, features = ["typescript"] }
-swc_ecma_visit = "29.0.0"
+swc_common = { version = "26.0.0", optional = true }
+swc_ecma_ast = { version = "29.0.2", optional = true }
+swc_ecma_parser = { version = "46.1.2", default-features = false, features = ["typescript"], optional = true }
+swc_ecma_visit = { version = "29.0.0", optional = true }

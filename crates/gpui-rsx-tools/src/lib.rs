@@ -1,4 +1,5 @@
 //! Shared, host-independent tooling. Positions are UTF-8 byte offsets into the input.
+#[cfg(feature = "convert")]
 pub mod convert;
 pub mod format;
 pub mod preview;
@@ -6,7 +7,7 @@ pub mod preview;
 use gpui_rsx_core::codegen::attribute::static_class_literals;
 use gpui_rsx_core::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use gpui_rsx_core::{ClassMode, Severity, SpacingScale, class_diagnostics};
-use proc_macro2::{Span, TokenStream, TokenTree};
+use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use serde::{Deserialize, Serialize};
 use syn::{Expr, Lit, spanned::Spanned};
 
@@ -42,6 +43,14 @@ pub const MACROS: &[&str] = &[
     "rsx_expand",
 ];
 
+fn is_macro_name(name: &Ident) -> bool {
+    name == "rsx"
+        || name == "rsx_strict"
+        || name == "rsx_permissive"
+        || name == "rsx_tw"
+        || name == "rsx_expand"
+}
+
 /// Byte offset of `span` within `source`, which must be the string the span was parsed from.
 ///
 /// `Span::byte_range` resolves through proc-macro2's cached char-to-byte table, so this
@@ -61,7 +70,7 @@ pub fn macro_calls(source: &str) -> Result<Vec<MacroCall>, String> {
         let mut i = 0;
         while i < tokens.len() {
             if let TokenTree::Ident(name) = &tokens[i]
-                && MACROS.contains(&name.to_string().as_str())
+                && is_macro_name(name)
                 && let Some(TokenTree::Punct(bang)) = tokens.get(i + 1)
                 && bang.as_char() == '!'
                 && let Some(TokenTree::Group(group)) = tokens.get(i + 2)
