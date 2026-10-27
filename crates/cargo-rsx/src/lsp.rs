@@ -158,15 +158,10 @@ fn range(source: &str, start: usize, end: usize) -> Value {
 }
 fn uri_path(uri: &str) -> Option<PathBuf> {
     let raw = uri.strip_prefix("file://")?;
-    let raw = if cfg!(windows) {
-        raw.strip_prefix('/').unwrap_or(raw)
-    } else {
-        raw
-    };
     let mut bytes = Vec::new();
     let mut i = 0;
     while i < raw.len() {
-        if raw.as_bytes()[i] == b'%' && i + 2 < raw.len() {
+        if raw.as_bytes()[i] == b'%' {
             bytes.push(u8::from_str_radix(raw.get(i + 1..i + 3)?, 16).ok()?);
             i += 3;
         } else {
@@ -174,7 +169,21 @@ fn uri_path(uri: &str) -> Option<PathBuf> {
             i += 1;
         }
     }
-    Some(String::from_utf8(bytes).ok()?.into())
+    let decoded = String::from_utf8(bytes).ok()?;
+    // Only a Windows drive URI has an extra slash (`file:///C:/...`). Rooted
+    // paths such as `file:///tmp/...` must keep theirs on every platform.
+    let path = if cfg!(windows)
+        && decoded.as_bytes().get(..4).is_some_and(|prefix| {
+            prefix[0] == b'/'
+                && prefix[1].is_ascii_alphabetic()
+                && prefix[2] == b':'
+                && prefix[3] == b'/'
+        }) {
+        &decoded[1..]
+    } else {
+        &decoded
+    };
+    Some(path.into())
 }
 fn mode(uri: &str) -> ClassMode {
     let path = uri_path(uri);
@@ -850,6 +859,27 @@ mod tests {
         // Malformed escapes are rejected rather than silently dropped.
         assert_eq!(uri_path("file:///tmp/%zz.rs"), None);
         assert_eq!(uri_path("file:///tmp/%4.rs"), None);
+        assert_eq!(uri_path("file:///tmp/%"), None);
+        assert_eq!(uri_path("file:///tmp/%4"), None);
+    }
+
+    #[test]
+    fn uri_path_strips_only_windows_drive_prefixes() {
+        let expected = if cfg!(windows) {
+            "C:/Users/a b/main.rs"
+        } else {
+            "/C:/Users/a b/main.rs"
+        };
+        for uri in [
+            "file:///C:/Users/a%20b/main.rs",
+            "file:///%43%3A/Users/a%20b/main.rs",
+        ] {
+            assert_eq!(uri_path(uri), Some(PathBuf::from(expected)), "{uri}");
+        }
+        assert_eq!(
+            uri_path("file:///Code/main.rs"),
+            Some(PathBuf::from("/Code/main.rs"))
+        );
     }
 
     #[test]

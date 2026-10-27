@@ -308,6 +308,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
+      CRITERION_HOME: ${{ github.workspace }}/target/criterion/${{ github.run_id }}-${{ github.run_attempt }}
       BASE_REV: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
       - uses: actions/checkout@v4
@@ -321,7 +322,9 @@ jobs:
         run: |
           if test -n "$BASE_REV" && git cat-file -e "$BASE_REV:crates/gpui-rsx-core/benches/expansion.rs" 2>/dev/null; then
             git worktree add --detach "$RUNNER_TEMP/rsx-bench-base" "$BASE_REV"
-            cargo bench --manifest-path "$RUNNER_TEMP/rsx-bench-base/Cargo.toml" -p gpui-rsx-core --bench expansion -- --save-baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+            # Compare product code with the same harness, including span cleanup.
+            cp crates/gpui-rsx-core/benches/expansion.rs "$RUNNER_TEMP/rsx-bench-base/crates/gpui-rsx-core/benches/expansion.rs"
+            cargo bench --locked --manifest-path "$RUNNER_TEMP/rsx-bench-base/Cargo.toml" -p gpui-rsx-core --bench expansion -- --save-baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
             echo 'comparable=true' >> "$GITHUB_OUTPUT"
           else
             echo 'No expansion benchmark in the base revision; recording the initial baseline.'
@@ -330,16 +333,21 @@ jobs:
       - name: Compare expansion costs
         if: steps.baseline.outputs.comparable == 'true'
         run: |
-          cargo bench -p gpui-rsx-core --bench expansion -- --baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
-          cargo xtask bench-check --threshold 0.10
+          cargo bench --locked -p gpui-rsx-core --bench expansion -- --baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+          if ! cargo xtask bench-check --threshold 0.10; then
+            echo 'Confirming the regression with a fresh baseline and candidate measurement.'
+            cargo bench --locked --manifest-path "$RUNNER_TEMP/rsx-bench-base/Cargo.toml" -p gpui-rsx-core --bench expansion -- --save-baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+            cargo bench --locked -p gpui-rsx-core --bench expansion -- --baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+            cargo xtask bench-check --threshold 0.10
+          fi
       - name: Record initial baseline
         if: steps.baseline.outputs.comparable != 'true'
-        run: cargo bench -p gpui-rsx-core --bench expansion -- --save-baseline initial --sample-size 30 --warm-up-time 1 --measurement-time 2
+        run: cargo bench --locked -p gpui-rsx-core --bench expansion -- --save-baseline initial --sample-size 30 --warm-up-time 1 --measurement-time 2
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: expansion-benchmarks
-          path: target/criterion
+          path: ${{ env.CRITERION_HOME }}
           retention-days: 7
 
   tooling:

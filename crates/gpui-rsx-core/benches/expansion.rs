@@ -2,7 +2,7 @@
 //!
 //! Run: `cargo bench -p gpui-rsx-core --bench expansion`
 
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use gpui_rsx_core::{ClassMode, expand};
 use proc_macro2::TokenStream;
 use std::hint::black_box;
@@ -29,18 +29,26 @@ const DASHBOARD: &str = r#"
 const DYNAMIC: &str = r#"<div class={classes} />"#;
 
 fn bench(c: &mut Criterion) {
-    let dashboard: TokenStream = DASHBOARD.parse().unwrap();
-    let dynamic: TokenStream = DYNAMIC.parse().unwrap();
-
-    c.bench_function("expand/static_dashboard", |b| {
-        b.iter(|| expand(black_box(dashboard.clone()), ClassMode::PERMISSIVE))
-    });
-    c.bench_function("expand/strict_dashboard", |b| {
-        b.iter(|| expand(black_box(dashboard.clone()), ClassMode::STRICT))
-    });
-    c.bench_function("expand/dynamic_class", |b| {
-        b.iter(|| expand(black_box(dynamic.clone()), ClassMode::PERMISSIVE))
-    });
+    for (name, source, mode) in [
+        ("expand/static_dashboard", DASHBOARD, ClassMode::PERMISSIVE),
+        ("expand/strict_dashboard", DASHBOARD, ClassMode::STRICT),
+        ("expand/dynamic_class", DYNAMIC, ClassMode::PERMISSIVE),
+    ] {
+        c.bench_function(name, |b| {
+            b.iter_batched(
+                || {
+                    // Parsing the generated dynamic helper appends to proc-macro2's
+                    // source map. Each invocation needs fresh span state, otherwise
+                    // the measured cost depends on all earlier benchmark iterations.
+                    // PerIteration drops the previous input/output before this reset.
+                    proc_macro2::extra::invalidate_current_thread_spans();
+                    source.parse::<TokenStream>().unwrap()
+                },
+                |input| expand(black_box(input), mode),
+                BatchSize::PerIteration,
+            )
+        });
+    }
 }
 
 fn configuration() -> Criterion {

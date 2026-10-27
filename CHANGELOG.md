@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The LSP preserves rooted file URI paths on Windows, removes the extra slash only for
+  drive-letter paths after percent decoding, and rejects truncated percent escapes.
+
+### Changed
+
+- Expansion benchmarks reset span memory between invocations and use the same harness for
+  both revisions. Performance CI isolates each run's reports and confirms an over-budget
+  result with a fresh baseline and candidate measurement before failing the 10% gate.
+
 ## [0.8.2] - 2026-10-25
 
 ### Fixed
