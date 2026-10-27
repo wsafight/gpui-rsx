@@ -9,6 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### 0.9.0 development
+
+- Theme loading now shares owned `Arc<Theme>` values instead of leaking one static theme for
+  every configuration revision. `ClassMode` is cloneable and carries the owned theme handle.
+- The 0.9.0 line is tracked in `todo/ROADMAP_0.9.0.md`; it is intentionally not published yet.
+
 ## [0.8.3] - 2026-10-27
 
 ### Fixed

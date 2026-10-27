@@ -89,7 +89,7 @@ pub(crate) fn generate_attr_methods_with_mode(
                 // 情况 2：条件表达式的每个分支都是字符串字面量 → 分支内静态展开。
                 // 这是常见写法，避免为 `if active { "..." } else { "..." }`
                 // 生成完整动态 class matcher。
-                if let Some(static_expr) = generate_static_class_expr_code(value, mode) {
+                if let Some(static_expr) = generate_static_class_expr_code(value, mode.clone()) {
                     out.push(quote! { .map(|__el| #static_expr) });
                     return;
                 }
@@ -205,7 +205,7 @@ fn generate_static_class_expr_code(expr: &syn::Expr, mode: ClassMode) -> Option<
     match expr {
         syn::Expr::If(expr_if) => {
             let condition = &expr_if.cond;
-            let then_code = generate_static_class_block_code(&expr_if.then_branch, mode)?;
+            let then_code = generate_static_class_block_code(&expr_if.then_branch, mode.clone())?;
             let (_, else_expr) = expr_if.else_branch.as_ref()?;
             let else_code = generate_static_class_expr_code(else_expr, mode)?;
             Some(quote! {
@@ -229,7 +229,7 @@ fn generate_static_class_expr_code(expr: &syn::Expr, mode: ClassMode) -> Option<
                     } else {
                         quote! {}
                     };
-                    let body = generate_static_class_expr_code(&arm.body, mode)?;
+                    let body = generate_static_class_expr_code(&arm.body, mode.clone())?;
                     Some(quote! {
                         #(#attrs)*
                         #pat #guard => #body,

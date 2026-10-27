@@ -28,7 +28,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::SystemTime;
 
 /// File name looked up in `CARGO_MANIFEST_DIR`.
@@ -177,8 +177,8 @@ impl Theme {
     /// Loads `rsx.toml` from `dir`, caching by path and modification time.
     ///
     /// Returns `Ok(None)` when the file does not exist.
-    pub fn load_from_dir(dir: &Path) -> Result<Option<&'static Theme>, String> {
-        type Cache = Mutex<BTreeMap<PathBuf, (Option<SystemTime>, &'static Theme)>>;
+    pub fn load_from_dir(dir: &Path) -> Result<Option<Arc<Theme>>, String> {
+        type Cache = Mutex<BTreeMap<PathBuf, (Option<SystemTime>, Arc<Theme>)>>;
         static CACHE: OnceLock<Cache> = OnceLock::new();
 
         let path = dir.join(CONFIG_FILE);
@@ -192,17 +192,16 @@ impl Theme {
             && *cached_at == modified
             && modified.is_some()
         {
-            return Ok(Some(theme));
+            return Ok(Some(Arc::clone(theme)));
         }
 
         let source = std::fs::read_to_string(&path)
             .map_err(|e| format!("failed to read {}: {e}", path.display()))?;
         let mut theme = Theme::parse(&source)?;
         theme.path = Some(path.clone());
-        // Leaked on purpose: one entry per (file, revision) for the life of the compiler process.
-        let theme: &'static Theme = Box::leak(Box::new(theme));
+        let theme = Arc::new(theme);
         if let Ok(mut cache) = cache.lock() {
-            cache.insert(path, (modified, theme));
+            cache.insert(path, (modified, Arc::clone(&theme)));
         }
         Ok(Some(theme))
     }
@@ -638,12 +637,12 @@ mod tests {
         );
         assert!(theme.expand_class("bg-brand").is_some());
 
-        // A second call hits the cache and returns the same leaked instance.
+        // A second call hits the cache and returns the same shared allocation.
         let again = Theme::load_from_dir(&root).unwrap().unwrap();
-        assert!(std::ptr::eq(theme, again));
+        assert!(std::sync::Arc::ptr_eq(&theme, &again));
 
         // Rebuild tracking points at the config file.
-        let tracker = rebuild_tracker(theme).unwrap().to_string();
+        let tracker = rebuild_tracker(&theme).unwrap().to_string();
         assert!(tracker.contains("include_bytes"), "{tracker}");
         assert!(tracker.contains("rsx.toml"), "{tracker}");
         assert!(rebuild_tracker(&Theme::default()).is_none());

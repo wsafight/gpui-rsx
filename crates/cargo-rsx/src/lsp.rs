@@ -24,7 +24,7 @@ impl Document {
 
     /// Reuses an already resolved mode; resolving it walks the filesystem.
     fn with_mode(source: &str, mode: ClassMode) -> Self {
-        let analysis = gpui_rsx_tools::analyze_rust_document(source, mode);
+        let analysis = gpui_rsx_tools::analyze_rust_document(source, mode.clone());
         Self {
             source: source.to_owned(),
             mode,
@@ -190,7 +190,7 @@ fn mode(uri: &str) -> ClassMode {
     super::mode(&super::Options::default(), path.as_deref()).unwrap_or(ClassMode::PERMISSIVE)
 }
 fn mode_at(document: Option<&Document>, cursor: usize, uri: &str) -> ClassMode {
-    let base = document.map_or_else(|| mode(uri), |document| document.mode);
+    let base = document.map_or_else(|| mode(uri), |document| document.mode.clone());
     document
         .and_then(|document| {
             document
@@ -198,7 +198,7 @@ fn mode_at(document: Option<&Document>, cursor: usize, uri: &str) -> ClassMode {
                 .iter()
                 .find(|call| cursor >= call.start && cursor <= call.end)
         })
-        .map(|call| gpui_rsx_tools::mode_for(&call.name, base))
+        .map(|call| gpui_rsx_tools::mode_for(&call.name, base.clone()))
         .unwrap_or(base)
 }
 
@@ -264,10 +264,10 @@ fn request(
             let prefix = &source[start..cursor];
             let class_mode = mode_at(Some(document), cursor, uri);
             let mut matches = Vec::with_capacity(201);
-            for class in completion_candidates(prefix, class_mode) {
+            for class in completion_candidates(prefix, class_mode.clone()) {
                 if class.ends_with(':')
                     || matches!(
-                        analyze_class(&class, class_mode).outcome,
+                        analyze_class(&class, class_mode.clone()).outcome,
                         ClassOutcome::Supported(_)
                     )
                 {
@@ -307,7 +307,7 @@ fn request(
                 // Code being edited often fails to expand; diagnostics already report that.
                 Ok(gpui_rsx_tools::expand(
                     &source[call.start..call.end],
-                    gpui_rsx_tools::mode_for(&call.name, document.mode),
+                    gpui_rsx_tools::mode_for(&call.name, document.mode.clone()),
                 )
                 .map_or(Value::Null, |expansion| {
                     json!({"contents":{"kind":"markdown","value":format!("```rust\n{expansion}\n```")}})
@@ -462,7 +462,7 @@ fn handle(
         if let Some(text) = text {
             let document = match docs.get(&uri) {
                 Some(previous) if method.ends_with("didChange") => {
-                    Document::with_mode(text, previous.mode)
+                    Document::with_mode(text, previous.mode.clone())
                 }
                 _ => Document::new(&uri, text),
             };
@@ -529,7 +529,11 @@ mod tests {
         }
     }
 
-    fn completion_response(source: &str, cursor: usize, theme: Option<&'static Theme>) -> Value {
+    fn completion_response(
+        source: &str,
+        cursor: usize,
+        theme: Option<std::sync::Arc<Theme>>,
+    ) -> Value {
         let uri = "file:///tmp/rsx-lsp-test.rs";
         let mut document = Document::new(uri, source);
         if let Some(theme) = theme {
@@ -569,21 +573,24 @@ mod tests {
 
     #[test]
     fn completion_includes_theme_tokens() {
-        static THEME: OnceLock<Theme> = OnceLock::new();
-        let theme = THEME.get_or_init(|| Theme {
-            colors: BTreeMap::from([(
-                "accent".into(),
-                TokenValue::Color {
-                    hex: 0x123456,
-                    alpha: false,
-                },
-            )]),
-            ..Theme::default()
+        static THEME: OnceLock<std::sync::Arc<Theme>> = OnceLock::new();
+        let theme = THEME.get_or_init(|| {
+            Theme {
+                colors: BTreeMap::from([(
+                    "accent".into(),
+                    TokenValue::Color {
+                        hex: 0x123456,
+                        alpha: false,
+                    },
+                )]),
+                ..Theme::default()
+            }
+            .into()
         });
         let source = "fn f(){rsx!{<div class=\"bg-acc\"/>}}";
         let prefix = "bg-acc";
         let cursor = source.find(prefix).unwrap() + prefix.len();
-        let response = completion_response(source, cursor, Some(theme));
+        let response = completion_response(source, cursor, Some(std::sync::Arc::clone(theme)));
 
         assert!(labels(&response).contains(&"bg-accent"));
     }
@@ -634,21 +641,24 @@ mod tests {
 
     #[test]
     fn completion_filters_unsupported_entries_and_supports_theme_variants() {
-        static THEME: OnceLock<Theme> = OnceLock::new();
-        let theme = THEME.get_or_init(|| Theme {
-            colors: BTreeMap::from([(
-                "accent".into(),
-                TokenValue::Color {
-                    hex: 0x123456,
-                    alpha: false,
-                },
-            )]),
-            ..Theme::default()
+        static THEME: OnceLock<std::sync::Arc<Theme>> = OnceLock::new();
+        let theme = THEME.get_or_init(|| {
+            Theme {
+                colors: BTreeMap::from([(
+                    "accent".into(),
+                    TokenValue::Color {
+                        hex: 0x123456,
+                        alpha: false,
+                    },
+                )]),
+                ..Theme::default()
+            }
+            .into()
         });
         let source = "fn f(){rsx!{<div class=\"hover:bg-acc\"/>}}";
         let prefix = "hover:bg-acc";
         let cursor = source.find(prefix).unwrap() + prefix.len();
-        let response = completion_response(source, cursor, Some(theme));
+        let response = completion_response(source, cursor, Some(std::sync::Arc::clone(theme)));
         let labels = labels(&response);
 
         assert_eq!(labels, ["hover:bg-accent"]);

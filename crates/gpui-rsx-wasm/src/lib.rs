@@ -13,8 +13,8 @@ pub fn analyze(source: &str, strict: bool, tailwind: bool) -> String {
         ..gpui_rsx_core::ClassMode::PERMISSIVE
     };
     let result = serde_json::json!({
-        "diagnostics": gpui_rsx_tools::analyze_body(source, mode),
-        "expansion": gpui_rsx_tools::expand(source, mode),
+        "diagnostics": gpui_rsx_tools::analyze_body(source, mode.clone()),
+        "expansion": gpui_rsx_tools::expand(source, mode.clone()),
         "preview": gpui_rsx_tools::preview::render(source, mode),
     })
     .to_string();

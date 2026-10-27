@@ -17,7 +17,7 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
     fn nodes(children: &[RsxNode], mode: ClassMode, out: &mut String) {
         for child in children {
             match child {
-                RsxNode::Element(el) => element(el, mode, out),
+                RsxNode::Element(el) => element(el, mode.clone(), out),
                 RsxNode::Expr(expr) => match literal_string(expr) {
                     Some(text) => out.push_str(&escape(&text)),
                     None => out.push_str("<span class=\"rsx-placeholder\">{expression}</span>"),
@@ -27,7 +27,7 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
                 }
                 RsxNode::For { body, .. } => {
                     out.push_str("<div class=\"rsx-placeholder\">loop template</div>");
-                    nodes(body, mode, out);
+                    nodes(body, mode.clone(), out);
                 }
             }
         }
@@ -41,7 +41,7 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
             {
                 if let Some(classes) = literal_string(value) {
                     for class in classes.split_ascii_whitespace() {
-                        match css(class, mode) {
+                        match css(class, mode.clone()) {
                             Some(style) => styles.push(style),
                             None => omitted.push(class.to_owned()),
                         }
@@ -71,12 +71,12 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
                 escape(&omitted.join(", "))
             ));
         }
-        nodes(&el.children, mode, out);
+        nodes(&el.children, mode.clone(), out);
         out.push_str("</div>");
     }
     let mut out = String::new();
     match &body {
-        RsxBody::Single(el) => element(el, mode, &mut out),
+        RsxBody::Single(el) => element(el, mode.clone(), &mut out),
         RsxBody::Fragment(children) => nodes(children, mode, &mut out),
     }
     Ok(out)
@@ -84,7 +84,7 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
 
 fn css(class: &str, mode: ClassMode) -> Option<String> {
     if !matches!(
-        analyze_class(class, mode).outcome,
+        analyze_class(class, mode.clone()).outcome,
         ClassOutcome::Supported(_)
     ) || class.contains(':')
     {

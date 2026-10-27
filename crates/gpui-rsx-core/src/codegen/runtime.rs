@@ -63,7 +63,7 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
     mode: ClassMode,
     unknown_class_handler: Option<&syn::Expr>,
 ) -> TokenStream {
-    let helper = get_cached_dynamic_class_helper(mode);
+    let helper = get_cached_dynamic_class_helper(mode.clone());
     let handler = match unknown_class_handler {
         Some(handler) => quote! { #handler },
         None => default_unknown_handler(mode),
@@ -172,7 +172,7 @@ fn default_unknown_handler(mode: ClassMode) -> TokenStream {
 }
 
 fn generate_dynamic_class_helper(mode: ClassMode) -> TokenStream {
-    let common_classes = generate_common_class_matches(mode);
+    let common_classes = generate_common_class_matches(mode.clone());
     let color_fallbacks = generate_color_fallback_code();
     let numeric_fallbacks = generate_numeric_fallback_code(mode.scale);
 
@@ -492,7 +492,7 @@ fn generate_integer_fallback(prefix: &'static str, method: &'static str, ty: &st
 ///
 fn generate_common_class_matches(mode: ClassMode) -> impl Iterator<Item = TokenStream> {
     dynamic_common_classes().map(move |class_str| {
-        let method_call = parse_dynamic_common_class(class_str, mode);
+        let method_call = parse_dynamic_common_class(class_str, mode.clone());
         quote! {
             #class_str => #method_call,
         }

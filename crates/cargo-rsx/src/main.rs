@@ -250,7 +250,10 @@ pub(crate) fn mode(opt: &Options, path: Option<&Path>) -> Result<ClassMode, Stri
         scale: if opt.tailwind {
             SpacingScale::Tailwind
         } else {
-            theme.and_then(|t| t.scale).unwrap_or(SpacingScale::Px)
+            theme
+                .as_ref()
+                .and_then(|t| t.scale)
+                .unwrap_or(SpacingScale::Px)
         },
         theme,
         report_dynamic_at_exit: false,

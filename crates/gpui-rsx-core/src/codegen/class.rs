@@ -19,6 +19,7 @@ use super::tables::*;
 use crate::theme::Theme;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
+use std::sync::Arc;
 
 /// 数值 spacing / sizing class 的单位。
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
@@ -40,12 +41,12 @@ impl SpacingScale {
 }
 
 /// class 处理模式。
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Debug)]
 pub struct ClassMode {
     /// 严格模式：未知 class 编译报错，动态未知 class 默认 panic。
     pub strict: bool,
     pub scale: SpacingScale,
-    pub theme: Option<&'static Theme>,
+    pub theme: Option<Arc<Theme>>,
     /// 动态 class 中被忽略的 class 在进程退出时汇总打印（debug 构建），而不是逐条打印。
     pub report_dynamic_at_exit: bool,
 }
@@ -62,22 +63,22 @@ impl ClassMode {
         ..Self::PERMISSIVE
     };
 
-    pub const fn with_scale(self, scale: SpacingScale) -> Self {
+    pub fn with_scale(self, scale: SpacingScale) -> Self {
         Self { scale, ..self }
     }
 
-    pub const fn with_theme(self, theme: Option<&'static Theme>) -> Self {
+    pub fn with_theme(self, theme: Option<Arc<Theme>>) -> Self {
         Self { theme, ..self }
     }
 
-    pub const fn with_dynamic_report(self, report_dynamic_at_exit: bool) -> Self {
+    pub fn with_dynamic_report(self, report_dynamic_at_exit: bool) -> Self {
         Self {
             report_dynamic_at_exit,
             ..self
         }
     }
 
-    pub const fn is_strict(self) -> bool {
+    pub fn is_strict(&self) -> bool {
         self.strict
     }
 }
@@ -176,18 +177,20 @@ pub fn class_diagnostics(class_str: &str, mode: ClassMode) -> Vec<ClassDiagnosti
     let base = class_str.as_ptr() as usize;
     for class in class_str.split_ascii_whitespace() {
         let offset = class.as_ptr() as usize - base;
-        let (severity, message, suggestion) = match analyze_class(class, mode).outcome {
+        let (severity, message, suggestion) = match analyze_class(class, mode.clone()).outcome {
             ClassOutcome::Supported(_) => continue,
             ClassOutcome::PassThrough { suggestion, .. } => (
                 Severity::Warning,
                 passthrough_message(class, suggestion.as_deref()),
                 suggestion,
             ),
-            ClassOutcome::Ignored { message } => {
-                (Severity::Warning, message, suggest_class(class, mode))
-            }
+            ClassOutcome::Ignored { message } => (
+                Severity::Warning,
+                message,
+                suggest_class(class, mode.clone()),
+            ),
             ClassOutcome::Error { message } => {
-                (Severity::Error, message, suggest_class(class, mode))
+                (Severity::Error, message, suggest_class(class, mode.clone()))
             }
         };
         out.push(ClassDiagnostic {
@@ -215,7 +218,7 @@ pub fn parse_class_string_with_mode(
     let mut variants: Vec<(Variant, Vec<TokenStream>)> = Vec::new();
 
     for class in class_str.split_ascii_whitespace() {
-        let analysis = analyze_class(class, mode);
+        let analysis = analyze_class(class, mode.clone());
         let tokens = match analysis.outcome {
             ClassOutcome::Supported(tokens) => tokens,
             ClassOutcome::PassThrough { tokens, suggestion } => {
@@ -254,7 +257,7 @@ pub fn parse_single_class_with_mode(class: &str, mode: ClassMode) -> TokenStream
 }
 
 fn base_outcome(class: &str, mode: ClassMode) -> ClassOutcome {
-    match expand_known_class(class, mode) {
+    match expand_known_class(class, mode.clone()) {
         Some(Ok(tokens)) => ClassOutcome::Supported(tokens),
         Some(Err(message)) => ClassOutcome::Error { message },
         None => unknown_outcome(class, mode),
@@ -262,7 +265,7 @@ fn base_outcome(class: &str, mode: ClassMode) -> ClassOutcome {
 }
 
 fn unknown_outcome(class: &str, mode: ClassMode) -> ClassOutcome {
-    let suggestion = suggest_class(class, mode);
+    let suggestion = suggest_class(class, mode.clone());
     if mode.strict {
         let message = if class.starts_with("font-") {
             format!(

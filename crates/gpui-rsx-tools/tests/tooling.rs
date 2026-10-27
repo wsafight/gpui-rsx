@@ -366,9 +366,12 @@ fn preview_page_embeds_refresh_script_only_in_watch_mode() {
 #[test]
 fn mode_for_derives_per_macro_options() {
     let base = ClassMode::PERMISSIVE;
-    assert_eq!(mode_for("rsx_tw", base).scale, SpacingScale::Tailwind);
-    assert_eq!(mode_for("rsx", base).scale, SpacingScale::Px);
-    assert!(mode_for("rsx_strict", base).strict);
+    assert_eq!(
+        mode_for("rsx_tw", base.clone()).scale,
+        SpacingScale::Tailwind
+    );
+    assert_eq!(mode_for("rsx", base.clone()).scale, SpacingScale::Px);
+    assert!(mode_for("rsx_strict", base.clone()).strict);
     // `rsx_permissive!` opts out of an enclosing strict mode.
     assert!(!mode_for("rsx_permissive", ClassMode::STRICT).strict);
     assert!(mode_for("rsx", ClassMode::STRICT).strict);

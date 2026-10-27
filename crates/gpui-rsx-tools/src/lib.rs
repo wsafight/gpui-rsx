@@ -153,7 +153,7 @@ pub fn analyze_rust_document(source: &str, mode: ClassMode) -> RustAnalysis {
     };
     for call in &analysis.calls {
         let body = &source[call.start..call.end];
-        let body_analysis = analyze_body_with_ranges(body, mode_for(&call.name, mode));
+        let body_analysis = analyze_body_with_ranges(body, mode_for(&call.name, mode.clone()));
         analysis.literals.extend(
             body_analysis
                 .literals
@@ -201,7 +201,7 @@ fn analyze_body_with_ranges(source: &str, mode: ClassMode) -> BodyAnalysis {
                     if let Some(literals) = class_literals(attr) {
                         for lit in literals {
                             if let Some(range) =
-                                lint_literal(source, lit, mode, &mut analysis.diagnostics)
+                                lint_literal(source, lit, mode.clone(), &mut analysis.diagnostics)
                             {
                                 analysis.literals.push(range);
                             }
@@ -214,7 +214,7 @@ fn analyze_body_with_ranges(source: &str, mode: ClassMode) -> BodyAnalysis {
                 RsxAttribute::WhenClass { .. } | RsxAttribute::StateClass { .. } => {
                     for lit in class_literals(attr).into_iter().flatten() {
                         if let Some(range) =
-                            lint_literal(source, lit, mode, &mut analysis.diagnostics)
+                            lint_literal(source, lit, mode.clone(), &mut analysis.diagnostics)
                         {
                             analysis.literals.push(range);
                         }
@@ -225,7 +225,7 @@ fn analyze_body_with_ranges(source: &str, mode: ClassMode) -> BodyAnalysis {
         }
     });
     // Include semantic errors (required constructors, loop keys, unsupported state classes).
-    let expanded = gpui_rsx_core::generate_body_with_mode(&body, mode);
+    let expanded = gpui_rsx_core::generate_body_with_mode(&body, mode.clone());
     fn semantic_errors(tokens: TokenStream, source: &str, out: &mut Vec<Diagnostic>) {
         let tokens: Vec<_> = tokens.into_iter().collect();
         for (i, token) in tokens.iter().enumerate() {

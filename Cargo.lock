@@ -112,7 +112,7 @@ dependencies = [
 
 [[package]]
 name = "cargo-rsx"
-version = "0.8.3"
+version = "0.9.0"
 dependencies = [
  "gpui-rsx-core",
  "gpui-rsx-tools",
@@ -383,7 +383,7 @@ checksum = "e4eba85ea1d0a966a983acd07deee566e67395d2d96b6fb39e62b5a833f1eb0b"
 
 [[package]]
 name = "gpui-rsx"
-version = "0.8.3"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "gpui-rsx-core",
@@ -396,7 +396,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-rsx-core"
-version = "0.8.3"
+version = "0.9.0"
 dependencies = [
  "criterion",
  "insta",
@@ -419,7 +419,7 @@ version = "0.0.0"
 
 [[package]]
 name = "gpui-rsx-tools"
-version = "0.8.3"
+version = "0.9.0"
 dependencies = [
  "gpui-rsx-core",
  "prettyplease",
@@ -436,7 +436,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-rsx-wasm"
-version = "0.8.3"
+version = "0.9.0"
 dependencies = [
  "gpui-rsx-core",
  "gpui-rsx-tools",

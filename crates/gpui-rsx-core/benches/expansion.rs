@@ -44,7 +44,7 @@ fn bench(c: &mut Criterion) {
                     proc_macro2::extra::invalidate_current_thread_spans();
                     source.parse::<TokenStream>().unwrap()
                 },
-                |input| expand(black_box(input), mode),
+                |input| expand(black_box(input), mode.clone()),
                 BatchSize::PerIteration,
             )
         });

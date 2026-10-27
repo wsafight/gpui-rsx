@@ -10,7 +10,7 @@ pub(super) fn expand_known_class(
     class: &str,
     mode: ClassMode,
 ) -> Option<Result<TokenStream, String>> {
-    if let Some(theme) = mode.theme
+    if let Some(theme) = mode.theme.as_ref()
         && let Some(tokens) = theme.expand_class(class)
     {
         return Some(Ok(tokens));

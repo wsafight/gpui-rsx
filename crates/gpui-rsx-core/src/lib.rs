@@ -72,16 +72,16 @@ pub fn expand_macro(input: TokenStream, options: MacroOptions) -> TokenStream {
     };
     let scale = options
         .forced_scale
-        .or_else(|| theme.and_then(|t| t.scale))
+        .or_else(|| theme.as_ref().and_then(|t| t.scale))
         .unwrap_or(options.default_scale);
     let mode = ClassMode {
         strict: options.strict,
         scale,
-        theme,
+        theme: theme.clone(),
         report_dynamic_at_exit: options.report_dynamic_at_exit,
     };
     let code = expand(input, mode);
-    match theme.and_then(theme::rebuild_tracker) {
+    match theme.as_deref().and_then(theme::rebuild_tracker) {
         Some(tracker) => quote::quote! { { #tracker #code } },
         None => code,
     }

@@ -125,7 +125,7 @@ fn generate_body_checked(body: &RsxBody, mode: ClassMode) -> CodegenResult {
         RsxBody::Fragment(children) => {
             let child_exprs: Vec<TokenStream> = children
                 .iter()
-                .map(|node| generate_node_checked(node, false, mode))
+                .map(|node| generate_node_checked(node, false, mode.clone()))
                 .collect::<Result<_, _>>()?;
             // Fragment 保持 vec![] —— 返回类型是用户可见 API
             Ok(quote! { vec![#(#child_exprs),*] })
@@ -168,7 +168,7 @@ fn generate_for_loop_checked(
 ) -> CodegenResult {
     let body_exprs: Vec<TokenStream> = body
         .iter()
-        .map(|node| generate_node_checked(node, true, mode))
+        .map(|node| generate_node_checked(node, true, mode.clone()))
         .collect::<Result<_, _>>()?;
     // A nested `for` or a spread yields an iterator of elements rather than one element.
     let yields_many = |node: &RsxNode| matches!(node, RsxNode::For { .. } | RsxNode::Spread(_));
@@ -280,7 +280,7 @@ fn generate_element_checked(
                     attr,
                     analysis.hints(unknown_class_handler),
                     &mut methods,
-                    mode,
+                    mode.clone(),
                 );
             }
         }
@@ -323,13 +323,18 @@ fn generate_element_checked(
     // styled 标志 → 注入标签默认样式（在用户属性之前）
     let default_methods: Vec<TokenStream> =
         if has_styled && let Some(class_str) = lookup_tag_default(&tag_str) {
-            parse_class_string_with_mode(class_str, mode, proc_macro2::Span::call_site())
+            parse_class_string_with_mode(class_str, mode.clone(), proc_macro2::Span::call_site())
         } else {
             Vec::new()
         };
 
     // 子节点 → .child() / .children() 调用（含聚合优化）
-    generate_children_methods(&element.children, require_loop_key, &mut methods, mode)?;
+    generate_children_methods(
+        &element.children,
+        require_loop_key,
+        &mut methods,
+        mode.clone(),
+    )?;
 
     Ok(quote! { #base #(#default_methods)* #(#methods)* })
 }
@@ -347,7 +352,7 @@ fn generate_children_methods(
                 methods.push(quote! { .child(#expr) });
             }
             RsxNode::Element(elem) => {
-                let child_expr = generate_element_checked(elem, require_loop_key, mode)?;
+                let child_expr = generate_element_checked(elem, require_loop_key, mode.clone())?;
                 methods.push(quote! { .child(#child_expr) });
             }
             RsxNode::Spread(expr) => {
@@ -358,7 +363,7 @@ fn generate_children_methods(
                 iter,
                 body,
             } => {
-                let for_expr = generate_for_loop_checked(binding, iter, body, mode)?;
+                let for_expr = generate_for_loop_checked(binding, iter, body, mode.clone())?;
                 methods.push(quote! { .children(#for_expr) });
             }
         }
