@@ -13,26 +13,23 @@ fn snapshot_derives_metrics_filters_and_impact_order() {
     assert_eq!(snapshot.stats.affected_customers, 3060);
     assert_eq!(
         snapshot
-            .visible_incidents
-            .iter()
-            .map(|incident| incident.id)
-            .collect::<Vec<_>>(),
+            .visible_ids,
         [4201, 4202, 4204, 4203]
     );
 
     console.scope = Scope::Unassigned;
-    assert_eq!(console.snapshot().visible_incidents[0].id, 4203);
+    assert_eq!(console.snapshot().visible_ids[0], 4203);
 }
 
 #[test]
 fn assignment_and_lifecycle_transitions_record_events() {
     let mut console = IncidentConsole::default();
     console.selected_id = 4203;
-    let initial_events = console.snapshot().selected.unwrap().events.len();
+    let initial_events = console.selected_incident().unwrap().events.len();
 
     console.assign_selected();
     console.advance_selected();
-    let selected = console.snapshot().selected.unwrap();
+    let selected = console.selected_incident().unwrap();
 
     assert_eq!(selected.owner, Some("You"));
     assert_eq!(selected.status, IncidentStatus::Investigating);
@@ -45,7 +42,7 @@ fn simulated_signals_respect_auto_triage() {
     let mut console = IncidentConsole::default();
 
     console.simulate_signal();
-    let first = console.snapshot().selected.unwrap();
+    let first = console.selected_incident().unwrap();
     assert_eq!(first.id, 4205);
     assert_eq!(first.owner, Some("Auto triage"));
     assert_eq!(first.status, IncidentStatus::Investigating);
@@ -53,7 +50,7 @@ fn simulated_signals_respect_auto_triage() {
 
     console.auto_triage = false;
     console.simulate_signal();
-    let second = console.snapshot().selected.unwrap();
+    let second = console.selected_incident().unwrap();
     assert_eq!(second.id, 4206);
     assert_eq!(second.owner, None);
     assert_eq!(second.status, IncidentStatus::Triggered);
@@ -69,11 +66,11 @@ fn an_empty_queue_can_recover_without_restarting() {
 
     console.clear_resolved();
     let empty = console.snapshot();
-    assert!(empty.visible_incidents.is_empty());
-    assert!(empty.selected.is_none());
+    assert!(empty.visible_ids.is_empty());
+    assert!(console.selected_incident().is_none());
 
     console.simulate_signal();
     let recovered = console.snapshot();
     assert_eq!(recovered.stats.active, 1);
-    assert_eq!(recovered.selected.unwrap().id, 4205);
+    assert_eq!(console.selected_incident().unwrap().id, 4205);
 }

@@ -1,5 +1,5 @@
 use std::cmp::Reverse;
-use std::collections::BTreeSet;
+use std::collections::HashSet;
 
 use crate::domain::{
     DetailTab, EventTone, Incident, IncidentStatus, Scope, Severity, SeverityFilter, SortMode,
@@ -19,8 +19,10 @@ pub(crate) struct ConsoleStats {
 
 pub(crate) struct ConsoleSnapshot {
     pub(crate) stats: ConsoleStats,
-    pub(crate) visible_incidents: Vec<Incident>,
-    pub(crate) selected: Option<Incident>,
+    /// IDs keep the render snapshot small while preserving the sort order.
+    /// The incident records remain owned by `IncidentConsole` and are looked
+    /// up only while building the queue elements.
+    pub(crate) visible_ids: Vec<u32>,
 }
 
 pub(crate) struct IncidentConsole {
@@ -58,33 +60,24 @@ impl Default for IncidentConsole {
 impl IncidentConsole {
     pub(crate) fn snapshot(&self) -> ConsoleSnapshot {
         let total = self.incidents.len();
-        let active = self
-            .incidents
-            .iter()
-            .filter(|incident| incident.is_active())
-            .count();
-        let critical = self
-            .incidents
-            .iter()
-            .filter(|incident| incident.is_active() && incident.severity == Severity::Critical)
-            .count();
-        let unassigned = self
-            .incidents
-            .iter()
-            .filter(|incident| incident.is_active() && incident.owner.is_none())
-            .count();
-        let affected_customers = self
-            .incidents
-            .iter()
-            .filter(|incident| incident.is_active())
-            .map(|incident| incident.customers)
-            .sum();
-        let service_count = self
-            .incidents
-            .iter()
-            .map(|incident| incident.service)
-            .collect::<BTreeSet<_>>()
-            .len();
+        let mut active = 0;
+        let mut critical = 0;
+        let mut unassigned = 0;
+        let mut affected_customers = 0;
+        let mut services = HashSet::new();
+        for incident in &self.incidents {
+            services.insert(incident.service);
+            if incident.is_active() {
+                active += 1;
+                affected_customers += incident.customers;
+                if incident.severity == Severity::Critical {
+                    critical += 1;
+                }
+                if incident.owner.is_none() {
+                    unassigned += 1;
+                }
+            }
+        }
 
         let mut visible_incidents = self
             .incidents
@@ -92,16 +85,24 @@ impl IncidentConsole {
             .filter(|incident| {
                 self.scope.matches(incident) && self.severity_filter.matches(incident)
             })
-            .cloned()
+            .map(|incident| {
+                (
+                    incident.id,
+                    incident.severity.sort_key(),
+                    Reverse(incident.customers),
+                    incident.age_minutes,
+                )
+            })
             .collect::<Vec<_>>();
         match self.sort_mode {
-            SortMode::Impact => visible_incidents.sort_by_key(|incident| {
-                (incident.severity.sort_key(), Reverse(incident.customers))
-            }),
-            SortMode::Newest => {
-                visible_incidents.sort_by_key(|incident| incident.age_minutes);
-            }
+            SortMode::Impact => visible_incidents
+                .sort_by_key(|(_, severity, customers, _)| (*severity, *customers)),
+            SortMode::Newest => visible_incidents.sort_by_key(|(_, _, _, age)| *age),
         }
+        let visible_ids = visible_incidents
+            .into_iter()
+            .map(|(id, _, _, _)| id)
+            .collect();
 
         ConsoleSnapshot {
             stats: ConsoleStats {
@@ -111,16 +112,17 @@ impl IncidentConsole {
                 unassigned,
                 resolved: total - active,
                 affected_customers,
-                service_count,
+                service_count: services.len(),
             },
-            visible_incidents,
-            selected: self
-                .incidents
-                .iter()
-                .find(|incident| incident.id == self.selected_id)
-                .or_else(|| self.incidents.first())
-                .cloned(),
+            visible_ids,
         }
+    }
+
+    pub(crate) fn selected_incident(&self) -> Option<&Incident> {
+        self.incidents
+            .iter()
+            .find(|incident| incident.id == self.selected_id)
+            .or_else(|| self.incidents.first())
     }
 
     fn record_event(

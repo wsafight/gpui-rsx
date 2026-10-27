@@ -11,7 +11,7 @@ GPUI-RSX 是一个用于编写 GPUI 视图的过程宏。静态标记会在编�
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.8.0" }
+gpui = { package = "gpui-kit", version = "=0.8.1" }
 gpui-rsx = "0.8.3"
 ```
 

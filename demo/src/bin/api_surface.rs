@@ -1,3 +1,5 @@
+mod common;
+
 use gpui::component::tooltip::Tooltip;
 use gpui::prelude::*;
 use gpui::*;
@@ -112,14 +114,5 @@ impl Render for ApiSurfaceView {
 }
 
 fn main() {
-    application()
-        .with_assets(assets::Assets)
-        .run(|cx: &mut App| {
-            gpui::init(cx);
-            gpui::open_window(WindowOptions::default(), cx, |_, cx| {
-                cx.new(|_| ApiSurfaceView::default())
-            })
-            .expect("failed to open API surface window");
-            cx.activate(true);
-        });
+    common::run(|_| WindowOptions::default(), |_| ApiSurfaceView::default());
 }

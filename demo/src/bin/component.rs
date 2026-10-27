@@ -1,3 +1,5 @@
+mod common;
+
 use gpui::component::Sizable as _;
 use gpui::component::StyledExt as _;
 use gpui::component::button::{Button, ButtonVariants as _};
@@ -82,14 +84,5 @@ impl Render for ComponentView {
 }
 
 fn main() {
-    application()
-        .with_assets(assets::Assets)
-        .run(|cx: &mut App| {
-            gpui::init(cx);
-            gpui::open_window(WindowOptions::default(), cx, |_, cx| {
-                cx.new(|_| ComponentView)
-            })
-            .expect("failed to open component window");
-            cx.activate(true);
-        });
+    common::run(|_| WindowOptions::default(), |_| ComponentView);
 }
