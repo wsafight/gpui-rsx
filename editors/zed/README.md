@@ -1,6 +1,6 @@
 # GPUI RSX for Zed
 
-Install the server with `cargo install cargo-rsx --version 0.8.2 --locked`. In Zed, run **zed: install dev
+Install the server with `cargo install cargo-rsx --version 0.8.3 --locked`. In Zed, run **zed: install dev
 extension** and select this directory. The extension adds the GPUI RSX language server
 to Rust alongside rust-analyzer. If you customize Rust language servers in settings,
 include `"gpui-rsx"` and `"..."` in that list.

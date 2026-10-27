@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-10-27
+
 ### Fixed
 
 - The LSP preserves rooted file URI paths on Windows, removes the extra slash only for
@@ -21,6 +23,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Expansion benchmarks reset span memory between invocations and use the same harness for
   both revisions. Performance CI isolates each run's reports and confirms an over-budget
   result with a fresh baseline and candidate measurement before failing the 10% gate.
+- SWC-based JSX/TSX conversion is now behind the opt-in-capable `convert` feature while
+  remaining enabled by default for compatibility; the CLI and WASM playground enable it
+  explicitly.
+- Preview content responses avoid copying the cached rendered fragment, and macro discovery
+  no longer allocates temporary strings for every token.
+- CI cancels superseded branch runs, isolates build caches by job and Rust channel, and checks
+  the Rust 1.98 MSRV for the CLI tooling separately from the Rust 1.88 macro MSRV.
 
 ## [0.8.2] - 2026-10-25
 
@@ -678,7 +687,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...v0.8.1
 [v0.8.0 GitHub Release]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0

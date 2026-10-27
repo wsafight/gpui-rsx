@@ -9,6 +9,8 @@
 
 ## [未发布]
 
+## [0.8.3] - 2026-10-27
+
 ### 修复
 
 - LSP 在 Windows 上保留文件 URI 的根路径前缀，只在百分号解码后对盘符路径移除额外的 `/`，
@@ -19,6 +21,11 @@
 
 - 展开基准在调用之间重置 span 内存，并对两个版本使用相同的测试代码。性能 CI 隔离每次运行的
   报告，在超过 10% 门限时重新测量基线和当前版本，确认超限后才判定失败。
+- 基于 SWC 的 JSX/TSX 转换现在由可选的 `convert` feature 控制，同时默认开启以保持兼容；CLI
+  和 WASM Playground 会显式启用该 feature。
+- Preview 返回缓存的渲染片段时不再复制整段内容，宏扫描也不再为每个 token 创建临时字符串。
+- CI 会取消同一分支中过期的运行，按 job 和 Rust 通道隔离构建缓存，并单独检查 CLI 工具的 Rust 1.98
+  MSRV 与宏库的 Rust 1.88 MSRV。
 
 ## [0.8.2] - 2026-10-25
 
@@ -616,7 +623,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...v0.8.1
 [v0.8.0 GitHub Release]: https://github.com/wsafight/gpui-rsx/releases/tag/v0.8.0

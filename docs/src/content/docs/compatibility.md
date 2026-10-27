@@ -15,14 +15,14 @@ The macro and core crates have no GPUI runtime dependency. The demo names
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.8.2` | `0.8.0` | `gpui-pre@0.3.9` | `gpui-component@0.8.0` |
+| `0.8.3` | `0.8.0` | `gpui-pre@0.3.9` | `gpui-component@0.8.0` |
 
 This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.0" }
-gpui-rsx = "0.8.2"
+gpui-rsx = "0.8.3"
 ```
 <!-- gpui-rsx:compat:end -->
 

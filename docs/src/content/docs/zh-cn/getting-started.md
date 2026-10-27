@@ -12,7 +12,7 @@ GPUI-RSX 是一个用于编写 GPUI 视图的过程宏。静态标记会在编�
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.0" }
-gpui-rsx = "0.8.2"
+gpui-rsx = "0.8.3"
 ```
 
 Kit 固定配套的 `gpui-pre` 快照，并导出 GPUI、组件和资源。应用应提交 `Cargo.lock`，固定完整依赖图。

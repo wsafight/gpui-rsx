@@ -1,6 +1,6 @@
 [package]
 name = "gpui-rsx-tools"
-version = "0.8.2"
+version = "0.8.3"
 edition = "2024"
 rust-version = "1.98"
 description = "Shared diagnostics, formatting, migration and preview for GPUI-RSX tools"
@@ -19,7 +19,7 @@ convert = [
 ]
 
 [dependencies]
-gpui-rsx-core = { version = "0.8.2", path = "../gpui-rsx-core" }
+gpui-rsx-core = { version = "0.8.3", path = "../gpui-rsx-core" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
 syn = { version = "2", features = ["full", "visit"] }
