@@ -3,15 +3,14 @@ use std::{
     io::{Read, Write},
     net::TcpListener,
     path::Path,
-    time::{Duration, SystemTime},
+    time::Duration,
 };
 
-fn content(opt: &Options, path: &Path) -> Result<String, String> {
-    let source = input(Some(path))?;
+fn content(opt: &Options, path: &Path, source: &str) -> Result<String, String> {
     let mode = mode(opt, Some(path))?;
-    let calls = gpui_rsx_tools::macro_calls(&source).unwrap_or_default();
+    let calls = gpui_rsx_tools::macro_calls(source).unwrap_or_default();
     if calls.is_empty() {
-        gpui_rsx_tools::preview::render(&source, mode)
+        gpui_rsx_tools::preview::render(source, mode)
     } else {
         let call = calls.get(opt.index).ok_or_else(|| {
             format!(
@@ -40,12 +39,13 @@ pub fn run(opt: &Options) -> Result<i32, String> {
             })
             .ok_or("no RSX macros found; specify a file")?,
     };
-    let initial = content(opt, &path)?;
+    let source = input(Some(&path))?;
+    let initial = content(opt, &path, &source)?;
     if !opt.watch {
         output(opt, &gpui_rsx_tools::preview::page(&initial, false))?;
         return Ok(0);
     }
-    let mut cached = (file_modified(&path), initial);
+    let mut cached = (Ok(source), initial);
     let listener = TcpListener::bind(("127.0.0.1", opt.port)).map_err(|e| e.to_string())?;
     eprintln!(
         "Static preview: http://{} ({}; Ctrl-C to stop)",
@@ -70,14 +70,19 @@ pub fn run(opt: &Options) -> Result<i32, String> {
         };
         let request = String::from_utf8_lossy(&buffer[..count]);
         let route = request.lines().next().unwrap_or("");
-        let modified = file_modified(&path);
-        if modified != cached.0 {
+        // Timestamps can stay unchanged across rapid or same-size edits. Compare
+        // source text so those edits refresh without re-rendering unchanged input.
+        let source = input(Some(&path));
+        if source != cached.0 {
+            let rendered = match &source {
+                Ok(source) => content(opt, &path, source),
+                Err(error) => Err(error.clone()),
+            };
             cached = (
-                modified,
-                match content(opt, &path) {
-                    Ok(html) => html,
-                    Err(e) => format!("<pre>{}</pre>", gpui_rsx_tools::preview::escape(&e)),
-                },
+                source,
+                rendered.unwrap_or_else(|e| {
+                    format!("<pre>{}</pre>", gpui_rsx_tools::preview::escape(&e))
+                }),
             );
         }
         let fragment = cached.1.clone();
@@ -95,10 +100,4 @@ pub fn run(opt: &Options) -> Result<i32, String> {
         let _ = stream.write_all(response.as_bytes());
     }
     Ok(0)
-}
-
-fn file_modified(path: &Path) -> Option<SystemTime> {
-    std::fs::metadata(path)
-        .and_then(|metadata| metadata.modified())
-        .ok()
 }

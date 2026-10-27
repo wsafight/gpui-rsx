@@ -157,12 +157,13 @@ fn cli_lint_json_and_exit_status_match_findings() {
 }
 
 #[test]
-fn watch_preview_reflects_file_changes_without_recompiling() {
+fn watch_preview_refreshes_same_size_edits_with_unchanged_timestamps() {
     use std::io::{BufRead, Read};
     let root = std::env::temp_dir().join(format!("rsx-preview-test-{}", std::process::id()));
     std::fs::create_dir_all(&root).unwrap();
     let file = root.join("layout.rsx");
     std::fs::write(&file, "<div>{\"before\"}</div>").unwrap();
+    let modified = std::fs::metadata(&file).unwrap().modified().unwrap();
     let mut process = Command::new(env!("CARGO_BIN_EXE_cargo-rsx"))
         .arg("preview")
         .arg(&file)
@@ -195,13 +196,21 @@ fn watch_preview_reflects_file_changes_without_recompiling() {
         response
     };
     let before = get();
-    std::fs::write(&file, "<div>{\"after\"}</div>").unwrap();
+    std::fs::write(&file, "<div>{\"after!\"}</div>").unwrap();
+    // Editors can make same-size changes within the filesystem's timestamp
+    // resolution. Keep both metadata fields unchanged to exercise that case.
+    std::fs::File::options()
+        .write(true)
+        .open(&file)
+        .unwrap()
+        .set_modified(modified)
+        .unwrap();
     let after = get();
     process.kill().unwrap();
     process.wait().unwrap();
     std::fs::remove_dir_all(root).unwrap();
     assert!(before.contains("before"));
-    assert!(after.contains("after"));
+    assert!(after.contains("after!"));
     assert!(!after.contains("before"));
 }
 

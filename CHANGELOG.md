@@ -13,6 +13,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The LSP preserves rooted file URI paths on Windows, removes the extra slash only for
   drive-letter paths after percent decoding, and rejects truncated percent escapes.
+- Static preview refreshes after same-size edits with unchanged filesystem timestamps,
+  while reusing rendered output for unchanged source.
 
 ### Changed
 
