@@ -3,7 +3,8 @@ const zh = Astro.locals.starlightRoute.lang.toLowerCase().startsWith('zh');
 const text = zh ? {
   strict: '严格诊断', tailwind: 'Tailwind 刻度', format: '格式化 RSX', convert: '转换 JSX / TSX', share: '复制分享链接',
   source: '源代码', hint: '编辑 RSX，或粘贴 JSX 后转换', expansion: 'Rust 展开结果', preview: '静态布局预览',
-  previewNote: '近似展示静态布局。表达式、事件和自定义组件使用占位标记。', diagnostics: '诊断与转换提示',
+  previewNote: '静态布局近似展示，实际效果请在原生应用中验证。', diagnostics: '诊断与转换提示',
+  previewCount: '{count} 处样式或行为未模拟', previewLang: 'zh-CN', expression: '{ Rust 表达式 }', children: '{ 子节点 }', loop: '循环模板', component: '组件', unknown: '未知语法', behavior: '属性 / 交互行为', dynamic: '动态 class',
   loading: '正在加载 Rust 解析器…', checking: '正在检查…', limit: '源码超过 Playground 的 100,000 字符限制。',
   empty: '没有诊断信息。', failed: '解析器未能加载，请刷新页面重试。', tooLong: '源码过长，无法生成分享链接。',
   copied: '分享链接已复制。', address: '分享链接已更新到地址栏。', invalid: '分享链接无效，已使用默认示例。',
@@ -13,7 +14,8 @@ const text = zh ? {
 } : {
   strict: 'Strict diagnostics', tailwind: 'Tailwind scale', format: 'Format RSX', convert: 'Convert JSX / TSX', share: 'Copy share link',
   source: 'Source', hint: 'Edit RSX, or paste JSX to convert', expansion: 'Expanded Rust', preview: 'Static layout preview',
-  previewNote: 'Approximate layout. Expressions, events, and custom components use placeholders.', diagnostics: 'Diagnostics & conversion notes',
+  previewNote: 'Approximate static layout. Verify the final result in your native app.', diagnostics: 'Diagnostics & conversion notes',
+  previewCount: '{count} element(s) have styles or behavior omitted', previewLang: 'en', expression: '{ Rust expression }', children: '{ children }', loop: 'Loop template', component: 'Component', unknown: 'Unknown syntax', behavior: 'Attributes / interactions', dynamic: 'Dynamic classes',
   loading: 'Loading the Rust parser…', checking: 'Checking…', limit: 'Source exceeds the 100,000 character playground limit.',
   empty: 'No diagnostics.', failed: 'The parser could not load. Reload to retry.', tooLong: 'Source is too long for a share link.',
   copied: 'Share link copied.', address: 'Share link is in the address bar.', invalid: 'Invalid share link; using the example.',
@@ -21,14 +23,20 @@ const text = zh ? {
   tailwindScale: 'Tailwind: 4px per unit.', pixelScale: 'Default: 1px per unit.',
   error: 'error', warning: 'warning', info: 'info', review: 'review', conversion: 'conversion',
 };
-const example = `<div class="flex flex-col gap-[16px] p-[24px] bg-zinc-900 rounded-lg">
-    <h1 class="text-2xl font-bold text-white">{"${zh ? '用 GPUI 构建界面' : 'Build with GPUI'}"}</h1>
-    <p class="text-zinc-300">{"${zh ? '编辑源码，查看生成的 Rust 代码。' : 'Edit the source. See the Rust it becomes.'}"}</p>
-    <button class="p-[12px] bg-teal-600 text-white rounded-md hover:bg-teal-700">{"${zh ? '继续' : 'Continue'}"}</button>
+const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420px] bg-white border border-zinc-200 rounded-lg">
+    <span class="text-xs font-semibold text-teal-700">{"GPUI / RSX"}</span>
+    <div class="flex flex-col gap-[8px]">
+        <h1 class="text-xl font-semibold text-zinc-900">{"${zh ? '让想法变成原生界面' : 'Make room for your next idea'}"}</h1>
+        <p class="text-sm text-zinc-500">{"${zh ? '编辑源码，实时查看布局与 Rust 展开。' : 'Edit the source. Explore the layout and generated Rust.'}"}</p>
+    </div>
+    <div class="flex flex-wrap items-center justify-between gap-[12px]">
+        <span class="text-xs text-zinc-500">{"${zh ? 'Rust 原生 · 编译期展开' : 'Native Rust. Compiled views.'}"}</span>
+        <button class="px-[16px] py-[10px] bg-teal-700 text-white text-sm font-medium rounded-md hover:bg-teal-800">{"${zh ? '开始构建' : 'Start building'}"}</button>
+    </div>
 </div>`;
 ---
 <div class="rsx-playground not-content" data-messages={JSON.stringify(text)} data-pagefind-ignore>
-  <div class="editor-panel">
+  <div class="workbench">
     <div class="toolbar">
       <div class="options">
         <label><input id="rsx-strict" type="checkbox" checked /> {text.strict}</label>
@@ -40,21 +48,27 @@ const example = `<div class="flex flex-col gap-[16px] p-[24px] bg-zinc-900 round
         <button id="rsx-share" class="share-button" type="button">{text.share}</button>
       </div>
     </div>
-    <div class="editor-heading"><label for="rsx-source">{text.source}<span>RSX</span></label><span class="editor-hint">{text.hint}</span></div>
-    <textarea id="rsx-source" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="rsx-status">{example}</textarea>
+    <div class="workspace">
+      <div class="editor-panel">
+        <div class="editor-heading"><label for="rsx-source">{text.source}<span>RSX</span></label><span class="editor-hint">{text.hint}</span></div>
+        <textarea id="rsx-source" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="rsx-status">{example}</textarea>
+      </div>
+      <section class="preview-panel">
+        <div class="panel-heading"><h2>{text.preview}</h2><span class="live-indicator">{zh ? '实时预览' : 'Live preview'}</span></div>
+        <iframe id="rsx-preview" title={text.preview} sandbox=""></iframe>
+        <p class="preview-note">{text.previewNote}</p>
+      </section>
+    </div>
     <p id="rsx-status" data-state="checking" role="status" aria-live="polite">{text.loading}</p>
   </div>
-  <div class="outputs">
-    <section class="output-panel">
-      <div class="panel-heading"><h2>{text.preview}</h2><span>PREVIEW</span></div>
-      <p class="preview-note">{text.previewNote}</p>
-      <iframe id="rsx-preview" title={text.preview} sandbox=""></iframe>
-    </section>
-    <section class="output-panel">
-      <div class="panel-heading"><h2>{text.expansion}</h2><span>RUST</span></div>
-      <pre tabindex="0" aria-label={text.expansion}><code id="rsx-expansion"></code></pre>
-    </section>
-  </div>
+  <details id="rsx-preview-notes" class="preview-limitations" hidden>
+    <summary id="rsx-preview-note-count"></summary>
+    <ul id="rsx-preview-note-list"></ul>
+  </details>
+  <details class="expansion-panel">
+    <summary><span>{text.expansion}</span><span class="language-label">RUST</span></summary>
+    <pre tabindex="0" aria-label={text.expansion}><code id="rsx-expansion"></code></pre>
+  </details>
   <section class="diagnostics-panel">
     <div class="panel-heading"><h2>{text.diagnostics}</h2><span id="rsx-diagnostic-count">0</span></div>
     <ul id="rsx-diagnostics" aria-label={text.diagnostics}></ul>
@@ -70,6 +84,9 @@ const example = `<div class="flex flex-col gap-[16px] p-[24px] bg-zinc-900 round
   const expansion = document.querySelector<HTMLElement>('#rsx-expansion')!;
   const diagnostics = document.querySelector<HTMLUListElement>('#rsx-diagnostics')!;
   const preview = document.querySelector<HTMLIFrameElement>('#rsx-preview')!;
+  const previewNotes = document.querySelector<HTMLDetailsElement>('#rsx-preview-notes')!;
+  const previewNoteCount = document.querySelector<HTMLElement>('#rsx-preview-note-count')!;
+  const previewNoteList = document.querySelector<HTMLUListElement>('#rsx-preview-note-list')!;
   const base = import.meta.env.BASE_URL.replace(/\/$/, '');
   const worker = new Worker(`${base}/playground/worker.js`, { type: 'module' });
   let sequence = 0;
@@ -120,7 +137,35 @@ const example = `<div class="flex flex-col gap-[16px] p-[24px] bg-zinc-900 round
     const result = data.result;
     expansion.textContent = result.expansion.Ok ?? result.expansion.Err;
     const html = result.preview.Ok ?? `<pre>${String(result.preview.Err).replace(/[&<>]/g, (c:string) => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]!))}</pre>`;
-    preview.srcdoc = `<!doctype html><meta charset="utf-8"><style>body{font:14px system-ui;margin:12px}.rsx-placeholder{font:11px monospace;background:#fef3c7;color:#92400e;padding:2px}</style>${html}`;
+    // Keep renderer annotations outside the layout so they cannot change the UI being previewed.
+    const template = document.createElement('template');
+    template.innerHTML = html;
+    const omitted = template.content.querySelectorAll<HTMLElement>('small.rsx-placeholder[title]');
+    previewNoteList.replaceChildren();
+    for (const annotation of omitted) {
+      const item = document.createElement('li');
+      const tag = document.createElement('code');
+      tag.textContent = `<${annotation.parentElement?.dataset.rsxTag ?? 'element'}>`;
+      const reason = document.createElement('span');
+      reason.textContent = annotation.title.replaceAll('attribute/behavior', messages.behavior).replaceAll('dynamic class', messages.dynamic);
+      item.append(tag, reason);
+      previewNoteList.append(item);
+      annotation.remove();
+    }
+    previewNotes.hidden = omitted.length === 0;
+    previewNoteCount.textContent = messages.previewCount.replace('{count}', String(omitted.length));
+    for (const placeholder of template.content.querySelectorAll<HTMLElement>('.rsx-placeholder')) {
+      const label = placeholder.textContent ?? '';
+      placeholder.textContent = ({'{expression}': messages.expression, '{children}': messages.children, 'loop template': messages.loop, 'unknown syntax': messages.unknown} as Record<string, string>)[label]
+        ?? label.replace(/^component: /, `${messages.component} · `);
+    }
+    preview.srcdoc = `<!doctype html><html lang="${messages.previewLang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>
+      :root{color-scheme:light}*{box-sizing:border-box}body{margin:0;font:14px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;color:#27272a;background:#f5f6f8}
+      .preview-stage{min-height:100vh;display:grid;place-items:center;gap:16px;padding:28px;background-image:radial-gradient(#dce0e5 .7px,transparent .7px);background-size:16px 16px}
+      .rsx-placeholder{display:inline-block;padding:3px 7px;border:1px dashed #94a3b8;border-radius:4px;background:#f1f5f9;color:#475569;font:11px/1.6 ui-monospace,monospace}
+      pre{max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere}
+      @media(max-width:360px){.preview-stage{padding:16px}}
+      </style></head><body><main class="preview-stage">${template.innerHTML}</main></body></html>`;
     showDiagnostics([...result.diagnostics, ...conversionNotes]);
     const countMessage = messages.diagnosticsCount.replace('{count}', String(result.diagnostics.length));
     const notesMessage = conversionNotes.length ? messages.conversionCount.replace('{count}', String(conversionNotes.length)) : '';
@@ -159,7 +204,10 @@ const example = `<div class="flex flex-col gap-[16px] p-[24px] bg-zinc-900 round
 
 <style>
   .rsx-playground { margin-block:1.75rem; }
-  .editor-panel,.output-panel,.diagnostics-panel { border:1px solid var(--rsx-border); border-radius:10px; overflow:hidden; background:var(--rsx-surface); }
+  .workbench,.expansion-panel,.diagnostics-panel { border:1px solid var(--rsx-border); border-radius:10px; overflow:hidden; background:var(--rsx-surface); }
+  .workspace { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .editor-panel,.preview-panel { display:flex; flex-direction:column; min-width:0; }
+  .editor-panel { border-inline-end:1px solid var(--rsx-border); }
   .toolbar { display:flex; flex-wrap:wrap; justify-content:space-between; gap:1rem; align-items:center; padding:.8rem 1rem; background:var(--rsx-surface-raised); border-bottom:1px solid var(--rsx-border); }
   .options,.actions { display:flex; flex-wrap:wrap; gap:.5rem 1rem; align-items:center; }
   .actions { gap:.4rem; }
@@ -173,25 +221,37 @@ const example = `<div class="flex flex-col gap-[16px] p-[24px] bg-zinc-900 round
   .editor-heading label { font-size:.8rem; font-weight:600; }
   .editor-heading label span { margin-inline-start:.65rem; font:.6rem var(--sl-font-mono); color:var(--sl-color-text-accent); }
   .editor-hint { font-size:.7rem; color:var(--sl-color-gray-3); }
-  textarea { display:block; width:100%; min-height:18rem; resize:vertical; font:13px/1.85 var(--sl-font-mono); color:var(--sl-color-text); background:var(--sl-color-bg); border:0; border-radius:0; padding:1rem; tab-size:4; }
+  textarea { display:block; flex:1; width:100%; min-height:27rem; resize:vertical; font:12px/1.8 var(--sl-font-mono); color:var(--sl-color-text); background:var(--sl-color-bg); border:0; border-radius:0; padding:1rem; tab-size:4; }
   textarea:focus-visible { outline-offset:-3px; }
   #rsx-status { display:flex; align-items:baseline; gap:.6rem; padding:.65rem 1rem; margin:0; border-top:1px solid var(--rsx-border); font-size:.72rem; color:var(--sl-color-gray-2); min-height:2.5rem; }
   #rsx-status::before { content:''; width:6px; height:6px; flex-shrink:0; border-radius:50%; background:var(--sl-color-accent); }
   #rsx-status[data-state='checking']::before { background:var(--sl-color-gray-3); }
   #rsx-status[data-state='error']::before { background:#dc704e; }
-  .outputs { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; margin-top:1rem; }
-  .output-panel { display:flex; flex-direction:column; min-width:0; }
-  .panel-heading { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.8rem 1rem; border-bottom:1px solid var(--rsx-border); }
+  .panel-heading { display:flex; justify-content:space-between; align-items:center; gap:1rem; padding:.7rem 1rem; border-bottom:1px solid var(--rsx-border); }
   .panel-heading h2 { font-size:.8rem; font-weight:600; color:var(--sl-color-white); margin:0; }
-  .panel-heading > span { font:.6rem var(--sl-font-mono); color:var(--sl-color-gray-3); }
-  pre { height:23rem; margin:0; overflow:auto; font:12px/1.8 var(--sl-font-mono); padding:1rem; background:var(--sl-color-bg); }
-  iframe { display:block; width:100%; flex:1; min-height:19rem; background:white; border:0; }
-  .preview-note { font-size:.7rem; line-height:1.6; color:var(--sl-color-gray-2); padding:.6rem 1rem; margin:0; border-bottom:1px solid var(--rsx-border); }
+  .panel-heading > span,.language-label { font:.6rem var(--sl-font-mono); color:var(--sl-color-gray-3); }
+  .panel-heading .live-indicator { display:flex; align-items:center; gap:.4rem; font:.65rem var(--sl-font); }
+  .live-indicator::before { content:''; width:5px; height:5px; border-radius:50%; background:var(--sl-color-accent); }
+  pre { max-height:26rem; margin:0; overflow:auto; font:12px/1.8 var(--sl-font-mono); padding:1rem; background:var(--sl-color-bg); }
+  iframe { display:block; width:100%; flex:1; min-height:24rem; background:#f5f6f8; border:0; }
+  .preview-note { font-size:.65rem; line-height:1.6; color:var(--sl-color-gray-3); padding:.65rem 1rem; margin:0; border-top:1px solid var(--rsx-border); }
+  .preview-limitations { margin-top:.75rem; padding:.65rem .85rem; border-inline-start:2px solid var(--rsx-border); color:var(--sl-color-gray-2); font-size:.75rem; }
+  .preview-limitations summary { cursor:pointer; }
+  .preview-limitations ul { list-style:none; margin:.75rem 0 0; padding:0; }
+  .preview-limitations :global(li) { display:flex; gap:.6rem; flex-wrap:wrap; padding:.3rem 0; }
+  .preview-limitations :global(code) { color:var(--sl-color-text-accent); }
+  .expansion-panel { margin-top:1rem; }
+  .expansion-panel summary { display:flex; align-items:center; gap:.6rem; padding:.8rem 1rem; cursor:pointer; color:var(--sl-color-gray-1); font-size:.8rem; font-weight:600; }
+  .expansion-panel summary::before { content:'›'; font-size:1rem; line-height:1; color:var(--sl-color-gray-3); }
+  .expansion-panel[open] summary::before { transform:rotate(90deg); }
+  .expansion-panel summary::-webkit-details-marker { display:none; }
+  .expansion-panel .language-label { margin-inline-start:auto; font-weight:400; }
+  .expansion-panel[open] summary { border-bottom:1px solid var(--rsx-border); }
   .diagnostics-panel { margin-top:1rem; }
   #rsx-diagnostics { list-style:none; padding:1rem; margin:0; font-size:.8rem; }
   #rsx-diagnostics :global(li + li) { margin-top:.5rem; }
   #rsx-diagnostics :global(button) { width:100%; text-align:left; white-space:pre-wrap; overflow-wrap:anywhere; font-size:.75rem; padding:.6rem .75rem; }
   #rsx-diagnostics :global(button[data-severity='error']) { border-inline-start:3px solid #dc704e; }
   #rsx-diagnostics :global(.empty-diagnostics) { color:var(--sl-color-gray-3); }
-  @media (max-width:55rem) { .outputs { grid-template-columns:1fr; } .editor-hint { display:none; } .toolbar { padding:.8rem; } textarea { min-height:20rem; } }
+  @media (max-width:64rem) { .workspace { grid-template-columns:1fr; } .editor-panel { border-inline-end:0; border-bottom:1px solid var(--rsx-border); } .editor-hint { display:none; } .toolbar { padding:.8rem; } textarea { min-height:22rem; } iframe { flex:none; height:25rem; } }
 </style>
