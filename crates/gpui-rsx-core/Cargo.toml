@@ -21,7 +21,7 @@ proc-macro2 = { version = "1.0.106", features = ["span-locations"] }
 [dev-dependencies]
 criterion = { version = "0.8.2", default-features = false }
 insta = "1"
-prettyplease = "0.2"
+prettyplease = "0.3"
 
 [[bench]]
 name = "expansion"
