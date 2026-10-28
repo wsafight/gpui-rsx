@@ -19,13 +19,48 @@ Kit pins its matching `gpui-pre` snapshot and re-exports GPUI, components and as
 
 If you are upgrading from Zed Git or the official `gpui = "0.2.2"` package, follow the current Kit section in the [migration guide](/gpui-rsx/guides/migration/).
 
-## Imports
+## Complete View
+
+Create `src/main.rs` with a complete view. Import both GPUI and its prelude so the generated builder methods are in scope.
 
 ```rust
 use gpui::*;
 use gpui::prelude::*;
 use gpui_rsx::rsx;
+
+struct HelloView;
+
+impl Render for HelloView {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        rsx! {
+            <div class="flex flex-col gap-3 p-4">
+                <h1 class="text-xl font-bold">{"Hello GPUI-RSX"}</h1>
+                <p class="text-gray-600">{"This markup expands to GPUI builder calls."}</p>
+            </div>
+        }
+    }
+}
+
+fn main() {
+    application().with_assets(assets::Assets).run(|cx: &mut App| {
+        gpui::init(cx);
+        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
+            cx.new(|_cx| HelloView)
+        }).unwrap();
+        cx.activate(true);
+    });
+}
 ```
+
+## Run the application
+
+Run from your application directory:
+
+```sh
+cargo run
+```
+
+GPUI needs the native build dependencies for your platform. Use the [compatibility matrix](/gpui-rsx/compatibility/) to align GPUI Kit, Rust, and component versions.
 
 ## First Element
 
@@ -88,6 +123,10 @@ rsx! {
 }
 ```
 
+:::note[Pixel spacing by default]
+`p-4` and `gap-4` mean 4px. For Tailwind's 4px units, use `rsx_tw!` or a [project configuration](/gpui-rsx/guides/theming/).
+:::
+
 Static class strings are parsed by the macro. Dynamic strings are handled by a generated runtime matcher and are useful for values assembled at runtime:
 
 ```rust
@@ -138,37 +177,6 @@ rsx! {
 }
 ```
 
-## Complete View
-
-```rust
-use gpui::*;
-use gpui::prelude::*;
-use gpui_rsx::rsx;
-
-struct HelloView;
-
-impl Render for HelloView {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        rsx! {
-            <div class="flex flex-col gap-3 p-4">
-                <h1 class="text-xl font-bold">{"Hello GPUI-RSX"}</h1>
-                <p class="text-gray-600">{"This markup expands to GPUI builder calls."}</p>
-            </div>
-        }
-    }
-}
-
-fn main() {
-    application().with_assets(assets::Assets).run(|cx: &mut App| {
-        gpui::init(cx);
-        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
-            cx.new(|_cx| HelloView)
-        }).unwrap();
-        cx.activate(true);
-    });
-}
-```
-
 ## Check the Demo
 
 The repository includes a demo crate that exercises real GPUI integration:
@@ -187,6 +195,8 @@ cargo run --manifest-path demo/Cargo.toml --bin incident_console --locked
 
 ## Next Steps
 
+- Use [Themes & Design Tokens](/gpui-rsx/guides/theming/) to share colors, spacing, and typography.
+- Set up completion, diagnostics, and formatting with [CLI & Editors](/gpui-rsx/guides/tooling/).
 - Read [Syntax Reference](/gpui-rsx/usage/syntax/) for elements, attributes, children, and fragments.
 - Read [Class Handling](/gpui-rsx/usage/class/) before relying on dynamic class strings.
 - Read [IDs and Keys](/gpui-rsx/usage/ids/) before rendering interactive rows in loops.

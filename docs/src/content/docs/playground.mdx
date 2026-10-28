@@ -1,15 +1,18 @@
 ---
 title: Playground
 description: Expand RSX, diagnose classes and preview static layouts in your browser.
+tableOfContents: false
 ---
 import Playground from '../../components/Playground.astro';
 
-Edit an RSX macro body below. Parsing and expansion run locally in WebAssembly, using the
-same Rust core as the macros. No source code is sent to a server. Share links contain your
-source in the URL fragment.
+Edit an RSX macro body to see diagnostics, generated Rust, and an approximate layout side by side. The parser runs locally in WebAssembly using the same Rust core as the macros.
 
 <Playground />
 
 Use **Convert JSX / TSX** after pasting a JSX expression or TSX module. Conversion notes
 identify behavior that needs a Rust implementation. The layout preview approximates static
 styles; use a native GPUI application to verify rendering and interactions.
+
+:::tip[Spacing and sharing]
+Numeric spacing defaults to pixels: `p-4` means 4px. Enable **Tailwind scale** for 4px units. Source stays in your browser; share links include it in the URL fragment. Click a diagnostic to select the relevant source.
+:::

@@ -8,6 +8,23 @@ export default defineConfig({
     starlight({
       title: 'GPUI-RSX',
       description: 'A compile-time RSX macro for GPUI.',
+      favicon: '/favicon.svg',
+      customCss: ['./src/styles/custom.css'],
+      components: {
+        SiteTitle: './src/components/SiteTitle.astro',
+        Hero: './src/components/HomeHero.astro',
+        Head: './src/components/SiteHead.astro',
+        LanguageSelect: './src/components/LanguageSelect.astro',
+      },
+      expressiveCode: {
+        themes: ['github-dark', 'github-light'],
+        styleOverrides: {
+          borderRadius: '0.75rem',
+          codeFontSize: '0.8125rem',
+          codeLineHeight: '1.8',
+          codePaddingBlock: '1rem',
+        },
+      },
       defaultLocale: 'root',
       locales: {
         root: {
@@ -57,13 +74,13 @@ export default defineConfig({
               },
               slug: 'compatibility',
             },
-            { label: 'Playground', slug: 'playground' },
+            { label: 'Playground', translations: { 'zh-CN': '在线体验' }, slug: 'playground' },
           ],
         },
         {
-          label: 'Usage',
+          label: 'Build your UI',
           translations: {
-            'zh-CN': '用法',
+            'zh-CN': '构建界面',
           },
           items: [
             {
@@ -81,11 +98,20 @@ export default defineConfig({
               slug: 'usage/class',
             },
             {
+              label: 'Themes & Design Tokens',
+              translations: { 'zh-CN': '主题与设计令牌' },
+              slug: 'guides/theming',
+            },
+            {
               label: 'IDs and Keys',
               translations: {
                 'zh-CN': 'ID 与 Key',
               },
               slug: 'usage/ids',
+            },
+            {
+              label: 'gpui-component',
+              slug: 'guides/gpui-component',
             },
           ],
         },
@@ -105,11 +131,12 @@ export default defineConfig({
           ],
         },
         {
-          label: 'Guides',
+          label: 'Workflow',
           translations: {
-            'zh-CN': '指南',
+            'zh-CN': '开发工作流',
           },
           items: [
+            { label: 'CLI & Editors', translations: { 'zh-CN': 'CLI 与编辑器' }, slug: 'guides/tooling' },
             {
               label: 'Performance',
               translations: {
@@ -132,20 +159,12 @@ export default defineConfig({
               slug: 'guides/migration',
             },
             {
-              label: 'gpui-component',
-              translations: {
-                'zh-CN': 'gpui-component',
-              },
-              slug: 'guides/gpui-component',
-            },
-            {
               label: 'Troubleshooting',
               translations: {
                 'zh-CN': '问题排查',
               },
               slug: 'guides/troubleshooting',
             },
-            { label: 'CLI & Editors', translations: { 'zh-CN': 'CLI 与编辑器' }, slug: 'guides/tooling' },
           ],
         },
         {

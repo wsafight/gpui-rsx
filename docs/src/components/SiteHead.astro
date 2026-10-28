@@ -1,0 +1,18 @@
+---
+import DefaultHead from '@astrojs/starlight/components/Head.astro';
+
+const { entry, head } = Astro.locals.starlightRoute;
+if (entry.id === '404' || entry.id.endsWith('/404')) {
+  // Astro emits the root error route as 404.html, while Starlight formats it as /404/.
+  const base = import.meta.env.BASE_URL.replace(/\/$/, '');
+  for (const item of head) {
+    if (item.tag !== 'link' || typeof item.attrs?.href !== 'string') continue;
+    const url = new URL(item.attrs.href, Astro.url);
+    if (url.pathname === `${base}/404/`) {
+      url.pathname = `${base}/404.html`;
+      item.attrs.href = url.href;
+    }
+  }
+}
+---
+<DefaultHead />

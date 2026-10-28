@@ -388,7 +388,7 @@ jobs:
           tool: wasm-pack
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: 1.4.0
+          bun-version: 1.4.4
       - name: Build the WASM playground
         run: scripts/build-playground.sh
       - name: Test browser WASM and worker protocol

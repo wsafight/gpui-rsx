@@ -103,7 +103,7 @@ collects children. Third-party constructors continue to work with `base={...}`.
 
 Theme tokens in `rsx.toml` support `[colors]`, `[radius]` and `[spacing]`. Use
 `[options] preset = "gpui-component"` for semantic colors; import the theme extension
-trait and keep `cx` in scope. Tokens with `{ expr = "cx.theme().background" }` read the
+trait and keep `cx` in scope. Tokens with `{ expr = "cx.theme().colors.background" }` read the
 current theme during rendering. Literal hex tokens remain fixed colors.
 
 ## From Manual GPUI to RSX

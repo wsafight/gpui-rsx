@@ -1,0 +1,99 @@
+---
+import { Code, Icon } from '@astrojs/starlight/components';
+import DefaultHero from '@astrojs/starlight/components/Hero.astro';
+
+const { lang, entry } = Astro.locals.starlightRoute;
+const isHome = entry.id === '' || entry.id === 'zh-cn';
+const zh = lang.toLowerCase().startsWith('zh');
+const base = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/${zh ? 'zh-cn/' : ''}`;
+const text = zh ? {
+  first: '界面，清晰可读。', second: '底层，依然 Rust。',
+  description: '用 JSX 风格的语法编写原生 GPUI 视图。静态标记在编译期展开为 Rust builder 调用，布局、状态与类型检查自然衔接。',
+  start: '开始构建', try: '打开在线体验', note: '从第一个视图，到完整的桌面应用。',
+  pipeline: ['声明界面', '编译为 Rust', '原生 GPUI'],
+  release: '0.9.0 已发布',
+} : {
+  first: 'Native views.', second: 'Readable Rust.',
+  description: 'Write native GPUI views with JSX-like syntax. Static markup becomes Rust builder calls at compile time, bringing layout, state, and type checking together.',
+  start: 'Start building', try: 'Open playground', note: 'From your first view to a complete desktop app.',
+  pipeline: ['Declare your UI', 'Compile to Rust', 'Native GPUI'],
+  release: '0.9.0 is here',
+};
+const code = `rsx! {
+    <div class="flex flex-col gap-[12px] p-[24px]">
+        <h1 class="text-xl font-bold">
+            {"Hello, native."}
+        </h1>
+        <p>{"Your UI. Still Rust."}</p>
+    </div>
+}`;
+---
+
+{isHome ? <>
+<section class="home-hero" aria-labelledby="_top">
+  <div class="hero-copy">
+    <a class="release-link" href={`${base}guides/migration/`}>
+      <span class="release-dot" aria-hidden="true"></span>{text.release}<Icon name="right-arrow" size="0.9rem" />
+    </a>
+    <h1 id="_top" data-page-title aria-label={`${entry.data.title} — ${text.first} ${text.second}`}>
+      {text.first}<br /><span>{text.second}</span>
+    </h1>
+    <p class="hero-description">{text.description}</p>
+    <div class="hero-actions">
+      <a class="primary-action" href={`${base}getting-started/`}>{text.start}<Icon name="right-arrow" size="1rem" /></a>
+      <a class="secondary-action" href={`${base}playground/`}><Icon name="seti:rust" size="1rem" />{text.try}</a>
+    </div>
+    <p class="hero-note">{text.note}</p>
+  </div>
+  <div class="code-showcase">
+    <div class="code-heading"><span class="file-tab"><span aria-hidden="true">◈</span> src/main.rs</span><span class="code-language">RSX / RUST</span></div>
+    <Code code={code} lang="rust" />
+    <ol class="compile-path" aria-label={zh ? '编译流程' : 'Compilation flow'}>
+      {text.pipeline.map((step, index) => <li><span class="step-number">0{index + 1}</span>{step}{index < 2 && <Icon name="right-arrow" size="0.85rem" />}</li>)}
+    </ol>
+  </div>
+</section>
+
+<div class="compat-strip">
+  <span>GPUI-RSX <strong>0.9.0</strong></span>
+  <span>GPUI Kit <strong>0.8.1</strong></span>
+  <span>Rust <strong>1.88+</strong> <small>{zh ? '宏 / core' : 'macro / core'}</small></span>
+  <a href={`${base}compatibility/`}>{zh ? '兼容性矩阵' : 'Compatibility matrix'} <span aria-hidden="true">↗</span></a>
+</div>
+</> : <DefaultHero />}
+
+<style>
+  .home-hero { position:relative; display:grid; gap:3rem; align-items:center; padding-block:clamp(2.5rem,7vw,6rem) 3.5rem; }
+  .hero-copy { min-width:0; }
+  .release-link { display:inline-flex; align-items:center; gap:.55rem; margin-bottom:1.5rem; padding:.3rem .65rem; border:1px solid var(--rsx-border); border-radius:6px; font-size:.75rem; color:var(--sl-color-gray-2); text-decoration:none; background:var(--rsx-surface); }
+  .release-link:hover { border-color:var(--sl-color-accent); color:var(--sl-color-text-accent); }
+  .release-dot { width:6px; height:6px; border-radius:50%; background:var(--sl-color-accent); }
+  h1 { font-size:clamp(2.5rem,4.7vw,3.75rem); line-height:1.15; font-weight:750; letter-spacing:-.055em; color:var(--sl-color-white); }
+  h1 span { color:var(--sl-color-text-accent); }
+  .hero-description { max-width:43ch; margin-top:1.5rem; font-size:1.05rem; line-height:1.85; color:var(--sl-color-gray-2); text-wrap:pretty; }
+  .hero-actions { display:flex; flex-wrap:wrap; gap:.7rem; margin-top:2rem; }
+  .hero-actions a { display:inline-flex; justify-content:center; align-items:center; gap:.7rem; padding:.7rem 1rem; border:1px solid var(--rsx-border); border-radius:7px; font-size:.875rem; font-weight:600; text-decoration:none; }
+  .primary-action { background:var(--rsx-action); color:var(--rsx-action-text); border-color:var(--rsx-action) !important; }
+  .primary-action:hover { background:var(--rsx-action-hover); }
+  .secondary-action { background:var(--rsx-surface); color:var(--sl-color-white); }
+  .secondary-action:hover { border-color:var(--sl-color-accent); }
+  .hero-note { margin-top:1rem; color:var(--sl-color-gray-3); font-size:.75rem; }
+  .code-showcase { min-width:0; overflow:hidden; border:1px solid var(--rsx-border); border-radius:12px; background:var(--rsx-surface); box-shadow:0 16px 50px -24px var(--rsx-shadow); }
+  .code-heading { display:flex; justify-content:space-between; align-items:center; padding:.8rem 1rem; border-bottom:1px solid var(--rsx-border); font: .7rem var(--sl-font-mono); }
+  .file-tab { color:var(--sl-color-gray-1); display:flex; align-items:center; gap:.6rem; }
+  .file-tab > span { color:var(--sl-color-text-accent); }
+  .code-language { color:var(--sl-color-gray-3); font-size:.6rem; letter-spacing:.08em; }
+  .code-showcase :global(.expressive-code) { margin:0; }
+  .code-showcase :global(.expressive-code pre) { border:0; border-radius:0; }
+  .code-showcase :global(.expressive-code .frame) { --ec-frm-frameBoxShd:none; }
+  .compile-path { display:flex; justify-content:space-between; gap:.5rem; list-style:none; padding:1rem; margin:0; border-top:1px solid var(--rsx-border); font-size:.65rem; }
+  .compile-path li { display:flex; align-items:center; gap:.4rem; color:var(--sl-color-gray-2); }
+  .compile-path svg { margin-inline-start:.4rem; color:var(--sl-color-gray-3); }
+  .step-number { color:var(--sl-color-text-accent); font: .6rem var(--sl-font-mono); }
+  .compat-strip { display:flex; align-items:center; flex-wrap:wrap; gap:.75rem 2rem; padding-block:1.25rem; border-block:1px solid var(--rsx-border); color:var(--sl-color-gray-3); font-size:.75rem; }
+  .compat-strip strong { margin-inline-start:.3rem; color:var(--sl-color-gray-1); font-weight:600; }
+  .compat-strip small { font-size:.65rem; }
+  .compat-strip a { display:flex; gap:.5rem; align-items:center; margin-inline-start:auto; color:var(--sl-color-text-accent); text-decoration:none; }
+  @media (min-width:60rem) { .home-hero { grid-template-columns: .95fr 1.05fr; gap:3rem; } }
+  @media (max-width:35rem) { .hero-actions a { flex:1; padding:.65rem .75rem; } .compile-path { gap:.25rem; padding:.85rem .65rem; font-size:.6rem; } .compile-path svg { display:none; } .compat-strip { gap:.75rem 1.25rem; } .compat-strip a { margin-inline-start:0; } }
+</style>
