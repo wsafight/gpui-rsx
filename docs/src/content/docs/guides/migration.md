@@ -6,7 +6,7 @@ description: Adopt RSX and migrate existing Zed Git applications to GPUI Kit.
 
 ## From 0.8 to 0.9
 
-The 0.9 development branch targets GPUI Kit 0.8.1 and keeps pixel spacing as the default.
+Version 0.9 targets GPUI Kit 0.8.1 and keeps pixel spacing as the default.
 Existing RSX syntax and generated IDs keep their behavior. Tool integrations should use
 the `gpui-rsx-core` crate-root facade or `syntax` module, replace struct literals with
 `ClassMode::builder()`, `Theme::builder()` and `MacroOptions::new().with_*()`, and clone

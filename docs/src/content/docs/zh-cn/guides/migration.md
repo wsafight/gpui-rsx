@@ -6,7 +6,7 @@ description: 从手写 GPUI builder 链迁移，并升级到 GPUI-RSX 0.6 的 GP
 
 ## 从 0.8 升级到 0.9
 
-0.9 开发分支以 GPUI Kit 0.8.1 为兼容目标，默认间距仍按像素解释；现有 RSX
+0.9 版本以 GPUI Kit 0.8.1 为兼容目标，默认间距仍按像素解释；现有 RSX
 语法和自动 ID 行为保持一致。工具集成应使用 `gpui-rsx-core` 根导出或 `syntax`
 模块，将结构体字面量改为 `ClassMode::builder()`、`Theme::builder()` 和
 `MacroOptions::new().with_*()`。多次传递 `ClassMode` 时显式 `clone()`，Theme

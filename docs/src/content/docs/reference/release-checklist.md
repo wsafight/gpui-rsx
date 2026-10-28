@@ -51,7 +51,7 @@ Before publishing:
 - ensure the demo lockfile still reflects the intended Kit and GPUI snapshot versions,
 - confirm GitHub Pages deployment succeeds after merge.
 
-## 0.8 tooling packages
+## 0.9 tooling packages
 
 Publish in dependency order: `gpui-rsx-core`, `gpui-rsx-tools`, `gpui-rsx`, `cargo-rsx`.
 The release check script verifies all packages with local patches before registry publication.

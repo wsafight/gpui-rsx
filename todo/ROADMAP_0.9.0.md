@@ -1,7 +1,7 @@
 # GPUI-RSX 0.9.0 Roadmap
 
-The `0.9.0-dev` branch starts from the published `v0.8.3` tag. It is a breaking-change
-development line and must not be published until the migration surface is reviewed.
+The `0.9.0-dev` branch starts from the published `v0.8.3` tag. Version 0.9.0 adds the
+breaking API changes and migration guidance described below.
 
 ## Implemented in development order
 
@@ -46,5 +46,8 @@ development line and must not be published until the migration surface is review
   GPUI demo, docs, Playground WASM, editor packages and publish dry-runs. Remote platform CI
   and native interactive review remain part of the eventual merge/release process.
 
-The branch may be tested and committed during this work, but it must not be merged into `main`
-or published as `0.9.0` until all public API and migration checks are complete.
+## Release validation
+
+The local release suite, macro/tooling MSRVs, strict Rust API documentation, Playground
+WASM checks, editor package builds and all four publish dry-runs passed. Release proceeds
+after the pull request passes remote CI, followed by registry and release artifact verification.

@@ -9,7 +9,9 @@
 
 ## [未发布]
 
-### 0.9.0 开发中
+## [0.9.0] - 2026-10-28
+
+### 变更
 
 - 主题加载复用拥有型 `Arc<Theme>`，不再为每次配置修订泄漏静态主题；缓存使用规范路径、内容指纹和
   最多 64 项的 LRU 淘汰机制，并报告配置读取错误。
@@ -28,8 +30,7 @@
 - 同一次宏调用内的动态 class 共享一个 helper，各属性仍独立求值并调用自己的未知 class 回调。
   本地四属性宏展开示例从约 1.99 ms 降至 0.495 ms；80 个宏中复用 79 个宏体的分析从约
   1.00 ms 降至 223 µs。这些测量不代表整个项目的冷编译收益。
-- 双语文档补充迁移说明和基准命令；完成范围与发布前检查记录在 `todo/ROADMAP_0.9.0.md`。
-  当前版本尚未发布。
+- 双语文档补充迁移说明和基准命令；完成范围与验证记录在 `todo/ROADMAP_0.9.0.md`。
 
 ## [0.8.3] - 2026-10-27
 
@@ -645,7 +646,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...v0.8.1

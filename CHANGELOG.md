@@ -9,7 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### 0.9.0 development
+## [0.9.0] - 2026-10-28
+
+### Changed
 
 - Theme loading now shares owned `Arc<Theme>` values instead of leaking one static theme for
   every configuration revision. The cache uses canonical paths, content fingerprints and a
@@ -33,7 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   from about 1.99 ms to 0.495 ms. Reusing 79 of 80 macro bodies reduced analysis from about
   1.00 ms to 223 µs. These measurements do not establish whole-project cold build gains.
 - Migration notes and benchmark commands are in the bilingual docs; the completed scope and
-  remaining release checks are tracked in `todo/ROADMAP_0.9.0.md`. This version is unpublished.
+  validation scope is tracked in `todo/ROADMAP_0.9.0.md`.
 
 ## [0.8.3] - 2026-10-27
 
@@ -713,7 +715,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...v0.8.1

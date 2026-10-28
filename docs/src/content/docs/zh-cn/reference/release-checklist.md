@@ -50,7 +50,7 @@ cargo publish --dry-run --allow-dirty
 - 确认 demo lockfile 仍指向预期的 Kit 与 GPUI 快照版本；
 - 合并后确认 GitHub Pages 部署成功。
 
-## 0.8 tooling packages
+## 0.9 tooling packages
 
 Publish in dependency order: `gpui-rsx-core`, `gpui-rsx-tools`, `gpui-rsx`, `cargo-rsx`.
 The release check script verifies all packages with local patches before registry publication.
