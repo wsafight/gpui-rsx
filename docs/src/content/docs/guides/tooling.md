@@ -6,7 +6,7 @@ description: Diagnose, format, migrate and preview RSX; connect VS Code or Zed.
 Install the CLI with Rust 1.98 or newer (the macro library still supports Rust 1.88):
 
 ```sh
-cargo install cargo-rsx --version 0.8.3
+cargo install cargo-rsx --version 0.9.0
 cargo rsx doctor --manifest-path demo/Cargo.toml
 cargo rsx lint --deny-warnings
 cargo rsx lint --json
@@ -15,6 +15,9 @@ cargo rsx fmt src/main.rs --write
 cargo rsx migrate src/main.rs                 # dry run
 cargo rsx convert component.tsx              # JSON: RSX and conversion notes
 cargo rsx preview src/main.rs --watch        # http://127.0.0.1:9230
+cargo rsx theme check --manifest-path demo/Cargo.toml
+cargo rsx theme list --manifest-path demo/Cargo.toml
+cargo rsx theme explain bg-primary --manifest-path demo/Cargo.toml
 ```
 
 `doctor` checks the actual resolved Cargo graph, including aliases, Git dependencies and
@@ -29,6 +32,11 @@ containing comments remain unchanged. Choose `--check` for CI or `--write` to ap
 run, apply with `--write` once, then enable `tailwind-scale` or set `[options] spacing-scale =
 "tailwind"` in `rsx.toml`. It leaves `rsx_tw!`, explicit units and fractions untouched.
 Review dynamic strings and any scale overrides manually.
+
+`theme check` validates the nearest `rsx.toml`; `list` emits every generated class and GPUI
+method, while `explain` shows the source token and expansion for one class. Add `--json` to
+all three commands for editor or CI integrations. The LSP uses the same parser and reports
+invalid theme entries at the start of the document.
 
 JSX/TSX conversion uses SWC and produces RSX plus notes for unsupported classes, JavaScript
 expressions and handlers. Preview approximates static layout and labels omitted behavior;

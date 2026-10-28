@@ -199,5 +199,25 @@ Static literals support `hover:`, `focus:`, `focus-visible:`, `active:`, `group-
 and `group-active:`, including named groups such as `group-hover/menu:`. Stateful
 variants inject IDs; supply stable keys in loops. Theme tokens in `rsx.toml` support
 `[colors]`, `[radius]`, `[spacing]` and a gpui-component preset that maps semantic
-classes such as `bg-primary` to `cx.theme()` calls. Dynamic strings cannot use
-state variants or theme tokens.
+classes such as `bg-primary` to `cx.theme()` calls. Token sections also support
+`[text-size]` (`text-size-body`), `[line-height]` (`leading-body`), `[opacity]`
+(`opacity-muted`) and expression-only `[shadow]` (`shadow-card`) entries. Dynamic
+strings cannot use state variants or theme tokens. Use `cargo rsx theme check`,
+`cargo rsx theme list` and `cargo rsx theme explain bg-primary` to inspect the
+resolved configuration and generated GPUI call.
+
+```toml
+[text-size]
+body = "14px"
+[line-height]
+body = "20px"
+[opacity]
+muted = "60%"
+[shadow]
+card = { expr = "vec![BoxShadow::new(px(0.0), px(1.0), hsla(0.0, 0.0, 0.0, 0.2))]" }
+```
+
+Use `class="text-size-body leading-body opacity-muted shadow-card"`. Shadow expressions
+must evaluate to the type accepted by GPUI's `.shadow()` method and their names must be
+in scope where the macro expands. Static token values also appear in preview and color
+swatches; arbitrary Rust expressions remain placeholders.

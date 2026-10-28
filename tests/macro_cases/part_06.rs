@@ -1,5 +1,22 @@
 use super::*;
 
+#[test]
+fn test_shared_dynamic_helper_preserves_evaluation_and_per_element_handlers() {
+    let evaluations = std::cell::Cell::new(0);
+    let first = std::cell::RefCell::new(Vec::new());
+    let second = std::cell::RefCell::new(Vec::new());
+    let _ = rsx! {
+        <div class={{ evaluations.set(evaluations.get() + 1); "gap-7 unknown-one" }}
+            onUnknownClass={|class: &str| first.borrow_mut().push(class.to_owned())}>
+            <div class={{ evaluations.set(evaluations.get() + 1); "p-5 unknown-two" }}
+                onUnknownClass={|class: &str| second.borrow_mut().push(class.to_owned())}/>
+        </div>
+    };
+    assert_eq!(evaluations.get(), 2);
+    assert_eq!(*first.borrow(), ["unknown-one"]);
+    assert_eq!(*second.borrow(), ["unknown-two"]);
+}
+
 // ===========================================================================
 // 44. 动态 class 数值前缀回退（任意数值支持）
 // ===========================================================================

@@ -7,16 +7,14 @@ use gpui_rsx_core::{MacroOptions, SpacingScale, expand_component, expand_macro};
 use proc_macro::TokenStream;
 
 fn options(strict: bool) -> MacroOptions {
-    MacroOptions {
-        strict,
-        forced_scale: None,
-        default_scale: if cfg!(feature = "tailwind-scale") {
+    MacroOptions::new()
+        .with_strict(strict)
+        .with_default_scale(if cfg!(feature = "tailwind-scale") {
             SpacingScale::Tailwind
         } else {
             SpacingScale::Px
-        },
-        report_dynamic_at_exit: cfg!(feature = "dynamic-class-report"),
-    }
+        })
+        .with_dynamic_report(cfg!(feature = "dynamic-class-report"))
 }
 
 /// Transforms JSX-like markup into GPUI method chains at compile time.
@@ -377,10 +375,7 @@ pub fn rsx_permissive(input: TokenStream) -> TokenStream {
 /// `spacing-scale = "tailwind"` in `rsx.toml`.
 #[proc_macro]
 pub fn rsx_tw(input: TokenStream) -> TokenStream {
-    let options = MacroOptions {
-        forced_scale: Some(SpacingScale::Tailwind),
-        ..options(false)
-    };
+    let options = options(false).with_forced_scale(Some(SpacingScale::Tailwind));
     expand_macro(input.into(), options).into()
 }
 

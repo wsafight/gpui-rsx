@@ -1,6 +1,6 @@
 //! Formatting and explicit, behavior-preserving spacing migration.
 use crate::{byte_offset, class_literals, macro_calls, walk_body};
-use gpui_rsx_core::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
+use gpui_rsx_core::syntax::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
@@ -56,7 +56,12 @@ pub fn body(source: &str) -> Result<String, String> {
         return Err(reason.into());
     }
     let mut out = String::new();
-    fn element(source: &str, el: &RsxElement, depth: usize, out: &mut String) {
+    fn element(
+        source: &str,
+        el: &RsxElement,
+        depth: usize,
+        out: &mut String,
+    ) -> Result<(), String> {
         let indent = "    ".repeat(depth);
         let expression = |value: &dyn ExprLike| value.text(source, &indent);
         out.push_str(&format!("{indent}<{}", el.name));
@@ -96,6 +101,7 @@ pub fn body(source: &str) -> Result<String, String> {
                     };
                     format!("{name}={}", expression(class_lit))
                 }
+                _ => return Err("formatter does not support this RSX attribute".into()),
             };
             out.push(' ');
             out.push_str(&attr);
@@ -104,16 +110,22 @@ pub fn body(source: &str) -> Result<String, String> {
             out.push_str(" />\n");
         } else {
             out.push_str(">\n");
-            nodes(source, &el.children, depth + 1, out);
+            nodes(source, &el.children, depth + 1, out)?;
             out.push_str(&format!("{indent}</{}>\n", el.name));
         }
+        Ok(())
     }
-    fn nodes(source: &str, children: &[RsxNode], depth: usize, out: &mut String) {
+    fn nodes(
+        source: &str,
+        children: &[RsxNode],
+        depth: usize,
+        out: &mut String,
+    ) -> Result<(), String> {
         let indent = "    ".repeat(depth);
         let expression = |value: &dyn ExprLike| value.text(source, &indent);
         for child in children {
             match child {
-                RsxNode::Element(el) => element(source, el, depth, out),
+                RsxNode::Element(el) => element(source, el, depth, out)?,
                 RsxNode::Expr(expr) => out.push_str(&format!("{indent}{{{}}}\n", expression(expr))),
                 RsxNode::Spread(expr) => {
                     out.push_str(&format!("{indent}{{...{}}}\n", expression(expr)))
@@ -128,19 +140,22 @@ pub fn body(source: &str) -> Result<String, String> {
                         expression(binding),
                         expression(iter)
                     ));
-                    nodes(source, body, depth + 1, out);
+                    nodes(source, body, depth + 1, out)?;
                     out.push_str(&format!("{indent}}}}}\n"));
                 }
+                _ => return Err("formatter does not support this RSX node".into()),
             }
         }
+        Ok(())
     }
     match body {
-        RsxBody::Single(el) => element(source, &el, 0, &mut out),
+        RsxBody::Single(el) => element(source, &el, 0, &mut out)?,
         RsxBody::Fragment(children) => {
             out.push_str("<>\n");
-            nodes(source, &children, 1, &mut out);
+            nodes(source, &children, 1, &mut out)?;
             out.push_str("</>\n");
         }
+        _ => return Err("formatter does not support this RSX body".into()),
     }
     syn::parse_str::<RsxBody>(&out).map_err(|e| format!("formatter produced invalid RSX: {e}"))?;
     Ok(out.trim_end().into())

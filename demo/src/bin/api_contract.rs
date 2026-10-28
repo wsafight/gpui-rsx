@@ -83,6 +83,10 @@ fn interactive_event_contracts() {
 
 #[allow(dead_code)]
 fn styled_contracts() {
+    let _ = rsx! { <div class="text-size-body leading-body opacity-muted shadow-card" /> };
+    let outer = String::from("flex gap-4");
+    let inner = String::from("text-sm p-2");
+    let _ = rsx! { <div class={outer}><div id="shared-helper-contract" class={inner}/></div> };
     let _ = rsx! { <div scrollbarWidth={px(8.0)} /> };
     let _ = rsx! { <div class="text-ellipsis-start text-ellipsis-middle" /> };
     let _ = rsx! {

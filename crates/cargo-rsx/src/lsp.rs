@@ -1,4 +1,4 @@
-//! A synchronous stdio LSP server. Full document sync keeps editing deterministic.
+//! A synchronous stdio LSP server with incremental text sync and macro-body reuse.
 use gpui_rsx_core::{ClassMode, ClassOutcome, analyze_class, known_classes};
 use serde_json::{Value, json};
 use std::{
@@ -15,15 +15,25 @@ struct Document {
     /// Absolute byte ranges for static class string contents.
     literals: Vec<(usize, usize)>,
     diagnostics: Vec<gpui_rsx_tools::Diagnostic>,
+    config_error: Option<String>,
+    version: Option<i64>,
 }
 
 impl Document {
     fn new(uri: &str, source: &str) -> Self {
-        Self::with_mode(source, mode(uri))
+        let path = uri_path(uri);
+        match super::mode(&super::Options::default(), path.as_deref()) {
+            Ok(mode) => Self::with_mode(source, mode),
+            Err(error) => Self::with_mode_and_error(source, ClassMode::PERMISSIVE, Some(error)),
+        }
     }
 
     /// Reuses an already resolved mode; resolving it walks the filesystem.
     fn with_mode(source: &str, mode: ClassMode) -> Self {
+        Self::with_mode_and_error(source, mode, None)
+    }
+
+    fn with_mode_and_error(source: &str, mode: ClassMode, config_error: Option<String>) -> Self {
         let analysis = gpui_rsx_tools::analyze_rust_document(source, mode.clone());
         Self {
             source: source.to_owned(),
@@ -31,6 +41,31 @@ impl Document {
             calls: analysis.calls,
             literals: analysis.literals,
             diagnostics: analysis.diagnostics,
+            config_error,
+            version: None,
+        }
+    }
+
+    fn updated(&self, source: String) -> Self {
+        let previous = gpui_rsx_tools::RustAnalysis {
+            calls: self.calls.clone(),
+            literals: self.literals.clone(),
+            diagnostics: self.diagnostics.clone(),
+        };
+        let analysis = gpui_rsx_tools::update_rust_document(
+            &source,
+            self.mode.clone(),
+            &self.source,
+            &previous,
+        );
+        Self {
+            source,
+            mode: self.mode.clone(),
+            calls: analysis.calls,
+            literals: analysis.literals,
+            diagnostics: analysis.diagnostics,
+            config_error: self.config_error.clone(),
+            version: self.version,
         }
     }
 }
@@ -72,7 +107,7 @@ fn completion_candidates(prefix: &str, mode: ClassMode) -> Vec<String> {
         &variant,
         &mut candidates,
     );
-    if let Some(theme) = mode.theme {
+    if let Some(theme) = mode.theme() {
         // Theme lists are small and the result is sorted below, so a linear filter suffices.
         candidates.extend(
             theme
@@ -203,10 +238,19 @@ fn mode_at(document: Option<&Document>, cursor: usize, uri: &str) -> ClassMode {
 }
 
 fn diagnostics(document: &Document) -> Vec<Value> {
-    document.diagnostics.iter().map(|d| json!({
+    let mut diagnostics = document.diagnostics.iter().map(|d| json!({
         "range":range(&document.source,d.start,d.end),"severity": match d.severity.as_str() {"error"=>1,"warning"=>2,_=>3},
         "source":"gpui-rsx","message":d.message,"data":{"suggestion":d.suggestion}
-    })).collect()
+    })).collect::<Vec<_>>();
+    if let Some(error) = &document.config_error {
+        diagnostics.push(json!({
+            "range": range(&document.source, 0, 0),
+            "severity": 1,
+            "source": "gpui-rsx",
+            "message": format!("Theme configuration error: {error}"),
+        }));
+    }
+    diagnostics
 }
 
 /// A class token under the cursor; refuses text outside an RSX macro or class literal.
@@ -249,9 +293,10 @@ fn request(
     let cursor = offset(source, &params["position"]);
     match method {
         "initialize" => Ok(json!({"capabilities":{
-            "positionEncoding":"utf-16", "textDocumentSync":{"openClose":true,"change":1},
+            "positionEncoding":"utf-16", "textDocumentSync":{"openClose":true,"change":2},
             "completionProvider":{"triggerCharacters":["\"",":","-"," "]},
-            "hoverProvider":true,"documentFormattingProvider":true,"colorProvider":true,"codeActionProvider":true
+            "hoverProvider":true,"documentFormattingProvider":true,"colorProvider":true,"codeActionProvider":true,
+            "semanticTokensProvider":{"legend":{"tokenTypes":["rsxClass","rsxThemeToken","rsxInvalidClass"],"tokenModifiers":[]},"full":true}
         },"serverInfo":{"name":"gpui-rsx","version":env!("CARGO_PKG_VERSION")}})),
         "shutdown" => Ok(Value::Null),
         "textDocument/completion" => {
@@ -294,6 +339,7 @@ fn request(
                         t.to_string()
                     }
                     ClassOutcome::Ignored { message } | ClassOutcome::Error { message } => message,
+                    _ => "class analysis returned an unknown outcome".to_owned(),
                 };
                 Ok(
                     json!({"contents":{"kind":"markdown","value":format!("```rust\n{tokens}\n```")},"range":range(source,start,end)}),
@@ -330,10 +376,21 @@ fn request(
                         let begin = value[at..].find(class).unwrap_or(0) + at;
                         at = begin + class.len();
                         let base = class.rsplit(':').next().unwrap_or(class);
-                        let color = ["bg-", "text-", "border-"]
-                            .iter()
-                            .find_map(|prefix| base.strip_prefix(prefix))
-                            .and_then(color);
+                        let color = gpui_rsx_core::resolve_style(
+                            base,
+                            mode_at(Some(document), start + begin, uri),
+                        )
+                        .and_then(Result::ok)
+                        .and_then(|operation| match operation.value() {
+                            Some(gpui_rsx_core::StyleValue::Color { hex, alpha }) => {
+                                Some(rgba_channels(if *alpha {
+                                    *hex
+                                } else {
+                                    (*hex << 8) | 0xff
+                                }))
+                            }
+                            _ => None,
+                        });
                         if let Some((red, green, blue, alpha)) = color {
                             colors.push(json!({"range":range(source,start+begin,start+at),"color":{"red":red,"green":green,"blue":blue,"alpha":alpha}}));
                         }
@@ -342,6 +399,9 @@ fn request(
             }
             Ok(json!(colors))
         }
+        "textDocument/semanticTokens/full" => Ok(json!({
+            "data": semantic_tokens(document, source),
+        })),
         "textDocument/colorPresentation" => {
             let c = &params["color"];
             let channel =
@@ -382,14 +442,137 @@ fn request(
         _ => Err(format!("unsupported method {method}")),
     }
 }
+#[cfg(test)]
 fn color(value: &str) -> Option<(f64, f64, f64, f64)> {
-    let rgba = gpui_rsx_core::codegen::class::color_rgba(value)?;
-    Some((
+    gpui_rsx_core::codegen::class::color_rgba(value).map(rgba_channels)
+}
+fn rgba_channels(rgba: u32) -> (f64, f64, f64, f64) {
+    (
         (rgba >> 24) as f64 / 255.0,
         ((rgba >> 16) & 255) as f64 / 255.0,
         ((rgba >> 8) & 255) as f64 / 255.0,
         (rgba & 255) as f64 / 255.0,
-    ))
+    )
+}
+
+fn semantic_tokens(document: Option<&Document>, source: &str) -> Vec<usize> {
+    let Some(document) = document else {
+        return Vec::new();
+    };
+    let mut tokens = Vec::new();
+    for &(start, end) in &document.literals {
+        let value = &source[start..end];
+        let mut cursor = 0;
+        for class in value.split_ascii_whitespace() {
+            let Some(relative) = value[cursor..].find(class) else {
+                continue;
+            };
+            let class_start = start + cursor + relative;
+            let class_end = class_start + class.len();
+            cursor += relative + class.len();
+            let class_mode = mode_at(Some(document), class_start, "");
+            let token_type = match analyze_class(class, class_mode.clone()).outcome {
+                ClassOutcome::Supported(_) => {
+                    if class_mode
+                        .theme()
+                        .and_then(|theme| {
+                            theme.style_class(class.rsplit(':').next().unwrap_or(class))
+                        })
+                        .is_some()
+                    {
+                        1
+                    } else {
+                        0
+                    }
+                }
+                _ => 2,
+            };
+            let token_start = position(source, class_start);
+            let token_end = position(source, class_end);
+            tokens.push((
+                token_start["line"].as_u64().unwrap_or(0) as usize,
+                token_start["character"].as_u64().unwrap_or(0) as usize,
+                token_end["character"].as_u64().unwrap_or(0) as usize
+                    - token_start["character"].as_u64().unwrap_or(0) as usize,
+                token_type,
+            ));
+        }
+    }
+    tokens.sort_unstable_by_key(|(line, character, _, _)| (*line, *character));
+    let mut previous_line = 0;
+    let mut previous_character = 0;
+    let mut data = Vec::with_capacity(tokens.len() * 5);
+    for (line, character, length, token_type) in tokens {
+        data.extend([
+            line - previous_line,
+            if line == previous_line {
+                character - previous_character
+            } else {
+                character
+            },
+            length,
+            token_type,
+            0,
+        ]);
+        previous_line = line;
+        previous_character = character;
+    }
+    data
+}
+
+fn apply_content_changes(source: &str, changes: &[Value]) -> Result<String, String> {
+    let mut updated = source.to_owned();
+    for change in changes {
+        let text = change["text"]
+            .as_str()
+            .ok_or("content change is missing text")?;
+        let Some(range) = change.get("range") else {
+            updated.clear();
+            updated.push_str(text);
+            continue;
+        };
+        let start = edit_offset(&updated, &range["start"])?;
+        let end = edit_offset(&updated, &range["end"])?;
+        if start > end {
+            return Err("content change range is invalid".into());
+        }
+        updated.replace_range(start..end, text);
+    }
+    Ok(updated)
+}
+
+fn edit_offset(source: &str, pos: &Value) -> Result<usize, String> {
+    let line = pos["line"]
+        .as_u64()
+        .ok_or("edit line must be a nonnegative integer")?;
+    let column = pos["character"]
+        .as_u64()
+        .ok_or("edit character must be a nonnegative integer")?;
+    let mut start = 0;
+    for _ in 0..line {
+        start += source[start..]
+            .find('\n')
+            .ok_or("edit line is out of bounds")?
+            + 1;
+    }
+    let mut units = 0;
+    for (index, c) in source[start..].char_indices() {
+        if units == column {
+            return Ok(start + index);
+        }
+        if c == '\n' || (c == '\r' && source[start + index..].starts_with("\r\n")) {
+            break;
+        }
+        units += c.len_utf16() as u64;
+        if units > column {
+            return Err("edit splits a UTF-16 surrogate pair".into());
+        }
+    }
+    if units == column {
+        Ok(source.len())
+    } else {
+        Err("edit character is out of bounds".into())
+    }
 }
 
 pub fn run() -> Result<(), String> {
@@ -451,21 +634,38 @@ fn handle(
     if method == "textDocument/didOpen" || method == "textDocument/didChange" {
         let doc = &params["textDocument"];
         let uri = doc["uri"].as_str().unwrap_or("").to_owned();
+        let version = doc["version"].as_i64();
+        if method.ends_with("didChange")
+            && let Some(previous) = docs.get(&uri)
+            && version
+                .zip(previous.version)
+                .is_some_and(|(new, old)| new <= old)
+        {
+            return Ok(Flow::Continue);
+        }
         let text = if method.ends_with("didOpen") {
-            doc["text"].as_str()
+            doc["text"].as_str().map(str::to_owned)
         } else {
-            params["contentChanges"]
-                .as_array()
-                .and_then(|c| c.last())
-                .and_then(|c| c["text"].as_str())
+            match params["contentChanges"].as_array().map(|changes| {
+                apply_content_changes(docs.get(&uri).map_or("", |doc| &doc.source), changes)
+            }) {
+                Some(Ok(text)) => Some(text),
+                Some(Err(error)) => {
+                    send(
+                        out,
+                        json!({"jsonrpc":"2.0","method":"window/logMessage","params":{"type":2,"message":format!("Ignored invalid edit: {error}")}}),
+                    )?;
+                    None
+                }
+                None => None,
+            }
         };
         if let Some(text) = text {
-            let document = match docs.get(&uri) {
-                Some(previous) if method.ends_with("didChange") => {
-                    Document::with_mode(text, previous.mode.clone())
-                }
-                _ => Document::new(&uri, text),
+            let mut document = match docs.get(&uri) {
+                Some(previous) if method.ends_with("didChange") => previous.updated(text),
+                _ => Document::new(&uri, &text),
             };
+            document.version = version;
             send(
                 out,
                 json!({"jsonrpc":"2.0","method":"textDocument/publishDiagnostics","params":{"uri":uri,"version":doc["version"],"diagnostics":diagnostics(&document)}}),
@@ -476,7 +676,8 @@ fn handle(
         let uris: Vec<_> = docs.keys().cloned().collect();
         for uri in uris {
             if let Some(document) = docs.get(&uri) {
-                let refreshed = Document::new(&uri, &document.source);
+                let mut refreshed = Document::new(&uri, &document.source);
+                refreshed.version = document.version;
                 let diagnostics = diagnostics(&refreshed);
                 docs.insert(uri.clone(), refreshed);
                 send(
@@ -519,7 +720,6 @@ fn handle(
 mod tests {
     use super::*;
     use gpui_rsx_core::{Theme, theme::TokenValue};
-    use std::collections::BTreeMap;
 
     #[test]
     fn utf16_positions_roundtrip() {
@@ -527,6 +727,75 @@ mod tests {
         for (i, _) in source.char_indices() {
             assert_eq!(offset(source, &position(source, i)), i);
         }
+    }
+
+    #[test]
+    fn incremental_edits_apply_in_order_and_reject_invalid_utf16_ranges() {
+        let source = "// 😀\r\nfn f(){rsx!{<div class=\"flex-colum\"/>};}\r\n";
+        let start = source.find("flex-colum").unwrap();
+        let changes = vec![
+            json!({"range":range(source, start, start + 10),"text":"flex-col"}),
+            json!({"range":{"start":{"line":0,"character":3},"end":{"line":0,"character":5}},"text":"中文"}),
+        ];
+        let updated = apply_content_changes(source, &changes).unwrap();
+        assert!(updated.starts_with("// 中文\r\n"));
+        assert!(updated.contains("flex-col\""));
+        for pos in [
+            json!({"line":0,"character":4}),
+            json!({"line":9,"character":0}),
+            json!({"line":0,"character":99}),
+        ] {
+            assert!(
+                apply_content_changes(
+                    source,
+                    &[json!({"range":{"start":pos,"end":pos},"text":"x"})]
+                )
+                .is_err()
+            );
+        }
+        assert_eq!(
+            apply_content_changes(source, &[json!({"text":"replacement"})]).unwrap(),
+            "replacement"
+        );
+    }
+
+    #[test]
+    fn semantic_tokens_use_macro_modes_theme_values_and_utf16_positions() {
+        let source = "fn f(){let s=\"😀\";rsx_strict!{<div class=\"flex bg-brand nonsense\"/>};}";
+        let theme = Theme::parse("[colors]\nbrand=\"#123456\"\n").unwrap();
+        let document =
+            Document::with_mode(source, ClassMode::PERMISSIVE.with_theme(Some(theme.into())));
+        let data = semantic_tokens(Some(&document), source);
+        assert_eq!(data.len(), 15);
+        assert_eq!(
+            data[1],
+            position(source, source.find("flex").unwrap())["character"]
+                .as_u64()
+                .unwrap() as usize
+        );
+        assert_eq!(data[3], 0);
+        assert_eq!(data[8], 1);
+        assert_eq!(data[13], 2);
+        assert_eq!(data[7], "bg-brand".len());
+    }
+
+    #[test]
+    fn incremental_notifications_keep_errors_and_ignore_stale_or_bad_updates() {
+        let uri = "file:///tmp/incremental-rsx.rs";
+        let source = "fn f(){rsx!{<div class=\"flex-colum\"/>};}";
+        let start = source.find("flex-colum").unwrap();
+        let mut server = Server::new();
+        server.run(json!({"method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":source}}}));
+        server.docs.get_mut(uri).unwrap().config_error = Some("bad theme".into());
+        server.run(json!({"method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"range":range(source,start,start+10),"text":"flex-col"}]}}));
+        assert!(server.docs[uri].source.contains("flex-col\""));
+        assert!(server.docs[uri].diagnostics.is_empty());
+        assert_eq!(server.docs[uri].config_error.as_deref(), Some("bad theme"));
+        server.run(json!({"method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":1},"contentChanges":[{"text":"stale"}]}}));
+        server.run(json!({"method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":3},"contentChanges":[{"range":{"start":{"line":9,"character":0},"end":{"line":9,"character":1}},"text":"bad"}]}}));
+        assert!(server.docs[uri].source.contains("flex-col\""));
+        assert_eq!(server.docs[uri].version, Some(2));
+        assert!(server.output().contains("Ignored invalid edit"));
     }
 
     fn completion_response(
@@ -575,17 +844,16 @@ mod tests {
     fn completion_includes_theme_tokens() {
         static THEME: OnceLock<std::sync::Arc<Theme>> = OnceLock::new();
         let theme = THEME.get_or_init(|| {
-            Theme {
-                colors: BTreeMap::from([(
-                    "accent".into(),
+            Theme::builder()
+                .color(
+                    "accent",
                     TokenValue::Color {
                         hex: 0x123456,
                         alpha: false,
                     },
-                )]),
-                ..Theme::default()
-            }
-            .into()
+                )
+                .build()
+                .into()
         });
         let source = "fn f(){rsx!{<div class=\"bg-acc\"/>}}";
         let prefix = "bg-acc";
@@ -643,17 +911,16 @@ mod tests {
     fn completion_filters_unsupported_entries_and_supports_theme_variants() {
         static THEME: OnceLock<std::sync::Arc<Theme>> = OnceLock::new();
         let theme = THEME.get_or_init(|| {
-            Theme {
-                colors: BTreeMap::from([(
-                    "accent".into(),
+            Theme::builder()
+                .color(
+                    "accent",
                     TokenValue::Color {
                         hex: 0x123456,
                         alpha: false,
                     },
-                )]),
-                ..Theme::default()
-            }
-            .into()
+                )
+                .build()
+                .into()
         });
         let source = "fn f(){rsx!{<div class=\"hover:bg-acc\"/>}}";
         let prefix = "hover:bg-acc";
@@ -673,6 +940,27 @@ mod tests {
             edit["range"]["end"],
             position(source, source.find(prefix).unwrap() + prefix.len())
         );
+    }
+
+    #[test]
+    fn invalid_theme_config_is_reported_as_a_document_diagnostic() {
+        let root = std::env::temp_dir().join(format!("rsx-lsp-theme-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname=\"lsp-theme-test\"\nversion=\"0.1.0\"\nedition=\"2024\"\n",
+        )
+        .unwrap();
+        std::fs::write(root.join("rsx.toml"), "[opacity]\nmuted = \"120%\"\n").unwrap();
+        let uri = format!("file://{}", root.join("src/main.rs").display());
+        let document = Document::new(&uri, "fn f(){rsx!{<div/>}}\n");
+        let values = diagnostics(&document);
+        assert!(values.iter().any(|diagnostic| {
+            diagnostic["message"]
+                .as_str()
+                .is_some_and(|message| message.contains("Theme configuration error"))
+        }));
+        std::fs::remove_dir_all(root).unwrap();
     }
 
     #[test]
@@ -1012,12 +1300,12 @@ mod tests {
         assert!(server.output().contains("flex-colum"));
 
         // didChange keeps the resolved mode and uses the last content change.
-        let before = server.docs[uri].mode.scale;
+        let before = server.docs[uri].mode.scale();
         server.run(
             json!({"method":"textDocument/didChange","params":{"textDocument":{"uri":uri,"version":2},"contentChanges":[{"text":"ignored"},{"text":"fn f(){rsx!{<div class=\"flex\"/>};}"}]}}),
         );
         assert!(server.docs[uri].source.contains("class=\"flex\""));
-        assert_eq!(server.docs[uri].mode.scale, before);
+        assert_eq!(server.docs[uri].mode.scale(), before);
 
         // didClose clears diagnostics and forgets the document.
         server.run(json!({"method":"textDocument/didClose","params":{"textDocument":{"uri":uri}}}));

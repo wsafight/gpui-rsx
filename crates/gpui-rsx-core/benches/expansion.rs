@@ -27,12 +27,19 @@ const DASHBOARD: &str = r#"
 "#;
 
 const DYNAMIC: &str = r#"<div class={classes} />"#;
+const MULTI_DYNAMIC: &str =
+    r#"<div class={outer}><div class={header}/><div class={body}/><div class={footer}/></div>"#;
 
 fn bench(c: &mut Criterion) {
     for (name, source, mode) in [
         ("expand/static_dashboard", DASHBOARD, ClassMode::PERMISSIVE),
         ("expand/strict_dashboard", DASHBOARD, ClassMode::STRICT),
         ("expand/dynamic_class", DYNAMIC, ClassMode::PERMISSIVE),
+        (
+            "expand/four_dynamic_classes",
+            MULTI_DYNAMIC,
+            ClassMode::PERMISSIVE,
+        ),
     ] {
         c.bench_function(name, |b| {
             b.iter_batched(

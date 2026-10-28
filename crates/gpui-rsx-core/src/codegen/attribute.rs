@@ -37,6 +37,7 @@ pub(crate) fn generate_attr_methods_with_mode(
     hints: AttrHints<'_>,
     out: &mut Vec<TokenStream>,
     mode: ClassMode,
+    dynamic_used: &mut bool,
 ) {
     match attr {
         // id / key / base 已在 generate_element 中处理，跳过避免重复生成方法调用
@@ -95,6 +96,7 @@ pub(crate) fn generate_attr_methods_with_mode(
                 }
 
                 // 情况 3：动态表达式 → 生成运行时解析代码
+                *dynamic_used = true;
                 let dynamic_code =
                     generate_dynamic_class_code_with_mode(value, mode, hints.unknown_class_handler);
                 out.push(quote! { .map(|__el| #dynamic_code) });
@@ -415,6 +417,28 @@ mod tests {
         // A branch mixing literals with a runtime call is dynamic as a whole.
         let mixed = expand(r#"<div class={if active {"flex"} else {compute()}} />"#);
         assert!(mixed.contains("__rsx_apply_class"), "{mixed}");
+    }
+
+    #[test]
+    fn dynamic_helper_is_shared_across_children_loops_and_fragments() {
+        for source in [
+            "<div class={outer}><div class={inner}/></div>",
+            "<><div class={a}/><div class={b}/></>",
+            "<div class={outer}>{for item in items { <div class={item.classes}/> }}</div>",
+        ] {
+            let expanded = expand(source);
+            assert_eq!(
+                expanded.matches("fn __rsx_apply_class").count(),
+                1,
+                "{source}"
+            );
+            assert_eq!(
+                expanded.matches("fn __rsx_unknown_class_handler").count(),
+                2,
+                "{source}"
+            );
+            syn::parse_str::<syn::Expr>(&expanded).unwrap();
+        }
     }
 
     #[test]

@@ -144,20 +144,34 @@ fn mode_builders_only_change_the_selected_field() {
     let mode = ClassMode::PERMISSIVE
         .with_scale(SpacingScale::Tailwind)
         .with_dynamic_report(true);
-    assert_eq!(mode.scale, SpacingScale::Tailwind);
-    assert!(mode.report_dynamic_at_exit);
+    assert_eq!(mode.scale(), SpacingScale::Tailwind);
+    assert!(mode.reports_dynamic_at_exit());
     assert!(!mode.is_strict());
-    assert!(mode.theme.is_none());
+    assert!(mode.theme().is_none());
 
     let strict = ClassMode::STRICT.with_theme(None);
     assert!(strict.is_strict());
-    assert_eq!(strict.scale, SpacingScale::Px);
+    assert_eq!(strict.scale(), SpacingScale::Px);
 
     // `ClassMode` is cheaply cloneable, so helpers can take it by value.
     fn takes_by_value(mode: ClassMode) -> bool {
         mode.is_strict()
     }
     assert!(takes_by_value(ClassMode::STRICT));
+}
+
+#[test]
+fn stable_class_mode_builder_exposes_the_supported_configuration() {
+    let mode = ClassMode::builder()
+        .strict(true)
+        .scale(SpacingScale::Tailwind)
+        .report_dynamic_at_exit(true)
+        .build();
+
+    assert!(mode.is_strict());
+    assert_eq!(mode.scale(), SpacingScale::Tailwind);
+    assert!(mode.reports_dynamic_at_exit());
+    assert!(mode.theme().is_none());
 }
 
 #[test]

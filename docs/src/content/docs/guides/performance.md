@@ -202,6 +202,38 @@ For full compiler validation, use `cargo check`.
 
 ## Verify Performance-Sensitive Changes
 
+### 0.9 development measurements
+
+On macOS ARM64 with Rust 1.99.1, short Criterion runs (10 samples, 1 second warmup
+and measurement) produced these slope estimates:
+
+| Workload | Before | After |
+| --- | --- | --- |
+| Static dashboard macro expansion | 66.8 µs | 66.7 µs |
+| One dynamic class attribute | 489 µs | 477 µs |
+| Four dynamic class attributes in one invocation | 1.99 ms | 0.495 ms |
+| Analyze 80 macros / reuse 79 unchanged bodies | 1.00 ms (full) | 223 µs (reuse) |
+
+These are local microbenchmarks, not whole-project cold build timings. The reuse
+estimate had a 95% confidence interval of about 199–268 µs. Incremental analysis
+still scans the Rust token stream; it skips RSX parsing only for unchanged bodies.
+Dynamic helpers are shared within a macro invocation, while each attribute keeps
+its own expression evaluation and unknown-class handler.
+
+```bash
+cargo bench -p gpui-rsx-tools --bench analysis --no-default-features -- \
+  --sample-size 10 --warm-up-time 1 --measurement-time 1
+cargo bench -p gpui-rsx-core --bench expansion -- \
+  --save-baseline before09 --sample-size 10 --warm-up-time 1 --measurement-time 1
+# After applying the helper-sharing change, using the same benchmark inputs:
+cargo bench -p gpui-rsx-core --bench expansion -- \
+  --baseline before09 --sample-size 10 --warm-up-time 1 --measurement-time 1
+```
+
+Use the same benchmark harness on both revisions and retain Criterion's report
+directory when comparing them. Longer runs on an idle machine are appropriate
+before making a release performance claim.
+
 The repository includes a benchmark target for class parsing/code generation:
 
 ```bash

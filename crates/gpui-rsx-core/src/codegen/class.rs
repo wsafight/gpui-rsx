@@ -21,6 +21,15 @@ use proc_macro2::{Span, TokenStream};
 use quote::{quote, quote_spanned};
 use std::sync::Arc;
 
+/// Resolves base classes to style operations shared by code generation and previews.
+/// Stateful variants and element behavior have no static preview operation.
+pub fn resolve_style(
+    class: &str,
+    mode: ClassMode,
+) -> Option<Result<crate::StyleOperation, String>> {
+    values::resolve_style(class, mode)
+}
+
 /// 数值 spacing / sizing class 的单位。
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub enum SpacingScale {
@@ -44,11 +53,11 @@ impl SpacingScale {
 #[derive(Clone, Debug)]
 pub struct ClassMode {
     /// 严格模式：未知 class 编译报错，动态未知 class 默认 panic。
-    pub strict: bool,
-    pub scale: SpacingScale,
-    pub theme: Option<Arc<Theme>>,
+    strict: bool,
+    scale: SpacingScale,
+    theme: Option<Arc<Theme>>,
     /// 动态 class 中被忽略的 class 在进程退出时汇总打印（debug 构建），而不是逐条打印。
-    pub report_dynamic_at_exit: bool,
+    report_dynamic_at_exit: bool,
 }
 
 impl ClassMode {
@@ -58,6 +67,41 @@ impl ClassMode {
         theme: None,
         report_dynamic_at_exit: false,
     };
+
+    /// Creates the default permissive class mode.
+    pub const fn new() -> Self {
+        Self::PERMISSIVE
+    }
+
+    /// Creates a builder for a class mode.
+    pub const fn builder() -> ClassModeBuilder {
+        ClassModeBuilder::new()
+    }
+
+    /// Returns the configured class strictness.
+    pub const fn is_strict(&self) -> bool {
+        self.strict
+    }
+
+    /// Returns the spacing scale used for numeric classes.
+    pub const fn scale(&self) -> SpacingScale {
+        self.scale
+    }
+
+    /// Returns the optional design-token theme.
+    pub fn theme(&self) -> Option<&Theme> {
+        self.theme.as_deref()
+    }
+
+    /// Returns whether ignored dynamic classes are reported at process exit.
+    pub const fn reports_dynamic_at_exit(&self) -> bool {
+        self.report_dynamic_at_exit
+    }
+
+    /// Sets strict or permissive handling for unknown classes.
+    pub fn with_strict(self, strict: bool) -> Self {
+        Self { strict, ..self }
+    }
     pub const STRICT: Self = Self {
         strict: true,
         ..Self::PERMISSIVE
@@ -77,14 +121,72 @@ impl ClassMode {
             ..self
         }
     }
+}
 
-    pub fn is_strict(&self) -> bool {
-        self.strict
+impl Default for ClassMode {
+    fn default() -> Self {
+        Self::PERMISSIVE
+    }
+}
+
+/// Builder for [`ClassMode`].
+#[derive(Clone, Debug)]
+pub struct ClassModeBuilder {
+    strict: bool,
+    scale: SpacingScale,
+    theme: Option<Arc<Theme>>,
+    report_dynamic_at_exit: bool,
+}
+
+impl ClassModeBuilder {
+    pub const fn new() -> Self {
+        Self {
+            strict: false,
+            scale: SpacingScale::Px,
+            theme: None,
+            report_dynamic_at_exit: false,
+        }
+    }
+
+    pub fn strict(mut self, strict: bool) -> Self {
+        self.strict = strict;
+        self
+    }
+
+    pub fn scale(mut self, scale: SpacingScale) -> Self {
+        self.scale = scale;
+        self
+    }
+
+    pub fn theme(mut self, theme: impl Into<Option<Arc<Theme>>>) -> Self {
+        self.theme = theme.into();
+        self
+    }
+
+    pub fn report_dynamic_at_exit(mut self, report: bool) -> Self {
+        self.report_dynamic_at_exit = report;
+        self
+    }
+
+    pub fn build(self) -> ClassMode {
+        ClassMode {
+            strict: self.strict,
+            scale: self.scale,
+            theme: self.theme,
+            report_dynamic_at_exit: self.report_dynamic_at_exit,
+        }
+    }
+}
+
+impl Default for ClassModeBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 /// 单个 class 的分析结果。
 #[derive(Clone, Debug)]
+#[non_exhaustive]
 pub enum ClassOutcome {
     /// 已知 class，生成的方法调用片段（不含状态前缀包装）。
     Supported(TokenStream),
@@ -107,6 +209,7 @@ pub struct ClassAnalysis {
 
 /// 工具（lint / LSP）使用的诊断级别。
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum Severity {
     Warning,
     Error,

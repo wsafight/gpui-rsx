@@ -10,5 +10,5 @@ readme = "README.md"
 
 [dependencies]
 gpui-rsx-core = { version = "0.9.0", path = "../gpui-rsx-core" }
-gpui-rsx-tools = { version = "0.9.0", path = "../gpui-rsx-tools", features = ["convert"] }
+gpui-rsx-tools = { version = "0.9.0", path = "../gpui-rsx-tools", default-features = false, features = ["convert"] }
 serde_json = "1"

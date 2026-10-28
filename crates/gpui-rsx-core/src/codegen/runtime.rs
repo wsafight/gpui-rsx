@@ -27,8 +27,8 @@ static TAILWIND_HELPER_STR: OnceLock<String> = OnceLock::new();
 /// 获取完整动态 class helper（只与数值刻度有关，未知 class 的处理由调用点注入）。
 ///
 /// 缓存字符串而非 `TokenStream`，避免跨 proc-macro bridge 保存失效的 token handle。
-fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
-    let cell = match mode.scale {
+pub(crate) fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
+    let cell = match mode.scale() {
         SpacingScale::Px => &PX_HELPER_STR,
         SpacingScale::Tailwind => &TAILWIND_HELPER_STR,
     };
@@ -54,16 +54,13 @@ fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
 ///
 /// # 代码体积优化
 ///
-/// match 表被提取到 `#[inline(never)]` 泛型局部函数中，不会内联膨胀父函数。
-/// 注意：局部函数在每次展开处都是独立的 item，多个 `class={expr}` 并不共享实例，
-/// 每处都会完整生成并类型检查整份 helper。要真正共享，需要把 helper 移到一个
-/// 运行时支持 crate（proc-macro crate 本身不能导出普通函数）。
+/// 一次 RSX 宏调用内的所有动态 class 共享外层块中的一个泛型 helper。
+/// 各属性仍保留自己的表达式求值、未知 class 回调和诊断位置。
 pub(crate) fn generate_dynamic_class_code_with_mode(
     class_expr: &syn::Expr,
     mode: ClassMode,
     unknown_class_handler: Option<&syn::Expr>,
 ) -> TokenStream {
-    let helper = get_cached_dynamic_class_helper(mode.clone());
     let handler = match unknown_class_handler {
         Some(handler) => quote! { #handler },
         None => default_unknown_handler(mode),
@@ -71,7 +68,6 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
 
     quote! {
         {
-            #helper
             fn __rsx_unknown_class_handler<F: FnMut(&str)>(handler: F) -> F {
                 handler
             }
@@ -93,7 +89,7 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
 }
 
 fn default_unknown_handler(mode: ClassMode) -> TokenStream {
-    if mode.strict {
+    if mode.is_strict() {
         return quote! {
             |__class: &str| {
                 panic!(
@@ -106,7 +102,7 @@ fn default_unknown_handler(mode: ClassMode) -> TokenStream {
         };
     }
 
-    let report = if mode.report_dynamic_at_exit {
+    let report = if mode.reports_dynamic_at_exit() {
         quote! {
             static __RSX_IGNORED: std::sync::LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
                 std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
@@ -174,7 +170,7 @@ fn default_unknown_handler(mode: ClassMode) -> TokenStream {
 fn generate_dynamic_class_helper(mode: ClassMode) -> TokenStream {
     let common_classes = generate_common_class_matches(mode.clone());
     let color_fallbacks = generate_color_fallback_code();
-    let numeric_fallbacks = generate_numeric_fallback_code(mode.scale);
+    let numeric_fallbacks = generate_numeric_fallback_code(mode.scale());
 
     quote! {
         #[inline(never)]
@@ -516,7 +512,7 @@ fn parse_dynamic_common_class(class: &str, mode: ClassMode) -> TokenStream {
         _ => {
             // 只用数值刻度；主题令牌需要渲染上下文，不进入动态 helper。
             let method_call =
-                parse_single_class_with_mode(class, ClassMode::PERMISSIVE.with_scale(mode.scale));
+                parse_single_class_with_mode(class, ClassMode::PERMISSIVE.with_scale(mode.scale()));
             quote! { el #method_call }
         }
     }

@@ -2,6 +2,8 @@
 
 use super::super::tables::*;
 use super::{ClassMode, SpacingScale};
+pub use crate::StyleLength as LengthKind;
+use crate::{StyleOperation, StyleValue};
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 
@@ -10,14 +12,8 @@ pub(super) fn expand_known_class(
     class: &str,
     mode: ClassMode,
 ) -> Option<Result<TokenStream, String>> {
-    if let Some(theme) = mode.theme.as_ref()
-        && let Some(tokens) = theme.expand_class(class)
-    {
-        return Some(Ok(tokens));
-    }
-
-    if let Some(token) = parse_font_weight_class(class) {
-        return Some(Ok(token));
+    if let Some(operation) = resolve_style(class, mode) {
+        return Some(operation.map(|operation| operation.to_tokens()));
     }
 
     match class {
@@ -35,10 +31,6 @@ pub(super) fn expand_known_class(
                 })
             }));
         }
-        "flex-grow" => return Some(Ok(quote! { .flex_grow_1() })),
-        "flex-shrink" => return Some(Ok(quote! { .flex_shrink_1() })),
-        "border" => return Some(Ok(quote! { .border_1() })),
-        "no-underline" => return Some(Ok(quote! { .text_decoration_none() })),
         "group" => return Some(Ok(quote! { .group("") })),
         _ => {}
     }
@@ -46,21 +38,6 @@ pub(super) fn expand_known_class(
         return Some(Ok(quote! { .group(#name) }));
     }
 
-    if let Some(result) = parse_arbitrary_length_class(class) {
-        return Some(result);
-    }
-    if let Some(result) = parse_fraction_length_class(class) {
-        return Some(result);
-    }
-    if let Some(token) = parse_numeric_length_class(class, mode.scale) {
-        return Some(Ok(token));
-    }
-    if let Some(result) = parse_direct_color_class(class) {
-        return Some(result);
-    }
-    if let Some(result) = parse_direct_opacity_class(class) {
-        return Some(result);
-    }
     if let Some(token) = parse_direct_line_clamp_class(class) {
         return Some(Ok(token));
     }
@@ -68,34 +45,53 @@ pub(super) fn expand_known_class(
         return Some(Ok(token));
     }
 
-    // text-xl → .text_xl()（GPUI 生成表中存在对应方法时）
-    if let Some(size) = class.strip_prefix("text-")
-        && is_valid_text_size(size)
-    {
-        let ident = syn::Ident::new(&format!("text_{size}"), Span::call_site());
-        return Some(Ok(quote! { .#ident() }));
-    }
-
-    // 任意 GPUI 无参样式方法：flex-col → .flex_col()、rounded-t-md → .rounded_t_md()
-    if let Some(method) = gpui_no_arg_class_method(class) {
-        let ident = syn::Ident::new(method.name, Span::call_site());
-        return Some(Ok(quote! { .#ident() }));
-    }
-
     None
 }
 
-fn parse_font_weight_class(class: &str) -> Option<TokenStream> {
-    let (_, weight) = FONT_WEIGHTS.iter().find(|(name, _)| *name == class)?;
-    let weight_ident = syn::Ident::new(weight, Span::call_site());
-    Some(quote! { .font_weight(FontWeight::#weight_ident) })
-}
-
-#[derive(Clone, Copy)]
-pub enum LengthKind {
-    Px(f32),
-    Rem(f32),
-    Relative(f32),
+pub(super) fn resolve_style(
+    class: &str,
+    mode: ClassMode,
+) -> Option<Result<StyleOperation, String>> {
+    if let Some(theme) = mode.theme()
+        && let Some(operation) = theme.style_class(class)
+    {
+        return Some(Ok(operation));
+    }
+    if let Some((_, weight)) = FONT_WEIGHTS.iter().find(|(name, _)| *name == class) {
+        return Some(Ok(StyleOperation::new(
+            "font_weight",
+            Some(StyleValue::Expression(format!("FontWeight::{weight}"))),
+        )));
+    }
+    let alias = match class {
+        "border" => Some("border_1"),
+        "flex-grow" => Some("flex_grow_1"),
+        "flex-shrink" => Some("flex_shrink_1"),
+        "no-underline" => Some("text_decoration_none"),
+        _ => None,
+    };
+    if let Some(method) = alias {
+        return Some(Ok(StyleOperation::new(method, None)));
+    }
+    if let Some(result) = parse_arbitrary_length_class(class) {
+        return Some(result);
+    }
+    if let Some(result) = parse_fraction_length_class(class) {
+        return Some(result);
+    }
+    if let Some(operation) = parse_numeric_length_class(class, mode.scale()) {
+        return Some(Ok(operation));
+    }
+    if let Some(result) = parse_direct_color_class(class) {
+        return Some(result);
+    }
+    if let Some(result) = parse_direct_opacity_class(class) {
+        return Some(result);
+    }
+    if let Some(method) = gpui_no_arg_class_method(class) {
+        return Some(Ok(StyleOperation::new(method.name, None)));
+    }
+    None
 }
 
 impl LengthKind {
@@ -145,7 +141,7 @@ impl LengthKind {
     }
 }
 
-fn parse_arbitrary_length_class(class: &str) -> Option<Result<TokenStream, String>> {
+fn parse_arbitrary_length_class(class: &str) -> Option<Result<StyleOperation, String>> {
     let (method, value, family) = split_length_class(class)?;
     if !value.starts_with('[') {
         return None;
@@ -170,7 +166,7 @@ fn parse_arbitrary_length_class(class: &str) -> Option<Result<TokenStream, Strin
     Some(Ok(length_method_call(method, length)))
 }
 
-fn parse_fraction_length_class(class: &str) -> Option<Result<TokenStream, String>> {
+fn parse_fraction_length_class(class: &str) -> Option<Result<StyleOperation, String>> {
     let (method, value, family) = split_length_class(class)?;
     if !value.contains('/') {
         return None;
@@ -185,7 +181,7 @@ fn parse_fraction_length_class(class: &str) -> Option<Result<TokenStream, String
     Some(LengthKind::parse_fraction(class, value).map(|length| length_method_call(method, length)))
 }
 
-fn parse_numeric_length_class(class: &str, scale: SpacingScale) -> Option<TokenStream> {
+fn parse_numeric_length_class(class: &str, scale: SpacingScale) -> Option<StyleOperation> {
     let (method, value, _) = split_length_class(class)?;
     if value.starts_with('[') || value.contains('/') {
         return None;
@@ -197,7 +193,7 @@ fn parse_numeric_length_class(class: &str, scale: SpacingScale) -> Option<TokenS
         .map(|px| length_method_call(method, LengthKind::Px(px)))
 }
 
-fn parse_direct_color_class(class: &str) -> Option<Result<TokenStream, String>> {
+fn parse_direct_color_class(class: &str) -> Option<Result<StyleOperation, String>> {
     if let Some(rest) = class.strip_prefix("text-") {
         return parse_color_with_method(rest, "text_color", class);
     }
@@ -212,14 +208,17 @@ fn parse_direct_color_class(class: &str) -> Option<Result<TokenStream, String>> 
     None
 }
 
-fn parse_direct_opacity_class(class: &str) -> Option<Result<TokenStream, String>> {
+fn parse_direct_opacity_class(class: &str) -> Option<Result<StyleOperation, String>> {
     let rest = class.strip_prefix("opacity-")?;
     let n = match rest.parse::<u8>() {
         Ok(n) if n <= 100 => n,
         _ => return Some(Err(invalid_opacity_value_message(class))),
     };
     let val = n as f32 / 100.0;
-    Some(Ok(quote! { .opacity(#val) }))
+    Some(Ok(StyleOperation::new(
+        "opacity",
+        Some(StyleValue::Number(val)),
+    )))
 }
 
 fn parse_direct_line_clamp_class(class: &str) -> Option<TokenStream> {
@@ -257,13 +256,8 @@ pub fn invalid_length_value_message(class: &str) -> String {
     )
 }
 
-fn length_method_call(method: &str, length: LengthKind) -> TokenStream {
-    let method_ident = syn::Ident::new(method, Span::call_site());
-    match length {
-        LengthKind::Px(value) => quote! { .#method_ident(px(#value)) },
-        LengthKind::Rem(value) => quote! { .#method_ident(rems(#value)) },
-        LengthKind::Relative(value) => quote! { .#method_ident(relative(#value)) },
-    }
+fn length_method_call(method: &'static str, length: LengthKind) -> StyleOperation {
+    StyleOperation::new(method, Some(StyleValue::Length(length)))
 }
 
 /// 统一的颜色解析函数（核心去重逻辑）
@@ -271,9 +265,9 @@ fn length_method_call(method: &str, length: LengthKind) -> TokenStream {
 /// 将颜色名称或任意 hex / rgb() / rgba() 值转换为方法调用。
 fn parse_color_with_method(
     color: &str,
-    method: &str,
+    method: &'static str,
     class: &str,
-) -> Option<Result<TokenStream, String>> {
+) -> Option<Result<StyleOperation, String>> {
     let parsed = lookup_color_key(color)
         .map(ColorValue::Rgb)
         .or_else(|| parse_arbitrary_color_value(color));
@@ -283,11 +277,13 @@ fn parse_color_with_method(
         }
         return None;
     };
-    let ident = syn::Ident::new(method, Span::call_site());
-    Some(Ok(match parsed {
-        ColorValue::Rgb(hex) => quote! { .#ident(rgb(#hex)) },
-        ColorValue::Rgba(hex) => quote! { .#ident(rgba(#hex)) },
-    }))
+    Some(Ok(StyleOperation::new(
+        method,
+        Some(match parsed {
+            ColorValue::Rgb(hex) => StyleValue::Color { hex, alpha: false },
+            ColorValue::Rgba(hex) => StyleValue::Color { hex, alpha: true },
+        }),
+    )))
 }
 
 /// `0xRRGGBBAA` for a color class value (`red-500`, `[#f00]`, `[rgba(...)]`), as the class

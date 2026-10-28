@@ -584,7 +584,7 @@ fn help_and_version_describe_every_command() {
     let (code, stdout, _) = run(&["rsx", "--help"], "");
     assert_eq!(code, Some(0));
     for command in [
-        "doctor", "lint", "fmt", "migrate", "convert", "expand", "preview", "lsp",
+        "doctor", "lint", "fmt", "migrate", "convert", "expand", "preview", "theme", "lsp",
     ] {
         assert!(stdout.contains(command), "{command} missing from help");
     }
@@ -601,6 +601,136 @@ fn help_and_version_describe_every_command() {
         stdout.trim(),
         format!("cargo-rsx {}", env!("CARGO_PKG_VERSION"))
     );
+}
+
+#[test]
+fn theme_commands_check_list_and_explain_configured_tokens() {
+    let root = std::env::temp_dir().join(format!("rsx-theme-cli-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    let manifest = root.join("Cargo.toml");
+    std::fs::write(
+        &manifest,
+        "[package]\nname = \"theme-cli-test\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("rsx.toml"),
+        "[colors]\nbrand = \"#123456\"\n[text-size]\nbody = \"14px\"\n[opacity]\nmuted = \"60%\"\n",
+    )
+    .unwrap();
+
+    let manifest = manifest.to_str().unwrap();
+    let (code, stdout, _) = run(
+        &[
+            "rsx",
+            "theme",
+            "check",
+            "--manifest-path",
+            manifest,
+            "--json",
+        ],
+        "",
+    );
+    assert_eq!(code, Some(0));
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["ok"], true);
+    assert_eq!(report["tokenCount"], 3);
+
+    let (code, stdout, _) = run(
+        &[
+            "rsx",
+            "theme",
+            "list",
+            "--manifest-path",
+            manifest,
+            "--json",
+        ],
+        "",
+    );
+    assert_eq!(code, Some(0));
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    assert!(
+        report["tokens"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|token| token["class"] == "text-size-body")
+    );
+
+    let (code, stdout, _) = run(
+        &[
+            "rsx",
+            "theme",
+            "explain",
+            "hover:opacity-muted",
+            "--manifest-path",
+            manifest,
+            "--json",
+        ],
+        "",
+    );
+    assert_eq!(code, Some(0));
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["section"], "opacity");
+    assert!(report["expansion"].as_str().unwrap().contains("opacity"));
+    assert!(report["expansion"].as_str().unwrap().contains("hover"));
+
+    let (code, _, stderr) = run(
+        &[
+            "rsx",
+            "theme",
+            "explain",
+            "opacity-unknown",
+            "--manifest-path",
+            manifest,
+        ],
+        "",
+    );
+    assert_eq!(code, Some(1));
+    assert!(stderr.contains("unknown theme class"), "{stderr}");
+
+    std::fs::write(root.join("rsx.toml"), "[opacity]\nmuted = \"120%\"\n").unwrap();
+    let (code, stdout, _) = run(
+        &[
+            "rsx",
+            "theme",
+            "check",
+            "--manifest-path",
+            manifest,
+            "--json",
+        ],
+        "",
+    );
+    assert_eq!(code, Some(1));
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["ok"], false);
+    assert!(report["error"].as_str().unwrap().contains("opacity"));
+
+    std::fs::remove_file(root.join("rsx.toml")).unwrap();
+    for (operation, expected_code) in [("check", 0), ("list", 1)] {
+        let (code, stdout, _) = run(
+            &[
+                "rsx",
+                "theme",
+                operation,
+                "--manifest-path",
+                manifest,
+                "--json",
+            ],
+            "",
+        );
+        assert_eq!(code, Some(expected_code));
+        let report: Value = serde_json::from_str(&stdout).unwrap();
+        assert_eq!(report["present"], false);
+    }
+    for args in [
+        vec!["rsx", "theme", "check", "bg-brand"],
+        vec!["rsx", "theme", "explain"],
+        vec!["rsx", "theme", "list", "--unknown"],
+    ] {
+        assert_eq!(run(&args, "").0, Some(2));
+    }
+    std::fs::remove_dir_all(root).unwrap();
 }
 
 #[test]

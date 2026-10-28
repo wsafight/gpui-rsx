@@ -3,15 +3,14 @@ use wasm_bindgen::prelude::*;
 /// All operations use the same parser and code generator as the Rust macros.
 #[wasm_bindgen]
 pub fn analyze(source: &str, strict: bool, tailwind: bool) -> String {
-    let mode = gpui_rsx_core::ClassMode {
-        strict,
-        scale: if tailwind {
+    let mode = gpui_rsx_core::ClassMode::builder()
+        .strict(strict)
+        .scale(if tailwind {
             gpui_rsx_core::SpacingScale::Tailwind
         } else {
             gpui_rsx_core::SpacingScale::Px
-        },
-        ..gpui_rsx_core::ClassMode::PERMISSIVE
-    };
+        })
+        .build();
     let result = serde_json::json!({
         "diagnostics": gpui_rsx_tools::analyze_body(source, mode.clone()),
         "expansion": gpui_rsx_tools::expand(source, mode.clone()),

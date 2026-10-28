@@ -112,20 +112,32 @@ type CodegenResult = Result<TokenStream, TokenStream>;
 /// - 单个元素：返回实现 `IntoElement` 的表达式
 /// - Fragment：返回 `Vec<impl IntoElement>`
 pub fn generate_body_with_mode(body: &RsxBody, mode: ClassMode) -> TokenStream {
-    generate_body_checked(body, mode).unwrap_or_else(|err| err)
+    let mut dynamic_used = false;
+    let code =
+        generate_body_checked(body, mode.clone(), &mut dynamic_used).unwrap_or_else(|err| err);
+    if dynamic_used {
+        let helper = super::runtime::get_cached_dynamic_class_helper(mode);
+        quote! { { #helper #code } }
+    } else {
+        code
+    }
 }
 
 pub fn generate_body_expansion_preview(body: &RsxBody, mode: ClassMode) -> String {
     generate_body_with_mode(body, mode).to_string()
 }
 
-fn generate_body_checked(body: &RsxBody, mode: ClassMode) -> CodegenResult {
+fn generate_body_checked(
+    body: &RsxBody,
+    mode: ClassMode,
+    dynamic_used: &mut bool,
+) -> CodegenResult {
     match body {
-        RsxBody::Single(element) => generate_element_checked(element, false, mode),
+        RsxBody::Single(element) => generate_element_checked(element, false, mode, dynamic_used),
         RsxBody::Fragment(children) => {
             let child_exprs: Vec<TokenStream> = children
                 .iter()
-                .map(|node| generate_node_checked(node, false, mode.clone()))
+                .map(|node| generate_node_checked(node, false, mode.clone(), dynamic_used))
                 .collect::<Result<_, _>>()?;
             // Fragment 保持 vec![] —— 返回类型是用户可见 API
             Ok(quote! { vec![#(#child_exprs),*] })
@@ -136,9 +148,16 @@ fn generate_body_checked(body: &RsxBody, mode: ClassMode) -> CodegenResult {
 /// 生成单个子节点的代码
 ///
 /// 确保生成的代码具有正确的类型推断，支持 IntoElement trait
-fn generate_node_checked(node: &RsxNode, require_loop_key: bool, mode: ClassMode) -> CodegenResult {
+fn generate_node_checked(
+    node: &RsxNode,
+    require_loop_key: bool,
+    mode: ClassMode,
+    dynamic_used: &mut bool,
+) -> CodegenResult {
     match node {
-        RsxNode::Element(elem) => generate_element_checked(elem, require_loop_key, mode),
+        RsxNode::Element(elem) => {
+            generate_element_checked(elem, require_loop_key, mode, dynamic_used)
+        }
         // 表达式会被自动推断类型，GPUI 的 .child() 接受 impl IntoElement
         RsxNode::Expr(expr) => Ok(expr.to_token_stream()),
         RsxNode::Spread(expr) => Ok(expr.to_token_stream()),
@@ -146,7 +165,7 @@ fn generate_node_checked(node: &RsxNode, require_loop_key: bool, mode: ClassMode
             binding,
             iter,
             body,
-        } => generate_for_loop_checked(binding, iter, body, mode),
+        } => generate_for_loop_checked(binding, iter, body, mode, dynamic_used),
     }
 }
 
@@ -165,10 +184,11 @@ fn generate_for_loop_checked(
     iter: &syn::Expr,
     body: &[RsxNode],
     mode: ClassMode,
+    dynamic_used: &mut bool,
 ) -> CodegenResult {
     let body_exprs: Vec<TokenStream> = body
         .iter()
-        .map(|node| generate_node_checked(node, true, mode.clone()))
+        .map(|node| generate_node_checked(node, true, mode.clone(), dynamic_used))
         .collect::<Result<_, _>>()?;
     // A nested `for` or a spread yields an iterator of elements rather than one element.
     let yields_many = |node: &RsxNode| matches!(node, RsxNode::For { .. } | RsxNode::Spread(_));
@@ -213,6 +233,7 @@ fn generate_element_checked(
     element: &RsxElement,
     require_loop_key: bool,
     mode: ClassMode,
+    dynamic_used: &mut bool,
 ) -> CodegenResult {
     // 缓存标签名字符串，避免多次 to_string() 堆分配
     let tag_str = element.name.to_string();
@@ -281,6 +302,7 @@ fn generate_element_checked(
                     analysis.hints(unknown_class_handler),
                     &mut methods,
                     mode.clone(),
+                    dynamic_used,
                 );
             }
         }
@@ -334,6 +356,7 @@ fn generate_element_checked(
         require_loop_key,
         &mut methods,
         mode.clone(),
+        dynamic_used,
     )?;
 
     Ok(quote! { #base #(#default_methods)* #(#methods)* })
@@ -345,6 +368,7 @@ fn generate_children_methods(
     require_loop_key: bool,
     methods: &mut Vec<TokenStream>,
     mode: ClassMode,
+    dynamic_used: &mut bool,
 ) -> Result<(), TokenStream> {
     for node in children {
         match node {
@@ -352,7 +376,8 @@ fn generate_children_methods(
                 methods.push(quote! { .child(#expr) });
             }
             RsxNode::Element(elem) => {
-                let child_expr = generate_element_checked(elem, require_loop_key, mode.clone())?;
+                let child_expr =
+                    generate_element_checked(elem, require_loop_key, mode.clone(), dynamic_used)?;
                 methods.push(quote! { .child(#child_expr) });
             }
             RsxNode::Spread(expr) => {
@@ -363,7 +388,8 @@ fn generate_children_methods(
                 iter,
                 body,
             } => {
-                let for_expr = generate_for_loop_checked(binding, iter, body, mode.clone())?;
+                let for_expr =
+                    generate_for_loop_checked(binding, iter, body, mode.clone(), dynamic_used)?;
                 methods.push(quote! { .children(#for_expr) });
             }
         }

@@ -6,7 +6,7 @@ description: 检查、格式化、迁移和预览 RSX，并接入 VS Code、Zed�
 使用 Rust 1.98 或更新版本安装 CLI；宏库仍支持 Rust 1.88：
 
 ```sh
-cargo install cargo-rsx --version 0.8.3
+cargo install cargo-rsx --version 0.9.0
 cargo rsx doctor --manifest-path demo/Cargo.toml
 cargo rsx lint --deny-warnings
 cargo rsx lint --json
@@ -15,6 +15,9 @@ cargo rsx fmt src/main.rs --write
 cargo rsx migrate src/main.rs                 # 默认仅展示变更
 cargo rsx convert component.tsx              # JSON：RSX 和人工处理提示
 cargo rsx preview src/main.rs --watch        # http://127.0.0.1:9230
+cargo rsx theme check --manifest-path demo/Cargo.toml
+cargo rsx theme list --manifest-path demo/Cargo.toml
+cargo rsx theme explain bg-primary --manifest-path demo/Cargo.toml
 ```
 
 `doctor` 检查实际 Cargo 依赖图，支持别名、Git 依赖和发布快照。
@@ -28,6 +31,10 @@ cargo rsx preview src/main.rs --watch        # http://127.0.0.1:9230
 再用 `--write` 执行一次，随后启用 `tailwind-scale` 或在 `rsx.toml` 中设置
 `[options] spacing-scale = "tailwind"`。`rsx_tw!`、显式单位和分数不会改写；
 动态字符串和自行覆盖的刻度需要人工复核。
+
+`theme check` 检查最近的 `rsx.toml`；`list` 输出所有生成的 class 和 GPUI 方法，
+`explain` 显示单个 class 的源令牌及展开结果。三个命令都支持 `--json`，可用于编辑器
+或 CI；LSP 复用同一解析器，并在文档开头报告无效主题配置。
 
 JSX/TSX 转换使用 SWC，输出 RSX 并列出不支持的 class、JavaScript 表达式和事件。
 预览近似展示静态布局，并标记未执行的行为；`--index N` 选择文件中的第 N 个宏。

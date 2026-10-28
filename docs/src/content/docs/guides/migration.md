@@ -4,6 +4,30 @@ description: Adopt RSX and migrate existing Zed Git applications to GPUI Kit.
 ---
 
 
+## From 0.8 to 0.9
+
+The 0.9 development branch targets GPUI Kit 0.8.1 and keeps pixel spacing as the default.
+Existing RSX syntax and generated IDs keep their behavior. Tool integrations should use
+the `gpui-rsx-core` crate-root facade or `syntax` module, replace struct literals with
+`ClassMode::builder()`, `Theme::builder()` and `MacroOptions::new().with_*()`, and clone
+`ClassMode` when passing it more than once. Theme handles now use `Arc<Theme>`; syntax,
+class outcome and token enums require a fallback match arm.
+
+`gpui-rsx-tools` no longer enables SWC conversion by default. Libraries that call the
+converter must opt in with `features = ["convert"]`; the CLI and WASM playground already
+do so. Formatting, linting and preview work without SWC.
+
+New `rsx.toml` sections are `text-size`, `line-height`, `opacity` and `shadow`. Opacity
+uses a quoted fraction or percentage, such as `"0.6"` or `"60%"`; shadow values use
+`{ expr = "..." }`. Duplicate keys and conflicting `text-size-*` classes now produce
+configuration errors. `cargo rsx theme check/list/explain` supports `--json`, with
+validation failures returning exit status 1 and usage errors returning 2.
+
+The LSP advertises incremental sync (`change: 2`) and semantic tokens. Full replacements
+are still accepted; range changes use UTF-16 positions and apply in order. Unchanged
+macro bodies reuse their diagnostics. Dynamic classes within one RSX invocation share
+one helper; expressions and unknown-class handlers remain local to each attribute.
+
 ## Zed Git to GPUI Kit 0.8
 
 Replace the separate Zed Git `gpui`, `gpui_platform` and Git `gpui-component`
@@ -12,7 +36,7 @@ dependencies with Kit, preserving the `gpui` crate name for generated code:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.8.3"
+gpui-rsx = "0.9.0"
 ```
 
 Kit 0.8.1 pins `gpui-pre = 0.3.10`. Use `gpui::component` for styled controls and

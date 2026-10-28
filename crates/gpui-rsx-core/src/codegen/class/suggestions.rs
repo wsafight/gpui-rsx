@@ -72,8 +72,7 @@ pub fn suggest_class(class: &str, mode: ClassMode) -> Option<String> {
     }
 
     let theme_classes = mode
-        .theme
-        .as_ref()
+        .theme()
         .map(|theme| theme.class_names())
         .unwrap_or_default();
     let candidates = known_classes()

@@ -14,21 +14,35 @@
 //! assert_eq!(code.to_string(), "div () . flex () . gap (px (4f32))");
 //! ```
 
+// Implementation paths remain available to existing integrations; the root facade
+// and syntax module below define the supported public API for 0.9.
+#[doc(hidden)]
 pub mod codegen;
+#[doc(hidden)]
 pub mod component;
+#[doc(hidden)]
 pub mod diagnostics;
+#[doc(hidden)]
 pub mod parser;
+pub mod style;
 pub mod theme;
 
 pub use codegen::class::{
-    ClassAnalysis, ClassDiagnostic, ClassMode, ClassOutcome, SUPPORTED_VARIANTS, Severity,
-    SpacingScale, analyze_class, class_diagnostics, known_classes, suggest_class,
+    ClassAnalysis, ClassDiagnostic, ClassMode, ClassModeBuilder, ClassOutcome, SUPPORTED_VARIANTS,
+    Severity, SpacingScale, analyze_class, class_diagnostics, known_classes, resolve_style,
+    suggest_class,
 };
 pub use codegen::element::{generate_body_expansion_preview, generate_body_with_mode};
 pub use codegen::tables::{GPUI_COMPONENT_REV, GPUI_SOURCE_REV};
 pub use component::expand_component;
-pub use parser::RsxBody;
-pub use theme::Theme;
+pub use parser::{RsxAttribute, RsxBody, RsxElement, RsxElementName, RsxNode};
+pub use style::{StyleLength, StyleOperation, StyleValue};
+pub use theme::{Theme, ThemeBuilder, ThemeExplanation, ThemeToken, ThemeTokenKind, TokenValue};
+
+/// Parsed RSX syntax. Match enums with a fallback arm for future syntax additions.
+pub mod syntax {
+    pub use crate::{RsxAttribute, RsxBody, RsxElement, RsxElementName, RsxNode};
+}
 
 use proc_macro2::TokenStream;
 
@@ -50,12 +64,65 @@ pub fn expand_str(source: &str, mode: ClassMode) -> Result<TokenStream, syn::Err
 /// Options a macro entry point resolves before expanding.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MacroOptions {
-    pub strict: bool,
+    strict: bool,
     /// Scale forced by the macro itself (`rsx_tw!`), overriding `rsx.toml`.
-    pub forced_scale: Option<SpacingScale>,
+    forced_scale: Option<SpacingScale>,
     /// Scale used when neither the macro nor `rsx.toml` chooses one (Cargo feature).
-    pub default_scale: SpacingScale,
-    pub report_dynamic_at_exit: bool,
+    default_scale: SpacingScale,
+    report_dynamic_at_exit: bool,
+}
+
+impl MacroOptions {
+    /// Creates macro options with the default permissive, pixel-scale behavior.
+    pub const fn new() -> Self {
+        Self {
+            strict: false,
+            forced_scale: None,
+            default_scale: SpacingScale::Px,
+            report_dynamic_at_exit: false,
+        }
+    }
+
+    pub const fn with_strict(self, strict: bool) -> Self {
+        Self { strict, ..self }
+    }
+
+    pub const fn with_forced_scale(self, scale: Option<SpacingScale>) -> Self {
+        Self {
+            forced_scale: scale,
+            ..self
+        }
+    }
+
+    pub const fn with_default_scale(self, scale: SpacingScale) -> Self {
+        Self {
+            default_scale: scale,
+            ..self
+        }
+    }
+
+    pub const fn with_dynamic_report(self, report: bool) -> Self {
+        Self {
+            report_dynamic_at_exit: report,
+            ..self
+        }
+    }
+
+    pub const fn is_strict(&self) -> bool {
+        self.strict
+    }
+
+    pub const fn forced_scale(&self) -> Option<SpacingScale> {
+        self.forced_scale
+    }
+
+    pub const fn default_scale(&self) -> SpacingScale {
+        self.default_scale
+    }
+
+    pub const fn reports_dynamic_at_exit(&self) -> bool {
+        self.report_dynamic_at_exit
+    }
 }
 
 /// Expands a macro invocation, loading `rsx.toml` from `CARGO_MANIFEST_DIR` when present.
@@ -71,15 +138,15 @@ pub fn expand_macro(input: TokenStream, options: MacroOptions) -> TokenStream {
         None => None,
     };
     let scale = options
-        .forced_scale
-        .or_else(|| theme.as_ref().and_then(|t| t.scale))
-        .unwrap_or(options.default_scale);
-    let mode = ClassMode {
-        strict: options.strict,
-        scale,
-        theme: theme.clone(),
-        report_dynamic_at_exit: options.report_dynamic_at_exit,
-    };
+        .forced_scale()
+        .or_else(|| theme.as_ref().and_then(|t| t.scale()))
+        .unwrap_or(options.default_scale());
+    let mode = ClassMode::builder()
+        .strict(options.is_strict())
+        .scale(scale)
+        .theme(theme.clone())
+        .report_dynamic_at_exit(options.reports_dynamic_at_exit())
+        .build();
     let code = expand(input, mode);
     match theme.as_deref().and_then(theme::rebuild_tracker) {
         Some(tracker) => quote::quote! { { #tracker #code } },
@@ -156,10 +223,7 @@ mod tests {
         let forced = with_manifest_dir(Some(&dir), || {
             expand_macro(
                 quote::quote! { <div class="gap-4"/> },
-                MacroOptions {
-                    forced_scale: Some(SpacingScale::Px),
-                    ..options()
-                },
+                options().with_forced_scale(Some(SpacingScale::Px)),
             )
         })
         .to_string();
@@ -193,9 +257,23 @@ mod tests {
     #[test]
     fn macro_options_default_to_pixel_units_without_reporting() {
         let options = MacroOptions::default();
-        assert!(!options.strict);
-        assert_eq!(options.forced_scale, None);
-        assert_eq!(options.default_scale, SpacingScale::Px);
-        assert!(!options.report_dynamic_at_exit);
+        assert!(!options.is_strict());
+        assert_eq!(options.forced_scale(), None);
+        assert_eq!(options.default_scale(), SpacingScale::Px);
+        assert!(!options.reports_dynamic_at_exit());
+    }
+
+    #[test]
+    fn stable_macro_options_builder_keeps_explicit_overrides() {
+        let options = MacroOptions::new()
+            .with_strict(true)
+            .with_forced_scale(Some(SpacingScale::Tailwind))
+            .with_default_scale(SpacingScale::Px)
+            .with_dynamic_report(true);
+
+        assert!(options.is_strict());
+        assert_eq!(options.forced_scale(), Some(SpacingScale::Tailwind));
+        assert_eq!(options.default_scale(), SpacingScale::Px);
+        assert!(options.reports_dynamic_at_exit());
     }
 }

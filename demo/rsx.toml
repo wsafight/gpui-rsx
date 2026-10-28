@@ -1,3 +1,15 @@
 # Semantic colors resolve through Kit's component theme at render time.
 [options]
 preset = "gpui-component"
+
+[text-size]
+body = "14px"
+
+[line-height]
+body = "20px"
+
+[opacity]
+muted = "60%"
+
+[shadow]
+card = { expr = "vec![BoxShadow::new(px(0.0), px(1.0), hsla(0.0, 0.0, 0.0, 0.2))]" }

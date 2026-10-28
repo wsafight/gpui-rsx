@@ -197,5 +197,24 @@ let preview = rsx_expand! {
 
 静态字面量支持 `hover:`、`focus:`、`focus-visible:`、`active:`、`group-hover:` 和
 `group-active:`，也可写具名组 `group-hover/menu:`。有状态的前缀会注入 ID，循环内要提供稳定 key。
-主题令牌通过 `rsx.toml` 的 `[colors]`、`[radius]`、`[spacing]` 定义；gpui-component
+主题令牌通过 `rsx.toml` 的 `[colors]`、`[radius]`、`[spacing]` 定义；还支持
+`[text-size]`（`text-size-body`）、`[line-height]`（`leading-body`）、`[opacity]`
+（`opacity-muted`）和只接受表达式的 `[shadow]`（`shadow-card`）。gpui-component
 预设可将 `bg-primary` 等映射为 `cx.theme()` 调用。状态前缀和主题令牌不支持动态字符串。
+可用 `cargo rsx theme check`、`cargo rsx theme list` 和
+`cargo rsx theme explain bg-primary` 查看配置及生成的 GPUI 调用。
+
+```toml
+[text-size]
+body = "14px"
+[line-height]
+body = "20px"
+[opacity]
+muted = "60%"
+[shadow]
+card = { expr = "vec![BoxShadow::new(px(0.0), px(1.0), hsla(0.0, 0.0, 0.0, 0.2))]" }
+```
+
+通过 `class="text-size-body leading-body opacity-muted shadow-card"` 使用。阴影表达式
+需返回 GPUI `.shadow()` 接受的类型，其中的名称需要在宏调用处可见。静态令牌值
+也可用于预览和颜色提示，任意 Rust 表达式继续显示为占位内容。

@@ -55,7 +55,7 @@ bun run dev
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.8.3"
+gpui-rsx = "0.9.0"
 ```
 
 ### GPUI 版本目标
@@ -1245,7 +1245,7 @@ MIT License
 
 ## 开发工具
 
-安装 `cargo-rsx` 0.8.3（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
+安装 `cargo-rsx` 0.9.0（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
 `convert`、`preview --watch` 和 `lsp`。参见[工具指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/tooling/)
 与 [WASM Playground](https://wsafight.github.io/gpui-rsx/zh-cn/playground/)。
 编辑器适配位于 `editors/`，发布附件包含可安装的 VSIX，市场上架状态另行记录。

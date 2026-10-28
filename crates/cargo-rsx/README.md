@@ -13,6 +13,9 @@ cargo rsx migrate src/main.rs --write      # run once, then enable Tailwind scal
 cargo rsx convert component.tsx            # JSON: RSX + source-positioned TODOs
 cargo rsx expand layout.rsx --tailwind
 cargo rsx preview src/main.rs --watch      # localhost:9230, reloads layout
+cargo rsx theme check --manifest-path demo/Cargo.toml
+cargo rsx theme list --json
+cargo rsx theme explain bg-primary
 cargo rsx lsp                              # stdio language server
 ```
 
@@ -33,6 +36,10 @@ JavaScript expressions, event handlers and unsupported styles for manual work. I
 starting point, not a React runtime translator. Preview approximates static layouts in
 HTML and labels expressions/events/custom components and unsupported styles.
 
-The LSP provides supported-class completion, expansion hover, diagnostics, quick fixes,
-color swatches and RSX formatting inside Rust macro bodies. Install `cargo-rsx` first,
+`theme check/list/explain` validates and inspects the same tokens used by the macro,
+including text size, line height, opacity and shadow expressions. All commands accept
+`--json`; invalid configs and unknown theme classes exit with status 1.
+
+The LSP provides incremental document sync, supported-class completion, expansion hover,
+diagnostics, quick fixes, semantic tokens, color swatches and RSX formatting inside Rust macro bodies. Install `cargo-rsx` first,
 then install the VS Code or Zed extension from `editors/` in the repository.

@@ -202,6 +202,35 @@ let preview = gpui_rsx::rsx_expand! {
 
 ## 验证性能敏感改动
 
+### 0.9 开发测量
+
+macOS ARM64、Rust 1.99.1 下的短时 Criterion 测量（10 个样本、预热和测量各 1 秒）
+得到以下斜率估计值：
+
+| 场景 | 优化前 | 优化后 |
+| --- | --- | --- |
+| 静态 dashboard 宏展开 | 66.8 µs | 66.7 µs |
+| 单个动态 class 属性 | 489 µs | 477 µs |
+| 同次宏调用内四个动态 class 属性 | 1.99 ms | 0.495 ms |
+| 分析 80 个宏 / 复用 79 个未修改宏体 | 1.00 ms（完整分析） | 223 µs（复用） |
+
+这些是本地微基准，不代表整个项目的冷编译时间。复用分析的 95% 置信区间约为 199–268 µs。
+增量分析仍扫描 Rust token，只跳过未修改 RSX 宏体的解析。动态 helper 在单次宏调用内共享，
+各属性仍保留独立的表达式求值和未知 class 回调。
+
+```bash
+cargo bench -p gpui-rsx-tools --bench analysis --no-default-features -- \
+  --sample-size 10 --warm-up-time 1 --measurement-time 1
+cargo bench -p gpui-rsx-core --bench expansion -- \
+  --save-baseline before09 --sample-size 10 --warm-up-time 1 --measurement-time 1
+# 应用 helper 共享改动后，使用相同的 benchmark 输入：
+cargo bench -p gpui-rsx-core --bench expansion -- \
+  --baseline before09 --sample-size 10 --warm-up-time 1 --measurement-time 1
+```
+
+比较两个版本时使用相同的 benchmark 代码，并保留 Criterion 报告目录。发布性能结论前，
+应在空闲机器上进行更长时间的测量。
+
 仓库包含 class 解析/codegen 的 benchmark 目标：
 
 ```bash

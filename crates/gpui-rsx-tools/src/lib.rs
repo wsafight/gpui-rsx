@@ -5,7 +5,7 @@ pub mod format;
 pub mod preview;
 
 use gpui_rsx_core::codegen::attribute::static_class_literals;
-use gpui_rsx_core::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
+use gpui_rsx_core::syntax::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use gpui_rsx_core::{ClassMode, Severity, SpacingScale, class_diagnostics};
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use serde::{Deserialize, Serialize};
@@ -96,15 +96,13 @@ pub fn macro_calls(source: &str) -> Result<Vec<MacroCall>, String> {
 }
 
 pub fn mode_for(name: &str, mode: ClassMode) -> ClassMode {
-    ClassMode {
-        strict: name == "rsx_strict" || (mode.strict && name != "rsx_permissive"),
-        scale: if name == "rsx_tw" {
-            SpacingScale::Tailwind
-        } else {
-            mode.scale
-        },
-        ..mode
-    }
+    let strict = name == "rsx_strict" || (mode.is_strict() && name != "rsx_permissive");
+    let scale = if name == "rsx_tw" {
+        SpacingScale::Tailwind
+    } else {
+        mode.scale()
+    };
+    mode.with_strict(strict).with_scale(scale)
 }
 
 fn error(source: &str, e: syn::Error) -> Diagnostic {
@@ -132,6 +130,27 @@ pub fn analyze_rust(source: &str, mode: ClassMode) -> Vec<Diagnostic> {
 
 /// Scans a Rust document once, then parses each RSX macro body once to collect editor state.
 pub fn analyze_rust_document(source: &str, mode: ClassMode) -> RustAnalysis {
+    analyze_document(source, mode, None)
+}
+
+/// Reanalyzes changed macro bodies while reusing diagnostics and literal ranges for
+/// unchanged bodies. The Rust token stream is rescanned to keep discovery correct
+/// after edits to comments, strings, delimiters and macro names. `mode` must match
+/// the mode used for `previous`; configuration changes require a full analysis.
+pub fn update_rust_document(
+    source: &str,
+    mode: ClassMode,
+    previous_source: &str,
+    previous: &RustAnalysis,
+) -> RustAnalysis {
+    analyze_document(source, mode, Some((previous_source, previous)))
+}
+
+fn analyze_document(
+    source: &str,
+    mode: ClassMode,
+    previous: Option<(&str, &RustAnalysis)>,
+) -> RustAnalysis {
     let calls = match macro_calls(source) {
         Ok(calls) => calls,
         Err(message) => {
@@ -151,8 +170,47 @@ pub fn analyze_rust_document(source: &str, mode: ClassMode) -> RustAnalysis {
         calls,
         ..RustAnalysis::default()
     };
+    let mut reusable = std::collections::HashMap::new();
+    if let Some((previous_source, previous)) = previous {
+        for call in &previous.calls {
+            if let Some(body) = previous_source.get(call.start..call.end) {
+                reusable.entry((call.name.as_str(), body)).or_insert(call);
+            }
+        }
+    }
     for call in &analysis.calls {
         let body = &source[call.start..call.end];
+        if let Some(old_call) = reusable.get(&(call.name.as_str(), body))
+            && let Some((_, previous)) = previous
+        {
+            analysis.literals.extend(
+                previous
+                    .literals
+                    .iter()
+                    .filter(|&&(start, end)| start >= old_call.start && end <= old_call.end)
+                    .map(|&(start, end)| {
+                        (
+                            call.start + start - old_call.start,
+                            call.start + end - old_call.start,
+                        )
+                    }),
+            );
+            analysis.diagnostics.extend(
+                previous
+                    .diagnostics
+                    .iter()
+                    .filter(|diagnostic| {
+                        diagnostic.start >= old_call.start && diagnostic.end <= old_call.end
+                    })
+                    .map(|diagnostic| {
+                        let mut diagnostic = diagnostic.clone();
+                        diagnostic.start = call.start + diagnostic.start - old_call.start;
+                        diagnostic.end = call.start + diagnostic.end - old_call.start;
+                        diagnostic
+                    }),
+            );
+            continue;
+        }
         let body_analysis = analyze_body_with_ranges(body, mode_for(&call.name, mode.clone()));
         analysis.literals.extend(
             body_analysis
@@ -333,6 +391,7 @@ pub fn walk_body(body: &RsxBody, visitor: &mut impl FnMut(&RsxElement)) {
     match body {
         RsxBody::Single(el) => element(el, visitor),
         RsxBody::Fragment(children) => nodes(children, visitor),
+        _ => {}
     }
 }
 

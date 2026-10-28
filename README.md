@@ -55,7 +55,7 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.8.3"
+gpui-rsx = "0.9.0"
 ```
 
 ### GPUI Version Target
@@ -1244,7 +1244,7 @@ Inspired by:
 
 ## Development tools
 
-Install `cargo-rsx` 0.8.3 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
+Install `cargo-rsx` 0.9.0 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
 `preview --watch`, and the `lsp` server. See the [tooling guide](https://wsafight.github.io/gpui-rsx/guides/tooling/)
 and [WASM Playground](https://wsafight.github.io/gpui-rsx/playground/). VS Code and Zed adapters
 live in `editors/`; release assets include an installable VSIX.

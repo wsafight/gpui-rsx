@@ -17,6 +17,21 @@
     "vscode:prepublish": "bun run build"
   },
   "contributes": {
+    "semanticTokenTypes": [
+      { "id": "rsxClass", "superType": "string", "description": "Supported GPUI RSX utility class." },
+      { "id": "rsxThemeToken", "superType": "variable", "description": "Class resolved from rsx.toml." },
+      { "id": "rsxInvalidClass", "superType": "string", "description": "Unrecognized or unsupported GPUI RSX class." }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "rust",
+        "scopes": {
+          "rsxClass": ["support.constant.rsx"],
+          "rsxThemeToken": ["variable.other.constant.rsx"],
+          "rsxInvalidClass": ["invalid.illegal.rsx"]
+        }
+      }
+    ],
     "configuration": {
       "title": "GPUI RSX",
       "properties": {
