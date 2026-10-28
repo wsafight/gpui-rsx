@@ -101,6 +101,7 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
+          components: clippy
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -124,6 +125,8 @@ jobs:
         run: |
           cargo test --workspace
           cargo test --workspace --all-features
+          cargo test -p gpui-rsx-tools --no-default-features
+          cargo clippy -p gpui-rsx-tools --all-targets --no-default-features -- -D warnings
 
   demo:
     name: Demo GPUI Check

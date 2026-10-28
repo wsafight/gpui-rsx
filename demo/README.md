@@ -1,9 +1,9 @@
 # GPUI-RSX Demos
 
-The demos use GPUI Kit 0.8.0 and its pinned `gpui-pre 0.3.9` snapshot:
+The demos use GPUI Kit 0.8.1 and its pinned `gpui-pre 0.3.10` snapshot:
 
 ```toml
-gpui = { package = "gpui-kit", version = "=0.8.0" }
+gpui = { package = "gpui-kit", version = "=0.8.1" }
 gpui-rsx = { path = ".." }
 ```
 

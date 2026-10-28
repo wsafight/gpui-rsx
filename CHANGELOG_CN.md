@@ -9,6 +9,29 @@
 
 ## [未发布]
 
+## [0.9.0] - 2026-10-28
+
+### 变更
+
+- 主题加载复用拥有型 `Arc<Theme>`，不再为每次配置修订泄漏静态主题；缓存使用规范路径、内容指纹和
+  最多 64 项的 LRU 淘汰机制，并报告配置读取错误。
+- API 破坏性变更：`ClassMode`、`Theme`、`MacroOptions` 改用私有字段、builder 和 getter；
+  `ClassMode` 由 `Copy` 改为 `Clone`。语法、class 结果、诊断级别和 token 枚举标记为
+  non-exhaustive；工具集成可使用 crate 根导出及 `syntax` 模块。
+- Theme 新增 `[text-size]`、`[line-height]`、`[opacity]`、`[shadow]`；支持内存主题校验，
+  拒绝重复键和有歧义的 class。新增 `cargo rsx theme check/list/explain`，提供文本和 JSON 输出，
+  可解释状态前缀生成的代码。
+- LSP 支持 UTF-16 增量编辑、文档版本检查和未修改宏体的分析复用；语义高亮区分普通工具类、主题
+  token 和无效 class。主题配置错误持续显示为诊断，静态主题颜色支持色块预览。
+- class 代码生成与静态预览共享样式操作；预览支持静态主题 token 和 `styled` 默认样式，
+  运行时 Rust 表达式仍显示为占位内容。
+- feature 默认值破坏性变更：`gpui-rsx-tools` 默认不再启用 SWC；转换功能需显式开启
+  `features = ["convert"]`。CLI、WASM 保留转换能力，CI 覆盖启用与禁用 feature 两种情况。
+- 同一次宏调用内的动态 class 共享一个 helper，各属性仍独立求值并调用自己的未知 class 回调。
+  本地四属性宏展开示例从约 1.99 ms 降至 0.495 ms；80 个宏中复用 79 个宏体的分析从约
+  1.00 ms 降至 223 µs。这些测量不代表整个项目的冷编译收益。
+- 双语文档补充迁移说明和基准命令；完成范围与验证记录在 `todo/ROADMAP_0.9.0.md`。
+
 ## [0.8.3] - 2026-10-27
 
 ### 修复
@@ -623,7 +646,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/wsafight/gpui-rsx/compare/v0.8.0...v0.8.1

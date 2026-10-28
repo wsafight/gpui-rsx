@@ -3,7 +3,6 @@
 use super::super::tables::*;
 use super::variants::parse_variant;
 use super::{ClassMode, SUPPORTED_VARIANTS, parse_length_number};
-use crate::theme::Theme;
 use std::sync::OnceLock;
 
 // ---------------------------------------------------------------------------
@@ -72,7 +71,10 @@ pub fn suggest_class(class: &str, mode: ClassMode) -> Option<String> {
         }
     }
 
-    let theme_classes = mode.theme.map(Theme::class_names).unwrap_or_default();
+    let theme_classes = mode
+        .theme()
+        .map(|theme| theme.class_names())
+        .unwrap_or_default();
     let candidates = known_classes()
         .iter()
         .map(String::as_str)

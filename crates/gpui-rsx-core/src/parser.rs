@@ -17,6 +17,7 @@ use syn::{
 /// RSX 宏体
 ///
 /// 可以是单个元素或 Fragment（多根节点）
+#[non_exhaustive]
 pub enum RsxBody {
     /// 单个元素，如 `<div>...</div>`
     Single(RsxElement),
@@ -84,6 +85,7 @@ impl ToTokens for RsxElementName {
 /// RSX 属性
 ///
 /// 表示元素的属性，如 `class="container"` 或 `onClick={handler}`
+#[non_exhaustive]
 pub enum RsxAttribute {
     /// 布尔属性，如 `flex`
     Flag(Ident),
@@ -108,6 +110,7 @@ pub enum RsxAttribute {
 /// RSX 节点
 ///
 /// 可以是元素、表达式、展开或 for 循环
+#[non_exhaustive]
 pub enum RsxNode {
     /// 子元素
     Element(RsxElement),

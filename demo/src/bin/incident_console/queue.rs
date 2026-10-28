@@ -7,7 +7,7 @@ use crate::model::IncidentConsole;
 
 pub(crate) fn render(
     view: &IncidentConsole,
-    incidents: &[Incident],
+    incidents: &[&Incident],
     cx: &mut Context<IncidentConsole>,
 ) -> impl IntoElement + use<> {
     rsx! {

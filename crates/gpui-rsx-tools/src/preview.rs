@@ -1,7 +1,7 @@
 //! Static layout approximation. Never evaluates Rust expressions or event handlers.
 use crate::literal_string;
-use gpui_rsx_core::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
-use gpui_rsx_core::{ClassMode, ClassOutcome, analyze_class};
+use gpui_rsx_core::syntax::{RsxAttribute, RsxBody, RsxElement, RsxNode};
+use gpui_rsx_core::{ClassMode, StyleLength, StyleValue, resolve_style};
 
 pub fn escape(value: &str) -> String {
     value
@@ -17,7 +17,7 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
     fn nodes(children: &[RsxNode], mode: ClassMode, out: &mut String) {
         for child in children {
             match child {
-                RsxNode::Element(el) => element(el, mode, out),
+                RsxNode::Element(el) => element(el, mode.clone(), out),
                 RsxNode::Expr(expr) => match literal_string(expr) {
                     Some(text) => out.push_str(&escape(&text)),
                     None => out.push_str("<span class=\"rsx-placeholder\">{expression}</span>"),
@@ -27,21 +27,40 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
                 }
                 RsxNode::For { body, .. } => {
                     out.push_str("<div class=\"rsx-placeholder\">loop template</div>");
-                    nodes(body, mode, out);
+                    nodes(body, mode.clone(), out);
                 }
+                _ => out.push_str("<span class=\"rsx-placeholder\">unknown syntax</span>"),
             }
         }
     }
     fn element(el: &RsxElement, mode: ClassMode, out: &mut String) {
         let mut styles = Vec::new();
         let mut omitted = Vec::new();
+        if el
+            .attributes
+            .iter()
+            .any(|attr| matches!(attr, RsxAttribute::Flag(name) if name == "styled"))
+            && let Some(classes) =
+                gpui_rsx_core::codegen::tables::lookup_tag_default(&el.name.to_string())
+        {
+            for class in classes.split_ascii_whitespace() {
+                if let Some(style) = css(class, mode.clone()) {
+                    styles.push(style);
+                } else {
+                    omitted.push(class.to_owned());
+                }
+            }
+        }
         for attr in &el.attributes {
+            if matches!(attr, RsxAttribute::Flag(name) if name == "styled") {
+                continue;
+            }
             if let RsxAttribute::Value { name, value } = attr
                 && name == "class"
             {
                 if let Some(classes) = literal_string(value) {
                     for class in classes.split_ascii_whitespace() {
-                        match css(class, mode) {
+                        match css(class, mode.clone()) {
                             Some(style) => styles.push(style),
                             None => omitted.push(class.to_owned()),
                         }
@@ -71,132 +90,164 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
                 escape(&omitted.join(", "))
             ));
         }
-        nodes(&el.children, mode, out);
+        nodes(&el.children, mode.clone(), out);
         out.push_str("</div>");
     }
     let mut out = String::new();
     match &body {
-        RsxBody::Single(el) => element(el, mode, &mut out),
+        RsxBody::Single(el) => element(el, mode.clone(), &mut out),
         RsxBody::Fragment(children) => nodes(children, mode, &mut out),
+        _ => return Err("preview does not support this RSX body".into()),
     }
     Ok(out)
 }
 
 fn css(class: &str, mode: ClassMode) -> Option<String> {
-    if !matches!(
-        analyze_class(class, mode).outcome,
-        ClassOutcome::Supported(_)
-    ) || class.contains(':')
-    {
-        return None;
-    }
-    let direct = match class {
+    let operation = resolve_style(class, mode)?.ok()?;
+    let method = operation.method();
+    let Some(value) = operation.value() else {
+        return preset_css(method).map(str::to_owned);
+    };
+    let value = match value {
+        StyleValue::Color { hex, alpha } => {
+            let prop = match method {
+                "bg" => "background-color",
+                "text_color" => "color",
+                "border_color" => "border-color",
+                _ => return None,
+            };
+            let rgba = if *alpha { *hex } else { (*hex << 8) | 0xff };
+            return Some(format!("{prop}:#{rgba:08x}"));
+        }
+        StyleValue::Length(length) => match length {
+            StyleLength::Px(value) => format!("{value}px"),
+            StyleLength::Rem(value) => format!("{value}rem"),
+            StyleLength::Relative(value) => format!("{}%", value * 100.0),
+            _ => return None,
+        },
+        StyleValue::Number(number) if number.is_finite() && method == "opacity" => {
+            return Some(format!("opacity:{number}"));
+        }
+        StyleValue::Expression(expr) => {
+            if method == "font_weight" {
+                let weight = match expr.as_str() {
+                    "FontWeight::THIN" => 100,
+                    "FontWeight::EXTRA_LIGHT" => 200,
+                    "FontWeight::LIGHT" => 300,
+                    "FontWeight::NORMAL" => 400,
+                    "FontWeight::MEDIUM" => 500,
+                    "FontWeight::SEMIBOLD" => 600,
+                    "FontWeight::BOLD" => 700,
+                    "FontWeight::EXTRA_BOLD" => 800,
+                    "FontWeight::BLACK" => 900,
+                    _ => return None,
+                };
+                return Some(format!("font-weight:{weight}"));
+            }
+            // Recognize only normalized literal lengths; never execute expressions.
+            let expr = expr.trim();
+            let (number, unit) =
+                if let Some(inner) = expr.strip_prefix("px(").and_then(|v| v.strip_suffix(')')) {
+                    (inner, "px")
+                } else {
+                    let inner = expr
+                        .strip_prefix("rems(")
+                        .and_then(|v| v.strip_suffix(')'))?;
+                    (inner, "rem")
+                };
+            let number = number
+                .trim()
+                .parse::<f32>()
+                .ok()
+                .filter(|n| n.is_finite())?;
+            format!("{number}{unit}")
+        }
+        _ => return None,
+    };
+    let props: &[&str] = match method {
+        "w" => &["width"],
+        "h" => &["height"],
+        "size" => &["width", "height"],
+        "p" => &["padding"],
+        "px" => &["padding-left", "padding-right"],
+        "py" => &["padding-top", "padding-bottom"],
+        "pt" => &["padding-top"],
+        "pb" => &["padding-bottom"],
+        "pl" => &["padding-left"],
+        "pr" => &["padding-right"],
+        "m" => &["margin"],
+        "mx" => &["margin-left", "margin-right"],
+        "my" => &["margin-top", "margin-bottom"],
+        "mt" => &["margin-top"],
+        "mb" => &["margin-bottom"],
+        "ml" => &["margin-left"],
+        "mr" => &["margin-right"],
+        "gap" => &["gap"],
+        "gap_x" => &["column-gap"],
+        "gap_y" => &["row-gap"],
+        "min_w" => &["min-width"],
+        "max_w" => &["max-width"],
+        "min_h" => &["min-height"],
+        "max_h" => &["max-height"],
+        "rounded" => &["border-radius"],
+        "text_size" => &["font-size"],
+        "line_height" => &["line-height"],
+        _ => return None,
+    };
+    Some(
+        props
+            .iter()
+            .map(|prop| format!("{prop}:{value}"))
+            .collect::<Vec<_>>()
+            .join(";"),
+    )
+}
+
+fn preset_css(method: &str) -> Option<&'static str> {
+    Some(match method {
         "flex" => "display:flex",
-        "flex-col" => "flex-direction:column",
-        "flex-row" => "flex-direction:row",
-        "flex-wrap" => "flex-wrap:wrap",
-        "flex-1" => "flex:1",
-        "items-center" => "align-items:center",
-        "items-start" => "align-items:flex-start",
-        "items-end" => "align-items:flex-end",
-        "justify-center" => "justify-content:center",
-        "justify-between" => "justify-content:space-between",
-        "justify-end" => "justify-content:flex-end",
+        "flex_col" => "flex-direction:column",
+        "flex_row" => "flex-direction:row",
+        "flex_wrap" => "flex-wrap:wrap",
+        "flex_1" => "flex:1",
+        "flex_grow_1" => "flex-grow:1",
+        "flex_shrink_1" => "flex-shrink:1",
+        "items_center" => "align-items:center",
+        "items_start" => "align-items:flex-start",
+        "items_end" => "align-items:flex-end",
+        "justify_center" => "justify-content:center",
+        "justify_between" => "justify-content:space-between",
+        "justify_end" => "justify-content:flex-end",
         "hidden" => "display:none",
         "block" => "display:block",
         "relative" => "position:relative",
         "absolute" => "position:absolute",
-        "w-full" => "width:100%",
-        "h-full" => "height:100%",
-        "size-full" => "width:100%;height:100%",
-        "overflow-hidden" => "overflow:hidden",
-        "overflow-scroll" => "overflow:auto",
-        "border" => "border:1px solid",
-        "font-bold" => "font-weight:700",
-        "font-semibold" => "font-weight:600",
-        "font-medium" => "font-weight:500",
-        "text-center" => "text-align:center",
-        "text-left" => "text-align:left",
-        "text-right" => "text-align:right",
-        "text-xs" => "font-size:12px",
-        "text-sm" => "font-size:14px",
-        "text-base" => "font-size:16px",
-        "text-lg" => "font-size:18px",
-        "text-xl" => "font-size:20px",
-        "text-2xl" => "font-size:24px",
+        "w_full" => "width:100%",
+        "h_full" => "height:100%",
+        "size_full" => "width:100%;height:100%",
+        "overflow_hidden" => "overflow:hidden",
+        "overflow_scroll" => "overflow:auto",
+        "border_1" => "border:1px solid",
+        "text_center" => "text-align:center",
+        "text_left" => "text-align:left",
+        "text_right" => "text-align:right",
+        "text_xs" => "font-size:12px",
+        "text_sm" => "font-size:14px",
+        "text_base" => "font-size:16px",
+        "text_lg" => "font-size:18px",
+        "text_xl" => "font-size:20px",
+        "text_2xl" => "font-size:24px",
+        "text_3xl" => "font-size:30px",
         "rounded" => "border-radius:4px",
-        "rounded-sm" => "border-radius:2px",
-        "rounded-md" => "border-radius:6px",
-        "rounded-lg" => "border-radius:8px",
-        "rounded-full" => "border-radius:9999px",
+        "rounded_sm" => "border-radius:2px",
+        "rounded_md" => "border-radius:6px",
+        "rounded_lg" => "border-radius:8px",
+        "rounded_full" => "border-radius:9999px",
         "underline" => "text-decoration:underline",
+        "text_decoration_none" => "text-decoration:none",
         "italic" => "font-style:italic",
-        _ => "",
-    };
-    if !direct.is_empty() {
-        return Some(direct.into());
-    }
-    if let Some((method, value, _)) = gpui_rsx_core::codegen::tables::split_length_class(class) {
-        let value = if value.starts_with('[') {
-            value.trim_matches(['[', ']']).to_owned()
-        } else if let Some((n, d)) = value.split_once('/') {
-            format!(
-                "{}%",
-                n.parse::<f32>().ok()? / d.parse::<f32>().ok()? * 100.0
-            )
-        } else {
-            format!("{}px", value.parse::<f32>().ok()? * mode.scale.factor())
-        };
-        let props: &[&str] = match method {
-            "w" => &["width"],
-            "h" => &["height"],
-            "size" => &["width", "height"],
-            "p" => &["padding"],
-            "px" => &["padding-left", "padding-right"],
-            "py" => &["padding-top", "padding-bottom"],
-            "pt" => &["padding-top"],
-            "pb" => &["padding-bottom"],
-            "pl" => &["padding-left"],
-            "pr" => &["padding-right"],
-            "m" => &["margin"],
-            "mx" => &["margin-left", "margin-right"],
-            "my" => &["margin-top", "margin-bottom"],
-            "mt" => &["margin-top"],
-            "mb" => &["margin-bottom"],
-            "ml" => &["margin-left"],
-            "mr" => &["margin-right"],
-            "gap" => &["gap"],
-            "gap_x" => &["column-gap"],
-            "gap_y" => &["row-gap"],
-            "min_w" => &["min-width"],
-            "max_w" => &["max-width"],
-            "min_h" => &["min-height"],
-            "max_h" => &["max-height"],
-            _ => return None,
-        };
-        return Some(
-            props
-                .iter()
-                .map(|p| format!("{p}:{value}"))
-                .collect::<Vec<_>>()
-                .join(";"),
-        );
-    }
-    for (prefix, prop) in [
-        ("bg-", "background-color"),
-        ("text-", "color"),
-        ("border-", "border-color"),
-    ] {
-        if let Some(value) = class.strip_prefix(prefix)
-            && let Some(color) = gpui_rsx_core::codegen::class::color_rgba(value)
-        {
-            return Some(format!("{prop}:#{color:08x}"));
-        }
-    }
-    class
-        .strip_prefix("opacity-")
-        .and_then(|n| n.parse::<u8>().ok())
-        .map(|n| format!("opacity:{}", f32::from(n) / 100.0))
+        _ => return None,
+    })
 }
 
 pub fn page(content: &str, refresh: bool) -> String {

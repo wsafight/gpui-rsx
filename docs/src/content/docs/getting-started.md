@@ -11,8 +11,8 @@ Add GPUI Kit, aliased as `gpui` for macro-generated paths, and GPUI-RSX:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.8.0" }
-gpui-rsx = "0.8.3"
+gpui = { package = "gpui-kit", version = "=0.8.1" }
+gpui-rsx = "0.9.0"
 ```
 
 Kit pins its matching `gpui-pre` snapshot and re-exports GPUI, components and assets. Commit `Cargo.lock` to reproduce the complete dependency graph.

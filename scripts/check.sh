@@ -12,6 +12,8 @@ Runs the standard local validation suite:
   cargo xtask check-gpui
   cargo test --workspace
   cargo test --workspace --all-features
+  cargo test -p gpui-rsx-tools --no-default-features
+  cargo clippy -p gpui-rsx-tools --all-targets --no-default-features -- -D warnings
   cargo clippy --workspace --all-targets --all-features -- -D warnings
   cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
   cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
@@ -82,6 +84,8 @@ run cargo xtask spec --check
 run cargo xtask compat-matrix --check
 run cargo test --workspace
 run cargo test --workspace --all-features
+run cargo test -p gpui-rsx-tools --no-default-features
+run cargo clippy -p gpui-rsx-tools --all-targets --no-default-features -- -D warnings
 run cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 if [[ "$skip_demo" -eq 0 ]]; then

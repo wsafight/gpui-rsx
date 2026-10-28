@@ -1,3 +1,5 @@
+mod common;
+
 use gpui::prelude::*;
 use gpui::*;
 use gpui_rsx::rsx;
@@ -71,7 +73,7 @@ impl Default for ProjectDashboard {
             items: vec![
                 WorkItem {
                     id: 101,
-                    title: "Validate GPUI 0.2 event contracts".into(),
+                    title: "Validate GPUI 0.8 event contracts".into(),
                     owner: "Mina",
                     area: "Runtime",
                     priority: Priority::High,
@@ -137,14 +139,13 @@ impl Render for ProjectDashboard {
             .items
             .iter()
             .filter(|item| self.filter.matches(item))
-            .cloned()
             .collect::<Vec<_>>();
         let selected = self
             .items
             .iter()
             .find(|item| item.id == self.selected_id)
-            .cloned()
-            .unwrap_or_else(|| self.items[0].clone());
+            .or_else(|| self.items.first())
+            .expect("project dashboard must contain at least one work item");
         let row_spacing = if self.compact { "py-6" } else { "py-10" };
 
         rsx! {
@@ -154,7 +155,7 @@ impl Render for ProjectDashboard {
                         <header class="flex flex-col gap-4">
                             <span class="text-xs font-bold text-emerald-400">{"GPUI RSX"}</span>
                             <h1 class="text-xl font-bold text-white">{"Release desk"}</h1>
-                            <span class="text-sm text-neutral-500">{"v0.7 workspace"}</span>
+                            <span class="text-sm text-neutral-500">{"v0.9 workspace"}</span>
                         </header>
 
                         <nav class="flex flex-col gap-6">
@@ -403,20 +404,15 @@ impl Render for ProjectDashboard {
 }
 
 fn main() {
-    application()
-        .with_assets(assets::Assets)
-        .run(|cx: &mut App| {
-            gpui::init(cx);
-            let bounds = Bounds::centered(None, size(px(1180.0), px(760.0)), cx);
-            gpui::open_window(
-                WindowOptions {
-                    window_bounds: Some(WindowBounds::Windowed(bounds)),
-                    ..WindowOptions::default()
-                },
+    common::run(
+        |cx| WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(Bounds::centered(
+                None,
+                size(px(1180.0), px(760.0)),
                 cx,
-                |_, cx| cx.new(|_| ProjectDashboard::default()),
-            )
-            .expect("failed to open project dashboard window");
-            cx.activate(true);
-        });
+            ))),
+            ..WindowOptions::default()
+        },
+        |_| ProjectDashboard::default(),
+    );
 }

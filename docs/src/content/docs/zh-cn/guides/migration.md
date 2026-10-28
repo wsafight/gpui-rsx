@@ -4,6 +4,27 @@ description: 从手写 GPUI builder 链迁移，并升级到 GPUI-RSX 0.6 的 GP
 ---
 
 
+## 从 0.8 升级到 0.9
+
+0.9 版本以 GPUI Kit 0.8.1 为兼容目标，默认间距仍按像素解释；现有 RSX
+语法和自动 ID 行为保持一致。工具集成应使用 `gpui-rsx-core` 根导出或 `syntax`
+模块，将结构体字面量改为 `ClassMode::builder()`、`Theme::builder()` 和
+`MacroOptions::new().with_*()`。多次传递 `ClassMode` 时显式 `clone()`，Theme
+通过 `Arc<Theme>` 共享；语法、class 结果和 token 枚举的匹配需要兜底分支。
+
+`gpui-rsx-tools` 默认不再启用 SWC 转换器。调用转换器的库需要显式开启
+`features = ["convert"]`；CLI 和 WASM Playground 已开启。格式化、lint 和预览
+无需 SWC。
+
+`rsx.toml` 新增 `text-size`、`line-height`、`opacity` 和 `shadow` 分区。
+透明度使用 `"0.6"` 或 `"60%"`，阴影使用 `{ expr = "..." }`。重复键以及冲突的
+`text-size-*` class 会报告配置错误。`cargo rsx theme check/list/explain` 支持
+`--json`，校验失败退出码为 1，命令用法错误为 2。
+
+LSP 声明增量同步（`change: 2`）与语义 token；仍支持全文替换，范围编辑按
+UTF-16 位置依次应用，未修改的宏复用诊断结果。同一次 RSX 调用中的动态 class
+共享一个 helper，各属性仍独立求值并调用自己的未知 class 处理器。
+
 ## Zed Git 迁移到 GPUI Kit 0.8
 
 用 Kit 替换单独的 Zed Git `gpui`、`gpui_platform` 和 Git `gpui-component`
@@ -11,11 +32,11 @@ description: 从手写 GPUI builder 链迁移，并升级到 GPUI-RSX 0.6 的 GP
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.8.0" }
-gpui-rsx = "0.8.3"
+gpui = { package = "gpui-kit", version = "=0.8.1" }
+gpui-rsx = "0.9.0"
 ```
 
-Kit 0.8.0 固定 `gpui-pre = 0.3.9`。从 `gpui::component` 导入带样式控件，
+Kit 0.8.1 固定 `gpui-pre = 0.3.10`。从 `gpui::component` 导入带样式控件，
 从 `gpui::base` 导入基础行为。将 `gpui_platform::application()` 改为
 `gpui::application()`；打开窗口前初始化 Kit，并挂载其根视图：
 

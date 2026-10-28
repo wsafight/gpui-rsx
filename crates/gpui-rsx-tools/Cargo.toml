@@ -1,6 +1,6 @@
 [package]
 name = "gpui-rsx-tools"
-version = "0.8.3"
+version = "0.9.0"
 edition = "2024"
 rust-version = "1.98"
 description = "Shared diagnostics, formatting, migration and preview for GPUI-RSX tools"
@@ -8,9 +8,8 @@ license = "MIT"
 repository = "https://github.com/wsafight/gpui-rsx"
 
 [features]
-# Keep JSX/TSX conversion available by default for the CLI and existing users.
-# Consumers that only need linting, formatting or preview can opt out of SWC.
-default = ["convert"]
+# Linting, formatting, preview and LSP integrations do not require SWC.
+default = []
 convert = [
     "dep:swc_common",
     "dep:swc_ecma_ast",
@@ -19,7 +18,7 @@ convert = [
 ]
 
 [dependencies]
-gpui-rsx-core = { version = "0.8.3", path = "../gpui-rsx-core" }
+gpui-rsx-core = { version = "0.9.0", path = "../gpui-rsx-core" }
 proc-macro2 = { version = "1", features = ["span-locations"] }
 quote = "1"
 syn = { version = "2", features = ["full", "visit"] }
@@ -31,3 +30,10 @@ swc_common = { version = "26.0.0", optional = true }
 swc_ecma_ast = { version = "29.0.2", optional = true }
 swc_ecma_parser = { version = "46.1.2", default-features = false, features = ["typescript"], optional = true }
 swc_ecma_visit = { version = "29.0.0", optional = true }
+
+[dev-dependencies]
+criterion = { version = "0.8.2", default-features = false }
+
+[[bench]]
+name = "analysis"
+harness = false

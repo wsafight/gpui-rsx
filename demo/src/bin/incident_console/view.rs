@@ -10,9 +10,15 @@ use crate::sidebar;
 impl Render for IncidentConsole {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let snapshot = self.snapshot();
+        let visible_incidents = snapshot
+            .visible_ids
+            .iter()
+            .filter_map(|id| self.incidents.iter().find(|incident| incident.id == *id))
+            .collect::<Vec<_>>();
+        let selected = self.selected_incident();
         let sidebar = sidebar::render(self, &snapshot.stats, cx);
-        let queue = queue::render(self, &snapshot.visible_incidents, cx);
-        let details = details::render(self, snapshot.selected.as_ref(), cx);
+        let queue = queue::render(self, &visible_incidents, cx);
+        let details = details::render(self, selected, cx);
 
         rsx! {
             <div class="size-full flex bg-neutral-950 text-neutral-100">

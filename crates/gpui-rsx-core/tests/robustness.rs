@@ -162,15 +162,15 @@ fn random_classes_never_panic() {
     for _ in 0..3000 {
         let len = 1 + rng.next() % 6;
         let class: String = (0..len).map(|_| rng.pick(CLASS_PARTS)).collect();
-        for mode in modes {
+        for mode in &modes {
             assert_no_panic("analyze_class", &class, || {
-                let _ = analyze_class(&class, mode);
-                let _ = class_diagnostics(&class, mode);
+                let _ = analyze_class(&class, mode.clone());
+                let _ = class_diagnostics(&class, mode.clone());
             });
             let source = format!("<div class={class:?} hoverClass=\"flex\" />");
             if let Ok(tokens) = source.parse::<proc_macro2::TokenStream>() {
                 assert_no_panic("expand", &source, || {
-                    let _ = expand(tokens, mode);
+                    let _ = expand(tokens, mode.clone());
                 });
             }
         }
@@ -190,11 +190,11 @@ fn known_panic_inputs_expand_without_panicking() {
     for (source, mode) in cases {
         let tokens: proc_macro2::TokenStream = source.parse().unwrap();
         assert_no_panic("expand", source, || {
-            let _ = expand(tokens, mode);
+            let _ = expand(tokens.clone(), mode.clone());
         });
         let class = source.split('"').nth(1).unwrap_or("");
         assert_no_panic("analyze_class", class, || {
-            let _ = analyze_class(class, mode);
+            let _ = analyze_class(class, mode.clone());
         });
     }
 }

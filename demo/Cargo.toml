@@ -7,7 +7,7 @@ publish = false
 [dependencies]
 # Keep `gpui::` available to RSX expansions and GPUI derives. Kit re-exports
 # its matching GPUI snapshot, component catalog, platform entry point and assets.
-gpui = { package = "gpui-kit", version = "=0.8.0" }
+gpui = { package = "gpui-kit", version = "=0.8.1" }
 gpui-rsx = { path = ".." }
 
 # Keep the real rendering backend out of the proc-macro workspace and its MSRV.

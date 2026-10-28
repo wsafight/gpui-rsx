@@ -92,9 +92,9 @@ fn variants_reject_element_level_classes() {
 #[test]
 fn tailwind_scale_multiplies_numeric_lengths_only() {
     let mode = ClassMode::PERMISSIVE.with_scale(SpacingScale::Tailwind);
-    assert_eq!(expand("gap-4", mode), ". gap (px (16f32))");
-    assert_eq!(expand("p-2.5", mode), ". p (px (10f32))");
-    assert_eq!(expand("w-64", mode), ". w (px (256f32))");
+    assert_eq!(expand("gap-4", mode.clone()), ". gap (px (16f32))");
+    assert_eq!(expand("p-2.5", mode.clone()), ". p (px (10f32))");
+    assert_eq!(expand("w-64", mode.clone()), ". w (px (256f32))");
     assert_eq!(expand("gap-[14px]", mode), ". gap (px (14f32))");
     assert_eq!(expand("gap-4", ClassMode::PERMISSIVE), ". gap (px (4f32))");
 }
@@ -103,19 +103,22 @@ fn tailwind_scale_multiplies_numeric_lengths_only() {
 fn suggestions_cover_typos_prefixes_and_variants() {
     let mode = ClassMode::PERMISSIVE;
     assert_eq!(
-        suggest_class("flex-colum", mode).as_deref(),
+        suggest_class("flex-colum", mode.clone()).as_deref(),
         Some("flex-col")
     );
     assert_eq!(
-        suggest_class("bg-blu-500", mode).as_deref(),
+        suggest_class("bg-blu-500", mode.clone()).as_deref(),
         Some("bg-blue-500")
     );
-    assert_eq!(suggest_class("gpa-4", mode).as_deref(), Some("gap-4"));
     assert_eq!(
-        suggest_class("hovr:flex", mode).as_deref(),
+        suggest_class("gpa-4", mode.clone()).as_deref(),
+        Some("gap-4")
+    );
+    assert_eq!(
+        suggest_class("hovr:flex", mode.clone()).as_deref(),
         Some("hover:flex")
     );
-    assert_eq!(suggest_class("zzzzzzzz", mode), None);
+    assert_eq!(suggest_class("zzzzzzzz", mode.clone()), None);
 }
 
 #[test]
@@ -141,20 +144,34 @@ fn mode_builders_only_change_the_selected_field() {
     let mode = ClassMode::PERMISSIVE
         .with_scale(SpacingScale::Tailwind)
         .with_dynamic_report(true);
-    assert_eq!(mode.scale, SpacingScale::Tailwind);
-    assert!(mode.report_dynamic_at_exit);
+    assert_eq!(mode.scale(), SpacingScale::Tailwind);
+    assert!(mode.reports_dynamic_at_exit());
     assert!(!mode.is_strict());
-    assert!(mode.theme.is_none());
+    assert!(mode.theme().is_none());
 
     let strict = ClassMode::STRICT.with_theme(None);
     assert!(strict.is_strict());
-    assert_eq!(strict.scale, SpacingScale::Px);
+    assert_eq!(strict.scale(), SpacingScale::Px);
 
-    // `ClassMode` is `Copy`, so helpers can take it by value.
+    // `ClassMode` is cheaply cloneable, so helpers can take it by value.
     fn takes_by_value(mode: ClassMode) -> bool {
         mode.is_strict()
     }
     assert!(takes_by_value(ClassMode::STRICT));
+}
+
+#[test]
+fn stable_class_mode_builder_exposes_the_supported_configuration() {
+    let mode = ClassMode::builder()
+        .strict(true)
+        .scale(SpacingScale::Tailwind)
+        .report_dynamic_at_exit(true)
+        .build();
+
+    assert!(mode.is_strict());
+    assert_eq!(mode.scale(), SpacingScale::Tailwind);
+    assert!(mode.reports_dynamic_at_exit());
+    assert!(mode.theme().is_none());
 }
 
 #[test]
@@ -224,33 +241,35 @@ fn fraction_ratio_out_of_range_reports_compile_error() {
 
 #[test]
 fn suggestions_cover_theme_tokens_for_every_length_prefix() {
-    static THEME: std::sync::OnceLock<Theme> = std::sync::OnceLock::new();
+    static THEME: std::sync::OnceLock<std::sync::Arc<Theme>> = std::sync::OnceLock::new();
     let theme = THEME.get_or_init(|| {
-        Theme::parse("[colors]\naccent = \"#123456\"\n[spacing]\ngutter = \"12px\"\n").unwrap()
+        std::sync::Arc::new(
+            Theme::parse("[colors]\naccent = \"#123456\"\n[spacing]\ngutter = \"12px\"\n").unwrap(),
+        )
     });
-    let mode = ClassMode::PERMISSIVE.with_theme(Some(theme));
+    let mode = ClassMode::PERMISSIVE.with_theme(Some(std::sync::Arc::clone(theme)));
 
     assert_eq!(
-        suggest_class("bg-acent", mode).as_deref(),
+        suggest_class("bg-acent", mode.clone()).as_deref(),
         Some("bg-accent")
     );
     assert_eq!(
-        suggest_class("hover:bg-acent", mode).as_deref(),
+        suggest_class("hover:bg-acent", mode.clone()).as_deref(),
         Some("hover:bg-accent")
     );
     for typo in ["p-guttr", "pt-guttr", "min-w-guttr", "gap-x-guttr"] {
         let expected = typo.replace("guttr", "gutter");
         assert_eq!(
-            suggest_class(typo, mode).as_deref(),
+            suggest_class(typo, mode.clone()).as_deref(),
             Some(expected.as_str())
         );
     }
     // Correct tokens need no suggestion for the color family.
-    assert_eq!(suggest_class("bg-accent", mode), None);
+    assert_eq!(suggest_class("bg-accent", mode.clone()), None);
     // Length prefixes are one edit apart from each other, so a valid `pt-gutter` may still
     // suggest `px-gutter`; the typo itself must always resolve to the right prefix.
     assert_eq!(
-        suggest_class("pt-guttr", mode).as_deref(),
+        suggest_class("pt-guttr", mode.clone()).as_deref(),
         Some("pt-gutter")
     );
 }

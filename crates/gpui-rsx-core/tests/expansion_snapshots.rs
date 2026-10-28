@@ -92,12 +92,12 @@ snapshot!(
 
 #[test]
 fn theme_tokens() {
-    let theme: &'static Theme = Box::leak(Box::new(
+    let theme = std::sync::Arc::new(
         Theme::parse(
             "[colors]\nbrand = \"#2563eb\"\nsurface = { expr = \"cx.theme().background\" }\n[radius]\ncard = \"12px\"\n[spacing]\ngutter = \"18px\"\n",
         )
         .unwrap(),
-    ));
+    );
     let source = r#"<div class="bg-brand text-surface rounded-card p-gutter hover:bg-surface" />"#;
     insta::assert_snapshot!(
         "theme_tokens",

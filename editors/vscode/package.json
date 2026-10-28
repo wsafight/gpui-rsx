@@ -2,7 +2,7 @@
   "name": "gpui-rsx",
   "displayName": "GPUI RSX",
   "description": "Class completion, diagnostics, expansion hover and formatting for GPUI RSX macros.",
-  "version": "0.8.3",
+  "version": "0.9.0",
   "publisher": "wsafight",
   "license": "MIT",
   "engines": { "vscode": "^1.96.0" },
@@ -17,6 +17,21 @@
     "vscode:prepublish": "bun run build"
   },
   "contributes": {
+    "semanticTokenTypes": [
+      { "id": "rsxClass", "superType": "string", "description": "Supported GPUI RSX utility class." },
+      { "id": "rsxThemeToken", "superType": "variable", "description": "Class resolved from rsx.toml." },
+      { "id": "rsxInvalidClass", "superType": "string", "description": "Unrecognized or unsupported GPUI RSX class." }
+    ],
+    "semanticTokenScopes": [
+      {
+        "language": "rust",
+        "scopes": {
+          "rsxClass": ["support.constant.rsx"],
+          "rsxThemeToken": ["variable.other.constant.rsx"],
+          "rsxInvalidClass": ["invalid.illegal.rsx"]
+        }
+      }
+    ],
     "configuration": {
       "title": "GPUI RSX",
       "properties": {

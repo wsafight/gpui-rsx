@@ -1,3 +1,5 @@
+mod common;
+
 use gpui::prelude::*;
 use gpui::*;
 use gpui_rsx::rsx;
@@ -68,14 +70,5 @@ impl Render for CounterView {
 }
 
 fn main() {
-    application()
-        .with_assets(assets::Assets)
-        .run(|cx: &mut App| {
-            gpui::init(cx);
-            gpui::open_window(WindowOptions::default(), cx, |_, cx| {
-                cx.new(|_| CounterView::default())
-            })
-            .expect("failed to open counter window");
-            cx.activate(true);
-        });
+    common::run(|_| WindowOptions::default(), |_| CounterView::default());
 }

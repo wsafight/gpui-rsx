@@ -1,9 +1,9 @@
-#![cfg(feature = "convert")]
-
 use gpui_rsx_core::{ClassMode, SpacingScale};
+#[cfg(feature = "convert")]
+use gpui_rsx_tools::convert;
 use gpui_rsx_tools::{
-    analyze_body, analyze_rust, analyze_rust_document, class_literal_ranges, convert, expand,
-    format, macro_calls, mode_for, preview,
+    analyze_body, analyze_rust, analyze_rust_document, class_literal_ranges, expand, format,
+    macro_calls, mode_for, preview,
 };
 
 #[test]
@@ -41,6 +41,37 @@ fn document_analysis_matches_legacy_ranges_across_multiple_macro_modes() {
     assert_eq!(analysis.diagnostics.len(), 1);
     let diagnostic = &analysis.diagnostics[0];
     assert_eq!(&source[diagnostic.start..diagnostic.end], "flex-colum");
+}
+
+#[test]
+fn incremental_analysis_matches_full_analysis_after_structural_and_unicode_edits() {
+    let initial = "fn f(){rsx!{<div class=\"flex-colum\"/>};rsx_tw!{<div class=\"gap-4\"/>};}";
+    let mut previous_source = initial.to_owned();
+    let mut previous = analyze_rust_document(initial, ClassMode::PERMISSIVE);
+    for source in [
+        format!("// 中文😀\n{initial}"),
+        initial.replace("flex-colum", "dark:flex"),
+        initial.replace("rsx!", "rsx_strict!"),
+        format!("// {initial}"),
+        "fn f( {".to_owned(),
+        initial.to_owned(),
+        initial.replace("gap-4", "gap-[bad]"),
+        format!("{initial}\n{initial}"),
+    ] {
+        let updated = gpui_rsx_tools::update_rust_document(
+            &source,
+            ClassMode::PERMISSIVE,
+            &previous_source,
+            &previous,
+        );
+        let full = analyze_rust_document(&source, ClassMode::PERMISSIVE);
+        assert_eq!(updated.calls, full.calls, "{source}");
+        assert_eq!(updated.literals, full.literals, "{source}");
+        assert_eq!(updated.diagnostics, full.diagnostics, "{source}");
+        previous = updated;
+        previous_source = source;
+        gpui_rsx_tools::release_span_memory();
+    }
 }
 
 #[test]
@@ -106,6 +137,7 @@ fn migration_preserves_expanded_spacing_and_skips_tailwind_macros() {
 }
 
 #[test]
+#[cfg(feature = "convert")]
 fn jsx_conversion_drops_names_that_are_not_rust_identifiers() {
     let result = convert::convert(
         r#"const x = <my-el><button type="button" aria-label="Close" id="b">x</button></my-el>"#,
@@ -120,6 +152,7 @@ fn jsx_conversion_drops_names_that_are_not_rust_identifiers() {
 }
 
 #[test]
+#[cfg(feature = "convert")]
 fn jsx_conversion_uses_tsx_parser_and_marks_unsupported_behavior() {
     let result=convert::convert(r#"export function Card({title}: {title:string}) {return <div className="flex gap-4 md:hidden" onClick={() => alert('x')}>Hi <span>{title}</span></div>}"#).unwrap();
     assert!(
@@ -148,6 +181,48 @@ fn preview_escapes_untrusted_text_and_never_executes_expressions() {
     assert!(html.contains("&lt;script&gt;"));
     assert!(!html.contains("dangerous()"));
     assert!(html.contains("component: MyWidget"));
+}
+
+#[test]
+fn preview_and_codegen_share_theme_resolution_and_literal_styles() {
+    let theme = gpui_rsx_core::Theme::parse(
+        "[colors]\nbrand=\"#123456\"\n[spacing]\ngutter=\"1.5rem\"\n[radius]\ncard=\"12px\"\n[text-size]\nbody=\"14px\"\n[line-height]\nbody=\"20px\"\n[opacity]\nmuted=\"60%\"\n[shadow]\ncard={expr=\"never_execute()\"}\n",
+    ).unwrap();
+    let mode = ClassMode::PERMISSIVE.with_theme(Some(theme.into()));
+    let html = preview::render(r#"<h1 styled class="bg-brand p-gutter rounded-card text-size-body leading-body opacity-muted shadow-card"/>"#, mode.clone()).unwrap();
+    for expected in [
+        "font-size:30px",
+        "background-color:#123456ff",
+        "padding:1.5rem",
+        "border-radius:12px",
+        "font-size:14px",
+        "line-height:20px",
+        "opacity:0.6",
+        "partial preview",
+    ] {
+        assert!(html.contains(expected), "missing {expected}: {html}");
+    }
+    assert!(!html.contains("never_execute"));
+    for class in [
+        "bg-brand",
+        "p-gutter",
+        "rounded-card",
+        "text-size-body",
+        "leading-body",
+        "opacity-muted",
+        "gap-4",
+        "w-1/2",
+    ] {
+        let operation = gpui_rsx_core::resolve_style(class, mode.clone())
+            .unwrap()
+            .unwrap();
+        let gpui_rsx_core::ClassOutcome::Supported(tokens) =
+            gpui_rsx_core::analyze_class(class, mode.clone()).outcome
+        else {
+            panic!("{class}");
+        };
+        assert_eq!(operation.to_tokens().to_string(), tokens.to_string());
+    }
 }
 
 #[test]
@@ -291,6 +366,7 @@ fn migration_rewrites_every_class_attribute_but_skips_tailwind_macros() {
 }
 
 #[test]
+#[cfg(feature = "convert")]
 fn conversion_handles_fragments_multiple_roots_and_placeholders() {
     let fragment = convert::convert("const a = <><div/></>;").unwrap();
     assert_eq!(fragment.rsx, "<>\n    <div />\n</>");
@@ -366,12 +442,15 @@ fn preview_page_embeds_refresh_script_only_in_watch_mode() {
 #[test]
 fn mode_for_derives_per_macro_options() {
     let base = ClassMode::PERMISSIVE;
-    assert_eq!(mode_for("rsx_tw", base).scale, SpacingScale::Tailwind);
-    assert_eq!(mode_for("rsx", base).scale, SpacingScale::Px);
-    assert!(mode_for("rsx_strict", base).strict);
+    assert_eq!(
+        mode_for("rsx_tw", base.clone()).scale(),
+        SpacingScale::Tailwind
+    );
+    assert_eq!(mode_for("rsx", base.clone()).scale(), SpacingScale::Px);
+    assert!(mode_for("rsx_strict", base.clone()).is_strict());
     // `rsx_permissive!` opts out of an enclosing strict mode.
-    assert!(!mode_for("rsx_permissive", ClassMode::STRICT).strict);
-    assert!(mode_for("rsx", ClassMode::STRICT).strict);
+    assert!(!mode_for("rsx_permissive", ClassMode::STRICT).is_strict());
+    assert!(mode_for("rsx", ClassMode::STRICT).is_strict());
 }
 
 #[test]
@@ -456,6 +535,7 @@ fn formatter_handles_every_attribute_kind() {
 }
 
 #[test]
+#[cfg(feature = "convert")]
 fn conversion_notes_every_unsupported_jsx_construct() {
     let cases = [
         (
@@ -499,6 +579,7 @@ fn conversion_notes_every_unsupported_jsx_construct() {
 }
 
 #[test]
+#[cfg(feature = "convert")]
 fn conversion_keeps_string_and_number_children_and_normalizes_classes() {
     let result = convert::convert("const a = <div>{\"str\"}{42}<span>hi</span></div>;").unwrap();
     assert_eq!(
@@ -575,6 +656,7 @@ fn preview_leaves_unknown_classes_out_of_the_style_attribute() {
 }
 
 #[test]
+#[cfg(feature = "convert")]
 fn conversion_collapses_jsx_text_whitespace() {
     let single = convert::convert("const a = <div>hi</div>;").unwrap();
     assert_eq!(single.rsx, "<div>\n    {\"hi\"}\n</div>");

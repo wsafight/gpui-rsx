@@ -1,6 +1,7 @@
 mod doctor;
 mod lsp;
 mod preview;
+mod theme;
 
 use gpui_rsx_core::{ClassMode, SpacingScale, Theme};
 use serde_json::{Value, json};
@@ -50,7 +51,7 @@ fn run() -> Result<i32, String> {
         .to_owned();
     if matches!(command.as_str(), "help" | "--help" | "-h") {
         println!(
-            "cargo rsx <doctor|lint|fmt|migrate|convert|expand|preview|lsp> [path] [options]\n\
+            "cargo rsx <doctor|lint|fmt|migrate|convert|expand|preview|theme|lsp> [path] [options]\n\
   doctor       Check resolved GPUI identities and Kit/component compatibility\n\
   lint         Diagnose RSX macros throughout the Cargo workspace\n\
   fmt          Format RSX macros; prints a file unless --write or --check\n\
@@ -58,6 +59,7 @@ fn run() -> Result<i32, String> {
   convert      Convert JSX/TSX to RSX; unsupported behavior gets placeholders\n\
   expand       Expand a standalone RSX body to Rust\n\
   preview      Preview static layout (file or Cargo project; --index selects macro)\n\
+  theme        Check, list or explain rsx.toml theme tokens\n\
   lsp          Run the language server over stdio\n\n\
 Options: --manifest-path PATH --json --strict --tailwind --deny-warnings\n\
          --check --write --output PATH --watch --port N --index N --offline\n\
@@ -69,6 +71,9 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
     if matches!(command.as_str(), "--version" | "-V") {
         println!("cargo-rsx {}", env!("CARGO_PKG_VERSION"));
         return Ok(0);
+    }
+    if command == "theme" {
+        return theme::run(&args[1..]);
     }
     if command == "lsp" {
         return lsp::run().map(|()| 0);
@@ -228,33 +233,47 @@ fn files(opt: &Options) -> Result<BTreeSet<PathBuf>, String> {
 }
 
 pub(crate) fn mode(opt: &Options, path: Option<&Path>) -> Result<ClassMode, String> {
-    let anchor = path.map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_owned()));
+    let theme = resolve_theme(opt, path)?;
+    Ok(ClassMode::builder()
+        .strict(opt.strict)
+        .scale(if opt.tailwind {
+            SpacingScale::Tailwind
+        } else {
+            theme
+                .as_ref()
+                .and_then(|t| t.scale())
+                .unwrap_or(SpacingScale::Px)
+        })
+        .theme(theme)
+        .build())
+}
+
+fn resolve_theme(
+    opt: &Options,
+    path: Option<&Path>,
+) -> Result<Option<std::sync::Arc<Theme>>, String> {
+    let fallback = opt
+        .manifest
+        .clone()
+        .map(Ok)
+        .unwrap_or_else(std::env::current_dir)
+        .map_err(|e| format!("cannot resolve current directory: {e}"))?;
+    let anchor = path
+        .or(Some(&fallback))
+        .map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_owned()));
     let mut dir = anchor
         .as_deref()
         .and_then(|p| if p.is_dir() { Some(p) } else { p.parent() });
-    let mut theme = None;
     while let Some(current) = dir {
         if current.join("Cargo.toml").exists() {
-            theme = Theme::load_from_dir(current)?;
-            break;
+            return Theme::load_from_dir(current);
         }
         dir = current.parent();
     }
-    if theme.is_none()
-        && let Some(manifest) = &opt.manifest
-    {
-        theme = Theme::load_from_dir(manifest.parent().unwrap_or(Path::new(".")))?;
+    if let Some(manifest) = &opt.manifest {
+        return Theme::load_from_dir(manifest.parent().unwrap_or(Path::new(".")));
     }
-    Ok(ClassMode {
-        strict: opt.strict,
-        scale: if opt.tailwind {
-            SpacingScale::Tailwind
-        } else {
-            theme.and_then(|t| t.scale).unwrap_or(SpacingScale::Px)
-        },
-        theme,
-        report_dynamic_at_exit: false,
-    })
+    Ok(None)
 }
 
 fn is_stdin(opt: &Options) -> bool {
@@ -322,7 +341,7 @@ fn rewrite(opt: &Options, migrate: bool) -> Result<i32, String> {
     // Rewrite everything in memory first so an error never leaves the tree half-written.
     let mut rewritten = Vec::new();
     for (path, source) in sources(opt)? {
-        if migrate && mode(opt, mode_path(&path))?.scale == SpacingScale::Tailwind {
+        if migrate && mode(opt, mode_path(&path))?.scale() == SpacingScale::Tailwind {
             return Err(format!(
                 "{} already uses Tailwind scale; refusing a second migration",
                 path.display()
