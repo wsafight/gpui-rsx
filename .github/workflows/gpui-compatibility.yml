@@ -1,8 +1,7 @@
 name: GPUI Compatibility
 
 on:
-  schedule:
-    - cron: '0 0 * * *'
+  # Upstream upgrades are maintained manually; do not create scheduled PRs.
   workflow_dispatch:
 
 permissions:

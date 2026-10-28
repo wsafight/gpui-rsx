@@ -4,13 +4,12 @@
 # =============================================================================
 #
 # English:
-# Automatically checks for dependency updates on a weekly basis and creates
-# pull requests to keep dependencies up-to-date. Includes both Rust crates
-# (via Cargo) and GitHub Actions versions.
+# Dependencies are updated manually. Version-update pull requests are disabled
+# for each ecosystem with open-pull-requests-limit: 0.
 #
 # 中文：
-# 每周自动检查依赖更新并创建 Pull Request 以保持依赖的最新状态。
-# 包括 Rust crates（通过 Cargo）和 GitHub Actions 版本。
+# 依赖由维护者手动升级，各生态的版本更新 PR 均通过
+# open-pull-requests-limit: 0 停用。
 #
 # Documentation / 文档:
 # https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
@@ -26,7 +25,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 10
+    open-pull-requests-limit: 0
     reviewers:
       - "wsafight"
     labels:
@@ -53,7 +52,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     reviewers:
       - "wsafight"
     labels:
@@ -73,7 +72,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     reviewers:
       - "wsafight"
     labels:
@@ -96,7 +95,7 @@ updates:
       day: "monday"
       time: "09:00"
       timezone: "Asia/Shanghai"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     reviewers:
       - "wsafight"
     labels:
