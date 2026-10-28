@@ -9,6 +9,15 @@
 
 ## [未发布]
 
+### 新增
+
+- `#[component]` 支持同步函数，复用结构体组件的编译期必填属性检查、默认值、布尔 flag
+  和 children builder。显式 `#[context]` 参数在 GPUI 渲染时获得 `&mut Window` / `&mut App`。
+- 元素、组件 children、根 Fragment 和循环内均支持嵌套 `<>...</>`，不添加包装元素或
+  Fragment 运行时向量。格式化保留分组，诊断、class 范围、间距迁移和预览会遍历其中内容。
+- 上述能力参考 [@ppmpreetham](https://github.com/ppmpreetham) 的
+  [#8](https://github.com/wsafight/gpui-rsx/pull/8)，基于当前架构重新实现。
+
 ## [0.9.0] - 2026-10-28
 
 ### 变更

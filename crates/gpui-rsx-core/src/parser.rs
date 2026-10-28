@@ -114,6 +114,8 @@ pub enum RsxAttribute {
 pub enum RsxNode {
     /// 子元素
     Element(RsxElement),
+    /// A nested fragment groups children without introducing an element.
+    Fragment(Vec<RsxNode>),
     /// 表达式（文本或其他）
     Expr(Expr),
     /// 展开子节点列表，如 `{...iter}`
@@ -128,21 +130,8 @@ pub enum RsxNode {
 
 impl Parse for RsxBody {
     fn parse(input: ParseStream) -> Result<Self> {
-        // 检查是否是 Fragment: <>...</>
         if input.peek(Token![<]) && input.peek2(Token![>]) {
-            // 解析 <>
-            input.parse::<Token![<]>()?;
-            input.parse::<Token![>]>()?;
-
-            // 解析子节点
-            let children = parse_children(input, None)?;
-
-            // 解析 </>
-            input.parse::<Token![<]>()?;
-            input.parse::<Token![/]>()?;
-            input.parse::<Token![>]>()?;
-
-            Ok(RsxBody::Fragment(children))
+            Ok(RsxBody::Fragment(parse_fragment(input)?))
         } else {
             // 单个元素
             let element: RsxElement = input.parse()?;
@@ -311,7 +300,9 @@ fn parse_children(
 /// 处理所有子节点类型：`{expr}`, `{...spread}`, `{for ...}`, `<element>`, `"string"`。
 /// 如果当前 token 不匹配任何已知类型，返回 `Ok(None)`，由调用方决定如何报错。
 fn try_parse_child_node(input: ParseStream) -> Result<Option<RsxNode>> {
-    if input.peek(token::Brace) {
+    if input.peek(Token![<]) && input.peek2(Token![>]) {
+        Ok(Some(RsxNode::Fragment(parse_fragment(input)?)))
+    } else if input.peek(token::Brace) {
         let content;
         syn::braced!(content in input);
 
@@ -339,6 +330,16 @@ fn try_parse_child_node(input: ParseStream) -> Result<Option<RsxNode>> {
     } else {
         Ok(None)
     }
+}
+
+fn parse_fragment(input: ParseStream) -> Result<Vec<RsxNode>> {
+    input.parse::<Token![<]>()?;
+    input.parse::<Token![>]>()?;
+    let children = parse_children(input, None)?;
+    input.parse::<Token![<]>()?;
+    input.parse::<Token![/]>()?;
+    input.parse::<Token![>]>()?;
+    Ok(children)
 }
 
 /// 解析 for 循环: `for item in iter { <child /> ... }`
@@ -619,5 +620,20 @@ mod tests {
         assert!(matches!(nodes[0], RsxNode::Element(_)));
         assert!(matches!(nodes[1], RsxNode::Spread(_)));
         assert!(matches!(nodes[2], RsxNode::For { .. }));
+    }
+
+    #[test]
+    fn nested_fragments_preserve_groups_and_require_matching_closers() {
+        let RsxBody::Single(element) = parse("<div><><span/><><div/></></></div>").unwrap() else {
+            panic!("expected an element");
+        };
+        let RsxNode::Fragment(children) = &element.children[0] else {
+            panic!("expected a nested fragment");
+        };
+        assert_eq!(children.len(), 2);
+        assert!(matches!(children[1], RsxNode::Fragment(_)));
+        for source in ["<div><></div>", "<div><><span/></div></>", "<><div></></>"] {
+            assert!(parse(source).is_err(), "{source}");
+        }
     }
 }

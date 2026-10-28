@@ -18,6 +18,7 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
         for child in children {
             match child {
                 RsxNode::Element(el) => element(el, mode.clone(), out),
+                RsxNode::Fragment(children) => nodes(children, mode.clone(), out),
                 RsxNode::Expr(expr) => match literal_string(expr) {
                     Some(text) => out.push_str(&escape(&text)),
                     None => out.push_str("<span class=\"rsx-placeholder\">{expression}</span>"),

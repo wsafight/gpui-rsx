@@ -135,8 +135,7 @@ fn generate_body_checked(
     match body {
         RsxBody::Single(element) => generate_element_checked(element, false, mode, dynamic_used),
         RsxBody::Fragment(children) => {
-            let child_exprs: Vec<TokenStream> = children
-                .iter()
+            let child_exprs: Vec<TokenStream> = flattened_nodes(children)
                 .map(|node| generate_node_checked(node, false, mode.clone(), dynamic_used))
                 .collect::<Result<_, _>>()?;
             // Fragment 保持 vec![] —— 返回类型是用户可见 API
@@ -158,6 +157,8 @@ fn generate_node_checked(
         RsxNode::Element(elem) => {
             generate_element_checked(elem, require_loop_key, mode, dynamic_used)
         }
+        // All callers flatten fragment groups before generating individual nodes.
+        RsxNode::Fragment(_) => unreachable!("nested fragment was not flattened"),
         // 表达式会被自动推断类型，GPUI 的 .child() 接受 impl IntoElement
         RsxNode::Expr(expr) => Ok(expr.to_token_stream()),
         RsxNode::Spread(expr) => Ok(expr.to_token_stream()),
@@ -186,21 +187,27 @@ fn generate_for_loop_checked(
     mode: ClassMode,
     dynamic_used: &mut bool,
 ) -> CodegenResult {
-    let body_exprs: Vec<TokenStream> = body
-        .iter()
-        .map(|node| generate_node_checked(node, true, mode.clone(), dynamic_used))
-        .collect::<Result<_, _>>()?;
+    let body_exprs: Vec<(TokenStream, bool)> = flattened_nodes(body)
+        .map(|node| {
+            let expr = generate_node_checked(node, true, mode.clone(), dynamic_used)?;
+            let yields_many = matches!(node, RsxNode::For { .. } | RsxNode::Spread(_));
+            Ok((expr, yields_many))
+        })
+        .collect::<Result<_, TokenStream>>()?;
     // A nested `for` or a spread yields an iterator of elements rather than one element.
-    let yields_many = |node: &RsxNode| matches!(node, RsxNode::For { .. } | RsxNode::Spread(_));
-    if let [single] = body_exprs.as_slice() {
-        if yields_many(&body[0]) {
+    if body_exprs.is_empty() {
+        Ok(quote! {
+            (#iter).into_iter().flat_map(|#binding| ::core::iter::empty::<::gpui::AnyElement>())
+        })
+    } else if let [(single, yields_many)] = body_exprs.as_slice() {
+        if *yields_many {
             Ok(quote! { (#iter).into_iter().flat_map(|#binding| #single) })
         } else {
             Ok(quote! { (#iter).into_iter().map(|#binding| #single) })
         }
-    } else if body.iter().any(yields_many) {
-        let pieces = body.iter().zip(&body_exprs).map(|(node, expr)| {
-            if yields_many(node) {
+    } else if body_exprs.iter().any(|(_, yields_many)| *yields_many) {
+        let pieces = body_exprs.iter().map(|(expr, yields_many)| {
+            if *yields_many {
                 quote! {
                     ::core::iter::IntoIterator::into_iter(#expr)
                         .map(|__rsx_child| __rsx_child.into_any_element())
@@ -215,10 +222,29 @@ fn generate_for_loop_checked(
             (#iter).into_iter().flat_map(|#binding| #first #(.chain(#chained))*)
         })
     } else {
+        let exprs = body_exprs.iter().map(|(expr, _)| expr);
         Ok(quote! {
-            (#iter).into_iter().flat_map(|#binding| [#((#body_exprs).into_any_element()),*])
+            (#iter).into_iter().flat_map(|#binding| [#((#exprs).into_any_element()),*])
         })
     }
+}
+
+/// Flatten syntax groups during expansion; nested fragments allocate no runtime Vec.
+fn flattened_nodes(nodes: &[RsxNode]) -> impl Iterator<Item = &RsxNode> {
+    let mut current = nodes.iter();
+    // No allocation on the common path without fragment groups.
+    let mut parents = Vec::new();
+    std::iter::from_fn(move || {
+        loop {
+            match current.next() {
+                Some(RsxNode::Fragment(children)) => {
+                    parents.push(std::mem::replace(&mut current, children.iter()));
+                }
+                Some(node) => return Some(node),
+                None => current = parents.pop()?,
+            }
+        }
+    })
 }
 
 /// 生成单个元素的代码
@@ -372,6 +398,15 @@ fn generate_children_methods(
 ) -> Result<(), TokenStream> {
     for node in children {
         match node {
+            RsxNode::Fragment(children) => {
+                generate_children_methods(
+                    children,
+                    require_loop_key,
+                    methods,
+                    mode.clone(),
+                    dynamic_used,
+                )?;
+            }
             RsxNode::Expr(expr) => {
                 methods.push(quote! { .child(#expr) });
             }
@@ -653,5 +688,22 @@ mod tests {
         let multiple = expand("<ul>{for row in rows {<li>{row}</li><li>{row}</li>}}</ul>");
         assert!(multiple.contains("flat_map"), "{multiple}");
         assert!(multiple.contains("into_any_element ()"), "{multiple}");
+    }
+
+    #[test]
+    fn fragment_groups_have_the_same_expansion_as_ungrouped_children() {
+        for (grouped, plain) in [
+            (
+                "<div><><span/><><span/></></></div>",
+                "<div><span/><span/></div>",
+            ),
+            ("<><div/><><div/><div/></></>", "<><div/><div/><div/></>"),
+            (
+                "<div>{for x in xs {<><span/>{...row}</>}}</div>",
+                "<div>{for x in xs {<span/>{...row}}}</div>",
+            ),
+        ] {
+            assert_eq!(expand(grouped), expand(plain));
+        }
     }
 }

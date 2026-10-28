@@ -376,7 +376,7 @@ pub fn walk_body(body: &RsxBody, visitor: &mut impl FnMut(&RsxElement)) {
         for node in nodes {
             match node {
                 RsxNode::Element(el) => element(el, visitor),
-                RsxNode::For { body, .. } => self_nodes(body, visitor),
+                RsxNode::For { body, .. } | RsxNode::Fragment(body) => self_nodes(body, visitor),
                 _ => {}
             }
         }

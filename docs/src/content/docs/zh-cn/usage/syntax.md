@@ -78,6 +78,50 @@ rsx! {
 
 `base` 会被宏消费，不会生成 `.base(...)` 方法调用。
 
+### 函数式组件（未发布）
+
+在同步函数上使用 `#[component]`，即可生成与结构体组件相同的属性 builder。
+函数体在 GPUI 渲染该元素时执行：
+
+```rust
+use gpui::prelude::*;
+use gpui::*;
+use gpui_rsx::{component, rsx};
+
+#[component]
+fn Badge(
+    label: SharedString,
+    #[prop(default)] highlighted: bool,
+    #[prop(default = 2u8)] depth: u8,
+    #[children] children: Vec<AnyElement>,
+    #[context] cx: &mut App,
+) -> impl IntoElement {
+    let _ = (cx, depth);
+    rsx! {
+        <div class="flex gap-2" whenClass={(highlighted, "bg-blue-500")}>
+            {label}{...children}
+        </div>
+    }
+}
+
+let badge = rsx! {
+    <Badge label="Inbox" highlighted>
+        <><span>{"3 unread"}</span><span>{"!"}</span></>
+    </Badge>
+};
+```
+
+普通参数为必填属性。`#[prop(default)]` 使用 `Default::default()`，
+`#[prop(default = expr)]` 提供显式默认值。带默认值的布尔属性使用 flag setter
+（`highlighted`）或条件 setter（`highlightedIf={active}`）。`#[children]` 将子节点
+收集到 `Vec<AnyElement>`。也支持 `<ui::Badge ...>` 这样的模块路径标签。
+
+可选的 `#[context]` 参数必须是 `&mut Window` 或 `&mut App`，由 GPUI 渲染时传入，
+调用方无需将它们作为属性传递；宏也不会隐式捕获调用方的 `window` 或 `cx`。
+属性使用具体的拥有型类型或 `'static` 引用；回调属性可使用 boxed callback。
+暂不支持泛型、async/unsafe 函数或解构参数。原函数名会成为无参 builder 构造函数：
+`Badge().label("Inbox")`。
+
 ## 属性
 
 Flag 属性会生成无参方法：
@@ -199,6 +243,22 @@ rsx! {
 ```
 
 Fragment 会展开为 `vec![...]`。如果根元素具体类型不同，通常需要 `into_any_element()` 或包一层共同父元素。
+
+未发布的开发版本还支持嵌套 Fragment：
+
+```rust
+rsx! {
+    <div>
+        <><span>{"First"}</span><span>{"Second"}</span></>
+        {for item in items {
+            <><span>{item.name.clone()}</span><span>{"Details"}</span></>
+        }}
+    </div>
+}
+```
+
+嵌套分组按顺序直接添加子节点，不增加包装元素或额外的运行时向量，支持空分组。
+循环内的 stateful 后代仍需提供 `key` 或 `id`；格式化保留分组，诊断和预览会遍历其中内容。
 
 ## 条件渲染
 

@@ -1,0 +1,45 @@
+error[E0277]: the trait bound `GreetingBuilder: gpui::IntoElement` is not satisfied
+  --> tests/ui/function_component_missing_prop.rs:13:21
+   |
+13 |     require_element(rsx! { <Greeting /> });
+   |     --------------- ^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |     |
+   |     required by a bound introduced by this call
+   |
+help: the trait `gpui::IntoElement` is not implemented for `GreetingBuilder`
+  --> tests/ui/function_component_missing_prop.rs:5:1
+   |
+ 5 | #[component]
+   | ^^^^^^^^^^^^
+help: the trait `gpui::IntoElement` is conditionally implemented for `GreetingBuilder<__Label>`
+  --> tests/ui/function_component_missing_prop.rs:5:1
+   |
+ 5 | #[component]
+   | ^^^^^^^^^^^^ unsatisfied requirement introduced here: `MissingRequiredProp: label`
+note: required by a bound in `require_element`
+  --> tests/ui/function_component_missing_prop.rs:10:28
+   |
+10 | fn require_element(_: impl IntoElement) {}
+   |                            ^^^^^^^^^^^ required by this bound in `require_element`
+   = note: this error originates in the attribute macro `component` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0599]: the method `build` exists for struct `GreetingBuilder`, but its trait bounds were not satisfied
+  --> tests/ui/function_component_missing_prop.rs:14:24
+   |
+ 5 | #[component]
+   | ------------ method `build` not found for this struct because it doesn't satisfy `MissingRequiredProp: label`
+...
+14 |     let _ = Greeting().build();
+   |                        ^^^^^ method cannot be called on `GreetingBuilder` due to unsatisfied trait bounds
+   |
+note: trait bound `MissingRequiredProp: label` was not satisfied
+  --> tests/ui/function_component_missing_prop.rs:5:1
+   |
+ 5 | #[component]
+   | ^^^^^^^^^^^^
+note: the trait `label` must be implemented
+  --> tests/ui/function_component_missing_prop.rs:5:1
+   |
+ 5 | #[component]
+   | ^^^^^^^^^^^^
+   = note: this error originates in the attribute macro `component` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,6 +1,7 @@
 mod common;
 
 use gpui::component::Sizable as _;
+use gpui::component::ActiveTheme as _;
 use gpui::component::StyledExt as _;
 use gpui::component::button::{Button, ButtonVariants as _};
 use gpui::component::input::{Input, InputState};
@@ -9,7 +10,33 @@ use gpui::component::popover::Popover;
 use gpui::component::tab::Tab;
 use gpui::prelude::*;
 use gpui::*;
-use gpui_rsx::rsx;
+use gpui_rsx::{component, rsx};
+
+#[component]
+fn StatusBadge(label: SharedString, #[prop(default)] highlighted: bool) -> impl IntoElement {
+    rsx! {
+        <span
+            class="px-3 py-1 rounded-full text-sm bg-zinc-800 text-zinc-300"
+            whenClass={(highlighted, "bg-blue-600 text-white")}
+        >
+            {label}
+        </span>
+    }
+}
+
+#[component]
+fn StatusCard(
+    title: SharedString,
+    #[children] children: Vec<AnyElement>,
+    #[context] cx: &mut App,
+) -> impl IntoElement {
+    rsx! {
+        <section class="flex flex-col gap-3 p-4 rounded-lg border border-zinc-700" textColor={cx.theme().foreground}>
+            <h2 class="text-lg font-semibold">{title}</h2>
+            <div class="flex gap-2">{...children}</div>
+        </section>
+    }
+}
 
 struct ComponentView;
 
@@ -37,6 +64,13 @@ impl Render for ComponentView {
                         {"External component builders composed through RSX base constructors."}
                     </p>
                 </header>
+
+                <StatusCard title="Function components">
+                    <>
+                        <StatusBadge label="Required props checked" highlighted />
+                        <StatusBadge label="Children without wrappers" />
+                    </>
+                </StatusCard>
 
                 <section class="flex flex-col gap-3 p-4 rounded-lg bg-zinc-900 border border-zinc-700">
                     <Label

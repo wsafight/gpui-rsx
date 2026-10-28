@@ -17927,11 +17927,22 @@
     ]
   },
   "component_attribute_macro": "component",
+  "components": {
+    "children": "#[children] Vec<AnyElement>",
+    "declarations": [
+      "struct with named fields",
+      "synchronous function with concrete prop types"
+    ],
+    "function_context": "#[context] &mut Window or &mut App; supplied during RenderOnce, not as props",
+    "optional_props": "#[prop(default)] or #[prop(default = expr)]",
+    "required_props": "compile-time checked"
+  },
   "examples": [
     "<div class=\"flex flex-col gap-4 p-4 bg-blue-500\"><span>{\"Hello\"}</span></div>",
     "<button class=\"hover:bg-blue-600 active:opacity-75\" onClick={handler}>{\"Save\"}</button>",
     "<ul>{for item in items { <li key={item.id} onClick={handler}>{item.name.clone()}</li> }}</ul>",
-    "<div class=\"w-[280px] h-1/2 gap-[14px]\" />"
+    "<div class=\"w-[280px] h-1/2 gap-[14px]\" />",
+    "<div><><span>{\"One\"}</span><span>{\"Two\"}</span></></div>"
   ],
   "gpui_component_revision": "gpui-component@0.8.1",
   "gpui_revision": "gpui-pre@0.3.10",
@@ -17946,7 +17957,8 @@
   "syntax": {
     "children_spread": "{...children}",
     "fragment": "<>...</>",
-    "loop": "{for item in items { <div key={item.id} /> }}"
+    "loop": "{for item in items { <div key={item.id} /> }}",
+    "nested_fragments": "allowed in elements, fragments and loops; no wrapper element"
   },
   "tags": {
     "custom": "Rust path; use base={constructor} when arguments are required",

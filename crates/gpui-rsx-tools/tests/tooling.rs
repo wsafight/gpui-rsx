@@ -7,6 +7,31 @@ use gpui_rsx_tools::{
 };
 
 #[test]
+fn nested_fragments_preserve_formatting_diagnostics_migration_and_preview() {
+    let source = r#"<div><><span class="gap-16"/><>{for item in items {<><span class="flex-colum"/></>}}</></></div>"#;
+    let formatted = format::body(source).unwrap();
+    assert_eq!(formatted.matches("<>").count(), 3);
+    assert_eq!(format::body(&formatted).unwrap(), formatted);
+    let diagnostics = analyze_body(source, ClassMode::PERMISSIVE);
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        &source[diagnostics[0].start..diagnostics[0].end],
+        "flex-colum"
+    );
+    assert_eq!(class_literal_ranges(source).unwrap().len(), 2);
+    let rust = format!("fn render() {{ rsx! {{ {source} }} }}");
+    assert!(format::migrate_rust(&rust).unwrap().contains("gap-4"));
+    assert_eq!(
+        preview::render(
+            "<div><><span>{\"hello\"}</span></></div>",
+            ClassMode::PERMISSIVE
+        )
+        .unwrap(),
+        preview::render("<div><span>{\"hello\"}</span></div>", ClassMode::PERMISSIVE).unwrap()
+    );
+}
+
+#[test]
 fn scans_qualified_macros_without_matching_comments_or_strings() {
     let source = "// rsx!{ignored}\nfn f(){ let s=\"rsx!{}\"; let _=gpui_rsx::rsx!{<div class=\"dark:flex\"/>}; }";
     assert_eq!(macro_calls(source).unwrap().len(), 1);

@@ -55,7 +55,199 @@ fn expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
             "#[component] takes no arguments; configure props with #[prop(...)] and #[children]",
         ));
     }
-    let mut input: syn::ItemStruct = syn::parse2(item)?;
+    let input = syn::parse2::<syn::Item>(item)?;
+    let gates: Vec<_> = match &input {
+        syn::Item::Struct(input) => &input.attrs,
+        syn::Item::Fn(input) => &input.attrs,
+        _ => &[][..],
+    }
+    .iter()
+    .filter(|attr| attr.path().is_ident("cfg"))
+    .cloned()
+    .collect();
+    let expanded = match input {
+        syn::Item::Struct(input) => expand_struct(input),
+        syn::Item::Fn(input) => expand_function(input),
+        input => Err(syn::Error::new_spanned(
+            input,
+            "#[component] requires a struct with named fields or a synchronous function",
+        )),
+    }?;
+    // Gate every generated item, including builders and impls, along with its source.
+    if gates.is_empty() {
+        return Ok(expanded);
+    }
+    let file: syn::File = syn::parse2(expanded)?;
+    let items = file
+        .items
+        .into_iter()
+        .map(|item| quote! { #(#gates)* #item });
+    Ok(quote! { #(#items)* })
+}
+
+fn expand_function(mut input: syn::ItemFn) -> syn::Result<TokenStream> {
+    let sig = &input.sig;
+    if !sig.generics.params.is_empty() || sig.generics.where_clause.is_some() {
+        return Err(syn::Error::new_spanned(
+            &sig.generics,
+            "#[component] does not support generic functions yet; use concrete owned prop types",
+        ));
+    }
+    if sig.asyncness.is_some()
+        || sig.constness.is_some()
+        || sig.unsafety.is_some()
+        || sig.abi.is_some()
+        || sig.variadic.is_some()
+    {
+        return Err(syn::Error::new_spanned(
+            sig,
+            "#[component] requires a safe, synchronous Rust function",
+        ));
+    }
+    if matches!(sig.output, syn::ReturnType::Default) {
+        return Err(syn::Error::new_spanned(
+            sig,
+            "component functions must return an element, e.g. `-> impl IntoElement`",
+        ));
+    }
+
+    let name = input.sig.ident.clone();
+    let vis = input.vis.clone();
+    let attrs: Vec<_> = input
+        .attrs
+        .iter()
+        .filter(|attr| {
+            matches!(
+                attr.path().get_ident().map(ToString::to_string).as_deref(),
+                Some("doc" | "allow" | "warn" | "deny" | "forbid" | "expect" | "deprecated")
+            )
+        })
+        .cloned()
+        .collect();
+    let render_fn = format_ident!("__rsx_render_{}", name.unraw());
+    let mut fields = Vec::new();
+    let mut arguments = Vec::new();
+    let mut contexts = std::collections::HashSet::new();
+    for arg in &mut input.sig.inputs {
+        let syn::FnArg::Typed(arg) = arg else {
+            return Err(syn::Error::new_spanned(
+                arg,
+                "component functions cannot take `self`",
+            ));
+        };
+        let syn::Pat::Ident(pattern) = &*arg.pat else {
+            return Err(syn::Error::new_spanned(
+                &arg.pat,
+                "component parameters must be named props; destructuring is not supported",
+            ));
+        };
+        if pattern.by_ref.is_some() || pattern.subpat.is_some() {
+            return Err(syn::Error::new_spanned(
+                &arg.pat,
+                "component parameters must be named props",
+            ));
+        }
+        let ident = &pattern.ident;
+        let ty = &arg.ty;
+        if arg.attrs.iter().any(|attr| attr.path().is_ident("context")) {
+            if arg.attrs.len() != 1 || !matches!(arg.attrs[0].meta, syn::Meta::Path(_)) {
+                return Err(syn::Error::new_spanned(
+                    arg,
+                    "#[context] cannot have options or be combined with prop attributes",
+                ));
+            }
+            let syn::Type::Reference(reference) = &**ty else {
+                return Err(context_error(ty));
+            };
+            let syn::Type::Path(path) = &*reference.elem else {
+                return Err(context_error(ty));
+            };
+            let kind = path
+                .path
+                .segments
+                .last()
+                .map(|segment| segment.ident.to_string());
+            if reference.mutability.is_none() || !matches!(kind.as_deref(), Some("Window" | "App"))
+            {
+                return Err(context_error(ty));
+            }
+            let kind = kind.expect("validated context type");
+            if !contexts.insert(kind.clone()) {
+                return Err(syn::Error::new_spanned(
+                    arg,
+                    "each context type may appear only once",
+                ));
+            }
+            arguments.push(if kind == "Window" {
+                quote! { __rsx_window }
+            } else {
+                quote! { __rsx_cx }
+            });
+        } else {
+            if let syn::Type::Reference(reference) = &**ty
+                && !reference
+                    .lifetime
+                    .as_ref()
+                    .is_some_and(|lifetime| lifetime.ident == "static")
+            {
+                return Err(syn::Error::new_spanned(
+                    ty,
+                    "component props must own their values or use 'static references; use #[context] for &mut Window or &mut App",
+                ));
+            }
+            if matches!(&**ty, syn::Type::ImplTrait(_)) {
+                return Err(syn::Error::new_spanned(
+                    ty,
+                    "component props need concrete types; use a boxed callback instead of `impl Trait`",
+                ));
+            }
+            let prop_attrs = &arg.attrs;
+            if prop_attrs.iter().any(|attr| {
+                !matches!(
+                    attr.path().get_ident().map(ToString::to_string).as_deref(),
+                    Some("prop" | "children" | "doc")
+                )
+            }) {
+                return Err(syn::Error::new_spanned(
+                    arg,
+                    "component props support only #[prop(...)] and #[children] annotations",
+                ));
+            }
+            fields.push(quote! { #(#prop_attrs)* #ident: #ty });
+            arguments.push(quote! { self.#ident });
+        }
+        // Prop annotations belong to generated fields, not the private render function.
+        arg.attrs.clear();
+    }
+    input.sig.ident = render_fn.clone();
+    input.vis = syn::Visibility::Inherited;
+    input.attrs.retain(|attr| !attr.path().is_ident("doc"));
+    input
+        .attrs
+        .push(syn::parse_quote!(#[allow(non_snake_case)]));
+    let props: syn::ItemStruct = syn::parse2(quote! {
+        #(#attrs)*
+        #[derive(::gpui::IntoElement)]
+        #vis struct #name { #(#fields,)* }
+    })?;
+    let builder = expand_struct(props)?;
+    Ok(quote! {
+        #builder
+        #input
+
+        impl ::gpui::RenderOnce for #name {
+            fn render(self, __rsx_window: &mut ::gpui::Window, __rsx_cx: &mut ::gpui::App) -> impl ::gpui::IntoElement {
+                #render_fn(#(#arguments),*)
+            }
+        }
+    })
+}
+
+fn context_error(ty: &syn::Type) -> syn::Error {
+    syn::Error::new_spanned(ty, "#[context] requires `&mut Window` or `&mut App`")
+}
+
+fn expand_struct(mut input: syn::ItemStruct) -> syn::Result<TokenStream> {
     if !input.generics.params.is_empty() {
         return Err(syn::Error::new(
             input.generics.span(),
@@ -72,15 +264,28 @@ fn expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     let mut props = Vec::new();
     for field in fields.named.iter_mut() {
         let ident = field.ident.clone().expect("named field");
-        let mut kind = PropKind::Required;
+        let mut kind = None;
         let mut kept = Vec::new();
         for attr in field.attrs.drain(..) {
-            if attr.path().is_ident("children") {
-                kind = PropKind::Children;
+            let parsed = if attr.path().is_ident("children") {
+                if !matches!(attr.meta, syn::Meta::Path(_)) {
+                    return Err(syn::Error::new_spanned(
+                        attr,
+                        "#[children] takes no arguments",
+                    ));
+                }
+                PropKind::Children
             } else if attr.path().is_ident("prop") {
-                kind = parse_prop_attr(&attr)?;
+                parse_prop_attr(&attr)?
             } else {
                 kept.push(attr);
+                continue;
+            };
+            if kind.replace(parsed).is_some() {
+                return Err(syn::Error::new_spanned(
+                    &field.ident,
+                    "use only one #[prop(...)] or #[children] annotation per prop",
+                ));
             }
         }
         let docs = kept
@@ -92,7 +297,7 @@ fn expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
         props.push(Prop {
             ident,
             ty: field.ty.clone(),
-            kind,
+            kind: kind.unwrap_or(PropKind::Required),
             docs,
         });
     }
@@ -401,6 +606,60 @@ fn to_pascal(name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_unsupported_function_signatures_and_contexts() {
+        for (source, expected) in [
+            (
+                quote! { async fn Card() -> impl IntoElement { div() } },
+                "synchronous",
+            ),
+            (
+                quote! { fn Card<T>(value: T) -> impl IntoElement { div() } },
+                "generic functions",
+            ),
+            (quote! { fn Card() {} }, "must return an element"),
+            (
+                quote! { fn Card((x, y): (u8, u8)) -> impl IntoElement { div() } },
+                "destructuring",
+            ),
+            (
+                quote! { fn Card(handler: impl Fn()) -> impl IntoElement { div() } },
+                "concrete types",
+            ),
+            (
+                quote! { fn Card(label: &str) -> impl IntoElement { div() } },
+                "must own their values",
+            ),
+            (
+                quote! { fn Card(#[prop(default)] #[children] children: Vec<AnyElement>) -> impl IntoElement { div() } },
+                "only one",
+            ),
+            (
+                quote! { fn Card(#[children(default)] children: Vec<AnyElement>) -> impl IntoElement { div() } },
+                "takes no arguments",
+            ),
+            (
+                quote! { fn Card(#[context] cx: &App) -> impl IntoElement { div() } },
+                "&mut Window",
+            ),
+            (
+                quote! { fn Card(#[context] cx: &mut Context<Card>) -> impl IntoElement { div() } },
+                "&mut App",
+            ),
+            (
+                quote! { fn Card(#[context] a: &mut App, #[context] b: &mut App) -> impl IntoElement { div() } },
+                "only once",
+            ),
+            (
+                quote! { fn Card(#[context] #[prop(default)] cx: &mut App) -> impl IntoElement { div() } },
+                "combined",
+            ),
+        ] {
+            let error = expand(TokenStream::new(), source).unwrap_err().to_string();
+            assert!(error.contains(expected), "{error}");
+        }
+    }
 
     #[test]
     fn rejects_generics_and_tuple_structs() {

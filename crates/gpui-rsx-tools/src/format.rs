@@ -126,6 +126,11 @@ pub fn body(source: &str) -> Result<String, String> {
         for child in children {
             match child {
                 RsxNode::Element(el) => element(source, el, depth, out)?,
+                RsxNode::Fragment(children) => {
+                    out.push_str(&format!("{indent}<>\n"));
+                    nodes(source, children, depth + 1, out)?;
+                    out.push_str(&format!("{indent}</>\n"));
+                }
                 RsxNode::Expr(expr) => out.push_str(&format!("{indent}{{{}}}\n", expression(expr))),
                 RsxNode::Spread(expr) => {
                     out.push_str(&format!("{indent}{{...{}}}\n", expression(expr)))

@@ -137,6 +137,7 @@ ID；`groupActive` 需要。
 | --- | --- |
 | 单个元素 | 生成 GPUI 元素表达式 |
 | Fragment `<>...</>` | `vec![...]` |
+| 嵌套 Fragment（未发布） | 子节点直接加入外层元素、Fragment 或循环 |
 | 子表达式 `{expr}` | `.child(expr)` |
 | Spread `{...iter}` | `.children(iter)` |
 | For 循环 `{for item in iter { ... }}` | `.children(iter.into_iter().map(...))` 或 `.flat_map(...)` |

@@ -10,6 +10,7 @@ const EXAMPLES: &[&str] = &[
     r#"<button class="hover:bg-blue-600 active:opacity-75" onClick={handler}>{"Save"}</button>"#,
     r#"<ul>{for item in items { <li key={item.id} onClick={handler}>{item.name.clone()}</li> }}</ul>"#,
     r#"<div class="w-[280px] h-1/2 gap-[14px]" />"#,
+    r#"<div><><span>{"One"}</span><span>{"Two"}</span></></div>"#,
 ];
 
 pub fn document() -> Value {
@@ -45,6 +46,13 @@ pub fn document() -> Value {
         "gpui_component_revision": gpui_rsx_core::GPUI_COMPONENT_REV,
         "macros": ["rsx", "rsx_strict", "rsx_permissive", "rsx_tw", "rsx_expand"],
         "component_attribute_macro": "component",
+        "components": {
+            "declarations": ["struct with named fields", "synchronous function with concrete prop types"],
+            "required_props": "compile-time checked",
+            "optional_props": "#[prop(default)] or #[prop(default = expr)]",
+            "children": "#[children] Vec<AnyElement>",
+            "function_context": "#[context] &mut Window or &mut App; supplied during RenderOnce, not as props",
+        },
         "tags": { "div_aliases": HTML_TAGS, "special": ["img", "svg", "canvas"], "custom": "Rust path; use base={constructor} when arguments are required" },
         "attributes": {
             "special": ["class", "id", "key", "base", "styled", "when", "whenSome", "whenClass", "hoverClass", "focusClass", "activeClass", "onUnknownClass"],
@@ -59,7 +67,7 @@ pub fn document() -> Value {
             "dynamic_limitations": ["No state variants", "No rsx.toml tokens", "Only Styled methods; stateful classes need static literals"],
             "unsupported_variants": ["dark", "sm", "md", "lg", "xl", "2xl"],
         },
-        "syntax": { "fragment": "<>...</>", "children_spread": "{...children}", "loop": "{for item in items { <div key={item.id} /> }}" },
+        "syntax": { "fragment": "<>...</>", "nested_fragments": "allowed in elements, fragments and loops; no wrapper element", "children_spread": "{...children}", "loop": "{for item in items { <div key={item.id} /> }}" },
         "examples": EXAMPLES,
     })
 }

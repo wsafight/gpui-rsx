@@ -26,4 +26,11 @@ await self.onmessage({data:{id:13,operation:'convert',source:'<div>hello</div>'}
 assert.ok(message.result.Ok.rsx.includes('hello'));
 await self.onmessage({data:{id:14,operation:'format',source:'<div>'}});
 assert.equal(message.id,14);assert.ok(message.error);
-console.log('Playground WASM + worker: 9 checks passed');
+const grouped = '<div><><span>{"one"}</span><span>{"two"}</span></></div>';
+await self.onmessage({data:{id:15,operation:'analyze',source:grouped,strict:true,tailwind:false}});
+assert.equal(message.id,15);
+assert.deepEqual(message.result.diagnostics,[]);
+assert.ok(!message.result.expansion.Ok.includes('vec!'));
+assert.match(message.result.preview.Ok,/one.*two/);
+assert.match(format(grouped),/<>\n/);
+console.log('Playground WASM + worker: 10 checks passed');

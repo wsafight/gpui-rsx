@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `#[component]` supports synchronous functions, sharing struct components' compile-time
+  required-prop checks, defaults, boolean flags and children builders. Explicit `#[context]`
+  parameters receive `&mut Window` / `&mut App` during GPUI rendering.
+- Nested `<>...</>` fragments work inside elements, component children, root fragments and
+  loops without adding wrapper elements or runtime fragment vectors. Formatting preserves
+  the groups; diagnostics, class ranges, spacing migration and preview traverse them.
+- These capabilities were inspired by [#8](https://github.com/wsafight/gpui-rsx/pull/8)
+  from [@ppmpreetham](https://github.com/ppmpreetham), adapted to the current architecture.
+
 ## [0.9.0] - 2026-10-28
 
 ### Changed

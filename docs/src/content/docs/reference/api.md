@@ -137,6 +137,7 @@ handlers are `InteractiveElement` methods and likewise remain non-stateful.
 | --- | --- |
 | Single element | generated GPUI element expression |
 | Fragment `<>...</>` | `vec![...]` |
+| Nested fragment (unreleased) | children added directly to the enclosing element, fragment or loop |
 | Child expression `{expr}` | `.child(expr)` |
 | Spread `{...iter}` | `.children(iter)` |
 | For loop `{for item in iter { ... }}` | `.children(iter.into_iter().map(...))` or `.flat_map(...)` |

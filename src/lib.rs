@@ -389,7 +389,46 @@ pub fn rsx_expand(input: TokenStream) -> TokenStream {
     quote::quote! { #preview }.into()
 }
 
-/// Turns a struct with named fields into an RSX component with a typestate props builder.
+/// Turns a struct or synchronous function into an RSX component with a typestate props builder.
+///
+/// Function parameters become props, using the same defaults and children annotations as
+/// struct fields. The function runs when GPUI renders the element. Optional `#[context]`
+/// parameters receive `&mut Window` or `&mut App` at that point; they are not props.
+///
+/// ```
+/// use gpui::prelude::*;
+/// use gpui::*;
+/// use gpui_rsx::{component, rsx};
+///
+/// #[component]
+/// fn Badge(
+///     label: SharedString,
+///     #[prop(default)] highlighted: bool,
+///     #[children] children: Vec<AnyElement>,
+///     #[context] cx: &mut App,
+/// ) -> impl IntoElement {
+///     let _ = cx;
+///     rsx! {
+///         <div class="flex gap-2" whenClass={(highlighted, "bg-blue-500")}>
+///             {label}{...children}
+///         </div>
+///     }
+/// }
+///
+/// let badge = rsx! {
+///     <Badge label="Inbox" highlighted>
+///         <><span>{"3 unread"}</span><span>{"!"}</span></>
+///     </Badge>
+/// };
+/// # let _ = badge.into_any_element();
+/// ```
+///
+/// Functions must use concrete owned (or `'static`) prop types and an explicit element
+/// return type. Generics, async/unsafe functions, destructured parameters and `impl Trait`
+/// props are not supported. Use boxed callbacks for callback props. The generated
+/// constructor is `Badge()`; use its builder or `<Badge ...>` to supply props.
+///
+/// Struct components keep their existing `RenderOnce` implementation:
 ///
 /// - plain fields are **required** props; forgetting one is a compile error naming the prop
 /// - `#[prop(default)]` / `#[prop(default = expr)]` fields are optional; `bool` props become

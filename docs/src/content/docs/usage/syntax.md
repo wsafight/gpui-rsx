@@ -78,6 +78,50 @@ rsx! {
 
 `base` is consumed by the macro. It does not generate a `.base(...)` method call.
 
+### Function components (unreleased)
+
+Use `#[component]` on a synchronous function to generate the same props builder as a
+struct component. The function runs during GPUI rendering:
+
+```rust
+use gpui::prelude::*;
+use gpui::*;
+use gpui_rsx::{component, rsx};
+
+#[component]
+fn Badge(
+    label: SharedString,
+    #[prop(default)] highlighted: bool,
+    #[prop(default = 2u8)] depth: u8,
+    #[children] children: Vec<AnyElement>,
+    #[context] cx: &mut App,
+) -> impl IntoElement {
+    let _ = (cx, depth);
+    rsx! {
+        <div class="flex gap-2" whenClass={(highlighted, "bg-blue-500")}>
+            {label}{...children}
+        </div>
+    }
+}
+
+let badge = rsx! {
+    <Badge label="Inbox" highlighted>
+        <><span>{"3 unread"}</span><span>{"!"}</span></>
+    </Badge>
+};
+```
+
+Plain parameters are required props. `#[prop(default)]` uses `Default::default()`;
+`#[prop(default = expr)]` supplies an explicit default. Defaulted booleans use flag setters
+(`highlighted`) or conditional setters (`highlightedIf={active}`). `#[children]` collects
+children into `Vec<AnyElement>`. Module-qualified tags such as `<ui::Badge ...>` work too.
+
+Optional `#[context]` parameters must be `&mut Window` or `&mut App`; they are supplied by
+GPUI, so callers never pass them as props. The macro does not capture the caller's `window`
+or `cx`. Prop types must be concrete and owned (or `'static` references); use boxed callbacks
+for callback props. Generic, async/unsafe functions and destructured parameters are unsupported.
+The original function name becomes a zero-argument builder constructor: `Badge().label("Inbox")`.
+
 ## Attributes
 
 Flag attributes become zero-argument methods:
@@ -199,6 +243,23 @@ rsx! {
 ```
 
 A fragment expands to `vec![...]`. Mixed concrete root types may need `into_any_element()` or a common wrapper element.
+
+Nested fragments are supported in the unreleased development version:
+
+```rust
+rsx! {
+    <div>
+        <><span>{"First"}</span><span>{"Second"}</span></>
+        {for item in items {
+            <><span>{item.name.clone()}</span><span>{"Details"}</span></>
+        }}
+    </div>
+}
+```
+
+A nested group adds its children directly, preserving order without a wrapper or an extra
+runtime vector. Empty groups are allowed. Inside loops, stateful descendants still need
+`key` or `id`. Formatting, diagnostics and preview retain or traverse the group as appropriate.
 
 ## Conditional Rendering
 
