@@ -75,13 +75,13 @@ application lockfile; update Kit and its matching snapshot together. See the
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.8.3` | `0.8.0` | `gpui-pre@0.3.9` | `gpui-component@0.8.0` |
+| `0.8.3` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.8.0" }
+gpui = { package = "gpui-kit", version = "=0.8.1" }
 gpui-rsx = "0.8.3"
 ```
 <!-- gpui-rsx:compat:end -->

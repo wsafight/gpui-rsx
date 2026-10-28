@@ -10592,6 +10592,11 @@
         "requires_id": true
       },
       {
+        "arity": 1,
+        "name": "on_back_gesture",
+        "requires_id": false
+      },
+      {
         "arity": 2,
         "name": "on_boxed_action",
         "requires_id": false
@@ -10679,6 +10684,11 @@
       {
         "arity": 1,
         "name": "on_pinch",
+        "requires_id": false
+      },
+      {
+        "arity": 1,
+        "name": "on_scroll",
         "requires_id": false
       },
       {
@@ -17923,8 +17933,8 @@
     "<ul>{for item in items { <li key={item.id} onClick={handler}>{item.name.clone()}</li> }}</ul>",
     "<div class=\"w-[280px] h-1/2 gap-[14px]\" />"
   ],
-  "gpui_component_revision": "gpui-component@0.8.0",
-  "gpui_revision": "gpui-pre@0.3.9",
+  "gpui_component_revision": "gpui-component@0.8.1",
+  "gpui_revision": "gpui-pre@0.3.10",
   "macros": [
     "rsx",
     "rsx_strict",
