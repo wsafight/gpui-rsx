@@ -14,12 +14,12 @@
     "build:wasm": "../scripts/build-playground.sh"
   },
   "devDependencies": {
-    "@astrojs/check": "^0.9.10",
-    "@astrojs/starlight": "^0.41.8",
+    "@astrojs/check": "^0.9.12",
+    "@astrojs/starlight": "^0.42.7",
     "@types/bun": "1.4.4",
-    "astro": "^7.2.6",
-    "sharp": "^0.35.3",
-    "typescript": "^6.0.3"
+    "astro": "^7.4.2",
+    "sharp": "^0.35.5",
+    "typescript": "^7.0.2"
   },
   "trustedDependencies": [
     "esbuild",
