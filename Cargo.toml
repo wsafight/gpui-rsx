@@ -31,7 +31,7 @@ proc-macro = true
 
 [dependencies]
 gpui-rsx-core = { version = "0.9.0", path = "crates/gpui-rsx-core" }
-syn = { version = "2.0.117", features = ["full"] }
+syn = { version = "3.0.4", features = ["full"] }
 quote = "1.0.45"
 proc-macro2 = { version = "1.0.106", features = ["span-locations"] }
 

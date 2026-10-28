@@ -14,7 +14,7 @@ keywords = ["gpui", "rsx", "jsx", "parser", "codegen"]
 categories = ["gui", "development-tools"]
 
 [dependencies]
-syn = { version = "2.0.117", features = ["full"] }
+syn = { version = "3.0.4", features = ["full"] }
 quote = "1.0.45"
 proc-macro2 = { version = "1.0.106", features = ["span-locations"] }
 
