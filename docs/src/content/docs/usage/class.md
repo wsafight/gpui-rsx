@@ -221,3 +221,5 @@ Use `class="text-size-body leading-body opacity-muted shadow-card"`. Shadow expr
 must evaluate to the type accepted by GPUI's `.shadow()` method and their names must be
 in scope where the macro expands. Static token values also appear in preview and color
 swatches; arbitrary Rust expressions remain placeholders.
+
+For complete configuration examples, token mappings, and validation, see [Themes & Design Tokens](/gpui-rsx/guides/theming/).

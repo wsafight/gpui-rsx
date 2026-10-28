@@ -1,14 +1,18 @@
 ---
-title: Playground
+title: 在线体验
 description: 在浏览器中展开 RSX、检查 class 并预览静态布局。
+tableOfContents: false
 ---
 import Playground from '../../../components/Playground.astro';
 
-输入 RSX 宏体即可查看 Rust 展开结果与诊断。解析在浏览器本地通过 WebAssembly 执行，
-复用宏的 Rust core，不会将源码发送到服务器。分享链接将源码保存在 URL 片段中。
+编辑 RSX 宏体，并排查看近似布局；展开下方的 **Rust 展开结果** 可检查生成的代码。解析通过 WebAssembly 在浏览器本地执行，复用宏的 Rust core。
 
 <Playground />
 
-粘贴 JSX 表达式或 TSX 模块后，点击 **Convert JSX / TSX**。
+粘贴 JSX 表达式或 TSX 模块后，点击 **转换 JSX / TSX**。
 转换提示会列出需要手动改写为 Rust 的行为。预览只近似展示静态样式，
-表达式、事件、自定义组件与不支持的样式会显示为占位；请用原生 GPUI 应用验证实际效果。
+表达式与自定义组件会显示为占位；未模拟的样式与交互行为单独列在预览下方的折叠说明中。请用原生 GPUI 应用验证实际效果。
+
+:::tip[间距与分享]
+默认数值间距以像素为单位：`p-4` 是 4px。勾选 **Tailwind 刻度** 后，每单位为 4px。源码保留在浏览器本地；分享链接将源码包含在 URL 片段中。点击诊断信息可选中对应源码。
+:::

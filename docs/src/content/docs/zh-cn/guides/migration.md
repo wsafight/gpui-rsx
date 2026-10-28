@@ -95,7 +95,7 @@ spacing-scale = "tailwind"
 
 `rsx.toml` 中的 `[colors]`、`[radius]`、`[spacing]` 定义主题令牌。
 `[options] preset = "gpui-component"` 可复用语义颜色；使用时导入主题扩展 trait，
-并确保 `cx` 在作用域内。`{ expr = "cx.theme().background" }` 在渲染时读取当前主题，
+并确保 `cx` 在作用域内。`{ expr = "cx.theme().colors.background" }` 在渲染时读取当前主题，
 十六进制颜色字面量则保持固定。
 
 ## 从手写 GPUI 迁移到 RSX

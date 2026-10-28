@@ -3,18 +3,20 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "packageManager": "bun@1.4.0",
+  "packageManager": "bun@1.4.4",
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "bun run build:wasm && astro build",
+    "build": "bun run build:wasm && astro build --force && bun run check:links",
     "preview": "astro preview",
     "check": "astro check",
+    "check:links": "bun scripts/check-links.mjs",
     "build:wasm": "../scripts/build-playground.sh"
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.10",
     "@astrojs/starlight": "^0.41.8",
+    "@types/bun": "1.4.4",
     "astro": "^7.2.6",
     "sharp": "^0.35.3",
     "typescript": "^6.0.3"

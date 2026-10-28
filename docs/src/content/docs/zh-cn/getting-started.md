@@ -19,13 +19,48 @@ Kit 固定配套的 `gpui-pre` 快照，并导出 GPUI、组件和资源。应�
 
 如果你从 Zed Git 或官方 `gpui = "0.2.2"` 迁移，请采用[迁移指南](/gpui-rsx/zh-cn/guides/migration/)中的当前 Kit 迁移章节。
 
-## 引入
+## 完整视图
+
+创建 `src/main.rs`，写入下面的完整视图。需要同时引入 GPUI 和 prelude，让宏生成的 builder 方法在作用域内可用。
 
 ```rust
 use gpui::*;
 use gpui::prelude::*;
 use gpui_rsx::rsx;
+
+struct HelloView;
+
+impl Render for HelloView {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+        rsx! {
+            <div class="flex flex-col gap-3 p-4">
+                <h1 class="text-xl font-bold">{"Hello GPUI-RSX"}</h1>
+                <p class="text-gray-600">{"This markup expands to GPUI builder calls."}</p>
+            </div>
+        }
+    }
+}
+
+fn main() {
+    application().with_assets(assets::Assets).run(|cx: &mut App| {
+        gpui::init(cx);
+        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
+            cx.new(|_cx| HelloView)
+        }).unwrap();
+        cx.activate(true);
+    });
+}
 ```
+
+## 运行应用
+
+在应用目录执行：
+
+```sh
+cargo run
+```
+
+GPUI 需要对应平台的原生构建依赖。请参考[兼容性矩阵](/gpui-rsx/zh-cn/compatibility/)对齐 GPUI Kit、Rust 和组件版本。
 
 ## 第一个元素
 
@@ -88,6 +123,10 @@ rsx! {
 }
 ```
 
+:::note[默认间距以像素为单位]
+`p-4` 和 `gap-4` 表示 4px。若需要每单位 4px 的 Tailwind 刻度，请使用 `rsx_tw!` 或[项目配置](/gpui-rsx/zh-cn/guides/theming/)。
+:::
+
 静态 class 字符串由宏在编译期解析。动态字符串由生成的运行时 matcher 处理，适合必须运行时组装的场景：
 
 ```rust
@@ -138,37 +177,6 @@ rsx! {
 }
 ```
 
-## 完整视图
-
-```rust
-use gpui::*;
-use gpui::prelude::*;
-use gpui_rsx::rsx;
-
-struct HelloView;
-
-impl Render for HelloView {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        rsx! {
-            <div class="flex flex-col gap-3 p-4">
-                <h1 class="text-xl font-bold">{"Hello GPUI-RSX"}</h1>
-                <p class="text-gray-600">{"This markup expands to GPUI builder calls."}</p>
-            </div>
-        }
-    }
-}
-
-fn main() {
-    application().with_assets(assets::Assets).run(|cx: &mut App| {
-        gpui::init(cx);
-        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
-            cx.new(|_cx| HelloView)
-        }).unwrap();
-        cx.activate(true);
-    });
-}
-```
-
 ## 检查 Demo
 
 仓库内置 demo crate，用来验证真实 GPUI 集成：
@@ -187,6 +195,8 @@ cargo run --manifest-path demo/Cargo.toml --bin incident_console --locked
 
 ## 下一步
 
+- 用[主题与设计令牌](/gpui-rsx/zh-cn/guides/theming/)统一颜色、间距与排版。
+- 阅读 [CLI 与编辑器](/gpui-rsx/zh-cn/guides/tooling/)配置补全、诊断与格式化。
 - 阅读[语法参考](/gpui-rsx/zh-cn/usage/syntax/)了解元素、属性、子节点和 Fragment。
 - 在依赖动态 class 前阅读 [Class 处理](/gpui-rsx/zh-cn/usage/class/)。
 - 在循环中渲染可交互行前阅读 [ID 与 Key](/gpui-rsx/zh-cn/usage/ids/)。

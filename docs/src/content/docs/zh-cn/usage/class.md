@@ -218,3 +218,5 @@ card = { expr = "vec![BoxShadow::new(px(0.0), px(1.0), hsla(0.0, 0.0, 0.0, 0.2))
 通过 `class="text-size-body leading-body opacity-muted shadow-card"` 使用。阴影表达式
 需返回 GPUI `.shadow()` 接受的类型，其中的名称需要在宏调用处可见。静态令牌值
 也可用于预览和颜色提示，任意 Rust 表达式继续显示为占位内容。
+
+配置的完整示例、令牌映射与检查流程见[主题与设计令牌](/gpui-rsx/zh-cn/guides/theming/)。

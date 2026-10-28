@@ -1,0 +1,110 @@
+---
+import { Icon } from '@astrojs/starlight/components';
+const zh = Astro.locals.starlightRoute.lang.toLowerCase().startsWith('zh');
+const base = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/${zh ? 'zh-cn/' : ''}`;
+const features = zh ? [
+  { title: '按界面结构写代码', description: '标签、属性、Fragment 与循环，直接嵌入 Rust 表达式。为可交互列表提供稳定的 key。', href: 'usage/syntax/', link: '探索语法' },
+  { title: '让样式成为可读的约定', description: '静态工具类、状态变体和项目级设计令牌，展开为 GPUI 方法。需要动态值时，直接使用 Rust 属性。', href: 'guides/theming/', link: '配置主题' },
+  { title: '在熟悉的工具里构建', description: '在编辑器中补全、查看诊断与展开结果。用 CLI 格式化代码、检查主题，或转换现有 JSX。', href: 'guides/tooling/', link: '接入工具链' },
+] : [
+  { title: 'Code that follows your UI', description: 'Tags, attributes, fragments, and loops with Rust expressions inline. Stable keys keep interactive lists predictable.', href: 'usage/syntax/', link: 'Explore the syntax' },
+  { title: 'Styles with a shared vocabulary', description: 'Static utilities, state variants, and project design tokens expand to GPUI methods. Use typed attributes for dynamic Rust values.', href: 'guides/theming/', link: 'Build your theme' },
+  { title: 'A familiar development loop', description: 'Get completion, diagnostics, and expansion hover in your editor. Format code, validate themes, or convert JSX with the CLI.', href: 'guides/tooling/', link: 'Set up your tools' },
+];
+const paths = zh ? [
+  { title: '第一次使用 GPUI-RSX', description: '安装依赖，运行第一个完整视图。', href: 'getting-started/', label: '入门' },
+  { title: '从现有项目迁移', description: '对齐 GPUI Kit、0.9 API 与间距刻度。', href: 'guides/migration/', label: '迁移' },
+  { title: '构建一个完整应用', description: '阅读事故响应控制台的模块与交互设计。', href: 'examples/incident-console/', label: '实践' },
+  { title: '查找具体 API', description: '速查宏、标签、属性与 class 映射。', href: 'reference/api/', label: '参考' },
+] : [
+  { title: 'New to GPUI-RSX?', description: 'Install dependencies and run your first complete view.', href: 'getting-started/', label: 'START' },
+  { title: 'Bringing an existing project?', description: 'Align GPUI Kit, the 0.9 APIs, and spacing semantics.', href: 'guides/migration/', label: 'MIGRATE' },
+  { title: 'Building a complete app?', description: 'Explore the structure and interactions of the Incident Console.', href: 'examples/incident-console/', label: 'BUILD' },
+  { title: 'Looking for a specific API?', description: 'Find macros, tags, attributes, and class mappings.', href: 'reference/api/', label: 'REFERENCE' },
+];
+const macros = zh ? [
+  ['rsx!', '默认宽松模式，适合逐步接入。'],
+  ['rsx_strict!', '不支持的静态 class 在编译时报错。'],
+  ['rsx_permissive!', '显式选择宽松模式。'],
+  ['rsx_tw!', '使用 Tailwind 间距刻度：每单位 4px。'],
+  ['rsx_expand!', '返回生成的 Rust 代码字符串，用于调试。'],
+] : [
+  ['rsx!', 'The default permissive mode for gradual adoption.'],
+  ['rsx_strict!', 'Reject unsupported static classes at compile time.'],
+  ['rsx_permissive!', 'Select permissive mode explicitly.'],
+  ['rsx_tw!', 'Opt into Tailwind spacing: 4px per unit.'],
+  ['rsx_expand!', 'Return the generated Rust as a string for debugging.'],
+];
+---
+
+<div class="home-overview not-content">
+  <section class="features" aria-label={zh ? '核心能力' : 'Core capabilities'}>
+    {features.map((feature, index) => <article>
+      <span class="section-number">0{index + 1}</span>
+      <h2>{feature.title}</h2>
+      <p>{feature.description}</p>
+      <a href={`${base}${feature.href}`}>{feature.link}<Icon name="right-arrow" size="0.9rem" /></a>
+    </article>)}
+  </section>
+
+  <section class="reading-paths" aria-labelledby="find-your-path">
+    <div class="section-intro">
+      <p class="eyebrow">{zh ? '从这里出发' : 'THE DOCUMENTATION'}</p>
+      <h2 id="find-your-path">{zh ? '找到你的下一步。' : 'Find your next step.'}</h2>
+      <p>{zh ? '从基础语法到应用实践，按你当前的任务阅读。' : 'From the first element to a working application. Start with the task in front of you.'}</p>
+      <a class="text-link" href={`${base}playground/`}>{zh ? '也可以先在线试一试' : 'Or try it in your browser'}<Icon name="right-arrow" size="0.9rem" /></a>
+    </div>
+    <div class="path-list">
+      {paths.map(path => <a href={`${base}${path.href}`} class="path-row">
+        <span class="path-label">{path.label}</span>
+        <span class="path-copy"><strong>{path.title}</strong><span>{path.description}</span></span>
+        <Icon name="right-arrow" size="1rem" />
+      </a>)}
+    </div>
+  </section>
+
+  <section class="macro-section" aria-labelledby="choose-a-macro">
+    <div class="section-intro">
+      <p class="eyebrow">{zh ? '保留 Rust 的选择' : 'RUST, WITH OPTIONS'}</p>
+      <h2 id="choose-a-macro">{zh ? '为你的项目选择宏。' : 'Choose your macro.'}</h2>
+      <p>{zh ? '默认数值间距以像素为单位：gap-4 为 4px。Tailwind 刻度需要显式启用。' : 'Numeric spacing defaults to pixels: gap-4 means 4px. Tailwind spacing is an explicit opt-in.'}</p>
+      <a class="text-link" href={`${base}usage/class/`}>{zh ? '了解 class 的支持范围' : 'See class support and behavior'}<Icon name="right-arrow" size="0.9rem" /></a>
+    </div>
+    <dl class="macro-list">{macros.map(([macro, description]) => <div><dt><code>{macro}</code></dt><dd>{description}</dd></div>)}</dl>
+  </section>
+
+  <aside class="native-note">
+    <Icon name="information" size="1.2rem" />
+    <p>{zh ? '静态 RSX 编译为原生 GPUI 调用；动态 class 使用运行时 matcher。在线预览近似展示静态布局，实际渲染与交互请在原生应用中验证。' : 'Static RSX compiles to native GPUI calls; dynamic classes use a runtime matcher. The browser preview approximates static layout. Verify rendering and interactions in your native application.'}</p>
+  </aside>
+</div>
+
+<style>
+  .home-overview { margin:0; }
+  .features { display:grid; gap:2rem; padding-block:3rem 4rem; }
+  .section-number { font:.7rem var(--sl-font-mono); color:var(--sl-color-text-accent); }
+  .features h2 { font-size:1.05rem; font-weight:650; margin:.9rem 0 .65rem; color:var(--sl-color-white); letter-spacing:-.025em; }
+  .features p { color:var(--sl-color-gray-2); font-size:.875rem; line-height:1.85; }
+  .features a,.text-link { display:inline-flex; align-items:center; gap:.6rem; margin-top:1rem; font-size:.8rem; font-weight:550; color:var(--sl-color-text-accent); text-decoration:none; }
+  a:hover { text-decoration:underline; text-underline-offset:4px; }
+  .reading-paths,.macro-section { display:grid; gap:2rem; padding-block:3rem; border-top:1px solid var(--rsx-border); }
+  .eyebrow { color:var(--sl-color-text-accent); font:.65rem var(--sl-font-mono); letter-spacing:.1em; }
+  .section-intro h2 { margin:.8rem 0 1rem; color:var(--sl-color-white); font-size:1.75rem; letter-spacing:-.045em; font-weight:650; line-height:1.3; }
+  .section-intro > p:not(.eyebrow) { max-width:35ch; color:var(--sl-color-gray-2); font-size:.9rem; line-height:1.85; }
+  .path-list { border-top:1px solid var(--rsx-border); }
+  .path-row { display:flex; align-items:center; gap:1rem; padding:1.2rem .25rem; border-bottom:1px solid var(--rsx-border); text-decoration:none; color:var(--sl-color-gray-1); }
+  .path-row:hover { background:var(--rsx-surface-raised); text-decoration:none; }
+  .path-label { width:4.5rem; flex-shrink:0; font:.6rem var(--sl-font-mono); color:var(--sl-color-gray-3); letter-spacing:.025em; }
+  .path-copy { display:grid; gap:.3rem; flex:1; }
+  .path-copy strong { font-size:.9rem; font-weight:600; }
+  .path-copy > span { color:var(--sl-color-gray-2); font-size:.8rem; }
+  .path-row svg { flex-shrink:0; color:var(--sl-color-text-accent); }
+  .macro-list { margin:0; }
+  .macro-list > div { display:grid; grid-template-columns:9.5rem 1fr; gap:.75rem; padding:.9rem 0; border-bottom:1px solid var(--rsx-border); }
+  .macro-list dt { font-size:.8rem; color:var(--sl-color-text-accent); }
+  .macro-list dd { margin:0; font-size:.8rem; color:var(--sl-color-gray-2); }
+  .native-note { display:flex; align-items:flex-start; gap:.8rem; padding:1.2rem; background:var(--rsx-surface-raised); border-radius:8px; color:var(--sl-color-gray-2); font-size:.8rem; line-height:1.8; }
+  .native-note svg { flex-shrink:0; margin-top:.15rem; color:var(--sl-color-text-accent); }
+  @media (min-width:50rem) { .features { grid-template-columns:repeat(3,minmax(0,1fr)); gap:3rem; } .reading-paths,.macro-section { grid-template-columns: .9fr 1.1fr; gap:5rem; } }
+  @media (max-width:35rem) { .path-label { display:none; } .macro-list > div { grid-template-columns:1fr; gap:.3rem; } .features { padding-bottom:2.5rem; } }
+</style>
