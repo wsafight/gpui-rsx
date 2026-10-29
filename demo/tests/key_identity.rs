@@ -15,6 +15,32 @@ fn concrete_integer_keys_use_named_integer_ids() {
 }
 
 #[test]
+fn all_supported_integer_keys_preserve_named_integer_identity() {
+    macro_rules! check {
+        ($($key:expr),* $(,)?) => {$(
+            let key = $key;
+            let element = gpui_rsx::rsx! { <div key={key} focusable /> };
+            assert!(matches!(
+                Element::id(&element),
+                Some(ElementId::NamedInteger(_, value)) if value == key as u64
+            ));
+        )*};
+    }
+    check!(
+        u8::MAX,
+        u16::MAX,
+        u32::MAX,
+        u64::MAX,
+        usize::MAX,
+        i8::MIN,
+        i16::MIN,
+        i32::MIN,
+        i64::MIN,
+        isize::MIN,
+    );
+}
+
+#[test]
 fn explicit_id_wins_and_does_not_evaluate_an_unused_key() {
     let key_calls = std::cell::Cell::new(0);
     let element = gpui_rsx::rsx! {

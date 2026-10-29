@@ -47,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Reduce expansion overhead by emitting integer-key implementations through a local macro
+  and sharing dynamic length parsing across prefixes, retaining units and overflow checks.
 - CLI spacing detection reports Cargo metadata failures before expansion or migration
   instead of assuming px. Failed resolutions can be retried; explicit scale settings
   still work without dependency resolution.

@@ -319,6 +319,44 @@ fn generate_numeric_fallback_code(scale: SpacingScale) -> TokenStream {
             }
         }
 
+        enum __RsxLength {
+            Px(f32),
+            Rem(f32),
+            Relative(f32),
+        }
+
+        fn __rsx_parse_length(
+            rest: &str,
+            factor: f32,
+            percent: bool,
+            fraction: bool,
+        ) -> Option<__RsxLength> {
+            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
+                if let Some(raw) = inner.strip_suffix("px") {
+                    return Some(__RsxLength::Px(raw.parse::<f32>().__rsx_finite().ok()?));
+                }
+                if let Some(raw) = inner.strip_suffix("rem") {
+                    return Some(__RsxLength::Rem(raw.parse::<f32>().__rsx_finite().ok()?));
+                }
+                if percent {
+                    if let Some(raw) = inner.strip_suffix('%') {
+                        return Some(__RsxLength::Relative(raw.parse::<f32>().__rsx_finite().ok()? / 100.0));
+                    }
+                }
+                return None;
+            }
+            if fraction {
+                if let Some((num, den)) = rest.split_once('/') {
+                    let num = num.parse::<f32>().__rsx_finite().ok()?;
+                    let den = den.parse::<f32>().__rsx_finite().ok()?;
+                    let ratio = num / den;
+                    return (den > 0.0 && ratio.is_finite()).then_some(__RsxLength::Relative(ratio));
+                }
+            }
+            let scaled = rest.parse::<f32>().__rsx_finite().ok()? * factor;
+            scaled.is_finite().then_some(__RsxLength::Px(scaled))
+        }
+
         #(#length_fallbacks)*
         if let Some(inner) = class.strip_prefix("text-[").and_then(|rest| rest.strip_suffix(']')) {
             if let Some(raw) = inner.strip_suffix("px") {
@@ -345,30 +383,11 @@ fn generate_numeric_fallback_code(scale: SpacingScale) -> TokenStream {
 fn generate_length_fallback(spec: &super::tables::LengthClassSpec, factor: f32) -> TokenStream {
     let prefix = spec.prefix;
     let method = syn::Ident::new(spec.method, Span::call_site());
-    let percent = if spec.family.allows_percent() {
+    let percent = spec.family.allows_percent();
+    let fraction = spec.family.allows_fraction();
+    let relative = if percent || fraction {
         quote! {
-            if let Some(raw) = inner.strip_suffix('%') {
-                if let Ok(n) = raw.parse::<f32>().__rsx_finite() {
-                    return el.#method(relative(n / 100.0));
-                }
-            }
-        }
-    } else {
-        quote! {}
-    };
-    let fraction = if spec.family.allows_fraction() {
-        quote! {
-            if let Some((num, den)) = rest.split_once('/') {
-                if let (Ok(num), Ok(den)) = (
-                    num.parse::<f32>().__rsx_finite(),
-                    den.parse::<f32>().__rsx_finite(),
-                ) {
-                    let ratio = num / den;
-                    if den > 0.0 && ratio.is_finite() {
-                        return el.#method(relative(ratio));
-                    }
-                }
-            }
+            Some(__RsxLength::Relative(n)) => return el.#method(relative(n)),
         }
     } else {
         quote! {}
@@ -376,25 +395,11 @@ fn generate_length_fallback(spec: &super::tables::LengthClassSpec, factor: f32) 
 
     quote! {
         if let Some(rest) = class.strip_prefix(#prefix) {
-            if let Some(inner) = rest.strip_prefix('[').and_then(|s| s.strip_suffix(']')) {
-                if let Some(raw) = inner.strip_suffix("px") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() {
-                        return el.#method(px(n));
-                    }
-                }
-                if let Some(raw) = inner.strip_suffix("rem") {
-                    if let Ok(n) = raw.parse::<f32>().__rsx_finite() {
-                        return el.#method(rems(n));
-                    }
-                }
-                #percent
-            }
-            #fraction
-            if let Ok(n) = rest.parse::<f32>().__rsx_finite() {
-                let scaled = n * #factor;
-                if scaled.is_finite() {
-                    return el.#method(px(scaled));
-                }
+            match __rsx_parse_length(rest, #factor, #percent, #fraction) {
+                Some(__RsxLength::Px(n)) => return el.#method(px(n)),
+                Some(__RsxLength::Rem(n)) => return el.#method(rems(n)),
+                #relative
+                _ => {}
             }
         }
     }

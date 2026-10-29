@@ -1,5 +1,5 @@
 //! Compare generated classes with real GPUI builder chains, including existing styles.
-use gpui::{div, prelude::*, px, rgb, svg};
+use gpui::{div, prelude::*, px, relative, rems, rgb, svg};
 use gpui_rsx::{rsx, rsx_strict, rsx_tw};
 
 fn style(el: &mut impl Styled) -> String {
@@ -62,6 +62,42 @@ fn new_dynamic_tailwind_values_match_static_builder_calls() {
         .line_height(px(24.0))
         .bg(gpui::rgba(0xef444480));
     assert_eq!(style(&mut actual), style(&mut expected));
+}
+
+#[test]
+fn dynamic_lengths_preserve_units_scaling_and_family_restrictions() {
+    let classes = "p-2.5 mx-[-3px] gap-y-[0.75rem] rounded-[6px] leading-[1.25rem] w-2/3 min-h-[25%] max-w-[17px]";
+    let expected = |padding| {
+        div()
+            .p(px(padding))
+            .mx(px(-3.0))
+            .gap_y(rems(0.75))
+            .rounded(px(6.0))
+            .line_height(rems(1.25))
+            .w(relative(2.0 / 3.0))
+            .min_h(relative(0.25))
+            .max_w(px(17.0))
+    };
+    assert_eq!(
+        style(&mut rsx! { <div class={classes} /> }),
+        style(&mut expected(2.5))
+    );
+    assert_eq!(
+        style(&mut rsx_tw! { <div class={classes} /> }),
+        style(&mut expected(10.0))
+    );
+
+    let invalid =
+        "p-[25%] rounded-1/2 leading-[50%] gap-1/2 w-1/0 h-1/-2 min-w-[NaNpx] max-h-[infrem]";
+    let mut unknown = Vec::new();
+    let mut actual = rsx_strict! {
+        <div class={invalid} onUnknownClass={|class: &str| unknown.push(class.to_owned())} />
+    };
+    assert_eq!(
+        unknown,
+        invalid.split_ascii_whitespace().collect::<Vec<_>>()
+    );
+    assert_eq!(style(&mut actual), style(&mut div()));
 }
 
 #[test]
