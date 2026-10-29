@@ -1,10 +1,13 @@
+mod config;
 mod doctor;
+mod help;
+mod lint;
 mod lsp;
 mod preview;
 mod theme;
 
-use gpui_rsx_core::{ClassMode, SpacingScale, Theme};
-use serde_json::{Value, json};
+use gpui_rsx_core::{ClassMode, SpacingScale};
+use serde_json::Value;
 use std::{
     collections::BTreeSet,
     io::{self, Read},
@@ -21,12 +24,25 @@ struct Options {
     strict: bool,
     tailwind: bool,
     deny_warnings: bool,
+    min_severity: Option<String>,
+    quiet: bool,
     check: bool,
     write: bool,
     watch: bool,
     offline: bool,
     index: usize,
     port: u16,
+}
+
+impl Options {
+    fn mode_options(&self) -> config::ModeOptions<'_> {
+        config::ModeOptions {
+            strict: self.strict,
+            tailwind: self.tailwind,
+            manifest: self.manifest.as_deref(),
+            offline: self.offline,
+        }
+    }
 }
 
 fn main() {
@@ -63,6 +79,7 @@ fn run() -> Result<i32, String> {
   lsp          Run the language server over stdio\n\n\
 Options: --manifest-path PATH --json --strict --tailwind --deny-warnings\n\
          --check --write --output PATH --watch --port N --index N --offline\n\
+         lint: --min-severity error|warning|information --quiet\n\
 Migration: enable tailwind-scale or set spacing-scale=\"tailwind\" after migrating.\n\
 Formatting preserves surrounding Rust and leaves commented macro bodies unchanged."
         );
@@ -72,19 +89,30 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
         println!("cargo-rsx {}", env!("CARGO_PKG_VERSION"));
         return Ok(0);
     }
+    if args.iter().skip(1).any(|a| a == "--help" || a == "-h") {
+        help::print(&command, args.get(1).map(String::as_str))?;
+        return Ok(0);
+    }
     if command == "theme" {
         return theme::run(&args[1..]);
     }
     if command == "lsp" {
+        if args.len() > 1 {
+            return Err("lsp takes no command-line options; run cargo rsx lsp --help".into());
+        }
         return lsp::run().map(|()| 0);
     }
     let mut opt = Options {
         port: 9230,
         ..Options::default()
     };
+    let mut flags = Vec::new();
     let mut i = 1;
     while i < args.len() {
         let arg = &args[i];
+        if arg.starts_with("--") {
+            flags.push(arg.clone());
+        }
         let mut value = || {
             i += 1;
             args.get(i)
@@ -100,6 +128,19 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
             "--strict" => opt.strict = true,
             "--tailwind" => opt.tailwind = true,
             "--deny-warnings" => opt.deny_warnings = true,
+            "--min-severity" => {
+                let level = value()?;
+                if !matches!(level.as_str(), "error" | "warning" | "information") {
+                    return Err("--min-severity expects error, warning or information".into());
+                }
+                opt.min_severity = Some(level);
+            }
+            "--quiet" | "-q" => {
+                opt.quiet = true;
+                if arg == "-q" {
+                    flags.push("--quiet".into());
+                }
+            }
             "--check" => opt.check = true,
             "--write" => opt.write = true,
             "--watch" => opt.watch = true,
@@ -111,6 +152,11 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
         }
         i += 1;
     }
+    if let Some(allowed) = allowed_options(&command)
+        && let Some(flag) = flags.iter().find(|flag| !allowed.contains(&flag.as_str()))
+    {
+        return Err(format!("{flag} does not apply to `cargo rsx {command}`"));
+    }
     if opt.write && opt.check {
         return Err("--write and --check are mutually exclusive".into());
     }
@@ -121,9 +167,12 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
                 println!("{report}");
             } else {
                 for engine in report["engines"].as_array().unwrap() {
+                    let field = |key: &str| engine[key].as_str().unwrap_or("unknown").to_owned();
                     println!(
                         "GPUI: {} {} ({})",
-                        engine["name"], engine["version"], engine["source"]
+                        field("name"),
+                        field("version"),
+                        field("source")
                     );
                 }
                 for key in ["warnings", "errors"] {
@@ -142,15 +191,22 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
             }
             Ok(i32::from(report["ok"] != true))
         }
-        "lint" => lint(&opt),
+        "lint" => lint::run(&opt),
         "fmt" | "migrate" => rewrite(&opt, command == "migrate"),
         "expand" | "convert" => {
             let source = input(opt.path.as_deref())?;
             let result = if command == "expand" {
                 gpui_rsx_tools::expand(&source, mode(&opt, opt.path.as_deref())?)?
             } else {
-                serde_json::to_string_pretty(&gpui_rsx_tools::convert::convert(&source)?)
-                    .map_err(|e| e.to_string())?
+                serde_json::to_string_pretty(&gpui_rsx_tools::convert::convert_with_options(
+                    &source,
+                    {
+                        let mut options = gpui_rsx_tools::convert::ConversionOptions::default();
+                        options.tailwind = opt.tailwind;
+                        options
+                    },
+                )?)
+                .map_err(|e| e.to_string())?
             };
             output(&opt, &result)?;
             Ok(0)
@@ -158,6 +214,50 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
         "preview" => preview::run(&opt),
         _ => Err(format!("unknown command {command}; run cargo rsx --help")),
     }
+}
+
+/// Options each command reads; anything else would be silently ignored, so it is rejected.
+fn allowed_options(command: &str) -> Option<&'static [&'static str]> {
+    Some(match command {
+        "doctor" => &["--manifest-path", "--json", "--offline"],
+        "lint" => &[
+            "--manifest-path",
+            "--json",
+            "--strict",
+            "--tailwind",
+            "--deny-warnings",
+            "--min-severity",
+            "--quiet",
+            "--offline",
+        ],
+        "fmt" => &["--manifest-path", "--check", "--write", "--offline"],
+        "migrate" => &[
+            "--manifest-path",
+            "--check",
+            "--write",
+            "--tailwind",
+            "--offline",
+        ],
+        "expand" => &[
+            "--manifest-path",
+            "--strict",
+            "--tailwind",
+            "--output",
+            "--offline",
+        ],
+        "convert" => &["--output", "--tailwind"],
+        "preview" => &[
+            "--manifest-path",
+            "--strict",
+            "--tailwind",
+            "--watch",
+            "--port",
+            "--index",
+            "--output",
+            "--offline",
+        ],
+        _ => return None,
+    })
 }
 
 fn metadata(opt: &Options, no_deps: bool) -> Result<Value, String> {
@@ -208,6 +308,12 @@ fn files(opt: &Options) -> Result<BTreeSet<PathBuf>, String> {
     }
     let mut out = BTreeSet::new();
     if let Some(path) = &opt.path {
+        // A file named explicitly is checked whatever its extension; only directory walks
+        // filter for `.rs`.
+        if path.is_file() {
+            out.insert(path.clone());
+            return Ok(out);
+        }
         collect(path, &mut out)?;
         return Ok(out);
     }
@@ -232,48 +338,8 @@ fn files(opt: &Options) -> Result<BTreeSet<PathBuf>, String> {
     Ok(out)
 }
 
-pub(crate) fn mode(opt: &Options, path: Option<&Path>) -> Result<ClassMode, String> {
-    let theme = resolve_theme(opt, path)?;
-    Ok(ClassMode::builder()
-        .strict(opt.strict)
-        .scale(if opt.tailwind {
-            SpacingScale::Tailwind
-        } else {
-            theme
-                .as_ref()
-                .and_then(|t| t.scale())
-                .unwrap_or(SpacingScale::Px)
-        })
-        .theme(theme)
-        .build())
-}
-
-fn resolve_theme(
-    opt: &Options,
-    path: Option<&Path>,
-) -> Result<Option<std::sync::Arc<Theme>>, String> {
-    let fallback = opt
-        .manifest
-        .clone()
-        .map(Ok)
-        .unwrap_or_else(std::env::current_dir)
-        .map_err(|e| format!("cannot resolve current directory: {e}"))?;
-    let anchor = path
-        .or(Some(&fallback))
-        .map(|p| std::fs::canonicalize(p).unwrap_or_else(|_| p.to_owned()));
-    let mut dir = anchor
-        .as_deref()
-        .and_then(|p| if p.is_dir() { Some(p) } else { p.parent() });
-    while let Some(current) = dir {
-        if current.join("Cargo.toml").exists() {
-            return Theme::load_from_dir(current);
-        }
-        dir = current.parent();
-    }
-    if let Some(manifest) = &opt.manifest {
-        return Theme::load_from_dir(manifest.parent().unwrap_or(Path::new(".")));
-    }
-    Ok(None)
+fn mode(opt: &Options, path: Option<&Path>) -> Result<ClassMode, String> {
+    config::mode(opt.mode_options(), path)
 }
 
 fn is_stdin(opt: &Options) -> bool {
@@ -298,40 +364,6 @@ fn sources(opt: &Options) -> Result<Vec<(PathBuf, String)>, String> {
 /// The path to resolve `rsx.toml` from; stdin falls back to `--manifest-path`.
 fn mode_path(path: &Path) -> Option<&Path> {
     (path != Path::new("-")).then_some(path)
-}
-
-fn lint(opt: &Options) -> Result<i32, String> {
-    let mut reports = Vec::new();
-    let mut failed = false;
-    for (path, source) in sources(opt)? {
-        for diagnostic in gpui_rsx_tools::analyze_rust(&source, mode(opt, mode_path(&path))?) {
-            failed |= diagnostic.severity == "error"
-                || (opt.deny_warnings && diagnostic.severity == "warning");
-            let line = source[..diagnostic.start]
-                .bytes()
-                .filter(|&b| b == b'\n')
-                .count()
-                + 1;
-            // Columns count characters, as editors and rustc do, not bytes.
-            let line_start = source[..diagnostic.start].rfind('\n').map_or(0, |n| n + 1);
-            let column = source[line_start..diagnostic.start].chars().count() + 1;
-            if !opt.json {
-                println!(
-                    "{}:{line}:{column}: {}: {}",
-                    path.display(),
-                    diagnostic.severity,
-                    diagnostic.message
-                );
-            }
-            reports.push(
-                json!({"file": path, "line": line, "column": column, "diagnostic": diagnostic}),
-            );
-        }
-    }
-    if opt.json {
-        println!("{}", json!({"ok": !failed, "diagnostics": reports}));
-    }
-    Ok(i32::from(failed))
 }
 
 fn rewrite(opt: &Options, migrate: bool) -> Result<i32, String> {

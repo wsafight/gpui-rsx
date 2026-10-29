@@ -104,6 +104,15 @@ pub enum MouseButton {
 
 /// Styled trait，用于动态 class 的运行时解析
 pub trait Styled: Sized {
+    fn text_size<T>(self, _: T) -> Self {
+        self
+    }
+    fn line_height<T>(self, _: T) -> Self {
+        self
+    }
+    fn rounded<T>(self, _: T) -> Self {
+        self
+    }
     fn style(&mut self) -> &mut StyleRefinement;
 
     // --- flex ---

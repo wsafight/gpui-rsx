@@ -61,6 +61,15 @@ rsx! {
 
 This optimization applies to the expression passed to `class`. If you assign the result to a variable first, the macro sees a runtime expression and uses the dynamic matcher.
 
+## Static edges of format templates
+
+`class={format!("p-{} bg-red-500", n)}` expands `bg-red-500` at compile time and parses
+only the dynamic portion at runtime. The original `format!` still runs once, including
+named arguments and formatting specifications; this optimization does not remove its String
+allocation. Complete static tokens before the first dynamic token and after the last are
+eligible. Static tokens between dynamic tokens remain in the runtime string because values
+can contain spaces. Class application order and expression side effects are preserved.
+
 ## Use Dynamic Classes Sparingly
 
 Dynamic classes are useful when the class string is genuinely assembled at runtime:
@@ -96,6 +105,56 @@ rsx! {
     </button>
 }
 ```
+
+## Share the Dynamic Class Runtime
+
+By default, each macro invocation with a dynamic class generates its own matcher.
+For projects with many such call sites, generate the matcher once at the crate root:
+
+```rust title="src/lib.rs"
+gpui_rsx::rsx_runtime!();
+```
+
+Enable it for the package:
+
+```toml title="rsx.toml"
+[options]
+dynamic-runtime = "rsx_runtime"
+```
+
+The generated public module contains `px` and `tailwind` helpers. Both operate on
+GPUI's `StyleRefinement`, so different element types share the same compiled code.
+`rsx!` and `rsx_tw!` choose the appropriate helper. Existing styles and per-element
+`onUnknownClass` callbacks are preserved, and strict mode still rejects unknown
+dynamic classes at runtime. Variants and theme tokens still require static strings.
+This setting reduces compilation work; dynamic strings are still parsed during rendering.
+
+Library code uses `crate::rsx_runtime`; integration tests, examples and binaries in
+the same package automatically use the library's module, including a custom `[lib].name`.
+In a package with only binaries, put `rsx_runtime!()` at each target's crate root,
+including integration tests and examples that use dynamic classes. An explicit
+`dynamic-runtime = "crate::rsx_runtime"` always selects the current target, and
+`"::my_library::rsx_runtime"` can select an existing module directly.
+If GPUI is renamed, pass its import path: `gpui_rsx::rsx_runtime!(my_gpui);`.
+
+This optimization is optional in 0.10. Without `dynamic-runtime`, generated code
+keeps the existing behavior. Lint and LSP information diagnostics suggest the option
+when they encounter dynamic classes without a configured shared runtime.
+
+A local macOS ARM64 / Rust 1.99.1 comparison used 50 public functions, each with
+one `class={classes}` attribute, against this repository's GPUI stub. Dependencies
+were built first, incremental compilation was disabled, and only the application
+source was touched before each measurement (one run per command):
+
+| Workload | Inline helper | Shared runtime |
+| --- | --- | --- |
+| `cargo check` | 2.180 s | 0.259 s |
+| Debug build | 4.112 s | 0.386 s |
+| Release build | 12.841 s | 0.885 s |
+| Debug `.rlib` | 11.86 MB | 2.06 MB |
+
+This isolates generated-code compilation costs. Real application cold builds also
+compile GPUI and other dependencies, so the relative whole-build gain will differ.
 
 ## Avoid Render-Loop Allocation
 
@@ -169,7 +228,12 @@ rsx! {
 }
 ```
 
-Literal keys use `concat!`; dynamic keys use formatting so any `Display` value can participate in the generated ID.
+Literal keys use `concat!`. Concrete dynamic integer values up to 64 bits (including
+`usize` / `isize`) use GPUI's `(&'static str, u64)` ID without formatting or allocating a
+string. Other `Display` values retain the formatted-string fallback, including `u128` /
+`i128` to avoid truncation. Borrowed integer references and generic `T: Display` values may
+also use that fallback. The expression is borrowed and evaluated once, so a String key is
+not moved. Prefer an owned integer value such as `key={task.id}` for large stateful lists.
 
 ## Keep RSX Blocks Scannable
 
@@ -215,8 +279,8 @@ and measurement) produced these slope estimates:
 | Analyze 80 macros / reuse 79 unchanged bodies | 1.00 ms (full) | 223 µs (reuse) |
 
 These are local microbenchmarks, not whole-project cold build timings. The reuse
-estimate had a 95% confidence interval of about 199–268 µs. Incremental analysis
-still scans the Rust token stream; it skips RSX parsing only for unchanged bodies.
+estimate had a 95% confidence interval of about 199–268 µs. That earlier incremental implementation scanned the Rust token stream and skipped RSX
+parsing only for unchanged bodies; the 0.10 measurements below include confined-body scans.
 Dynamic helpers are shared within a macro invocation, while each attribute keeps
 its own expression evaluation and unknown-class handler.
 
@@ -252,3 +316,18 @@ For documentation examples and navigation, build the docs site:
 cd docs
 bun run build
 ```
+
+## Editor and matcher measurements (2026-10-29)
+
+On this macOS ARM64 machine, a 5000-line file with 50 macros took about **1.12ms** for
+full analysis and **0.15ms** when editing one balanced macro. The fixture includes ordinary
+comment lines and small RSX bodies; it is not a bound on arbitrary Rust files. Reproduce with
+`cargo bench -p gpui-rsx-tools --bench analysis -- 5000_lines`. Edits outside a balanced
+macro use a full scan; files without `rsx` skip analysis, and the LSP coalesces queued edits.
+Class classifications and colors are cached for semantic-token and color requests.
+
+The common runtime matcher now dispatches by first byte. A short 10-sample stub benchmark
+showed `dynamic_class_simple` at about 16→14ns and `dynamic_class_complex` at 129→89ns;
+`gap-4` alone regressed from about 9→11ns and numeric fallback stayed near 13ns. These are
+small synthetic workloads, not a uniform speedup guarantee. Reproduce with
+`cargo bench --bench class_performance -- dynamic_`.

@@ -23,8 +23,8 @@ impl MockElement {
     // --- 身份 ---
     /// 接受静态或动态字符串，捕获 auto-ID 供测试验证。
     /// 新格式："{file}::__rsx_{tag}_L{line}C{col}"（含文件路径前缀）
-    pub fn id(self, id: impl AsRef<str>) -> Self {
-        let id = id.as_ref();
+    pub fn id(self, id: impl MockId) -> Self {
+        let id = id.mock_id();
         // 新格式含文件路径前缀，用 contains 兼容两种格式
         if id.contains("__rsx_") {
             LAST_AUTO_ID.with(|c| *c.borrow_mut() = Some(id.to_string()));
@@ -242,5 +242,29 @@ impl MockElement {
 
     pub fn grayscale(self, _: bool) -> Self {
         self
+    }
+}
+
+pub trait MockId {
+    fn mock_id(self) -> String;
+}
+impl MockId for &str {
+    fn mock_id(self) -> String {
+        self.to_owned()
+    }
+}
+impl MockId for String {
+    fn mock_id(self) -> String {
+        self
+    }
+}
+impl MockId for &String {
+    fn mock_id(self) -> String {
+        self.clone()
+    }
+}
+impl MockId for (&'static str, u64) {
+    fn mock_id(self) -> String {
+        format!("{}{}", self.0, self.1)
     }
 }

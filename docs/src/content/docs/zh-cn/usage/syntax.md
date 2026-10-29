@@ -78,7 +78,7 @@ rsx! {
 
 `base` 会被宏消费，不会生成 `.base(...)` 方法调用。
 
-### 函数式组件（未发布）
+### 函数式组件
 
 在同步函数上使用 `#[component]`，即可生成与结构体组件相同的属性 builder。
 函数体在 GPUI 渲染该元素时执行：
@@ -118,9 +118,83 @@ let badge = rsx! {
 
 可选的 `#[context]` 参数必须是 `&mut Window` 或 `&mut App`，由 GPUI 渲染时传入，
 调用方无需将它们作为属性传递；宏也不会隐式捕获调用方的 `window` 或 `cx`。
-属性使用具体的拥有型类型或 `'static` 引用；回调属性可使用 boxed callback。
-暂不支持泛型、async/unsafe 函数或解构参数。原函数名会成为无参 builder 构造函数：
+属性使用具体的拥有型类型或 `'static` 引用。暂不支持 async/unsafe 函数或解构参数。原函数名会成为无参 builder 构造函数：
 `Badge().label("Inbox")`。
+
+### 结构体组件与弃用提示
+
+命名结构体使用相同的 prop 注解，实现 `RenderOnce` 并派生 `gpui::IntoElement`：
+
+```rust
+#[component]
+#[derive(gpui::IntoElement)]
+struct Panel {
+    title: gpui::SharedString,
+    #[prop(default)] compact: bool,
+    #[children] children: Vec<gpui::AnyElement>,
+}
+impl gpui::RenderOnce for Panel {
+    fn render(self, _: &mut gpui::Window, _: &mut gpui::App) -> impl gpui::IntoElement {
+        div().child(self.title).children(self.children)
+    }
+}
+// rsx! { <Panel title="Inbox" compact><span>{"Hello"}</span></Panel> }
+```
+
+在 `#[component]` 结构体或函数上添加 `#[deprecated(note = "use NewPanel")]`，
+即可在 `<Panel ...>` 与 `Panel()` 调用处提示弃用；生成代码内部不会重复报警。
+
+### 回调、可选属性与泛型
+
+`Box<dyn Fn...>` / `Rc<dyn Fn...>` 的 setter 与 GPUI 自带的事件 setter 一样接收
+`impl Fn... + 'static`，闭包参数可自动推导（`on_press={|_, _, _| ...}`），并保留声明的
+`Send`、`Sync` 和生命周期约束。传入已有的共享回调时需转发：
+`on_run={{ let run = run.clone(); move || run() }}`。
+
+回调默认值可直接构造容器，例如在 Box GPUI 处理函数上写
+`#[prop(default = Box::new(|_, _, _| {}))]`。默认值会转换为声明的回调类型，闭包参数与 setter
+一样可自动推导。
+
+宏按书写出的类型识别回调，因此 `type OnPress = Rc<dyn Fn(...)>` 这样的类型别名会被当作普通值属性。
+需要给较长的处理函数签名起名时，请声明 trait 别名并给属性加上 `#[prop(callback)]`（可与 `default`
+组合）；闭包仍可通过 supertrait 推导参数：
+
+```rust
+trait OnPress: Fn(&ClickEvent, &mut Window, &mut App) {}
+impl<F: Fn(&ClickEvent, &mut Window, &mut App)> OnPress for F {}
+
+#[component]
+fn Pressable(#[prop(callback)] on_press: Rc<dyn OnPress>) -> impl IntoElement {
+    div().id("pressable").on_click(move |e, w, cx| on_press(e, w, cx))
+}
+let pressable = rsx! { <Pressable on_press={|_, window, _| window.refresh()} /> };
+```
+
+对 `type` 别名使用 `#[prop(callback)]` 会产生编译错误，并提示改用上述写法。
+
+`Option<T>` 可接收 `T`、`Some(T)` 或 `None`；内部值必须已经是 `T` 类型，
+例如 `Option<SharedString>` 需先将字符串转为 `SharedString`。
+
+```rust
+#[component]
+fn Action<T: Into<gpui::SharedString>>(
+    label: T,
+    on_run: std::rc::Rc<dyn Fn()>,
+    #[prop(default)] hint: Option<gpui::SharedString>,
+) -> impl gpui::IntoElement {
+    let _ = (on_run, hint);
+    div().child(label.into())
+}
+let action = rsx! {
+    <Action label={String::from("Run")} on_run={|| println!("run")}
+        hint={gpui::SharedString::from("Ready")} />
+};
+```
+
+类型泛型、const 泛型、默认类型和 `where` 条件都会保留。函数组件自动添加 GPUI 所需的
+`'static` 约束。类型为 `T` 的 prop 可帮助推导泛型；无法推导时，在构造函数上显式指定：
+`<ArrayCard base={ArrayCard::<3>()} values={[1, 2, 3]} />`。
+标签支持模块路径，不支持 turbofish 写法。泛型结构体需满足自身的 GPUI trait 约束。
 
 ## 属性
 
@@ -242,9 +316,9 @@ rsx! {
 }
 ```
 
-Fragment 会展开为 `vec![...]`。如果根元素具体类型不同，通常需要 `into_any_element()` 或包一层共同父元素。
+Fragment 会展开为 `vec![...]`。如果根元素具体类型不同，通常需要 `into_any_element()` 或包一层共同父元素。根 Fragment 中包含 `for` 循环或 `{...spread}` 时，会展开为 `Vec<AnyElement>`，元素顺序保持不变。
 
-未发布的开发版本还支持嵌套 Fragment：
+Fragment 也可以嵌套：
 
 ```rust
 rsx! {

@@ -285,6 +285,29 @@ fn parse_children(
         if let Some(node) = try_parse_child_node(input)? {
             children.push(node);
         } else {
+            if input.peek(Ident) {
+                let fork = input.fork();
+                let mut tokens = TokenStream::new();
+                let start = fork.span();
+                let mut end = start;
+                while !fork.is_empty()
+                    && !fork.peek(Token![<])
+                    && !fork.peek(token::Brace)
+                    && !fork.peek(syn::LitStr)
+                {
+                    let token: TokenTree = fork.parse()?;
+                    end = token.span();
+                    tokens.extend([token]);
+                }
+                let span = start.join(end).unwrap_or(start);
+                let text = span.source_text().unwrap_or_else(|| tokens.to_string());
+                return Err(syn::Error::new(
+                    span,
+                    format!(
+                        "Bare text is not supported. Write {text:?} in quotes, or use {{variable}} for a Rust expression."
+                    ),
+                ));
+            }
             return Err(match parent_name {
                 Some(name) => invalid_child_in_tag_error(input.span(), &name.to_string()),
                 None => invalid_child_in_fragment_error(input.span()),

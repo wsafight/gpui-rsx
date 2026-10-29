@@ -9879,13 +9879,13 @@ pub trait GeneratedStateful: Sized {
 }
 
 impl GeneratedStyled for Div {}
-impl GeneratedStyled for Stateful<Div> {}
+impl<E: Styled> GeneratedStyled for Stateful<E> {}
 impl GeneratedStyled for StyleRefinement {}
 impl GeneratedStyled for Svg {}
 impl GeneratedStyled for Img {}
 impl<T> GeneratedStyled for Canvas<T> {}
 impl GeneratedInteractive for Div {}
-impl GeneratedInteractive for Stateful<Div> {}
+impl<E: InteractiveElement> GeneratedInteractive for Stateful<E> {}
 impl GeneratedInteractive for Svg {}
 impl GeneratedInteractive for Img {}
-impl GeneratedStateful for Stateful<Div> {}
+impl<E: Element> GeneratedStateful for Stateful<E> {}

@@ -9,14 +9,95 @@
 
 ## [未发布]
 
+## [0.10.0] - 2026-10-29
+
 ### 新增
 
+- 可选的 `rsx_runtime!()` 与 `[options] dynamic-runtime = "rsx_runtime"` 在 crate 内
+  共享非泛型动态 class helper，覆盖测试、example 和 bin，支持 GPUI 别名和两种间距刻度。
+  lint 与 LSP 会为未配置的动态 class 给出建议。本地 50 调用点 stub 测试的 release 编译
+  从 12.84 s 降至 0.89 s，测量条件见性能指南。
 - `#[component]` 支持同步函数，复用结构体组件的编译期必填属性检查、默认值、布尔 flag
   和 children builder。显式 `#[context]` 参数在 GPUI 渲染时获得 `&mut Window` / `&mut App`。
 - 元素、组件 children、根 Fragment 和循环内均支持嵌套 `<>...</>`，不添加包装元素或
   Fragment 运行时向量。格式化保留分组，诊断、class 范围、间距迁移和预览会遍历其中内容。
 - 上述能力参考 [@ppmpreetham](https://github.com/ppmpreetham) 的
   [#8](https://github.com/wsafight/gpui-rsx/pull/8)，基于当前架构重新实现。
+
+- 组件 props 支持直接传入 Box / Rc 回调闭包、`Option<T>` 内部值和类型 / const 泛型，
+  支持类型推导与显式构造函数；函数组件补齐 GPUI 的 `'static` 约束。`#[prop(callback)]`
+  将 trait 别名（`trait OnPress: Fn(..) {}`）的 `Box` / `Rc` 视为回调，长签名同样可推导闭包参数。
+- 支持 `bg-red-500/50`、`rounded-[4px]`、`text-[14px]`、`leading-6`，覆盖动态 class；
+  CSS 专属工具类会说明对应的 GPUI 限制。
+- LSP 支持标签、方法和本文件组件 prop 补全，为裸文本、标签不匹配、缺 prop 和循环缺 key
+  提供修复；向支持动态文件监听的客户端注册配置监听，覆盖 VS Code 与 Zed。
+- CLI 每个命令支持帮助，stdin lint 接受裸宏体；`--min-severity` / `--quiet` 过滤诊断而不
+  改变退出状态。`convert --tailwind` 输出 `rsx_tw!`，保留简单标识符与成员访问，JS 行为仍需检查。
+- Playground 支持内存中的 `rsx.toml` 主题、分享链接、缓存与配置诊断，并预览静态 token；
+  Rust 表达式不会执行。
+
+### 修复
+
+- 组件标签及 `base` 表达式只为 GPUI 渲染元素自动注入 ID。gpui-component 的 `Button`
+  和带 `on_click` / `on_hover` 属性的 `#[component]` 构建器保留自身 setter，返回原生
+  元素的路径函数则继续获得自动 ID。
+- `#[prop(default = Box::new(|_, _, _| {}))]` 等回调默认值可推导闭包参数，并转换为声明的
+  Box / Rc 回调类型，也支持 trait 别名。
+- 动态颜色拒绝 `bg-red-500/50/50` 这类重复透明度修饰符，与静态校验保持一致，
+  不再静默使用最后一个修饰符。
+- 根 Fragment 中包含 `for` 循环或 `{...spread}` 时展开为 `Vec<AnyElement>`，不再生成
+  装着迭代器的 `vec!`（混合子节点时无法编译）。
+- `#[deprecated]` 组件在使用处给出警告，而不是在自身生成代码中报警；生成的 builder
+  使用完整的 `gpui` 路径，并支持 `r#Card` 这类原始标识符。
+- lint、迁移和语言服务器会分析嵌套在其他宏内部的 `rsx!` 调用，并使用嵌套宏自己的模式。
+- 工具按与宏相同的优先级识别 `gpui-rsx` 的 `tailwind-scale` feature，`migrate` 会拒绝
+  重复执行，hover 显示的长度与编译结果一致。
+- Code action 只覆盖请求的范围；文件未变化或无法解析时，格式化返回空结果而不是报错。
+- class 字符串包含 Unicode 空白时，LSP 补全与 hover 保留有效的 UTF-8 范围，避免语言服务器崩溃。
+- `preview` 支持目录参数，`--watch` 在 `rsx.toml` 修改后会刷新。
+- 变体内的未知 class（如 `focus:ring-2`）的透传警告改为显示生成的调用
+  `.focus(|style| style.ring_2())`，不再给出非法的方法名或 flag 属性。
+- 命令会拒绝不适用的选项，`lint` 会检查显式指定的任意扩展名文件，`doctor` 输出纯文本值。
+
+- 不超过 64 位的具体动态整数 key 使用 GPUI 命名整数 ID，无需格式化字符串；其他 Display
+  值保留借用、单次求值的格式化路径。
+- format class 模板的完整静态首尾 token 在编译期展开，原表达式仍求值一次，样式顺序保留；
+  中间部分继续动态处理。
+- 平衡宏体内的编辑只扫描该宏体，LSP 合并队列中的连续修改，并复用语义高亮与颜色分析缓存。
+  本地 5000 行样本完整分析约 1.12ms，单次增量修改约 0.15ms。
+- 常用运行时 class matcher 按首字节分派；性能指南记录实测收益、回退场景与复现命令。
+
+### 变更
+
+- class 行为变更：宽松模式下，静态 `z-*`、`space-x-*`、`space-y-*`、`divide-*`、
+  `transition*`、`duration-*`、`ease-*`、`delay-*` 和 `animate-*` class 会警告并忽略，
+  不再透传为扩展方法；严格模式下报错。自定义实现改用显式属性（如 `z_10`、`transition`）
+  或 `base={...}` 调用。
+- 转换器保留 `{items}` / `{item.title}`，不再提示需要手动转换；仍需检查 Rust 类型和
+  所有权，集合子节点可能需要 `{...items}` 或 `{for ...}`。
+- 语言服务器按文档缓存行偏移，每个文档只保留一份分析结果而不是每次编辑时复制，
+  代码拆分为 protocol、document、features 模块。`gpui-rsx-core` 的主题与组件代码拆分为目录模块。
+- 新增 `cargo xtask line-limit`（CI 和 `scripts/check.sh` 会运行），限制手写 Rust 文件的非空、
+  非测试代码不超过 600 行。
+- VS Code 插件从自身版本推导安装版本，从 GUI 启动时也能找到 `~/.cargo/bin`，
+  显示真实的启动错误，版本不一致时给出提示，修改设置后自动重启并监听 `Cargo.toml`。
+- VS Code 接受 major.minor 相同的服务端补丁版本，安装命令会选择最新兼容补丁，
+  不再固定安装插件自身的旧补丁版本。
+- 破坏性 API：`Rc<dyn Fn...>` 组件属性与 `Box<dyn Fn...>` 属性及 GPUI 事件 setter 一样接收
+  `impl Fn... + 'static`，闭包参数和生命周期可自动推导（`on_press={|_, _, _| ...}`）。
+  已有的 `Rc` 值需转发：`on_press={{ let f = f.clone(); move |e, w, cx| f(e, w, cx) }}`。
+- 破坏性 API：`gpui-rsx-tools` 的 `Diagnostic::severity` 改为 `#[non_exhaustive]` 的
+  `DiagnosticSeverity` 枚举，序列化结果与原字符串相同；整文件分析包含嵌套宏（`macro_calls`
+  仍只返回顶层调用，参见 `nested_macro_calls` 与 `call_at`）。`report_body`（`#[non_exhaustive]`
+  的 `BodyReport`）一次解析即返回诊断、展开结果和预览，它与 `expand_summary` 均省略动态 class
+  helper。详见迁移指南“从 0.9 升级到 0.10”。
+- 工具分析、hover 和 Playground 不再生成动态 class helper：80 个动态 class 宏的整文件分析
+  从约 67 ms 降至 2 ms。`lint` 按 workspace 解析一次 Cargo feature，而不是每个成员一次。
+- 新增 `cargo xtask bump <version>`，统一设置 manifest、lockfile、编辑器插件和安装片段中的
+  发布版本；CI 会运行 `cargo xtask bump --check`。
+- `gpui-rsx-tools` 不再精确锁定 `serde` 版本。
+- 语言服务器仅在 `initializationOptions.formatting` 为 `true` 时声明 RSX 格式化能力
+  （VS Code：`gpuiRsx.format.enable`），编辑器默认仍使用 rustfmt 格式化 Rust。
 
 ## [0.9.0] - 2026-10-28
 
@@ -655,7 +736,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...v0.8.2

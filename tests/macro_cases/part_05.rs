@@ -507,7 +507,8 @@ fn test_keyed_auto_id_dynamic_key_keeps_format_fallback() {
     };
     let compact = expanded.split_whitespace().collect::<String>();
 
-    assert!(compact.contains("format!(concat!(file!(),"));
+    assert!(compact.contains("__rsx_key_id(concat!(file!(),"));
+    assert!(compact.contains("::std::format!"));
     assert!(compact.contains("item.id"));
 }
 
@@ -537,4 +538,24 @@ fn test_dynamic_class_accepts_short_hex_with_alpha() {
     let _el = rsx! { <div class={cls} /> };
     assert!(take_rgb_calls().is_empty());
     assert_eq!(take_rgba_calls(), vec![0x11223344, 0xaabbccdd]);
+}
+
+#[test]
+fn test_dynamic_color_opacity_rejects_repeated_modifiers() {
+    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let sink = seen.clone();
+    let invalid =
+        "bg-red-500/50/50 text-[#1234]/50/50 border-[rgba(1,2,3,0.5)]/50/50 bg-red-500//50";
+    let classes = format!("{invalid} bg-red-500/50 text-[#1234]/0 border-[rgba(1,2,3,0.25)]/100");
+    take_rgb_calls();
+    take_rgba_calls();
+    let _ = rsx! {
+        <div class={classes} onUnknownClass={move |class: &str| sink.borrow_mut().push(class.to_owned())} />
+    };
+    assert_eq!(
+        *seen.borrow(),
+        invalid.split_ascii_whitespace().collect::<Vec<_>>()
+    );
+    assert!(take_rgb_calls().is_empty());
+    assert_eq!(take_rgba_calls(), [0xef444480, 0x11223300, 0x010203ff]);
 }

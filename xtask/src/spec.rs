@@ -44,8 +44,9 @@ pub fn document() -> Value {
         "schema_version": 1,
         "gpui_revision": gpui_rsx_core::GPUI_SOURCE_REV,
         "gpui_component_revision": gpui_rsx_core::GPUI_COMPONENT_REV,
-        "macros": ["rsx", "rsx_strict", "rsx_permissive", "rsx_tw", "rsx_expand"],
+        "macros": gpui_rsx_core::MACRO_NAMES,
         "component_attribute_macro": "component",
+        "runtime_macro": "rsx_runtime",
         "components": {
             "declarations": ["struct with named fields", "synchronous function with concrete prop types"],
             "required_props": "compile-time checked",
@@ -107,5 +108,58 @@ mod tests {
                 .len()
                 > 700
         );
+    }
+
+    #[test]
+    fn document_describes_the_public_macro_surface() {
+        let document = document();
+        assert_eq!(document["schema_version"], 1);
+        assert_eq!(document["component_attribute_macro"], "component");
+        assert_eq!(document["runtime_macro"], "rsx_runtime");
+        assert_eq!(document["macros"], json!(gpui_rsx_core::MACRO_NAMES));
+        assert!(
+            document["components"]["declarations"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|entry| entry.as_str().unwrap().contains("function"))
+        );
+        assert!(
+            document["components"]["function_context"]
+                .as_str()
+                .unwrap()
+                .contains("#[context]")
+        );
+    }
+
+    #[test]
+    fn document_lists_tags_attributes_and_tailwind_limits() {
+        let document = document();
+        assert!(document["tags"]["div_aliases"].as_array().unwrap().len() > 1);
+        assert!(
+            document["tags"]["special"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("img"))
+        );
+        for attribute in ["class", "whenClass", "onUnknownClass", "base"] {
+            assert!(
+                document["attributes"]["special"]
+                    .as_array()
+                    .unwrap()
+                    .contains(&json!(attribute)),
+                "{attribute}"
+            );
+        }
+        assert_eq!(document["classes"]["default_numeric_unit_px"], 1);
+        assert_eq!(document["classes"]["tailwind_numeric_unit_px"], 4);
+        assert!(
+            document["classes"]["unsupported_variants"]
+                .as_array()
+                .unwrap()
+                .contains(&json!("dark"))
+        );
+        assert_eq!(document["syntax"]["fragment"], "<>...</>");
+        assert_eq!(document["examples"].as_array().unwrap().len(), 5);
     }
 }

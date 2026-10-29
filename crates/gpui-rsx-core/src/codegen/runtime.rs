@@ -6,12 +6,13 @@
 //! 优化：使用进程级缓存保存完整 helper 源码，避免多个动态 class 重复生成和分段解析。
 
 use super::class::{ClassMode, SpacingScale, parse_single_class_with_mode};
-use super::tables::{
-    COLOR_FAMILIES, COLOR_SHADES, LENGTH_CLASS_SPECS, dynamic_common_classes, lookup_color,
-};
+use super::tables::{LENGTH_CLASS_SPECS, dynamic_common_classes};
+mod color;
+use color::generate_color_fallback_code;
 use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use std::sync::OnceLock;
+use syn::spanned::Spanned;
 
 // 缓存所有 match 分支拼接后的字符串（每个进程和 spacing scale 只生成一次）
 //
@@ -63,7 +64,47 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
 ) -> TokenStream {
     let handler = match unknown_class_handler {
         Some(handler) => quote! { #handler },
-        None => default_unknown_handler(mode),
+        None => default_unknown_handler(mode.clone()),
+    };
+
+    let apply = if let Some(path) = mode.dynamic_runtime_path() {
+        let helper = match mode.scale() {
+            SpacingScale::Px => quote! { px },
+            SpacingScale::Tailwind => quote! { tailwind },
+        };
+        quote! {
+            let mut __el = __el;
+            let __style = Styled::style(&mut __el);
+            *__style = #path::#helper(std::mem::take(__style), __class_str, &mut __on_unknown);
+            __el
+        }
+    } else {
+        quote! {
+            __class_str
+                .split_ascii_whitespace()
+                .fold(__el, |__el, __class| __rsx_apply_class(__el, __class, &mut __on_unknown))
+        }
+    };
+
+    let result = quote! { if __class_str.is_empty() { __el } else { #apply } };
+    let result = if let Some(edges) = super::format_class::static_edges(class_expr, mode.clone()) {
+        let prefix = super::class::parse_class_string_with_mode(
+            &edges.prefix,
+            mode.clone(),
+            class_expr.span(),
+        );
+        let suffix =
+            super::class::parse_class_string_with_mode(&edges.suffix, mode, class_expr.span());
+        let prefix_len = edges.prefix.len();
+        let suffix_len = edges.suffix.len();
+        quote! {
+            let __class_str = &__class_str[#prefix_len..__class_str.len() - #suffix_len];
+            let __el = __el #(#prefix)*;
+            let __el = #result;
+            __el #(#suffix)*
+        }
+    } else {
+        result
     };
 
     quote! {
@@ -76,14 +117,7 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
             // AsRef<str>：&str、String、Cow<str> 均零拷贝通过
             let __class_expr = #class_expr;
             let __class_str: &str = __class_expr.as_ref();
-            // 空字符串快速路径：跳过迭代器创建（常见于 class={if c { "flex" } else { "" }}）
-            if __class_str.is_empty() {
-                __el
-            } else {
-                __class_str
-                    .split_ascii_whitespace()
-                    .fold(__el, |__el, __class| __rsx_apply_class(__el, __class, &mut __on_unknown))
-            }
+            #result
         }
     }
 }
@@ -168,186 +202,60 @@ fn default_unknown_handler(mode: ClassMode) -> TokenStream {
 }
 
 fn generate_dynamic_class_helper(mode: ClassMode) -> TokenStream {
+    dynamic_class_helper(
+        mode,
+        quote! { fn __rsx_apply_class<E: Styled>(el: E, class: &str, on_unknown: &mut dyn FnMut(&str)) -> E },
+    )
+}
+
+/// Generates the optional crate-wide runtime without depending on a particular GPUI crate.
+pub fn generate_runtime_module(gpui: &syn::Path) -> TokenStream {
+    let helpers = [("px", SpacingScale::Px), ("tailwind", SpacingScale::Tailwind)]
+        .into_iter()
+        .map(|(name, scale)| {
+            let name = syn::Ident::new(name, Span::call_site());
+            let matcher = dynamic_class_helper(ClassMode::PERMISSIVE.with_scale(scale), quote! {
+                fn __rsx_apply_class(el: StyleRefinement, class: &str, on_unknown: &mut dyn FnMut(&str)) -> StyleRefinement
+            });
+            quote! {
+                #[doc(hidden)]
+                pub fn #name(mut el: StyleRefinement, classes: &str, on_unknown: &mut dyn FnMut(&str)) -> StyleRefinement {
+                    // The public `px` helper must not shadow GPUI's length constructor.
+                    use #gpui::px;
+                    #matcher
+                    for class in classes.split_ascii_whitespace() {
+                        el = __rsx_apply_class(el, class, on_unknown);
+                    }
+                    el
+                }
+            }
+        });
+    quote! {
+        #[doc(hidden)]
+        pub mod rsx_runtime {
+            #[allow(unused_imports)]
+            use #gpui::{prelude::*, *};
+            #(#helpers)*
+        }
+    }
+}
+
+fn dynamic_class_helper(mode: ClassMode, signature: TokenStream) -> TokenStream {
     let common_classes = generate_common_class_matches(mode.clone());
     let color_fallbacks = generate_color_fallback_code();
     let numeric_fallbacks = generate_numeric_fallback_code(mode.scale());
 
     quote! {
         #[inline(never)]
-        fn __rsx_apply_class<E: Styled>(el: E, class: &str, on_unknown: &mut dyn FnMut(&str)) -> E {
-            match class {
+        #signature {
+            match class.as_bytes().first().copied() {
                 #(#common_classes)*
-                _ => {
-                    // 颜色前缀解析：覆盖完整 Tailwind 色板和 arbitrary hex。
-                    #color_fallbacks
-                    // 数值前缀回退：gap-7、px-5、ml-3、opacity-33 等任意数值
-                    #numeric_fallbacks
-                    on_unknown(class);
-                    el
-                }
+                _ => {}
             }
-        }
-    }
-}
-
-/// 生成动态颜色解析回退代码。
-///
-/// 相比为 text/bg/border 三个前缀展开完整色板 match arm，这里只在动态路径中
-/// 解析 `prefix-family-shade`，把展开体积从 700+ 个颜色分支降到 22 个色系分支。
-fn generate_color_fallback_code() -> TokenStream {
-    let shade_arms = COLOR_SHADES.iter().enumerate().map(|(idx, shade)| {
-        quote! { #shade => #idx, }
-    });
-
-    let family_arms = COLOR_FAMILIES.iter().map(|family| {
-        let values = COLOR_SHADES.iter().map(|shade| {
-            let key = format!("{family}_{shade}");
-            lookup_color(&key).expect("COLOR_FAMILIES/COLOR_SHADES must match lookup_color")
-        });
-        quote! {
-            #family => {
-                const VALUES: [u32; 11] = [#(#values),*];
-                Some(VALUES[shade_index])
-            }
-        }
-    });
-
-    quote! {
-        fn __rsx_hex_digit(byte: u8) -> Option<u32> {
-            match byte {
-                b'0'..=b'9' => Some((byte - b'0') as u32),
-                b'a'..=b'f' => Some((byte - b'a' + 10) as u32),
-                b'A'..=b'F' => Some((byte - b'A' + 10) as u32),
-                _ => None,
-            }
-        }
-
-        fn __rsx_parse_hex_color(color: &str) -> Option<u32> {
-            let inner = color.strip_prefix("[#")?.strip_suffix(']')?;
-            let bytes = inner.as_bytes();
-            // `from_str_radix` alone would also accept a leading `+`.
-            if !bytes.iter().all(u8::is_ascii_hexdigit) {
-                return None;
-            }
-            match bytes.len() {
-                8 => u32::from_str_radix(inner, 16).ok(),
-                6 => u32::from_str_radix(inner, 16).ok(),
-                4 => {
-                    let r = __rsx_hex_digit(bytes[0])?;
-                    let g = __rsx_hex_digit(bytes[1])?;
-                    let b = __rsx_hex_digit(bytes[2])?;
-                    let a = __rsx_hex_digit(bytes[3])?;
-                    let expand = |n: u32| (n << 4) | n;
-                    Some(expand(r) << 24 | expand(g) << 16 | expand(b) << 8 | expand(a))
-                }
-                3 => {
-                    let r = __rsx_hex_digit(bytes[0])?;
-                    let g = __rsx_hex_digit(bytes[1])?;
-                    let b = __rsx_hex_digit(bytes[2])?;
-                    Some(r << 20 | r << 16 | g << 12 | g << 8 | b << 4 | b)
-                }
-                _ => None,
-            }
-        }
-
-        fn __rsx_parse_u8_component(raw: &str) -> Option<u8> {
-            raw.trim().parse::<u8>().ok()
-        }
-
-        fn __rsx_parse_alpha_component(raw: &str) -> Option<u8> {
-            let value = raw.trim().parse::<f32>().ok()?;
-            if !value.is_finite() || !(0.0..=1.0).contains(&value) {
-                return None;
-            }
-            Some((value * 255.0).round() as u8)
-        }
-
-        fn __rsx_parse_color_function(color: &str) -> Option<(u32, bool)> {
-            let inner = color.strip_prefix('[')?.strip_suffix(']')?;
-
-            if let Some(args) = inner.strip_prefix("rgb(").and_then(|s| s.strip_suffix(')')) {
-                let mut parts = args.split(',');
-                let r = __rsx_parse_u8_component(parts.next()?)?;
-                let g = __rsx_parse_u8_component(parts.next()?)?;
-                let b = __rsx_parse_u8_component(parts.next()?)?;
-                if parts.next().is_some() {
-                    return None;
-                }
-                return Some((((r as u32) << 16) | ((g as u32) << 8) | b as u32, false));
-            }
-
-            if let Some(args) = inner.strip_prefix("rgba(").and_then(|s| s.strip_suffix(')')) {
-                let mut parts = args.split(',');
-                let r = __rsx_parse_u8_component(parts.next()?)?;
-                let g = __rsx_parse_u8_component(parts.next()?)?;
-                let b = __rsx_parse_u8_component(parts.next()?)?;
-                let a = __rsx_parse_alpha_component(parts.next()?)?;
-                if parts.next().is_some() {
-                    return None;
-                }
-                return Some((
-                    ((r as u32) << 24) | ((g as u32) << 16) | ((b as u32) << 8) | a as u32,
-                    true,
-                ));
-            }
-
-            None
-        }
-
-        fn __rsx_parse_named_color(color: &str) -> Option<u32> {
-            if color == "black" {
-                return Some(0x000000);
-            }
-            if color == "white" {
-                return Some(0xffffff);
-            }
-
-            let (family, shade) = color.rsplit_once('-')?;
-            let shade_index = match shade {
-                #(#shade_arms)*
-                _ => return None,
-            };
-
-            match family {
-                #(#family_arms,)*
-                _ => None,
-            }
-        }
-
-        fn __rsx_parse_color(color: &str) -> Option<(u32, bool)> {
-            if let Some(hex) = __rsx_parse_hex_color(color) {
-                let hex_inner = color.strip_prefix("[#")?.strip_suffix(']')?;
-                let is_rgba = hex_inner.len() == 8 || hex_inner.len() == 4;
-                return Some((hex, is_rgba));
-            }
-            __rsx_parse_color_function(color)
-                .or_else(|| __rsx_parse_named_color(color).map(|color| (color, false)))
-        }
-
-        // 生成代码不使用 let-chains：调用方 crate 可能仍是 edition 2021。
-        if let Some(rest) = class.strip_prefix("text-") {
-            if let Some((color, is_rgba)) = __rsx_parse_color(rest) {
-                if is_rgba {
-                    return el.text_color(rgba(color));
-                }
-                return el.text_color(rgb(color));
-            }
-        }
-        if let Some(rest) = class.strip_prefix("bg-") {
-            if let Some((color, is_rgba)) = __rsx_parse_color(rest) {
-                if is_rgba {
-                    return el.bg(rgba(color));
-                }
-                return el.bg(rgb(color));
-            }
-        }
-        if let Some(rest) = class.strip_prefix("border-") {
-            if let Some((color, is_rgba)) = __rsx_parse_color(rest) {
-                if is_rgba {
-                    return el.border_color(rgba(color));
-                }
-                return el.border_color(rgb(color));
-            }
+            #color_fallbacks
+            #numeric_fallbacks
+            on_unknown(class);
+            el
         }
     }
 }
@@ -400,6 +308,14 @@ fn generate_numeric_fallback_code(scale: SpacingScale) -> TokenStream {
         }
 
         #(#length_fallbacks)*
+        if let Some(inner) = class.strip_prefix("text-[").and_then(|rest| rest.strip_suffix(']')) {
+            if let Some(raw) = inner.strip_suffix("px") {
+                if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.text_size(px(n)); }
+            }
+            if let Some(raw) = inner.strip_suffix("rem") {
+                if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.text_size(rems(n)); }
+            }
+        }
         // --- opacity: opacity-50 → 0.50 ---
         if let Some(rest) = class.strip_prefix("opacity-") {
             if let Ok(n) = rest.parse::<f32>().__rsx_finite() {
@@ -486,13 +402,23 @@ fn generate_integer_fallback(prefix: &'static str, method: &'static str, ty: &st
 /// 返回一个 match arm 列表，每个 arm 匹配一个 class 字符串并应用相应的方法。
 /// 通过 thread_local 缓存，整个编译过程只调用一次。
 ///
-fn generate_common_class_matches(mode: ClassMode) -> impl Iterator<Item = TokenStream> {
-    dynamic_common_classes().map(move |class_str| {
-        let method_call = parse_dynamic_common_class(class_str, mode.clone());
-        quote! {
-            #class_str => #method_call,
-        }
-    })
+fn generate_common_class_matches(mode: ClassMode) -> Vec<TokenStream> {
+    let mut groups = std::collections::BTreeMap::<u8, Vec<TokenStream>>::new();
+    for class in dynamic_common_classes() {
+        let method = parse_dynamic_common_class(class, mode.clone());
+        groups
+            .entry(class.as_bytes()[0])
+            .or_default()
+            .push(quote! { #class => return #method, });
+    }
+    groups
+        .into_iter()
+        .map(|(first, arms)| {
+            quote! {
+                Some(#first) => match class { #(#arms)* _ => {} },
+            }
+        })
+        .collect()
 }
 
 fn parse_dynamic_common_class(class: &str, mode: ClassMode) -> TokenStream {

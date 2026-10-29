@@ -124,3 +124,11 @@ spacing-scale = "tailwind"
 ```
 
 You can combine this setting with `preset` in the same `[options]` section. Explicit lengths such as `gap-[14px]` and named tokens such as `gap-gutter` keep their declared values. Review the [spacing migration guide](/gpui-rsx/guides/migration/#spacing-scale-state-variants-and-components) before changing an existing layout.
+
+## Share dynamic class helpers
+
+For many `class={expr}` call sites, add `gpui_rsx::rsx_runtime!();` at the crate root
+and set `dynamic-runtime = "rsx_runtime"` in `[options]`. The option is independent
+of `spacing-scale` and does not enable theme tokens in dynamic strings.
+See [Performance](/gpui-rsx/guides/performance/#share-the-dynamic-class-runtime)
+for target placement, GPUI aliases and measurements.

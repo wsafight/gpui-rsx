@@ -169,8 +169,8 @@ jobs:
       - name: Check demo bins
         run: cargo check --manifest-path demo/Cargo.toml --bins --locked
 
-      - name: Link and test demo bins
-        run: cargo test --manifest-path demo/Cargo.toml --bins --locked
+      - name: Link and test demo targets
+        run: cargo test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
 
   fmt:
     name: Rustfmt
@@ -325,6 +325,10 @@ jobs:
           cargo xtask gen-tables --check
           cargo xtask spec --check
           cargo xtask compat-matrix --check
+      - name: Keep hand-written Rust files under 600 non-test lines
+        run: cargo xtask line-limit
+      - name: Require one release version across manifests, lockfiles and docs
+        run: cargo xtask bump --check
 
   benchmarks:
     name: Expansion Performance
@@ -397,6 +401,7 @@ jobs:
         run: |
           bun install --cwd editors/vscode --frozen-lockfile
           bun run --cwd editors/vscode check
+          bun run --cwd editors/vscode test
           bun run --cwd editors/vscode package
       - name: Build Zed extension
         run: cargo +1.98.1 build --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1 --release --locked

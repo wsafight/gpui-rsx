@@ -15,7 +15,7 @@ help: the trait `gpui::IntoElement` is conditionally implemented for `GreetingBu
   --> tests/ui/function_component_missing_prop.rs:5:1
    |
  5 | #[component]
-   | ^^^^^^^^^^^^ unsatisfied requirement introduced here: `MissingRequiredProp: label`
+   | ^^^^^^^^^^^^ unsatisfied requirement introduced here: `MissingRequiredProp_label_on_Greeting: label`
 note: required by a bound in `require_element`
   --> tests/ui/function_component_missing_prop.rs:10:28
    |
@@ -27,12 +27,12 @@ error[E0599]: the method `build` exists for struct `GreetingBuilder`, but its tr
   --> tests/ui/function_component_missing_prop.rs:14:24
    |
  5 | #[component]
-   | ------------ method `build` not found for this struct because it doesn't satisfy `MissingRequiredProp: label`
+   | ------------ method `build` not found for this struct because it doesn't satisfy `MissingRequiredProp_label_on_Greeting: label`
 ...
 14 |     let _ = Greeting().build();
    |                        ^^^^^ method cannot be called on `GreetingBuilder` due to unsatisfied trait bounds
    |
-note: trait bound `MissingRequiredProp: label` was not satisfied
+note: trait bound `MissingRequiredProp_label_on_Greeting: label` was not satisfied
   --> tests/ui/function_component_missing_prop.rs:5:1
    |
  5 | #[component]

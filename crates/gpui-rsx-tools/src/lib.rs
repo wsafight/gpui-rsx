@@ -1,7 +1,12 @@
 //! Shared, host-independent tooling. Positions are UTF-8 byte offsets into the input.
+mod class_tokens;
+pub mod completion;
+pub mod components;
 #[cfg(feature = "convert")]
 pub mod convert;
 pub mod format;
+mod incremental;
+pub use class_tokens::{ClassToken, ClassTokenKind};
 pub mod preview;
 
 use gpui_rsx_core::codegen::attribute::static_class_literals;
@@ -11,11 +16,37 @@ use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use serde::{Deserialize, Serialize};
 use syn::{Expr, Lit, spanned::Spanned};
 
+/// Serialized in lowercase (`"error"`, `"warning"`, `"information"`).
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+#[non_exhaustive]
+pub enum DiagnosticSeverity {
+    Error,
+    Warning,
+    Information,
+}
+
+impl DiagnosticSeverity {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Error => "error",
+            Self::Warning => "warning",
+            Self::Information => "information",
+        }
+    }
+}
+
+impl std::fmt::Display for DiagnosticSeverity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Diagnostic {
     pub start: usize,
     pub end: usize,
-    pub severity: String,
+    pub severity: DiagnosticSeverity,
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suggestion: Option<String>,
@@ -30,25 +61,17 @@ pub struct MacroCall {
 
 #[derive(Clone, Debug, Default)]
 pub struct RustAnalysis {
+    pub components: Vec<components::Component>,
+    pub class_tokens: Vec<ClassToken>,
     pub calls: Vec<MacroCall>,
     pub literals: Vec<(usize, usize)>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
-pub const MACROS: &[&str] = &[
-    "rsx",
-    "rsx_strict",
-    "rsx_permissive",
-    "rsx_tw",
-    "rsx_expand",
-];
+pub const MACROS: &[&str] = gpui_rsx_core::MACRO_NAMES;
 
 fn is_macro_name(name: &Ident) -> bool {
-    name == "rsx"
-        || name == "rsx_strict"
-        || name == "rsx_permissive"
-        || name == "rsx_tw"
-        || name == "rsx_expand"
+    MACROS.iter().any(|macro_name| name == macro_name)
 }
 
 /// Byte offset of `span` within `source`, which must be the string the span was parsed from.
@@ -64,8 +87,20 @@ pub fn byte_offset(source: &str, span: Span, end: bool) -> usize {
     offset
 }
 
+/// Top-level RSX macro calls, in source order. Their ranges never overlap, so callers may
+/// rewrite each body independently.
 pub fn macro_calls(source: &str) -> Result<Vec<MacroCall>, String> {
-    fn scan(tokens: TokenStream, source: &str, calls: &mut Vec<MacroCall>) {
+    scan_macro_calls(source, false)
+}
+
+/// Every RSX macro call, including calls nested inside another call's body (for example
+/// `rsx!` inside an `if` child). Outer calls come before the calls they contain.
+pub fn nested_macro_calls(source: &str) -> Result<Vec<MacroCall>, String> {
+    scan_macro_calls(source, true)
+}
+
+fn scan_macro_calls(source: &str, nested: bool) -> Result<Vec<MacroCall>, String> {
+    fn scan(tokens: TokenStream, source: &str, nested: bool, calls: &mut Vec<MacroCall>) {
         let tokens: Vec<_> = tokens.into_iter().collect();
         let mut i = 0;
         while i < tokens.len() {
@@ -80,19 +115,44 @@ pub fn macro_calls(source: &str) -> Result<Vec<MacroCall>, String> {
                     start: byte_offset(source, group.span_open(), true),
                     end: byte_offset(source, group.span_close(), false),
                 });
+                if nested {
+                    scan(group.stream(), source, nested, calls);
+                }
                 i += 3;
                 continue;
             }
             if let TokenTree::Group(group) = &tokens[i] {
-                scan(group.stream(), source, calls);
+                scan(group.stream(), source, nested, calls);
             }
             i += 1;
         }
     }
     let tokens = source.parse::<TokenStream>().map_err(|e| e.to_string())?;
     let mut calls = Vec::new();
-    scan(tokens, source, &mut calls);
+    scan(tokens, source, nested, &mut calls);
     Ok(calls)
+}
+
+/// The innermost call whose body contains `offset`.
+pub fn call_at(calls: &[MacroCall], offset: usize) -> Option<&MacroCall> {
+    calls
+        .iter()
+        .filter(|call| offset >= call.start && offset <= call.end)
+        .min_by_key(|call| call.end - call.start)
+}
+
+/// Whether `start..end` belongs to `call` itself rather than to a call nested inside it.
+/// Each body analysis treats nested macros as opaque, so every range has one owner.
+fn owned_by(calls: &[MacroCall], call: &MacroCall, start: usize, end: usize) -> bool {
+    start >= call.start
+        && end <= call.end
+        && !calls.iter().any(|inner| {
+            inner != call
+                && inner.start >= call.start
+                && inner.end <= call.end
+                && start >= inner.start
+                && end <= inner.end
+        })
 }
 
 pub fn mode_for(name: &str, mode: ClassMode) -> ClassMode {
@@ -106,12 +166,24 @@ pub fn mode_for(name: &str, mode: ClassMode) -> ClassMode {
 }
 
 fn error(source: &str, e: syn::Error) -> Diagnostic {
+    let start = byte_offset(source, e.span(), false);
+    let end = byte_offset(source, e.span(), true);
+    let message = e.to_string();
+    let suggestion = if message.starts_with("Bare text is not supported") {
+        Some(format!("{:?}", &source[start..end]))
+    } else {
+        message
+            .split("help: Change the closing tag to `</")
+            .nth(1)
+            .and_then(|rest| rest.split(">`").next())
+            .map(str::to_owned)
+    };
     Diagnostic {
         start: byte_offset(source, e.span(), false),
         end: byte_offset(source, e.span(), true),
-        severity: "error".into(),
+        severity: DiagnosticSeverity::Error,
         message: e.to_string(),
-        suggestion: None,
+        suggestion,
     }
 }
 
@@ -134,8 +206,8 @@ pub fn analyze_rust_document(source: &str, mode: ClassMode) -> RustAnalysis {
 }
 
 /// Reanalyzes changed macro bodies while reusing diagnostics and literal ranges for
-/// unchanged bodies. The Rust token stream is rescanned to keep discovery correct
-/// after edits to comments, strings, delimiters and macro names. `mode` must match
+/// unchanged bodies. Edits confined to a balanced macro rescan only that body;
+/// structural edits fall back to scanning the Rust token stream. `mode` must match
 /// the mode used for `previous`; configuration changes require a full analysis.
 pub fn update_rust_document(
     source: &str,
@@ -151,14 +223,23 @@ fn analyze_document(
     mode: ClassMode,
     previous: Option<(&str, &RustAnalysis)>,
 ) -> RustAnalysis {
-    let calls = match macro_calls(source) {
+    if !source.contains("rsx") {
+        return RustAnalysis::default();
+    }
+    let cached = previous.and_then(|(old, analysis)| incremental::calls(source, old, analysis));
+    let components = if cached.is_some() {
+        previous.unwrap().1.components.clone()
+    } else {
+        components::collect(source)
+    };
+    let calls = match cached.map_or_else(|| nested_macro_calls(source), Ok) {
         Ok(calls) => calls,
         Err(message) => {
             return RustAnalysis {
                 diagnostics: vec![Diagnostic {
                     start: 0,
                     end: source.len().min(1),
-                    severity: "error".into(),
+                    severity: DiagnosticSeverity::Error,
                     message,
                     suggestion: None,
                 }],
@@ -168,11 +249,15 @@ fn analyze_document(
     };
     let mut analysis = RustAnalysis {
         calls,
+        components,
         ..RustAnalysis::default()
     };
     let mut reusable = std::collections::HashMap::new();
     if let Some((previous_source, previous)) = previous {
         for call in &previous.calls {
+            if previous.components != analysis.components {
+                break;
+            }
             if let Some(body) = previous_source.get(call.start..call.end) {
                 reusable.entry((call.name.as_str(), body)).or_insert(call);
             }
@@ -187,7 +272,7 @@ fn analyze_document(
                 previous
                     .literals
                     .iter()
-                    .filter(|&&(start, end)| start >= old_call.start && end <= old_call.end)
+                    .filter(|&&(start, end)| owned_by(&previous.calls, old_call, start, end))
                     .map(|&(start, end)| {
                         (
                             call.start + start - old_call.start,
@@ -200,7 +285,7 @@ fn analyze_document(
                     .diagnostics
                     .iter()
                     .filter(|diagnostic| {
-                        diagnostic.start >= old_call.start && diagnostic.end <= old_call.end
+                        owned_by(&previous.calls, old_call, diagnostic.start, diagnostic.end)
                     })
                     .map(|diagnostic| {
                         let mut diagnostic = diagnostic.clone();
@@ -209,9 +294,32 @@ fn analyze_document(
                         diagnostic
                     }),
             );
+            analysis.class_tokens.extend(
+                previous
+                    .class_tokens
+                    .iter()
+                    .filter(|t| owned_by(&previous.calls, old_call, t.start, t.end))
+                    .map(|t| {
+                        let mut t = t.clone();
+                        t.start = call.start + t.start - old_call.start;
+                        t.end = call.start + t.end - old_call.start;
+                        t
+                    }),
+            );
             continue;
         }
-        let body_analysis = analyze_body_with_ranges(body, mode_for(&call.name, mode.clone()));
+        let body_analysis = analyze_body_with_ranges(
+            body,
+            mode_for(&call.name, mode.clone()),
+            &analysis.components,
+        );
+        analysis
+            .class_tokens
+            .extend(body_analysis.class_tokens.into_iter().map(|mut t| {
+                t.start += call.start;
+                t.end += call.start;
+                t
+            }));
         analysis.literals.extend(
             body_analysis
                 .literals
@@ -230,29 +338,76 @@ fn analyze_document(
 }
 
 pub fn analyze_body(source: &str, mode: ClassMode) -> Vec<Diagnostic> {
-    analyze_body_with_ranges(source, mode).diagnostics
+    analyze_body_with_ranges(source, mode, &[]).diagnostics
 }
 
 struct BodyAnalysis {
+    class_tokens: Vec<ClassToken>,
     literals: Vec<(usize, usize)>,
     diagnostics: Vec<Diagnostic>,
 }
 
-fn analyze_body_with_ranges(source: &str, mode: ClassMode) -> BodyAnalysis {
-    let body = match syn::parse_str::<RsxBody>(source) {
-        Ok(body) => body,
-        Err(e) => {
-            return BodyAnalysis {
-                literals: Vec::new(),
-                diagnostics: vec![error(source, e)],
-            };
+/// Diagnostics, pretty-printed expansion and static preview of one RSX body.
+#[derive(Clone, Debug)]
+#[non_exhaustive]
+pub struct BodyReport {
+    pub diagnostics: Vec<Diagnostic>,
+    pub expansion: Result<String, String>,
+    pub preview: Result<String, String>,
+}
+
+/// Same results as [`analyze_body`], [`expand`] and [`preview::render`], but parses and
+/// expands the body once; the playground calls this on every keystroke.
+pub fn report_body(source: &str, mode: ClassMode) -> BodyReport {
+    match syn::parse_str::<RsxBody>(source) {
+        Ok(body) => {
+            let (analysis, (expanded, dynamic)) = analyze_parsed_body(source, &body, mode.clone());
+            BodyReport {
+                diagnostics: analysis.diagnostics,
+                expansion: pretty_expansion(expanded).map(|code| with_helper_note(code, dynamic)),
+                preview: preview::render_body(&body, mode),
+            }
         }
-    };
+        Err(e) => BodyReport {
+            expansion: Err(e.to_string()),
+            preview: Err(e.to_string()),
+            diagnostics: vec![error(source, e)],
+        },
+    }
+}
+
+fn analyze_body_with_ranges(
+    source: &str,
+    mode: ClassMode,
+    components: &[components::Component],
+) -> BodyAnalysis {
+    match syn::parse_str::<RsxBody>(source) {
+        Ok(body) => {
+            let mut result = analyze_parsed_body(source, &body, mode).0;
+            components::diagnostics(source, &body, components, &mut result.diagnostics);
+            result
+        }
+        Err(e) => BodyAnalysis {
+            class_tokens: Vec::new(),
+            literals: Vec::new(),
+            diagnostics: vec![error(source, e)],
+        },
+    }
+}
+
+/// Lints a parsed body and returns its helper-free expansion, which semantic checks already
+/// need, with whether it references the dynamic class helper.
+fn analyze_parsed_body(
+    source: &str,
+    body: &RsxBody,
+    mode: ClassMode,
+) -> (BodyAnalysis, (TokenStream, bool)) {
     let mut analysis = BodyAnalysis {
+        class_tokens: Vec::new(),
         literals: Vec::new(),
         diagnostics: Vec::new(),
     };
-    walk_body(&body, &mut |el| {
+    walk_body(body, &mut |el| {
         for attr in &el.attributes {
             match attr {
                 RsxAttribute::Value { name, value } if name == "class" => {
@@ -265,8 +420,17 @@ fn analyze_body_with_ranges(source: &str, mode: ClassMode) -> BodyAnalysis {
                             }
                         }
                     } else {
-                        analysis.diagnostics.push(Diagnostic { start: byte_offset(source, value.span(), false), end: byte_offset(source, value.span(), true),
-                            severity: "information".into(), message: "Dynamic class expression: values are checked at runtime; variants and theme tokens require static strings.".into(), suggestion: None });
+                        let mut message = "Dynamic class expression: values are checked at runtime; variants and theme tokens require static strings.".to_owned();
+                        if mode.dynamic_runtime_path().is_none() {
+                            message.push_str(" For many call sites, generate gpui_rsx::rsx_runtime!() once and set [options] dynamic-runtime = \"rsx_runtime\" in rsx.toml to reduce compilation time (50 call sites saved about 12s in a local release build).");
+                        }
+                        analysis.diagnostics.push(Diagnostic {
+                            start: byte_offset(source, value.span(), false),
+                            end: byte_offset(source, value.span(), true),
+                            severity: DiagnosticSeverity::Information,
+                            message,
+                            suggestion: None,
+                        });
                     }
                 }
                 RsxAttribute::WhenClass { .. } | RsxAttribute::StateClass { .. } => {
@@ -283,7 +447,9 @@ fn analyze_body_with_ranges(source: &str, mode: ClassMode) -> BodyAnalysis {
         }
     });
     // Include semantic errors (required constructors, loop keys, unsupported state classes).
-    let expanded = gpui_rsx_core::generate_body_with_mode(&body, mode.clone());
+    // The dynamic class helper holds no diagnostics and would dominate the walk below.
+    analysis.class_tokens = class_tokens::collect(source, &analysis.literals, mode.clone());
+    let (expanded, dynamic) = gpui_rsx_core::generate_body_without_runtime(body, mode);
     fn semantic_errors(tokens: TokenStream, source: &str, out: &mut Vec<Diagnostic>) {
         let tokens: Vec<_> = tokens.into_iter().collect();
         for (i, token) in tokens.iter().enumerate() {
@@ -295,9 +461,15 @@ fn analyze_body_with_ranges(source: &str, mode: ClassMode) -> BodyAnalysis {
                 let d = Diagnostic {
                     start: byte_offset(source, name.span(), false),
                     end: byte_offset(source, name.span(), true),
-                    severity: "error".into(),
+                    severity: DiagnosticSeverity::Error,
                     message: lit.value(),
-                    suggestion: None,
+                    suggestion: lit.value().contains("has no `id` or `key`").then(|| {
+                        format!(
+                            "{} key={{todo!(\"choose a stable unique key\") as usize}}",
+                            &source[byte_offset(source, name.span(), false)
+                                ..byte_offset(source, name.span(), true)]
+                        )
+                    }),
                 };
                 if !out.iter().any(|prev| prev.message == d.message) {
                     out.push(d);
@@ -308,8 +480,8 @@ fn analyze_body_with_ranges(source: &str, mode: ClassMode) -> BodyAnalysis {
             }
         }
     }
-    semantic_errors(expanded, source, &mut analysis.diagnostics);
-    analysis
+    semantic_errors(expanded.clone(), source, &mut analysis.diagnostics);
+    (analysis, (expanded, dynamic))
 }
 
 pub(crate) fn class_literals(attr: &RsxAttribute) -> Option<Vec<&syn::LitStr>> {
@@ -355,11 +527,10 @@ fn lint_literal(
                 content_start + d.offset + d.class.len()
             }),
             severity: if d.severity == Severity::Error {
-                "error"
+                DiagnosticSeverity::Error
             } else {
-                "warning"
-            }
-            .into(),
+                DiagnosticSeverity::Warning
+            },
             message: d.message,
             suggestion: if exact_range.is_some() {
                 d.suggestion
@@ -406,8 +577,29 @@ pub fn literal_string(expr: &Expr) -> Option<String> {
 }
 
 /// Pretty-print an expansion as a Rust expression (no GPUI runtime required).
+/// Like [`expand`], but omits the dynamic class helper and notes where it is used; for hovers
+/// and previews where its ~1,400 lines would bury the call site.
+pub fn expand_summary(source: &str, mode: ClassMode) -> Result<String, String> {
+    let body = syn::parse_str::<RsxBody>(source).map_err(|e| e.to_string())?;
+    let (code, dynamic) = gpui_rsx_core::generate_body_without_runtime(&body, mode);
+    pretty_expansion(code).map(|code| with_helper_note(code, dynamic))
+}
+
+fn with_helper_note(code: String, dynamic: bool) -> String {
+    if dynamic {
+        format!(
+            "// `__rsx_apply_class` is the dynamic class helper; `cargo rsx expand` shows it.\n{code}"
+        )
+    } else {
+        code
+    }
+}
+
 pub fn expand(source: &str, mode: ClassMode) -> Result<String, String> {
-    let tokens = gpui_rsx_core::expand_str(source, mode).map_err(|e| e.to_string())?;
+    pretty_expansion(gpui_rsx_core::expand_str(source, mode).map_err(|e| e.to_string())?)
+}
+
+fn pretty_expansion(tokens: TokenStream) -> Result<String, String> {
     let expr = syn::parse2::<Expr>(tokens).map_err(|e| e.to_string())?;
     let file: syn::File = syn::parse_quote! { fn expanded() { #expr; } };
     Ok(prettyplease::unparse(&file))

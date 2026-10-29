@@ -7,15 +7,18 @@ const END: &str = "<!-- gpui-rsx:compat:end -->";
 pub fn run(root: &Path, check: bool) -> Result<(), String> {
     let revs = crate::gen_tables::locked_revisions(root)?;
     let manifest = std::fs::read_to_string(root.join("Cargo.toml")).map_err(|e| e.to_string())?;
-    let package = manifest
-        .split("[package]")
-        .nth(1)
-        .ok_or("missing [package]")?;
-    let version = package
-        .lines()
-        .find_map(|l| {
-            l.strip_prefix("version = \"")
-                .and_then(|s| s.strip_suffix('"'))
+    // Published crates inherit their version from `[workspace.package]`.
+    let version = ["[workspace.package]", "[package]"]
+        .iter()
+        .filter_map(|section| manifest.split(section).nth(1))
+        .find_map(|section| {
+            section
+                .lines()
+                .take_while(|line| !line.starts_with('['))
+                .find_map(|line| {
+                    line.strip_prefix("version = \"")
+                        .and_then(|s| s.strip_suffix('"'))
+                })
         })
         .ok_or("missing package version")?;
     let mut files = Vec::new();
@@ -87,5 +90,31 @@ mod tests {
         );
         assert!(replace_block(START, &block, "unused").is_err());
         assert!(replace_block("no anchor", &block, "missing").is_err());
+    }
+
+    #[test]
+    fn incomplete_or_reversed_markers_are_errors() {
+        let block = format!("{START}\nnew\n{END}");
+        for source in [
+            format!("{START}\nold"),
+            format!("old\n{END}"),
+            format!("{END}\nold\n{START}"),
+        ] {
+            assert!(
+                replace_block(&source, &block, "anchor").is_err(),
+                "{source}"
+            );
+        }
+    }
+
+    #[test]
+    fn missing_markers_insert_before_the_anchor() {
+        let block = format!("{START}\nnew\n{END}");
+        let source = "# Title\n\n## Quick Start\nbody";
+        let updated = replace_block(source, &block, "## Quick Start").unwrap();
+        assert_eq!(
+            updated,
+            format!("# Title\n\n{block}\n\n## Quick Start\nbody")
+        );
     }
 }

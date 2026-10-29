@@ -216,4 +216,4 @@ cargo check --manifest-path demo/Cargo.toml --bins --locked
 
 避免把 `key` 当作通用列表标记。只有元素需要生成有状态 ID 时，`key` 才会生效。
 
-避免依赖 `hover:bg-blue-500` 等不支持的 Tailwind variant。使用 GPUI 方法、`when` 或显式状态。
+避免依赖 GPUI 无法表达的 Tailwind variant，例如 `md:` 断点或 `dark:`。状态 variant（`hover:`、`active:`、`focus:`、group variant）已支持；其余情况使用 GPUI 方法、`when` 或显式状态。

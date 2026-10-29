@@ -97,7 +97,7 @@ rsx! {
 
 ```rust
 rsx_strict! {
-    <div class="hover:bg-blue-500" />
+    <div class="md:flex" />
 }
 ```
 
@@ -386,7 +386,7 @@ let preview = gpui_rsx::rsx_expand! {
 };
 ```
 
-注意 GPUI-RSX 不是 Tailwind CSS。`hover:bg-blue-500` 这类不支持的 variant 不会变成 hover 样式。
+注意 GPUI-RSX 不是 Tailwind CSS。`hover:bg-blue-500` 这类状态 variant 会映射为 GPUI 的 `.hover(...)`，但 `md:`、`dark:` 等响应式与媒体 variant 在 GPUI 中没有对应能力，请自行计算条件并使用 `when`。
 
 ## 依赖问题
 

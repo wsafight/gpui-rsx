@@ -18,7 +18,14 @@ pub struct ConversionDiagnostic {
     pub message: String,
 }
 
+#[derive(Clone, Copy, Debug, Default)]
+#[non_exhaustive]
+pub struct ConversionOptions {
+    pub tailwind: bool,
+}
+
 struct Converter {
+    tailwind: bool,
     base: u32,
     diagnostics: Vec<ConversionDiagnostic>,
     roots: Vec<String>,
@@ -89,9 +96,21 @@ impl Converter {
                         if key == "class" {
                             let mut supported = Vec::new();
                             for class in value.split_ascii_whitespace() {
-                                let class = &tailwind_to_px(class);
+                                let class = if self.tailwind {
+                                    class.to_owned()
+                                } else {
+                                    tailwind_to_px(class)
+                                };
                                 if matches!(
-                                    analyze_class(class, ClassMode::STRICT).outcome,
+                                    analyze_class(
+                                        &class,
+                                        ClassMode::STRICT.with_scale(if self.tailwind {
+                                            gpui_rsx_core::SpacingScale::Tailwind
+                                        } else {
+                                            gpui_rsx_core::SpacingScale::Px
+                                        })
+                                    )
+                                    .outcome,
                                     ClassOutcome::Supported(_)
                                 ) {
                                     supported.push(class.clone());
@@ -103,6 +122,14 @@ impl Converter {
                                 .push_str(&format!(" class={}", rust_string(&supported.join(" "))));
                         } else {
                             result.push_str(&format!(" {key}={{{}}}", rust_string(&value)));
+                        }
+                    } else if let Some(JSXAttrValue::JSXExprContainer(container)) = &attr.value
+                        && let JSXExpr::Expr(expr) = &container.expr
+                        && let Some(expr) = simple_expression(expr)
+                    {
+                        result.push_str(&format!(" {key}={{{expr}}}"));
+                        if key == "class" && !self.tailwind {
+                            self.note(attr.span, "Dynamic class strings keep their numeric values; review pixel spacing or use Tailwind output");
                         }
                     } else if attr.value.is_none() {
                         self.note(
@@ -157,6 +184,8 @@ impl Converter {
                                 "{{{}}}",
                                 rust_string(&number.value.to_string())
                             ));
+                        } else if let Some(expr) = simple_expression(expr) {
+                            result.push_str(&format!("{{{expr}}}"));
                         } else {
                             self.note(container.span,"JavaScript expression replaced with a text placeholder; implement in Rust");
                             result.push_str("{\"TODO: JavaScript expression\"}");
@@ -210,6 +239,14 @@ fn rust_string(text: &str) -> String {
 
 /// Accepts a JSX expression or an entire TSX module and extracts its JSX roots.
 pub fn convert(source: &str) -> Result<Conversion, String> {
+    convert_with_options(source, ConversionOptions::default())
+}
+
+/// Tailwind output preserves numeric utility values and wraps the body in `rsx_tw!`.
+pub fn convert_with_options(
+    source: &str,
+    options: ConversionOptions,
+) -> Result<Conversion, String> {
     let map: Lrc<SourceMap> = Default::default();
     let file = map.new_source_file(
         FileName::Custom("input.tsx".into()).into(),
@@ -236,6 +273,7 @@ pub fn convert(source: &str) -> Result<Conversion, String> {
         return Err(format!("JSX parse error: {:?}", e.kind()));
     }
     let mut converter = Converter {
+        tailwind: options.tailwind,
         base: file.start_pos.0,
         diagnostics: Vec::new(),
         roots: Vec::new(),
@@ -250,6 +288,11 @@ pub fn convert(source: &str) -> Result<Conversion, String> {
         format!("<>{}</>", converter.roots.join(""))
     };
     let rsx = crate::format::body(&joined)?;
+    let rsx = if options.tailwind {
+        format!("rsx_tw! {{\n{rsx}\n}}")
+    } else {
+        rsx
+    };
     Ok(Conversion {
         rsx,
         diagnostics: converter.diagnostics,
@@ -274,4 +317,32 @@ fn tailwind_to_px(class: &str) -> String {
         return format!("{variant}{separator}{prefix}{}", n * 4.0);
     }
     class.to_owned()
+}
+
+// These expressions share Rust syntax. Calls, operators, indexing and optional chaining
+// require semantic conversion and deliberately retain a review note/placeholder.
+fn simple_expression(expr: &Expr) -> Option<String> {
+    match expr {
+        Expr::Ident(ident)
+            if is_rust_ident(&ident.sym)
+                && !matches!(
+                    ident.sym.as_ref(),
+                    "undefined" | "NaN" | "Infinity" | "arguments"
+                ) =>
+        {
+            Some(ident.sym.to_string())
+        }
+        Expr::Member(member) => {
+            let MemberProp::Ident(property) = &member.prop else {
+                return None;
+            };
+            is_rust_ident(&property.sym).then_some(())?;
+            Some(format!(
+                "{}.{}",
+                simple_expression(&member.obj)?,
+                property.sym
+            ))
+        }
+        _ => None,
+    }
 }

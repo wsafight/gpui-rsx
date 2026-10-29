@@ -1,5 +1,5 @@
 //! Formatting and explicit, behavior-preserving spacing migration.
-use crate::{byte_offset, class_literals, macro_calls, walk_body};
+use crate::{byte_offset, class_literals, macro_calls, nested_macro_calls, walk_body};
 use gpui_rsx_core::syntax::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use quote::ToTokens;
 use syn::spanned::Spanned;
@@ -272,7 +272,8 @@ pub fn rust(source: &str) -> Result<String, String> {
 /// Explicit px/rem values, fractions, theme tokens and dynamic expressions are untouched.
 pub fn migrate_rust(source: &str) -> Result<String, String> {
     let mut edits = Vec::<(usize, usize, String)>::new();
-    for call in macro_calls(source)? {
+    // Nested bodies are opaque to their parent's parse, so every literal is edited once.
+    for call in nested_macro_calls(source)? {
         if call.name == "rsx_tw" {
             continue;
         }

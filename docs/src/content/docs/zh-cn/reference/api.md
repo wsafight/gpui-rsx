@@ -6,7 +6,7 @@ description: GPUI-RSX 宏、标签、属性和生成映射的速查。
 ## 宏
 
 ```rust
-use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
+use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_runtime, rsx_strict, rsx_tw};
 ```
 
 | 宏 | 行为 |
@@ -15,6 +15,8 @@ use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
 | `rsx_permissive!` | 显式 permissive 模式；安全情况下忽略不支持的 class。 |
 | `rsx_strict!` | 不支持的静态 class 编译时报错；不支持的动态 class 求值时 panic。 |
 | `rsx_expand!` | 返回生成 GPUI builder 代码的字符串预览。 |
+| `rsx_tw!` | 数值间距使用 Tailwind 的每单位 4px 刻度。 |
+| `rsx_runtime!` | 在 crate 根生成共用动态 class helper，配合 `[options] dynamic-runtime = "rsx_runtime"` 启用，见[性能指南](/gpui-rsx/zh-cn/guides/performance/)。 |
 
 ## 元素构造器
 
@@ -136,8 +138,17 @@ ID；`groupActive` 需要。
 | RSX body | 返回表达式 |
 | --- | --- |
 | 单个元素 | 生成 GPUI 元素表达式 |
-| Fragment `<>...</>` | `vec![...]` |
-| 嵌套 Fragment（未发布） | 子节点直接加入外层元素、Fragment 或循环 |
+| Fragment `<>...</>` | `vec![...]`；包含 `for` 循环或 `{...spread}` 时为 `Vec<AnyElement>` |
+| 嵌套 Fragment | 子节点直接加入外层元素、Fragment 或循环 |
 | 子表达式 `{expr}` | `.child(expr)` |
 | Spread `{...iter}` | `.children(iter)` |
 | For 循环 `{for item in iter { ... }}` | `.children(iter.into_iter().map(...))` 或 `.flat_map(...)` |
+
+### 编辑器分析与转换选项
+
+`RustAnalysis` 包含本文件 `components` 与缓存的 `class_tokens`（UTF-8 范围、分类与
+可选 RGBA）。mode / 配置修改后需完整分析。`convert::convert_with_options` 接受
+`ConversionOptions`，`tailwind = true` 时保留数值 class 并返回 `rsx_tw!` 表达式；
+原 `convert` 仍返回像素宏体。WASM 新增
+`analyze_with_theme(source, strict, tailwind, theme)`（含 `theme_diagnostics`）与
+`convert_with_options(source, tailwind)`，保留原有导出。

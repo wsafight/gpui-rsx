@@ -25,6 +25,11 @@ rsx! {
 
 In permissive mode, static classes that cannot be expanded produce compile-time warnings. Unknown identifier-like classes also warn and pass through to GPUI methods; likely typos include suggestions. For third-party extension methods, prefer explicit flag attributes (for example, `h_flex`) or `base={...}`. Invalid arbitrary values still produce compile errors. In strict mode, unsupported static classes are compile errors:
 
+CSS-only families are an exception to pass-through: `z-*`, `space-x-*`, `space-y-*`,
+`divide-*`, `transition*`, `duration-*`, `ease-*`, `delay-*` and `animate-*` warn and are
+ignored in permissive mode, even if an extension trait defines the corresponding method.
+Use explicit attributes or `base={...}` to call that implementation.
+
 ```rust
 use gpui_rsx::rsx_strict;
 
@@ -223,3 +228,12 @@ in scope where the macro expands. Static token values also appear in preview and
 swatches; arbitrary Rust expressions remain placeholders.
 
 For complete configuration examples, token mappings, and validation, see [Themes & Design Tokens](/gpui-rsx/guides/theming/).
+
+## Common Tailwind values
+
+`bg-red-500/50` applies 50% alpha (also supported for text/border colors),
+`rounded-[4px]` sets a radius, `text-[14px]` sets font size and `leading-6` sets line height
+(6px by default, 24px under Tailwind scale). Opacity modifiers accept percentages from 0 to
+100, with at most one `/percentage` modifier per color. These values work in literal and dynamic classes, including supported state variants
+for literals. `z-*`, `space-x-*`, `space-y-*`, `divide-*`, transitions and animations need
+explicit GPUI implementations; diagnostics explain the limitation.

@@ -25,6 +25,10 @@ rsx! {
 
 permissive 模式下，不能展开的静态 class 会给出编译期警告；未知标识符形式也会警告并透传为 GPUI 方法，疑似拼写错误附带建议。第三方扩展方法建议改用显式属性（如 `h_flex`）或 `base={...}`。无效的任意值仍会编译时报错。strict 模式下，不支持的静态 class 会直接变成编译错误：
 
+CSS 专属类别不走透传：`z-*`、`space-x-*`、`space-y-*`、`divide-*`、`transition*`、
+`duration-*`、`ease-*`、`delay-*` 和 `animate-*` 在宽松模式下会警告并忽略，即使扩展 trait
+定义了对应方法。调用自定义实现时使用显式属性或 `base={...}`。
+
 ```rust
 use gpui_rsx::rsx_strict;
 
@@ -220,3 +224,11 @@ card = { expr = "vec![BoxShadow::new(px(0.0), px(1.0), hsla(0.0, 0.0, 0.0, 0.2))
 也可用于预览和颜色提示，任意 Rust 表达式继续显示为占位内容。
 
 配置的完整示例、令牌映射与检查流程见[主题与设计令牌](/gpui-rsx/zh-cn/guides/theming/)。
+
+## 常用 Tailwind 值
+
+`bg-red-500/50` 应用 50% 透明度（文字与边框颜色同样支持），`rounded-[4px]` 设置圆角，
+`text-[14px]` 设置字号，`leading-6` 设置行高（默认 6px，Tailwind 刻度下为 24px）。
+透明度修饰符接受 0 到 100 的百分数，每种颜色最多一个 `/百分数` 修饰符。字面量与动态 class 均支持这些值；字面量还可使用
+支持的状态变体。`z-*`、`space-x-*`、`space-y-*`、`divide-*`、过渡与动画需显式使用
+GPUI 实现，诊断会说明限制。

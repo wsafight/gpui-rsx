@@ -9,8 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-10-29
+
 ### Added
 
+- Optional `rsx_runtime!()` and `[options] dynamic-runtime = "rsx_runtime"` share
+  non-generic dynamic class helpers across a crate, including its tests, examples and
+  binaries. GPUI aliases and both spacing scales are supported; lint and LSP suggest
+  the option for unconfigured dynamic classes. A local 50-call-site stub comparison
+  reduced release compilation from 12.84 s to 0.89 s; see the performance guide.
 - `#[component]` supports synchronous functions, sharing struct components' compile-time
   required-prop checks, defaults, boolean flags and children builders. Explicit `#[context]`
   parameters receive `&mut Window` / `&mut App` during GPUI rendering.
@@ -19,6 +26,96 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the groups; diagnostics, class ranges, spacing migration and preview traverse them.
 - These capabilities were inspired by [#8](https://github.com/wsafight/gpui-rsx/pull/8)
   from [@ppmpreetham](https://github.com/ppmpreetham), adapted to the current architecture.
+
+- Component props accept closures for boxed/shared callbacks, inner values for `Option<T>`,
+  and type/const generics with inference and explicit constructors. Function props satisfy
+  GPUI's `'static` requirements. `#[prop(callback)]` treats `Box`/`Rc` of a trait alias
+  (`trait OnPress: Fn(..) {}`) as a callback so long handler types keep closure inference.
+- Common Tailwind values: `bg-red-500/50`, `rounded-[4px]`, `text-[14px]` and `leading-6`,
+  including runtime classes. CSS-only utilities explain the corresponding GPUI limitation.
+- LSP tag, method and local component prop completion, plus quick fixes for quoted text,
+  mismatched tags, missing props and loop keys. Configuration watches register with clients
+  that support dynamic file watching, including VS Code and Zed.
+- Every CLI command has help; stdin lint accepts bare bodies, and `--min-severity` / `--quiet`
+  filter diagnostics without changing exit status. `convert --tailwind` emits `rsx_tw!`;
+  conversion preserves simple identifiers/member access and keeps review notes for JS behavior.
+- Playground themes are parsed as in-memory `rsx.toml`, included in share links and cached
+  requests, with configuration diagnostics and static token preview. Rust expressions never run.
+
+### Fixed
+
+- Auto IDs on component tags and `base` expressions only wrap GPUI rendering elements.
+  gpui-component `Button` and `#[component]` builders with `on_click` / `on_hover` props
+  retain their own setters, while path functions returning native elements keep auto IDs.
+- Callback defaults such as `#[prop(default = Box::new(|_, _, _| {}))]` infer their
+  arguments and coerce to the declared boxed/shared callback type, including trait aliases.
+- Dynamic colors reject repeated opacity modifiers (`bg-red-500/50/50`), matching static
+  validation instead of silently applying the last modifier.
+- Root fragments containing a `for` loop or `{...spread}` expand to a `Vec<AnyElement>`
+  instead of a `vec!` holding iterators, which did not compile with mixed children.
+- `#[deprecated]` components warn where they are used instead of inside their own
+  generated code; generated builders use fully qualified `gpui` paths and accept raw
+  identifiers such as `r#Card`.
+- Lint, migration and the language server analyze `rsx!` calls nested inside another macro's
+  body, using each nested macro's own mode.
+- Tools honor the `tailwind-scale` feature of `gpui-rsx`, in the macro's priority order, so
+  `migrate` refuses a second run and hovers show the compiled lengths.
+- Code actions only cover the requested range; formatting answers unchanged or unparsable
+  files with no edits instead of an error.
+- LSP completion and hover keep valid UTF-8 ranges when class strings contain Unicode
+  whitespace, preventing a language server crash.
+- `preview` accepts a directory, and `--watch` refreshes after `rsx.toml` edits.
+- Pass-through warnings for unknown classes inside a variant (`focus:ring-2`) show the generated
+  call `.focus(|style| style.ring_2())` instead of an invalid method or flag attribute.
+- Commands reject options they do not use, `lint` checks explicitly named files of any
+  extension, and `doctor` prints plain text values.
+
+- Concrete dynamic integer keys up to 64 bits use GPUI named integer IDs without a formatted
+  string; other Display keys retain the borrowed, single-evaluation formatting fallback.
+- Format class templates compile complete static edge tokens while evaluating the original
+  format expression once and preserving style order. Interior tokens remain dynamic.
+- LSP edits confined to a balanced macro scan only that body, consecutive queued changes are
+  coalesced, and class classifications/colors are reused for semantic-token and color requests.
+  A local 5000-line fixture measured 1.12ms full analysis vs 0.15ms for one edit.
+- Runtime common-class matching dispatches by first byte; measured tradeoffs and reproducible
+  benchmark commands are recorded in the performance guide.
+
+### Changed
+
+- Breaking class behavior: permissive static `z-*`, `space-x-*`, `space-y-*`, `divide-*`,
+  `transition*`, `duration-*`, `ease-*`, `delay-*` and `animate-*` classes warn and are
+  ignored instead of being passed through to extension methods. Strict mode rejects them.
+  Call custom implementations with explicit attributes (`z_10`, `transition`) or `base={...}`.
+- Conversion keeps `{items}` / `{item.title}` without a manual-conversion diagnostic.
+  Review Rust types and ownership; collection children may need `{...items}` or `{for ...}`.
+- The language server caches line offsets per document, keeps one analysis per document
+  instead of cloning it on every edit, and its code is split into protocol, document and
+  feature modules. `gpui-rsx-core`'s theme and component code are split into directory modules.
+- `cargo xtask line-limit` (run by CI and `scripts/check.sh`) keeps hand-written Rust files
+  under 600 non-blank, non-test lines.
+- The VS Code extension derives its install version from itself, finds `~/.cargo/bin`
+  when launched from the GUI, reports the real startup error, warns on version mismatches,
+  restarts on setting changes and watches `Cargo.toml`.
+- VS Code accepts server patch releases with the same major.minor version, and its
+  install command selects the newest compatible patch instead of pinning an older one.
+- Breaking API: `Rc<dyn Fn...>` component props take `impl Fn... + 'static`, like
+  `Box<dyn Fn...>` props and GPUI's event setters, so closure arguments and lifetimes are
+  inferred (`on_press={|_, _, _| ...}`). Existing `Rc` values must be forwarded:
+  `on_press={{ let f = f.clone(); move |e, w, cx| f(e, w, cx) }}`.
+- Breaking API: `gpui-rsx-tools` `Diagnostic::severity` is a `#[non_exhaustive]`
+  `DiagnosticSeverity` enum that serializes to the same strings, and whole-file analysis
+  includes nested macros (`macro_calls` stays top-level; see `nested_macro_calls` and
+  `call_at`). `report_body` (`#[non_exhaustive]` `BodyReport`) returns diagnostics, expansion
+  and preview from one parse; it and `expand_summary` omit the dynamic class helper. See the
+  0.9 to 0.10 migration guide.
+- Tool analysis, hovers and the playground skip the dynamic class helper: whole-file analysis
+  of 80 dynamic-class macros drops from about 67 ms to 2 ms. `lint` resolves Cargo features
+  once per workspace instead of once per member.
+- `cargo xtask bump <version>` sets the release version in manifests, lockfiles, editor
+  packages and install snippets; CI runs `cargo xtask bump --check`.
+- `gpui-rsx-tools` no longer pins `serde` to an exact version.
+- The language server advertises RSX formatting only when `initializationOptions.formatting`
+  is `true` (VS Code: `gpuiRsx.format.enable`), so editors keep rustfmt as the Rust formatter.
 
 ## [0.9.0] - 2026-10-28
 
@@ -726,7 +823,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/wsafight/gpui-rsx/compare/v0.8.1...v0.8.2

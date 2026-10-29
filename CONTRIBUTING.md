@@ -137,6 +137,7 @@ cargo expand --lib
 - Follow the [Rust Style Guide](https://rust-lang.github.io/api-guidelines/)
 - Use `cargo fmt` with default settings
 - Address all `cargo clippy` warnings
+- Keep hand-written Rust files under 600 non-blank, non-test lines (`cargo xtask line-limit`); split larger files by responsibility
 
 ### Code Organization
 
@@ -405,6 +406,7 @@ cargo expand --lib
 - 遵循 [Rust 风格指南](https://rust-lang.github.io/api-guidelines/)
 - 使用默认设置的 `cargo fmt`
 - 处理所有 `cargo clippy` 警告
+- 手写 Rust 文件的非空、非测试代码不超过 600 行（`cargo xtask line-limit`），超出时按职责拆分
 
 ### 代码组织
 

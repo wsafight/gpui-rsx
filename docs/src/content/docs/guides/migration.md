@@ -4,6 +4,71 @@ description: Adopt RSX and migrate existing Zed Git applications to GPUI Kit.
 ---
 
 
+## From 0.9 to 0.10
+
+A root fragment that contains a `for` loop or `{...spread}` now expands to `Vec<AnyElement>`; previously it built a
+`vec!` of iterators that did not compile with mixed children. Deprecating a component with
+`#[deprecated]` now warns where the component is used, not inside its generated code.
+
+`#[component]` props typed `Rc<dyn Fn...>` now take `impl Fn... + 'static`, matching
+`Box<dyn Fn...>` props and GPUI's event setters, so `on_press={|_, _, _| ...}` infers its
+arguments. Code that passed an existing `Rc` callback forwards it instead:
+
+```rust
+<Row on_select={{ let on_select = on_select.clone(); move |item, w, cx| on_select(item, w, cx) }} />
+```
+
+Auto IDs on component constructors and `base` expressions now require both
+`InteractiveElement` and `Element`. Native element factories retain auto IDs; builders
+such as gpui-component's `Button` and callback props named `on_click` keep their own setters.
+Generic and opaque element types must expose the required bounds; see [IDs and Keys](/gpui-rsx/usage/ids/).
+
+Permissive static CSS-only classes (`z-*`, `space-x-*`, `space-y-*`, `divide-*`,
+`transition*`, `duration-*`, `ease-*`, `delay-*`, `animate-*`) now warn and are ignored
+instead of being passed through to extension methods. If an extension implements these
+methods, replace `class="z-10"` with the explicit flag `z_10`, or call it in `base={...}`.
+Strict mode rejects these classes.
+
+Breaking changes for `gpui-rsx-tools` integrations:
+
+- `Diagnostic::severity` is a `DiagnosticSeverity` enum instead of a `String`. JSON output is
+  unchanged (`"error"`, `"warning"`, `"information"`). Use `severity.as_str()` or
+  `to_string()` where a string is needed, and add a fallback arm when matching, because the
+  enum is `#[non_exhaustive]`.
+- Whole-file analysis (`analyze_rust`, `analyze_rust_document`, `update_rust_document`) now
+  includes RSX macros nested inside another macro's body. `macro_calls` still returns only
+  top-level calls, whose ranges never overlap; use `nested_macro_calls` for every call and
+  `call_at` to find the innermost call at an offset.
+- `report_body` returns diagnostics, expansion and preview from one parse. `BodyReport` is
+  `#[non_exhaustive]`, so read its fields instead of constructing it. Its expansion, like
+  the new `expand_summary`, omits the dynamic class helper; `expand` still prints it in full.
+
+The CLI rejects options a command does not use (for example `lint --port`) with exit
+status 2, and `lint` checks explicitly named files whatever their extension. Tools detect
+the `tailwind-scale` feature of `gpui-rsx` themselves, so `--tailwind` is no longer needed
+for projects that enable it.
+
+`RustAnalysis` also stores `components` and `class_tokens`. Construct it with
+`RustAnalysis::default()` and field updates, or use `analyze_rust_document`, instead of
+listing every field. Class token offsets remain UTF-8 bytes and classifications/colors
+can be reused by hosts. `update_rust_document` requires the same mode as the previous
+analysis; configuration changes must trigger a full analysis.
+
+Dynamic integer keys now have GPUI's named-integer representation. Use an explicit `id`
+if other code inspects or persists the old formatted representation. Keys still depend on
+source location; this change does not promise identity across edits.
+
+`convert(source)` keeps its pixel-body output. To preserve Tailwind values, set
+`ConversionOptions::default().tailwind = true` and call `convert_with_options`; its `rsx`
+field then contains a full `rsx_tw!` expression. WASM adds `analyze_with_theme` and
+`convert_with_options` while retaining the original exports.
+
+Conversion now preserves simple expressions such as `{items}` and `{item.title}` without
+a manual-conversion diagnostic. It checks syntax only: review Rust types and ownership.
+A collection used as children may need `{...items}` or `{for ...}`; preserving `{items}`
+does not convert JavaScript rendering semantics into GPUI children. Calls, operators,
+indexing, optional chaining and handlers still produce review diagnostics.
+
 ## From 0.8 to 0.9
 
 Version 0.9 targets GPUI Kit 0.8.1 and keeps pixel spacing as the default.
@@ -36,7 +101,7 @@ dependencies with Kit, preserving the `gpui` crate name for generated code:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.9.0"
+gpui-rsx = "0.10.0"
 ```
 
 Kit 0.8.1 pins `gpui-pre = 0.3.10`. Use `gpui::component` for styled controls and

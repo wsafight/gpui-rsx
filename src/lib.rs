@@ -17,6 +17,29 @@ fn options(strict: bool) -> MacroOptions {
         .with_dynamic_report(cfg!(feature = "dynamic-class-report"))
 }
 
+/// Generates shared dynamic class helpers once, at the crate root.
+///
+/// Enable them with `[options] dynamic-runtime = "rsx_runtime"` in `rsx.toml`.
+/// With no configuration, RSX continues to inline its runtime helper as before.
+/// Libraries expose this module to their integration tests, examples and binaries.
+/// Binary-only packages invoke this macro in each target using dynamic classes.
+///
+/// ```
+/// gpui_rsx::rsx_runtime!();
+/// ```
+///
+/// Pass a crate path when GPUI is imported under another name:
+/// `gpui_rsx::rsx_runtime!(my_gpui);`.
+#[proc_macro]
+pub fn rsx_runtime(input: TokenStream) -> TokenStream {
+    let gpui = if input.is_empty() {
+        syn::parse_quote!(::gpui)
+    } else {
+        syn::parse_macro_input!(input as syn::Path)
+    };
+    gpui_rsx_core::generate_runtime_module(&gpui).into()
+}
+
 /// Transforms JSX-like markup into GPUI method chains at compile time.
 ///
 /// # Syntax
@@ -423,10 +446,17 @@ pub fn rsx_expand(input: TokenStream) -> TokenStream {
 /// # let _ = badge.into_any_element();
 /// ```
 ///
-/// Functions must use concrete owned (or `'static`) prop types and an explicit element
-/// return type. Generics, async/unsafe functions, destructured parameters and `impl Trait`
-/// props are not supported. Use boxed callbacks for callback props. The generated
-/// constructor is `Badge()`; use its builder or `<Badge ...>` to supply props.
+/// Functions must use owned (or `'static`) prop types and an explicit element return type.
+/// Async/unsafe functions, destructured parameters and `impl Trait` props are not supported.
+/// The generated constructor is `Badge()`; use its builder or `<Badge ...>` to supply props.
+///
+/// Callback props `Box<dyn Fn...>` and `Rc<dyn Fn...>` take `impl Fn... + 'static`, so
+/// closure arguments are inferred; forward an existing `Rc` with `move |..| shared(..)`.
+/// For a trait alias (`trait OnPress: Fn(..) {}` with a blanket impl), write
+/// `#[prop(callback)] on_press: Rc<dyn OnPress>`; `type` aliases are not recognized.
+/// `Option<T>` accepts an inner `T`, `Some(T)` or `None`. Type/const generics and `where`
+/// clauses are supported; function component types must satisfy GPUI's `'static` bounds.
+/// Infer types from direct generic props or use `base={Card::<T>()}` for explicit arguments.
 ///
 /// Struct components keep their existing `RenderOnce` implementation:
 ///

@@ -2554,7 +2554,7 @@ checksum = "e0f9dae92b9bc15baa6e530c90bdd4c689d3710bd4d18c3566deb1d6ae182daf"
 
 [[package]]
 name = "gpui-rsx"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "gpui-rsx-core",
  "proc-macro2",
@@ -2564,7 +2564,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-rsx-core"
-version = "0.9.0"
+version = "0.10.0"
 dependencies = [
  "proc-macro2",
  "quote",

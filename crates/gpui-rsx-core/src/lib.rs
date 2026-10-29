@@ -24,6 +24,7 @@ pub mod component;
 pub mod diagnostics;
 #[doc(hidden)]
 pub mod parser;
+mod runtime_config;
 pub mod style;
 pub mod theme;
 
@@ -32,7 +33,10 @@ pub use codegen::class::{
     Severity, SpacingScale, analyze_class, class_diagnostics, known_classes, resolve_style,
     suggest_class,
 };
-pub use codegen::element::{generate_body_expansion_preview, generate_body_with_mode};
+pub use codegen::element::{
+    generate_body_expansion_preview, generate_body_with_mode, generate_body_without_runtime,
+};
+pub use codegen::runtime::generate_runtime_module;
 pub use codegen::tables::{GPUI_COMPONENT_REV, GPUI_SOURCE_REV};
 pub use component::expand_component;
 pub use parser::{RsxAttribute, RsxBody, RsxElement, RsxElementName, RsxNode};
@@ -45,6 +49,15 @@ pub mod syntax {
 }
 
 use proc_macro2::TokenStream;
+
+/// RSX body macros exported by `gpui-rsx`, shared by tools and the generated spec.
+pub const MACRO_NAMES: &[&str] = &[
+    "rsx",
+    "rsx_strict",
+    "rsx_permissive",
+    "rsx_tw",
+    "rsx_expand",
+];
 
 /// Parses and expands an RSX macro body. Parse errors become `compile_error!` tokens.
 pub fn expand(input: TokenStream, mode: ClassMode) -> TokenStream {
@@ -125,6 +138,18 @@ impl MacroOptions {
     }
 }
 
+/// Spacing-scale priority shared by the macros and tools: an explicit choice (`rsx_tw!` or a
+/// tool flag), then `spacing-scale` in `rsx.toml`, then the `tailwind-scale` crate feature.
+pub fn resolve_spacing_scale(
+    forced: Option<SpacingScale>,
+    theme: Option<&Theme>,
+    feature_default: SpacingScale,
+) -> SpacingScale {
+    forced
+        .or_else(|| theme.and_then(Theme::scale))
+        .unwrap_or(feature_default)
+}
+
 /// Expands a macro invocation, loading `rsx.toml` from `CARGO_MANIFEST_DIR` when present.
 ///
 /// When a config file is used, the output is wrapped in a block that `include_bytes!`s it so
@@ -137,16 +162,20 @@ pub fn expand_macro(input: TokenStream, options: MacroOptions) -> TokenStream {
         },
         None => None,
     };
-    let scale = options
-        .forced_scale()
-        .or_else(|| theme.as_ref().and_then(|t| t.scale()))
-        .unwrap_or(options.default_scale());
-    let mode = ClassMode::builder()
+    let scale = resolve_spacing_scale(
+        options.forced_scale(),
+        theme.as_deref(),
+        options.default_scale(),
+    );
+    let mut mode = ClassMode::builder()
         .strict(options.is_strict())
         .scale(scale)
         .theme(theme.clone())
         .report_dynamic_at_exit(options.reports_dynamic_at_exit())
         .build();
+    if let Some(path) = theme.as_deref().and_then(Theme::dynamic_runtime) {
+        mode = mode.with_dynamic_runtime_path(runtime_config::runtime_path(path));
+    }
     let code = expand(input, mode);
     match theme.as_deref().and_then(theme::rebuild_tracker) {
         Some(tracker) => quote::quote! { { #tracker #code } },

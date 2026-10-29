@@ -74,3 +74,92 @@ impl StyleOperation {
         quote! { .#ident(#value) }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tokens(method: &'static str, value: Option<StyleValue>) -> String {
+        StyleOperation::new(method, value).to_tokens().to_string()
+    }
+
+    #[test]
+    fn accessors_expose_the_operation_and_its_value() {
+        let operation = StyleOperation::new("w", Some(StyleValue::Length(StyleLength::Px(12.0))));
+        assert_eq!(operation.method(), "w");
+        assert_eq!(
+            operation.value(),
+            Some(&StyleValue::Length(StyleLength::Px(12.0)))
+        );
+        assert_eq!(StyleOperation::new("flex", None).value(), None);
+    }
+
+    #[test]
+    fn lengths_use_their_own_gpui_constructors() {
+        assert_eq!(
+            tokens("w", Some(StyleValue::Length(StyleLength::Px(4.0)))),
+            ". w (px (4f32))"
+        );
+        assert_eq!(
+            tokens("w", Some(StyleValue::Length(StyleLength::Rem(0.75)))),
+            ". w (rems (0.75f32))"
+        );
+        assert_eq!(
+            tokens("w", Some(StyleValue::Length(StyleLength::Relative(0.5)))),
+            ". w (relative (0.5f32))"
+        );
+    }
+
+    #[test]
+    fn colors_choose_rgb_or_rgba_from_alpha() {
+        assert_eq!(
+            tokens(
+                "bg",
+                Some(StyleValue::Color {
+                    hex: 0x3b82f6,
+                    alpha: false
+                })
+            ),
+            ". bg (rgb (3900150u32))"
+        );
+        assert_eq!(
+            tokens(
+                "bg",
+                Some(StyleValue::Color {
+                    hex: 0x3b82f680,
+                    alpha: true
+                })
+            ),
+            ". bg (rgba (998438528u32))"
+        );
+    }
+
+    #[test]
+    fn finite_numbers_are_emitted_and_others_become_compile_errors() {
+        assert_eq!(
+            tokens("opacity", Some(StyleValue::Number(0.5))),
+            ". opacity (0.5f32)"
+        );
+        for value in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY] {
+            let error = tokens("opacity", Some(StyleValue::Number(value)));
+            assert!(error.contains("compile_error"), "{error}");
+            assert!(error.contains("style number must be finite"), "{error}");
+        }
+    }
+
+    #[test]
+    fn expressions_are_passed_through_as_rust() {
+        assert_eq!(
+            tokens("w", Some(StyleValue::Expression("px(width)".into()))),
+            ". w (px (width))"
+        );
+        let error = tokens("w", Some(StyleValue::Expression("((".into())));
+        assert!(error.contains("compile_error"), "{error}");
+        assert!(error.contains("invalid style expression"), "{error}");
+    }
+
+    #[test]
+    fn valueless_operations_emit_plain_method_calls() {
+        assert_eq!(tokens("flex", None), ". flex ()");
+    }
+}

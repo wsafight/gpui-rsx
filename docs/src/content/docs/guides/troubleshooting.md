@@ -97,7 +97,7 @@ rsx! {
 
 ```rust
 rsx_strict! {
-    <div class="hover:bg-blue-500" />
+    <div class="md:flex" />
 }
 ```
 
@@ -387,7 +387,7 @@ let preview = gpui_rsx::rsx_expand! {
 };
 ```
 
-Remember that GPUI-RSX is not Tailwind CSS. Unsupported variants such as `hover:bg-blue-500` do not become hover styles.
+Remember that GPUI-RSX is not Tailwind CSS. State variants such as `hover:bg-blue-500` map to GPUI's `.hover(...)`, but responsive and media variants such as `md:` and `dark:` have no GPUI equivalent; compute the condition and use `when` instead.
 
 ## Dependency Issues
 

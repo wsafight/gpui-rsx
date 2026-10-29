@@ -1,0 +1,19 @@
+[package]
+name = "shared-runtime-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[lib]
+name = "runtime_fixture"
+
+# Shares the library's crate name, like the default `src/main.rs` beside `src/lib.rs`.
+[[bin]]
+name = "runtime_fixture"
+path = "src/bin/same_name.rs"
+
+[dependencies]
+gpui-rsx = { path = "../../.." }
+ui = { package = "gpui-rsx-gpui-stub", path = "../../../crates/gpui-stub" }
+
+[workspace]

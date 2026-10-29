@@ -38,7 +38,7 @@ impl AttrAnalysis {
     }
 }
 
-fn analyze_attr(attr: &RsxAttribute) -> AttrAnalysis {
+fn analyze_attr(attr: &RsxAttribute, mode: ClassMode) -> AttrAnalysis {
     match attr {
         RsxAttribute::Value { name, value: _ } if name == "id" || name == "key" => {
             AttrAnalysis::default()
@@ -56,7 +56,7 @@ fn analyze_attr(attr: &RsxAttribute) -> AttrAnalysis {
             let needs_id = if let Some(class) = static_class.as_deref() {
                 class.split_ascii_whitespace().any(is_stateful_class)
             } else {
-                static_class_expr_needs_id(value)
+                static_class_expr_needs_id(value, mode)
             };
 
             AttrAnalysis {
@@ -115,12 +115,22 @@ pub fn generate_body_with_mode(body: &RsxBody, mode: ClassMode) -> TokenStream {
     let mut dynamic_used = false;
     let code =
         generate_body_checked(body, mode.clone(), &mut dynamic_used).unwrap_or_else(|err| err);
-    if dynamic_used {
+    if dynamic_used && mode.dynamic_runtime_path().is_none() {
         let helper = super::runtime::get_cached_dynamic_class_helper(mode);
         quote! { { #helper #code } }
     } else {
         code
     }
+}
+
+/// Like [`generate_body_with_mode`] but without the dynamic class helper, which is about
+/// 1,400 lines; tools that only analyze or display the call site use this. The flag reports
+/// whether the omitted helper (`__rsx_apply_class`) is referenced.
+pub fn generate_body_without_runtime(body: &RsxBody, mode: ClassMode) -> (TokenStream, bool) {
+    let inline_runtime = mode.dynamic_runtime_path().is_none();
+    let mut dynamic_used = false;
+    let code = generate_body_checked(body, mode, &mut dynamic_used).unwrap_or_else(|err| err);
+    (code, dynamic_used && inline_runtime)
 }
 
 pub fn generate_body_expansion_preview(body: &RsxBody, mode: ClassMode) -> String {
@@ -135,11 +145,17 @@ fn generate_body_checked(
     match body {
         RsxBody::Single(element) => generate_element_checked(element, false, mode, dynamic_used),
         RsxBody::Fragment(children) => {
-            let child_exprs: Vec<TokenStream> = flattened_nodes(children)
-                .map(|node| generate_node_checked(node, false, mode.clone(), dynamic_used))
-                .collect::<Result<_, _>>()?;
+            let child_exprs = generate_flattened_nodes(children, false, mode, dynamic_used)?;
+            if child_exprs.iter().any(|(_, yields_many)| *yields_many) {
+                // A loop or spread contributes many elements, so erase types and collect.
+                let chained = chain_any_elements(&child_exprs);
+                return Ok(quote! {
+                    #chained.collect::<::std::vec::Vec<::gpui::AnyElement>>()
+                });
+            }
+            let exprs = child_exprs.iter().map(|(expr, _)| expr);
             // Fragment 保持 vec![] —— 返回类型是用户可见 API
-            Ok(quote! { vec![#(#child_exprs),*] })
+            Ok(quote! { vec![#(#exprs),*] })
         }
     }
 }
@@ -157,7 +173,7 @@ fn generate_node_checked(
         RsxNode::Element(elem) => {
             generate_element_checked(elem, require_loop_key, mode, dynamic_used)
         }
-        // All callers flatten fragment groups before generating individual nodes.
+        // Every caller iterates `flattened_nodes`, which never yields a fragment group.
         RsxNode::Fragment(_) => unreachable!("nested fragment was not flattened"),
         // 表达式会被自动推断类型，GPUI 的 .child() 接受 impl IntoElement
         RsxNode::Expr(expr) => Ok(expr.to_token_stream()),
@@ -187,14 +203,7 @@ fn generate_for_loop_checked(
     mode: ClassMode,
     dynamic_used: &mut bool,
 ) -> CodegenResult {
-    let body_exprs: Vec<(TokenStream, bool)> = flattened_nodes(body)
-        .map(|node| {
-            let expr = generate_node_checked(node, true, mode.clone(), dynamic_used)?;
-            let yields_many = matches!(node, RsxNode::For { .. } | RsxNode::Spread(_));
-            Ok((expr, yields_many))
-        })
-        .collect::<Result<_, TokenStream>>()?;
-    // A nested `for` or a spread yields an iterator of elements rather than one element.
+    let body_exprs = generate_flattened_nodes(body, true, mode, dynamic_used)?;
     if body_exprs.is_empty() {
         Ok(quote! {
             (#iter).into_iter().flat_map(|#binding| ::core::iter::empty::<::gpui::AnyElement>())
@@ -206,20 +215,9 @@ fn generate_for_loop_checked(
             Ok(quote! { (#iter).into_iter().map(|#binding| #single) })
         }
     } else if body_exprs.iter().any(|(_, yields_many)| *yields_many) {
-        let pieces = body_exprs.iter().map(|(expr, yields_many)| {
-            if *yields_many {
-                quote! {
-                    ::core::iter::IntoIterator::into_iter(#expr)
-                        .map(|__rsx_child| __rsx_child.into_any_element())
-                }
-            } else {
-                quote! { ::core::iter::once((#expr).into_any_element()) }
-            }
-        });
-        let mut chained = pieces;
-        let first = chained.next().expect("multi-child body is non-empty");
+        let chained = chain_any_elements(&body_exprs);
         Ok(quote! {
-            (#iter).into_iter().flat_map(|#binding| #first #(.chain(#chained))*)
+            (#iter).into_iter().flat_map(|#binding| #chained)
         })
     } else {
         let exprs = body_exprs.iter().map(|(expr, _)| expr);
@@ -227,6 +225,39 @@ fn generate_for_loop_checked(
             (#iter).into_iter().flat_map(|#binding| [#((#exprs).into_any_element()),*])
         })
     }
+}
+
+/// Generates flattened nodes, marking each one that yields many elements: a nested `for`
+/// or a spread produces an iterator of elements rather than one element.
+fn generate_flattened_nodes(
+    nodes: &[RsxNode],
+    require_loop_key: bool,
+    mode: ClassMode,
+    dynamic_used: &mut bool,
+) -> Result<Vec<(TokenStream, bool)>, TokenStream> {
+    flattened_nodes(nodes)
+        .map(|node| {
+            let expr = generate_node_checked(node, require_loop_key, mode.clone(), dynamic_used)?;
+            let yields_many = matches!(node, RsxNode::For { .. } | RsxNode::Spread(_));
+            Ok((expr, yields_many))
+        })
+        .collect()
+}
+
+/// Chains single elements and element iterators into one `AnyElement` iterator.
+fn chain_any_elements(exprs: &[(TokenStream, bool)]) -> TokenStream {
+    let mut pieces = exprs.iter().map(|(expr, yields_many)| {
+        if *yields_many {
+            quote! {
+                ::core::iter::IntoIterator::into_iter(#expr)
+                    .map(|__rsx_child| __rsx_child.into_any_element())
+            }
+        } else {
+            quote! { ::core::iter::once((#expr).into_any_element()) }
+        }
+    });
+    let first = pieces.next().expect("chained nodes are non-empty");
+    quote! { #first #(.chain(#pieces))* }
 }
 
 /// Flatten syntax groups during expansion; nested fragments allocate no runtime Vec.
@@ -319,7 +350,7 @@ fn generate_element_checked(
             }
             RsxAttribute::Value { name, .. } if name == "onUnknownClass" => {}
             _ => {
-                let analysis = analyze_attr(attr);
+                let analysis = analyze_attr(attr, mode.clone());
                 if !needs_id && analysis.needs_id {
                     needs_id = true;
                 }
@@ -357,11 +388,19 @@ fn generate_element_checked(
     let base = if let Some(id_value) = user_id {
         quote! { #tag.id(#id_value) }
     } else if needs_id {
-        if let Some(key_expr) = user_key {
-            let keyed_id = make_keyed_auto_id(&element.name, key_expr);
-            quote! { #tag.id(#keyed_id) }
+        let auto_id = if let Some(key_expr) = user_key {
+            make_keyed_auto_id(&element.name, key_expr)
         } else {
-            let auto_id = make_auto_id(&element.name);
+            make_auto_id(&element.name)
+        };
+        // Custom constructors and base expressions may return RenderOnce builders whose
+        // event setters must run before rendering. Only actual GPUI elements need an ID.
+        let native_tag = element.name.as_single_ident().is_some()
+            && (HTML_TAGS.contains(&tag_str.as_str())
+                || matches!(tag_str.as_str(), "svg" | "img" | "canvas"));
+        if base_expr.is_some() || !native_tag {
+            super::auto_id::with_auto_id(tag, auto_id)
+        } else {
             quote! { #tag.id(#auto_id) }
         }
     } else {
@@ -396,38 +435,14 @@ fn generate_children_methods(
     mode: ClassMode,
     dynamic_used: &mut bool,
 ) -> Result<(), TokenStream> {
-    for node in children {
-        match node {
-            RsxNode::Fragment(children) => {
-                generate_children_methods(
-                    children,
-                    require_loop_key,
-                    methods,
-                    mode.clone(),
-                    dynamic_used,
-                )?;
-            }
-            RsxNode::Expr(expr) => {
-                methods.push(quote! { .child(#expr) });
-            }
-            RsxNode::Element(elem) => {
-                let child_expr =
-                    generate_element_checked(elem, require_loop_key, mode.clone(), dynamic_used)?;
-                methods.push(quote! { .child(#child_expr) });
-            }
-            RsxNode::Spread(expr) => {
-                methods.push(quote! { .children(#expr) });
-            }
-            RsxNode::For {
-                binding,
-                iter,
-                body,
-            } => {
-                let for_expr =
-                    generate_for_loop_checked(binding, iter, body, mode.clone(), dynamic_used)?;
-                methods.push(quote! { .children(#for_expr) });
-            }
-        }
+    for (expr, yields_many) in
+        generate_flattened_nodes(children, require_loop_key, mode, dynamic_used)?
+    {
+        methods.push(if yields_many {
+            quote! { .children(#expr) }
+        } else {
+            quote! { .child(#expr) }
+        });
     }
     Ok(())
 }
@@ -508,12 +523,8 @@ fn make_auto_id(tag_name: &RsxElementName) -> TokenStream {
 
 /// 生成带 `key` 的复合自动 ID（用于循环场景）
 ///
-/// 动态 key 格式：`format!("{file}::{prefix}_{key}", file!(), key_expr)`
-/// 字面量 key 格式：`concat!(file!(), "::{prefix}_", "literal")`
-///
-/// `concat!(file!(), ...)` 在编译期求值（零开销）。动态 `key_expr` 在运行时拼接，
-/// 使同一循环迭代内的每个元素获得唯一 ID。
-/// `key_expr` 需实现 `std::fmt::Display`（数字、字符串、自定义类型均可）。
+/// 字面量 key 使用 concat!；具体整数值使用命名整数 ID（无字符串分配）。
+/// 其他 Display 值保留格式化路径，表达式借用求值一次。
 fn make_keyed_auto_id(tag_name: &RsxElementName, key_expr: &syn::Expr) -> TokenStream {
     let span = tag_name.span();
     let loc = span.start();
@@ -525,7 +536,7 @@ fn make_keyed_auto_id(tag_name: &RsxElementName, key_expr: &syn::Expr) -> TokenS
     }
     // 运行时将 key 追加到前缀后，生成如：
     //   "src/views/list.rs::__rsx_li_L42C8_item_42"
-    quote! { format!(concat!(file!(), #prefix_suffix, "{}"), #key_expr) }
+    super::key::dynamic_key(&prefix_suffix, key_expr)
 }
 
 fn static_key_suffix(expr: &syn::Expr) -> Option<String> {
@@ -705,5 +716,23 @@ mod tests {
         ] {
             assert_eq!(expand(grouped), expand(plain));
         }
+    }
+
+    #[test]
+    fn root_fragments_with_loops_or_spreads_collect_any_elements() {
+        for source in [
+            "<>{for x in xs {<div/>}}</>",
+            "<><div/><>{for x in xs {<div/>}}</></>",
+            "<><div/>{...rest}</>",
+        ] {
+            let expanded = expand(source);
+            assert!(!expanded.contains("vec !"), "{source}: {expanded}");
+            assert!(
+                expanded
+                    .ends_with("collect :: < :: std :: vec :: Vec < :: gpui :: AnyElement >> ()"),
+                "{source}: {expanded}"
+            );
+        }
+        assert!(expand("<><div/><span/></>").starts_with("vec !"));
     }
 }

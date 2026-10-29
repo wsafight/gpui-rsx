@@ -76,6 +76,27 @@ pub(super) fn resolve_style(
     if let Some(result) = parse_arbitrary_length_class(class) {
         return Some(result);
     }
+    if let Some(inner) = class.strip_prefix("text-[")
+        && !inner.starts_with('#')
+        && !inner.starts_with("rgb(")
+        && !inner.starts_with("rgba(")
+    {
+        return Some(
+            inner
+                .strip_suffix(']')
+                .ok_or_else(|| invalid_length_value_message(class))
+                .and_then(|inner| LengthKind::parse_arbitrary(class, inner))
+                .and_then(|length| {
+                    if matches!(length, LengthKind::Relative(_)) {
+                        Err(format!(
+                            "Invalid text size `{class}`: use px or rem, for example `text-[14px]`."
+                        ))
+                    } else {
+                        Ok(length_method_call("text_size", length))
+                    }
+                }),
+        );
+    }
     if let Some(result) = parse_fraction_length_class(class) {
         return Some(result);
     }
@@ -268,6 +289,26 @@ fn parse_color_with_method(
     method: &'static str,
     class: &str,
 ) -> Option<Result<StyleOperation, String>> {
+    let (color, alpha) = match color.rsplit_once('/') {
+        Some((base, raw)) => {
+            if base.contains('/') {
+                return Some(Err(format!(
+                    "Invalid color opacity in `{class}`: use only one opacity modifier, for example `bg-red-500/50`."
+                )));
+            }
+            let alpha = raw
+                .parse::<f32>()
+                .ok()
+                .filter(|n| n.is_finite() && (0.0..=100.0).contains(n));
+            let Some(alpha) = alpha else {
+                return Some(Err(format!(
+                    "Invalid color opacity in `{class}`: use a percentage from 0 to 100, for example `bg-red-500/50`."
+                )));
+            };
+            (base, Some((alpha / 100.0 * 255.0).round() as u8))
+        }
+        None => (color, None),
+    };
     let parsed = lookup_color_key(color)
         .map(ColorValue::Rgb)
         .or_else(|| parse_arbitrary_color_value(color));
@@ -276,6 +317,11 @@ fn parse_color_with_method(
             return Some(Err(invalid_color_value_message(class)));
         }
         return None;
+    };
+    let parsed = match (parsed, alpha) {
+        (ColorValue::Rgb(hex), Some(alpha)) => ColorValue::Rgba((hex << 8) | alpha as u32),
+        (ColorValue::Rgba(hex), Some(alpha)) => ColorValue::Rgba((hex & 0xffffff00) | alpha as u32),
+        (color, None) => color,
     };
     Some(Ok(StyleOperation::new(
         method,
@@ -289,12 +335,10 @@ fn parse_color_with_method(
 /// `0xRRGGBBAA` for a color class value (`red-500`, `[#f00]`, `[rgba(...)]`), as the class
 /// expansion would interpret it. Shared by editor tooling so colors never disagree.
 pub fn color_rgba(color: &str) -> Option<u32> {
-    match lookup_color_key(color)
-        .map(ColorValue::Rgb)
-        .or_else(|| parse_arbitrary_color_value(color))?
-    {
-        ColorValue::Rgb(hex) => Some((hex << 8) | 0xff),
-        ColorValue::Rgba(hex) => Some(hex),
+    match parse_color_with_method(color, "bg", color)?.ok()?.value()? {
+        StyleValue::Color { hex, alpha: false } => Some((hex << 8) | 0xff),
+        StyleValue::Color { hex, alpha: true } => Some(*hex),
+        _ => None,
     }
 }
 
@@ -302,12 +346,17 @@ fn lookup_color_key(color: &str) -> Option<u32> {
     if let Some(hex) = lookup_color(color) {
         return Some(hex);
     }
-    if color.contains('-') {
-        let normalized = color.replace('-', "_");
-        lookup_color(&normalized)
-    } else {
-        None
+    // Color names are short ASCII identifiers; normalize on the stack instead of allocating.
+    let mut buffer = [0u8; 64];
+    if !color.contains('-') || color.len() > buffer.len() {
+        return None;
     }
+    let normalized = &mut buffer[..color.len()];
+    for (slot, byte) in normalized.iter_mut().zip(color.bytes()) {
+        *slot = if byte == b'-' { b'_' } else { byte };
+    }
+    // Replacing ASCII `-` with `_` keeps the bytes valid UTF-8.
+    lookup_color(std::str::from_utf8(normalized).ok()?)
 }
 
 /// 判断 `border-` 之后的部分是否属于方向性边框类（而非颜色类）

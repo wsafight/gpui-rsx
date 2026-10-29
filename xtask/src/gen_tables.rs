@@ -381,9 +381,9 @@ fn stub(methods: &BTreeMap<String, Merged>, revs: &Revisions) -> String {
         }
         s.push_str("}\n\n");
     }
-    s.push_str("impl GeneratedStyled for Div {}\nimpl GeneratedStyled for Stateful<Div> {}\nimpl GeneratedStyled for StyleRefinement {}\nimpl GeneratedStyled for Svg {}\nimpl GeneratedStyled for Img {}\nimpl<T> GeneratedStyled for Canvas<T> {}\n");
-    s.push_str("impl GeneratedInteractive for Div {}\nimpl GeneratedInteractive for Stateful<Div> {}\nimpl GeneratedInteractive for Svg {}\nimpl GeneratedInteractive for Img {}\n");
-    s.push_str("impl GeneratedStateful for Stateful<Div> {}\n");
+    s.push_str("impl GeneratedStyled for Div {}\nimpl<E: Styled> GeneratedStyled for Stateful<E> {}\nimpl GeneratedStyled for StyleRefinement {}\nimpl GeneratedStyled for Svg {}\nimpl GeneratedStyled for Img {}\nimpl<T> GeneratedStyled for Canvas<T> {}\n");
+    s.push_str("impl GeneratedInteractive for Div {}\nimpl<E: InteractiveElement> GeneratedInteractive for Stateful<E> {}\nimpl GeneratedInteractive for Svg {}\nimpl GeneratedInteractive for Img {}\n");
+    s.push_str("impl<E: Element> GeneratedStateful for Stateful<E> {}\n");
     s
 }
 

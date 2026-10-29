@@ -46,15 +46,35 @@ cargo publish --dry-run --allow-dirty
 
 Before publishing:
 
-- update `CHANGELOG.md` and `CHANGELOG_CN.md`,
-- verify `Cargo.toml` version and README install snippets,
+- set the version everywhere with `cargo xtask bump <version>`: workspace manifests and
+  internal requirements, workspace entries in `Cargo.lock`, `demo/Cargo.lock` and
+  `editors/zed/Cargo.lock`, the VS Code and Zed extension manifests, install snippets in the
+  README and docs, and the compatibility matrix. CI runs `cargo xtask bump --check`,
+- update `CHANGELOG.md` and `CHANGELOG_CN.md`, and mark breaking API changes,
+- remove "unreleased" labels for shipped features: `rg -n -i 'unreleased|未发布' docs/src README*.md`,
 - ensure the demo lockfile still reflects the intended Kit and GPUI snapshot versions,
 - confirm GitHub Pages deployment succeeds after merge.
 
-## 0.9 tooling packages
+## Tooling packages
 
 Publish in dependency order: `gpui-rsx-core`, `gpui-rsx-tools`, `gpui-rsx`, `cargo-rsx`.
 The release check script verifies all packages with local patches before registry publication.
 Also run `node scripts/test-playground.mjs` after building WASM; build the VSIX and
 `editors/zed` for `wasm32-wasip1`. Attach both editor packages to the GitHub release.
 Track Marketplace authentication and Zed registry review separately from crate publication.
+
+## 0.10 behavior checks
+
+Verify numeric key identity, shared runtime styles, generic components/callbacks, and format
+class evaluation/order against real GPUI (`demo/tests`). Verify LSP UTF-16 coalescing,
+configuration watches, local prop completion and applicable fixes through CLI/LSP tests.
+Run both `cargo test --workspace` and `cargo test --workspace --all-features`, plus tools
+without default features. Regenerate intentional expansion/diagnostic snapshots and review
+the diffs. Check generated specs and tables with `cargo xtask spec --check`,
+`cargo xtask compat-matrix --check`, `cargo xtask gen-tables --check`, and require the GPUI
+API snapshot with `GPUI_API_SNAPSHOT_REQUIRED=1 cargo test -p xtask --test gpui_api_snapshot`.
+
+After building the docs/WASM, run `node scripts/test-playground.mjs` for themes, cache keys,
+input limits and conversion scale. When a browser is available, check theme errors, share
+restore, conversion and responsive layout interactively. Validate VS Code with `bun run check`,
+`bun test` and `bun run build` from `editors/vscode`.

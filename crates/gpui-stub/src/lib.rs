@@ -128,6 +128,12 @@ impl From<usize> for ElementId {
     }
 }
 
+impl From<(&'static str, u64)> for ElementId {
+    fn from((prefix, value): (&'static str, u64)) -> Self {
+        Self(format!("{prefix}{value}"))
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MouseButton {
     Left,
@@ -210,6 +216,7 @@ pub trait RenderOnce: 'static {
 pub struct Div;
 pub struct Stateful<E> {
     element: E,
+    id: ElementId,
 }
 #[derive(Default)]
 pub struct Svg;
@@ -220,6 +227,23 @@ pub struct Canvas<T>(PhantomData<T>);
 pub struct StyleRefinement;
 pub struct AnyElement;
 pub struct Bounds;
+
+/// Rendering elements, distinct from `RenderOnce` component builders.
+pub trait Element: Sized {
+    fn id(&self) -> Option<ElementId> {
+        None
+    }
+}
+
+impl Element for Div {}
+impl Element for Svg {}
+impl Element for Img {}
+impl<T> Element for Canvas<T> {}
+impl<E: Element> Element for Stateful<E> {
+    fn id(&self) -> Option<ElementId> {
+        Some(self.id.clone())
+    }
+}
 
 pub fn div() -> Div {
     Div
@@ -262,7 +286,6 @@ macro_rules! self_into_element {
 
 self_into_element!(
     Div,
-    Stateful<Div>,
     Svg,
     Img,
     AnyElement,
@@ -272,6 +295,13 @@ self_into_element!(
 );
 
 impl<T> IntoElement for Canvas<T> {
+    type Element = Self;
+    fn into_element(self) -> Self {
+        self
+    }
+}
+
+impl<E: Element> IntoElement for Stateful<E> {
     type Element = Self;
     fn into_element(self) -> Self {
         self
@@ -301,7 +331,7 @@ impl Styled for Div {
         Box::leak(Box::default())
     }
 }
-impl Styled for Stateful<Div> {
+impl<E: Styled> Styled for Stateful<E> {
     fn style(&mut self) -> &mut StyleRefinement {
         self.element.style()
     }
@@ -328,8 +358,11 @@ impl<T> Styled for Canvas<T> {
 }
 
 pub trait InteractiveElement: GeneratedInteractive {
-    fn id(self, _id: impl Into<ElementId>) -> Stateful<Self> {
-        Stateful { element: self }
+    fn id(self, id: impl Into<ElementId>) -> Stateful<Self> {
+        Stateful {
+            element: self,
+            id: id.into(),
+        }
     }
     fn hover(self, f: impl FnOnce(StyleRefinement) -> StyleRefinement) -> Self {
         let _ = f(StyleRefinement);
@@ -378,7 +411,7 @@ pub trait InteractiveElement: GeneratedInteractive {
 }
 
 impl InteractiveElement for Div {}
-impl InteractiveElement for Stateful<Div> {}
+impl<E: InteractiveElement> InteractiveElement for Stateful<E> {}
 impl InteractiveElement for Svg {}
 impl InteractiveElement for Img {}
 
@@ -406,7 +439,7 @@ pub trait StatefulInteractiveElement: InteractiveElement + GeneratedStateful {
     }
 }
 
-impl StatefulInteractiveElement for Stateful<Div> {}
+impl<E: Element + InteractiveElement> StatefulInteractiveElement for Stateful<E> {}
 
 pub trait ParentElement: Sized {
     fn extend(&mut self, _elements: impl IntoIterator<Item = AnyElement>) {}
@@ -423,7 +456,7 @@ pub trait ParentElement: Sized {
 }
 
 impl ParentElement for Div {}
-impl ParentElement for Stateful<Div> {}
+impl<E: ParentElement> ParentElement for Stateful<E> {}
 
 pub trait FluentBuilder: Sized {
     fn map<U>(self, f: impl FnOnce(Self) -> U) -> U {

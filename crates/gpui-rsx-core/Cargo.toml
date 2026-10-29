@@ -1,12 +1,12 @@
 [package]
 name = "gpui-rsx-core"
-version = "0.9.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 rust-version = "1.88"
 description = "Parser and code generator behind gpui-rsx, usable from tools (CLI, LSP, playground)"
 authors = ["GPUI-RSX Contributors"]
-license = "MIT"
-repository = "https://github.com/wsafight/gpui-rsx"
+license.workspace = true
+repository.workspace = true
 homepage = "https://github.com/wsafight/gpui-rsx"
 documentation = "https://docs.rs/gpui-rsx-core"
 readme = "README.md"

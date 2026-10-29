@@ -61,6 +61,13 @@ rsx! {
 
 这个优化只作用于传给 `class` 的表达式。如果先把结果赋值给变量，宏看到的就是运行时表达式，会使用动态 matcher。
 
+## format 模板的静态首尾
+
+`class={format!("p-{} bg-red-500", n)}` 在编译期展开 `bg-red-500`，仅动态部分进入
+运行时 matcher。原 `format!` 仍求值一次，保留命名参数与格式选项，因此仍会分配 String。
+首个动态 token 之前、最后一个动态 token 之后的完整静态 class 可以优化。
+动态 token 之间的静态 class 保留运行时处理，因为插值结果可能包含空格；应用顺序与副作用保持一致。
+
 ## 谨慎使用动态 Class
 
 动态 class 适合 class 字符串确实必须运行时组装的情况：
@@ -96,6 +103,51 @@ rsx! {
     </button>
 }
 ```
+
+## 共享动态 Class Runtime
+
+默认情况下，每次使用动态 class 的宏调用都会生成自己的匹配 helper。调用点较多时，
+可以在 crate 根生成一次：
+
+```rust title="src/lib.rs"
+gpui_rsx::rsx_runtime!();
+```
+
+在当前包的配置中启用：
+
+```toml title="rsx.toml"
+[options]
+dynamic-runtime = "rsx_runtime"
+```
+
+生成的公开模块包含 `px` 与 `tailwind` 两个 helper，均作用于 GPUI 的
+`StyleRefinement`，不同元素类型也复用同一份编译结果。`rsx!` 和 `rsx_tw!`
+按间距刻度选择 helper。已有样式、每个元素的 `onUnknownClass` 回调和严格模式
+行为保持一致；状态变体与主题 token 仍需使用静态字符串。
+此设置减少编译工作，动态字符串在渲染时仍需解析。
+
+库内部使用 `crate::rsx_runtime`；同一包的 integration test、example 和 bin
+自动引用库中的模块，也支持自定义 `[lib].name`。仅含 bin 的包需要在每个使用
+动态 class 的目标根部调用 `rsx_runtime!()`，包括独立的 integration test 和 example。
+显式配置 `dynamic-runtime = "crate::rsx_runtime"` 总是使用当前目标；
+`"::my_library::rsx_runtime"` 可直接指定已有模块。GPUI 使用其他依赖名时，
+将路径传给宏：`gpui_rsx::rsx_runtime!(my_gpui);`。
+
+0.10 中此优化为可选功能，未配置时保持原行为。lint 与 LSP 会在未配置共用 runtime
+时为动态 class 给出 information 级建议。
+
+本机 macOS ARM64 / Rust 1.99.1 测量：50 个公开函数各含一个 `class={classes}`，
+使用仓库的 GPUI stub。预先编译依赖，关闭增量编译，每次仅触碰应用源码后测量
+一次对应命令：
+
+| 项目 | 内联 helper | 共用 runtime |
+| --- | --- | --- |
+| `cargo check` | 2.180 s | 0.259 s |
+| Debug 构建 | 4.112 s | 0.386 s |
+| Release 构建 | 12.841 s | 0.885 s |
+| Debug `.rlib` | 11.86 MB | 2.06 MB |
+
+此比较仅测生成代码的编译成本。真实应用的冷构建还包含 GPUI 等依赖，整体提升比例会不同。
 
 ## 避免 Render 循环里的分配
 
@@ -169,7 +221,11 @@ rsx! {
 }
 ```
 
-字面量 key 使用 `concat!`；动态 key 使用格式化，因此任何实现 `Display` 的值都可以参与生成 ID。
+字面量 key 使用 `concat!`。具体类型的动态整数（不超过 64 位，含 `usize` / `isize`）
+使用 GPUI 的 `(&'static str, u64)` ID，无需格式化或分配字符串。其他 `Display` 值保留
+字符串格式化路径，`u128` / `i128` 也走此路径以避免截断。整数引用和泛型 `T: Display`
+也可能走格式化路径。表达式借用求值一次，不会移动 String key；大型有状态列表优先
+使用 `key={task.id}` 这样的整数值。
 
 ## 保持 RSX Block 易读
 
@@ -215,7 +271,7 @@ macOS ARM64、Rust 1.99.1 下的短时 Criterion 测量（10 个样本、预热�
 | 分析 80 个宏 / 复用 79 个未修改宏体 | 1.00 ms（完整分析） | 223 µs（复用） |
 
 这些是本地微基准，不代表整个项目的冷编译时间。复用分析的 95% 置信区间约为 199–268 µs。
-增量分析仍扫描 Rust token，只跳过未修改 RSX 宏体的解析。动态 helper 在单次宏调用内共享，
+早期增量分析仍扫描 Rust token，只跳过未修改 RSX 宏体的解析。动态 helper 在单次宏调用内共享，
 各属性仍保留独立的表达式求值和未知 class 回调。
 
 ```bash
@@ -249,3 +305,16 @@ cargo check --manifest-path demo/Cargo.toml --bins --locked
 cd docs
 bun run build
 ```
+
+## 编辑器与 matcher 实测（2026-10-29）
+
+本机 macOS ARM64 上，包含 50 个宏的 5000 行文件完整分析约 **1.12ms**，修改单个平衡
+宏后增量分析约 **0.15ms**。样本由普通注释行与小型 RSX 宏体组成，不代表任意 Rust 文件的
+延迟上限。复现：`cargo bench -p gpui-rsx-tools --bench analysis -- 5000_lines`。
+宏外或结构性修改会完整扫描；不含 `rsx` 的文件跳过分析，LSP 会合并队列中连续的编辑。
+语义高亮分类和颜色缓存在分析结果中，后续请求直接复用。
+
+常用运行时 matcher 改为按首字节分派。10 个短时 stub 样本中，简单动态 class 约
+16→14ns，复杂组合约 129→89ns；单独的 `gap-4` 从约 9ns 回退至 11ns，数值回退路径
+保持约 13ns。这是小型合成基准，不代表所有输入均提速。复现：
+`cargo bench --bench class_performance -- dynamic_`。

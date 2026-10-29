@@ -1,0 +1,115 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<ui::card key={item.id} onClick={handler} />"
+---
+fn expanded() {
+    let _ = {
+        struct __RsxAutoId<T>(::core::cell::Cell<::core::option::Option<T>>);
+        trait __RsxWithAutoId {
+            type Output;
+            fn __rsx_with_auto_id<I: ::core::convert::Into<::gpui::ElementId>>(
+                self,
+                id: I,
+            ) -> Self::Output;
+        }
+        impl<T: ::gpui::InteractiveElement + ::gpui::Element> __RsxWithAutoId
+        for __RsxAutoId<T> {
+            type Output = ::gpui::Stateful<T>;
+            fn __rsx_with_auto_id<I: ::core::convert::Into<::gpui::ElementId>>(
+                self,
+                id: I,
+            ) -> Self::Output {
+                ::gpui::InteractiveElement::id(
+                    self.0.take().expect("RSX element consumed once"),
+                    id,
+                )
+            }
+        }
+        impl<T> __RsxWithAutoId for &__RsxAutoId<T> {
+            type Output = T;
+            fn __rsx_with_auto_id<I: ::core::convert::Into<::gpui::ElementId>>(
+                self,
+                _id: I,
+            ) -> Self::Output {
+                self.0.take().expect("RSX element consumed once")
+            }
+        }
+        __RsxAutoId(::core::cell::Cell::new(::core::option::Option::Some(ui::card())))
+            .__rsx_with_auto_id({
+                struct __RsxKey<'a, T: ?Sized>(&'a T);
+                trait __RsxKeyId {
+                    type Id;
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id;
+                }
+                impl<T: ::core::fmt::Display + ?Sized> __RsxKeyId for &__RsxKey<'_, T> {
+                    type Id = ::std::string::String;
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        ::std::format!("{}{}", prefix, self.0)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, u8> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, u16> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, u32> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, u64> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, usize> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, i8> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, i16> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, i32> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, i64> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                impl __RsxKeyId for __RsxKey<'_, isize> {
+                    type Id = (&'static str, u64);
+                    fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                        (prefix, *self.0 as u64)
+                    }
+                }
+                __RsxKey(&(item.id))
+                    .__rsx_key_id(concat!(file!(), "::__rsx_ui::card_L1C1_"))
+            })
+    }
+        .on_click(handler);
+}

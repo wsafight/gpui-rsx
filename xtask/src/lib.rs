@@ -1,9 +1,11 @@
 //! Library half of `xtask`, shared by the binary and the API snapshot tests.
 
 pub mod bench;
+pub mod bump;
 pub mod compat;
 pub mod gen_tables;
 pub mod gpui_api;
+pub mod line_limit;
 pub mod spec;
 pub mod upstream;
 

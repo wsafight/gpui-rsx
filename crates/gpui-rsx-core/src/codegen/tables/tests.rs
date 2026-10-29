@@ -532,3 +532,21 @@ fn length_specs_are_unique_and_prefer_long_prefixes() {
         );
     }
 }
+
+#[test]
+fn kebab_method_lookup_matches_the_allocating_lookup() {
+    for method in GPUI_METHODS {
+        let kebab = method.name.replace('_', "-");
+        assert_eq!(
+            lookup_gpui_method_kebab(&kebab).map(|m| m.name),
+            lookup_gpui_method(&kebab.replace('-', "_")).map(|m| m.name),
+            "{kebab}"
+        );
+    }
+    for class in ["", "not-a-method", "flex-col-", "zzz"] {
+        assert_eq!(
+            lookup_gpui_method_kebab(class).map(|m| m.name),
+            lookup_gpui_method(&class.replace('-', "_")).map(|m| m.name),
+        );
+    }
+}

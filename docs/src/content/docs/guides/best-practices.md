@@ -216,4 +216,4 @@ Avoid cloning values only to satisfy children. Prefer `as_str()`, references, or
 
 Avoid using `key` as a general list marker. It only affects elements that need a generated stateful ID.
 
-Avoid depending on unsupported Tailwind variants such as `hover:bg-blue-500`. Use GPUI methods, `when`, or explicit state instead.
+Avoid depending on Tailwind variants GPUI cannot express, such as `md:` breakpoints or `dark:`. State variants (`hover:`, `active:`, `focus:`, group variants) are supported; for everything else use GPUI methods, `when`, or explicit state.

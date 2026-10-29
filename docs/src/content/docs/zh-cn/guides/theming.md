@@ -124,3 +124,10 @@ spacing-scale = "tailwind"
 ```
 
 可以将此设置与 `preset` 写在同一个 `[options]` 段中。`gap-[14px]` 等显式长度与 `gap-gutter` 等命名令牌保持声明的值。修改已有布局前，请阅读[间距迁移说明](/gpui-rsx/zh-cn/guides/migration/)。
+
+## 共享动态 class helper
+
+`class={expr}` 调用点较多时，在 crate 根添加 `gpui_rsx::rsx_runtime!();`，
+并在 `[options]` 设置 `dynamic-runtime = "rsx_runtime"`。该选项独立于
+`spacing-scale`，不会让动态字符串支持主题 token。
+目标放置方式、GPUI 别名和测量结果见[性能指南](/gpui-rsx/zh-cn/guides/performance/)。

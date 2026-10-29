@@ -14,6 +14,11 @@ pub fn escape(value: &str) -> String {
 
 pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
     let body = syn::parse_str::<RsxBody>(source).map_err(|e| e.to_string())?;
+    render_body(&body, mode)
+}
+
+/// Renders an already parsed body, for hosts that also lint or expand it.
+pub fn render_body(body: &RsxBody, mode: ClassMode) -> Result<String, String> {
     fn nodes(children: &[RsxNode], mode: ClassMode, out: &mut String) {
         for child in children {
             match child {
@@ -95,7 +100,7 @@ pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {
         out.push_str("</div>");
     }
     let mut out = String::new();
-    match &body {
+    match body {
         RsxBody::Single(el) => element(el, mode.clone(), &mut out),
         RsxBody::Fragment(children) => nodes(children, mode, &mut out),
         _ => return Err("preview does not support this RSX body".into()),

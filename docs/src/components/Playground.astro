@@ -1,6 +1,7 @@
 ---
 const zh = Astro.locals.starlightRoute.lang.toLowerCase().startsWith('zh');
 const text = zh ? {
+  theme: '主题（rsx.toml，可选）', themeHint: '静态 token 用于预览；Rust 表达式仅展示。', themeLimit: '主题超过 20,000 字符限制。',
   strict: '严格诊断', tailwind: 'Tailwind 刻度', format: '格式化 RSX', convert: '转换 JSX / TSX', share: '复制分享链接',
   source: '源代码', hint: '编辑 RSX，或粘贴 JSX 后转换', expansion: 'Rust 展开结果', preview: '静态布局预览',
   previewNote: '静态布局近似展示，实际效果请在原生应用中验证。', diagnostics: '诊断与转换提示',
@@ -12,6 +13,7 @@ const text = zh ? {
   tailwindScale: 'Tailwind：每单位 4px。', pixelScale: '默认：每单位 1px。',
   error: '错误', warning: '警告', info: '提示', review: '待检查', conversion: '转换提示',
 } : {
+  theme: 'Theme (rsx.toml, optional)', themeHint: 'Static tokens appear in preview; Rust expressions are displayed only.', themeLimit: 'Theme exceeds the 20,000 character limit.',
   strict: 'Strict diagnostics', tailwind: 'Tailwind scale', format: 'Format RSX', convert: 'Convert JSX / TSX', share: 'Copy share link',
   source: 'Source', hint: 'Edit RSX, or paste JSX to convert', expansion: 'Expanded Rust', preview: 'Static layout preview',
   previewNote: 'Approximate static layout. Verify the final result in your native app.', diagnostics: 'Diagnostics & conversion notes',
@@ -59,6 +61,11 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
         <p class="preview-note">{text.previewNote}</p>
       </section>
     </div>
+    <details class="theme-panel">
+      <summary><label for="rsx-theme">{text.theme}</label></summary>
+      <p>{text.themeHint}</p>
+      <textarea id="rsx-theme" spellcheck="false" aria-label={text.theme} placeholder={'[colors]\nbrand = "#0f766e"'}></textarea>
+    </details>
     <p id="rsx-status" data-state="checking" role="status" aria-live="polite">{text.loading}</p>
   </div>
   <details id="rsx-preview-notes" class="preview-limitations" hidden>
@@ -78,6 +85,7 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
 <script>
   const messages = JSON.parse(document.querySelector<HTMLElement>('.rsx-playground')!.dataset.messages!) as Record<string, string>;
   const source = document.querySelector<HTMLTextAreaElement>('#rsx-source')!;
+  const theme = document.querySelector<HTMLTextAreaElement>('#rsx-theme')!;
   const strict = document.querySelector<HTMLInputElement>('#rsx-strict')!;
   const tailwind = document.querySelector<HTMLInputElement>('#rsx-tailwind')!;
   const status = document.querySelector<HTMLElement>('#rsx-status')!;
@@ -91,7 +99,7 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
   const worker = new Worker(`${base}/playground/worker.js`, { type: 'module' });
   let sequence = 0;
   let timer: ReturnType<typeof setTimeout>;
-  type Diagnostic = {start: number; end: number; message: string; severity?: string};
+  type Diagnostic = {start: number; end: number; message: string; severity?: string; target?: 'theme'};
   let conversionNotes: Diagnostic[] = [];
   const setStatus = (message: string, state = 'ready') => {
     status.textContent = message;
@@ -101,8 +109,9 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
     clearTimeout(timer);
     const id = ++sequence;
     if (source.value.length > 100_000) { setStatus(messages.limit, 'error'); return; }
+    if (theme.value.length > 20_000) { setStatus(messages.themeLimit, 'error'); return; }
     setStatus(messages.checking, 'checking');
-    worker.postMessage({ id, operation, source: source.value, strict: strict.checked, tailwind: tailwind.checked });
+    worker.postMessage({ id, operation, source: source.value, strict: strict.checked, tailwind: tailwind.checked, theme: theme.value });
   };
   const showDiagnostics = (items: Diagnostic[]) => {
     diagnostics.replaceChildren();
@@ -114,10 +123,12 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
       button.textContent = `${messages[item.severity ?? 'review'] ?? item.severity}: ${item.message}`;
       button.dataset.severity = item.severity ?? 'review';
       button.addEventListener('click', () => {
-        const bytes = new TextEncoder().encode(source.value);
+        const editor = item.target === 'theme' ? theme : source;
+        const bytes = new TextEncoder().encode(editor.value);
         const decoder = new TextDecoder();
-        source.focus();
-        source.setSelectionRange(decoder.decode(bytes.slice(0,item.start)).length, decoder.decode(bytes.slice(0,item.end)).length);
+        if (item.target === 'theme') theme.closest('details')!.open = true;
+        editor.focus();
+        editor.setSelectionRange(decoder.decode(bytes.slice(0,item.start)).length, decoder.decode(bytes.slice(0,item.end)).length);
       });
       li.append(button); diagnostics.append(li);
     }
@@ -129,7 +140,8 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
     if (data.operation === 'format') { source.value = data.result; request(); return; }
     if (data.operation === 'convert') {
       if (data.result.Err) { setStatus(data.result.Err, 'error'); return; }
-      source.value = data.result.Ok.rsx;
+      const converted = data.result.Ok.rsx as string;
+      source.value = converted.startsWith('rsx_tw! {\n') ? converted.slice('rsx_tw! {\n'.length, -2) : converted;
       conversionNotes = data.result.Ok.diagnostics.map((note: {message: string}) => ({start: 0, end: 0, message: note.message, severity: 'conversion'}));
       request();
       return;
@@ -166,10 +178,11 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
       pre{max-width:100%;white-space:pre-wrap;overflow-wrap:anywhere}
       @media(max-width:360px){.preview-stage{padding:16px}}
       </style></head><body><main class="preview-stage">${template.innerHTML}</main></body></html>`;
-    showDiagnostics([...result.diagnostics, ...conversionNotes]);
-    const countMessage = messages.diagnosticsCount.replace('{count}', String(result.diagnostics.length));
+    const themeNotes: Diagnostic[] = (result.theme_diagnostics ?? []).map((message: string) => ({start:0,end:0,message,severity:'error',target:'theme'}));
+    showDiagnostics([...themeNotes, ...result.diagnostics, ...conversionNotes]);
+    const countMessage = messages.diagnosticsCount.replace('{count}', String(result.diagnostics.length + themeNotes.length));
     const notesMessage = conversionNotes.length ? messages.conversionCount.replace('{count}', String(conversionNotes.length)) : '';
-    setStatus(`${countMessage} ${notesMessage} ${tailwind.checked ? messages.tailwindScale : messages.pixelScale}`, result.diagnostics.some((item: Diagnostic) => item.severity === 'error') ? 'error' : 'ready');
+    setStatus(`${countMessage} ${notesMessage} ${result.tailwind ? messages.tailwindScale : messages.pixelScale}`, themeNotes.length || result.diagnostics.some((item: Diagnostic) => item.severity === 'error') ? 'error' : 'ready');
   };
   worker.onerror = () => { setStatus(messages.failed, 'error'); };
   source.addEventListener('input', () => {
@@ -179,12 +192,13 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
     setStatus(messages.checking, 'checking');
     timer = setTimeout(() => request(), 200);
   });
+  theme.addEventListener('input', () => { ++sequence; clearTimeout(timer); timer = setTimeout(() => request(), 200); });
   strict.addEventListener('change', () => request());
   tailwind.addEventListener('change', () => request());
   document.querySelector('#rsx-format')!.addEventListener('click', () => request('format'));
   document.querySelector('#rsx-convert')!.addEventListener('click', () => request('convert'));
   document.querySelector('#rsx-share')!.addEventListener('click', async () => {
-    const encoded = btoa(Array.from(new TextEncoder().encode(JSON.stringify({source:source.value,strict:strict.checked,tailwind:tailwind.checked})), byte => String.fromCharCode(byte)).join(''));
+    const encoded = btoa(Array.from(new TextEncoder().encode(JSON.stringify({source:source.value,strict:strict.checked,tailwind:tailwind.checked,theme:theme.value})), byte => String.fromCharCode(byte)).join(''));
     if (encoded.length > 16_000) { setStatus(messages.tooLong, 'error'); return; }
     const url = new URL(location.href); url.hash = encoded;
     history.replaceState(null,'',url);
@@ -194,8 +208,8 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
   if (location.hash.length > 1 && location.hash.length <= 16_001) {
     try {
       const shared = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(location.hash.slice(1)),c => c.charCodeAt(0))));
-      if (typeof shared.source === 'string' && shared.source.length <= 100_000) {
-        source.value = shared.source; strict.checked = shared.strict !== false; tailwind.checked = shared.tailwind === true;
+      if (typeof shared.source === 'string' && shared.source.length <= 100_000 && (shared.theme === undefined || (typeof shared.theme === 'string' && shared.theme.length <= 20_000))) {
+        source.value = shared.source; theme.value = shared.theme ?? ''; strict.checked = shared.strict !== false; tailwind.checked = shared.tailwind === true;
       }
     } catch { setStatus(messages.invalid, 'error'); }
   }
@@ -203,6 +217,9 @@ const example = `<div class="flex flex-col gap-[20px] p-[24px] w-full max-w-[420
 </script>
 
 <style>
+  .theme-panel { padding:.7rem 1rem; border-top:1px solid var(--rsx-border); }
+  .theme-panel p { font-size:.75rem; }
+  #rsx-theme { width:100%; min-height:110px; font:12px/1.6 ui-monospace,monospace; }
   .rsx-playground { margin-block:1.75rem; }
   .workbench,.expansion-panel,.diagnostics-panel { border:1px solid var(--rsx-border); border-radius:10px; overflow:hidden; background:var(--rsx-surface); }
   .workspace { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); }

@@ -16,8 +16,8 @@ Runs the standard local validation suite:
   cargo clippy -p gpui-rsx-tools --all-targets --no-default-features -- -D warnings
   cargo clippy --workspace --all-targets --all-features -- -D warnings
   cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
-  cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
-  cargo +1.98.1 test --manifest-path demo/Cargo.toml --bins --locked
+  cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings
+  cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
 
 With --release, also runs:
   cargo bench --bench class_performance --no-run
@@ -82,6 +82,8 @@ run() {
 run cargo fmt --all -- --check
 run cargo xtask spec --check
 run cargo xtask compat-matrix --check
+run cargo xtask line-limit
+run cargo xtask bump --check
 run cargo test --workspace
 run cargo test --workspace --all-features
 run cargo test -p gpui-rsx-tools --no-default-features
@@ -93,8 +95,8 @@ if [[ "$skip_demo" -eq 0 ]]; then
     run cargo xtask gen-tables --check
     GPUI_API_SNAPSHOT_REQUIRED=1 run cargo test -p xtask --test gpui_api_snapshot
     run cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
-    run cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
-    run cargo +1.98.1 test --manifest-path demo/Cargo.toml --bins --locked
+    run cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings
+    run cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
 fi
 
 if [[ "$release" -eq 1 ]]; then

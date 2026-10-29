@@ -16604,6 +16604,18 @@
     ],
     "length_families": [
       {
+        "fraction": false,
+        "method": "rounded",
+        "percent": false,
+        "prefix": "rounded-"
+      },
+      {
+        "fraction": false,
+        "method": "line_height",
+        "percent": false,
+        "prefix": "leading-"
+      },
+      {
         "fraction": true,
         "method": "min_w",
         "percent": true,
@@ -17953,6 +17965,7 @@
     "rsx_tw",
     "rsx_expand"
   ],
+  "runtime_macro": "rsx_runtime",
   "schema_version": 1,
   "syntax": {
     "children_spread": "{...children}",

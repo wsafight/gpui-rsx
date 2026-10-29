@@ -30,6 +30,15 @@ mod ui {
     pub fn Disabled(unknown: ThisTypeDoesNotExist) -> impl IntoElement {
         unknown
     }
+
+    #[component]
+    #[cfg(any())]
+    #[derive(IntoElement)]
+    pub struct DisabledStruct {
+        unknown: ThisTypeDoesNotExist,
+        #[children]
+        children: Vec<AnyElement>,
+    }
 }
 
 fn main() {

@@ -215,6 +215,71 @@ fn watch_preview_refreshes_same_size_edits_with_unchanged_timestamps() {
 }
 
 #[test]
+fn preview_accepts_directories_and_watch_refreshes_after_theme_edits() {
+    use std::io::{BufRead, Read};
+    let root = std::env::temp_dir().join(format!("rsx-preview-theme-{}", std::process::id()));
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"preview-theme\"\nversion = \"0.1.0\"\nedition = \"2024\"\n",
+    )
+    .unwrap();
+    std::fs::write(root.join("rsx.toml"), "[colors]\nbrand = \"#123456\"\n").unwrap();
+    std::fs::write(root.join("src/empty.rs"), "fn none() {}\n").unwrap();
+    std::fs::write(
+        root.join("src/view.rs"),
+        "fn f(){rsx!{<div class=\"bg-brand\">{\"themed\"}</div>};}\n",
+    )
+    .unwrap();
+
+    // A directory argument previews its first file with RSX macros.
+    let (code, page, stderr) = run(&["rsx", "preview", root.join("src").to_str().unwrap()], "");
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(
+        page.contains("themed") && page.contains("#123456"),
+        "{page}"
+    );
+
+    let mut process = Command::new(env!("CARGO_BIN_EXE_cargo-rsx"))
+        .arg("preview")
+        .arg(root.join("src/view.rs"))
+        .args(["--watch", "--port", "0"])
+        .stderr(Stdio::piped())
+        .stdout(Stdio::null())
+        .spawn()
+        .unwrap();
+    let mut line = String::new();
+    std::io::BufReader::new(process.stderr.take().unwrap())
+        .read_line(&mut line)
+        .unwrap();
+    let address = line
+        .split("http://")
+        .nth(1)
+        .unwrap()
+        .split(' ')
+        .next()
+        .unwrap()
+        .to_owned();
+    let get = || {
+        let mut stream = std::net::TcpStream::connect(&address).unwrap();
+        stream
+            .write_all(b"GET /content HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n")
+            .unwrap();
+        let mut response = String::new();
+        stream.read_to_string(&mut response).unwrap();
+        response
+    };
+    let before = get();
+    std::fs::write(root.join("rsx.toml"), "[colors]\nbrand = \"#abcdef\"\n").unwrap();
+    let after = get();
+    process.kill().unwrap();
+    process.wait().unwrap();
+    std::fs::remove_dir_all(root).unwrap();
+    assert!(before.contains("#123456"), "{before}");
+    assert!(after.contains("#abcdef"), "{after}");
+}
+
+#[test]
 fn preview_server_survives_aborted_connections_and_bad_content() {
     use std::io::{BufRead, Read};
     let root = std::env::temp_dir().join(format!("rsx-preview-robust-{}", std::process::id()));
@@ -274,6 +339,60 @@ fn preview_server_survives_aborted_connections_and_bad_content() {
 
     process.kill().unwrap();
     process.wait().unwrap();
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+fn preview_reports_missing_macros_and_out_of_range_indices() {
+    let root = std::env::temp_dir().join(format!("rsx-preview-select-{}", std::process::id()));
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(root.join("src/none.rs"), "fn none() {}\n").unwrap();
+
+    // A directory whose files contain no RSX macros names the missing selection.
+    let (code, _, stderr) = run(&["rsx", "preview", root.join("src").to_str().unwrap()], "");
+    assert_eq!(code, Some(2), "{stderr}");
+    assert!(stderr.contains("no RSX macros found"), "{stderr}");
+
+    // `--index` selects one macro from a file and reports when it is out of range.
+    let file = root.join("views.rs");
+    std::fs::write(&file, "fn a(){rsx!{<div/>};} fn b(){rsx!{<span/>};}\n").unwrap();
+    let (code, stdout, stderr) = run(
+        &["rsx", "preview", file.to_str().unwrap(), "--index", "1"],
+        "",
+    );
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(stdout.contains("data-rsx-tag=\"span\""), "{stdout}");
+
+    let (code, _, stderr) = run(
+        &["rsx", "preview", file.to_str().unwrap(), "--index", "2"],
+        "",
+    );
+    assert_eq!(code, Some(2), "{stderr}");
+    assert!(
+        stderr.contains("macro index 2 out of range (2 macros)"),
+        "{stderr}"
+    );
+
+    // `--output` writes the static page instead of printing it.
+    let output = root.join("preview.html");
+    let (code, stdout, stderr) = run(
+        &[
+            "rsx",
+            "preview",
+            file.to_str().unwrap(),
+            "--output",
+            output.to_str().unwrap(),
+        ],
+        "",
+    );
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(stdout.is_empty(), "{stdout}");
+    assert!(
+        std::fs::read_to_string(&output)
+            .unwrap()
+            .contains("RSX static preview")
+    );
+
     std::fs::remove_dir_all(root).unwrap();
 }
 
@@ -459,6 +578,43 @@ fn migrate_refuses_projects_that_already_use_the_tailwind_scale() {
 }
 
 #[test]
+fn the_tailwind_scale_feature_is_honored_like_the_macro_does() {
+    let root = std::env::temp_dir().join(format!("rsx-feature-test-{}", std::process::id()));
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    let gpui_rsx = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    std::fs::write(
+        root.join("Cargo.toml"),
+        format!(
+            "[package]\nname = \"feature-test\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[dependencies]\ngpui-rsx = {{ path = {:?}, features = [\"tailwind-scale\"] }}\n",
+            gpui_rsx.canonicalize().unwrap()
+        ),
+    )
+    .unwrap();
+    let file = root.join("src/lib.rs");
+    let source = "fn f(){rsx!{<div class=\"gap-4\"/>};}\n";
+    std::fs::write(&file, source).unwrap();
+
+    let (code, _, stderr) = run(&["rsx", "migrate", file.to_str().unwrap(), "--offline"], "");
+    assert_eq!(code, Some(2), "{stderr}");
+    assert!(stderr.contains("already uses Tailwind scale"), "{stderr}");
+    assert_eq!(std::fs::read_to_string(&file).unwrap(), source);
+
+    let (code, expanded, stderr) = run(
+        &[
+            "rsx",
+            "expand",
+            "--offline",
+            "--manifest-path",
+            root.join("Cargo.toml").to_str().unwrap(),
+        ],
+        "<div class=\"gap-4\"/>",
+    );
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(expanded.contains("16f32"), "{expanded}");
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn expand_and_convert_read_stdin_and_honor_output() {
     let (code, stdout, _) = run(&["rsx", "expand", "-"], "<div class=\"flex\"/>");
     assert_eq!(code, Some(0));
@@ -501,6 +657,13 @@ fn unknown_commands_and_options_exit_with_a_usage_error() {
     let (code, _, stderr) = run(&["rsx", "lint", "--bad"], "");
     assert_eq!(code, Some(2));
     assert!(stderr.contains("unknown option --bad"), "{stderr}");
+
+    let (code, _, stderr) = run(&["rsx", "lint", "-", "--port", "1"], "");
+    assert_eq!(code, Some(2));
+    assert!(
+        stderr.contains("--port does not apply to `cargo rsx lint`"),
+        "{stderr}"
+    );
 
     let (code, _, stderr) = run(&["rsx", "fmt", "--write", "--check"], "");
     assert_eq!(code, Some(2));

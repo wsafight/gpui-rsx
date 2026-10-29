@@ -81,4 +81,108 @@ mod tests {
         graph["packages"][1]["source"] = json!("git+other#sha");
         assert_eq!(inspect(&graph)["ok"], false);
     }
+
+    #[test]
+    fn reports_a_missing_engine_as_a_warning_not_an_error() {
+        let report = inspect(&json!({"packages":[]}));
+        assert_eq!(report["ok"], true);
+        assert_eq!(report["engines"].as_array().unwrap().len(), 0);
+        assert!(
+            report["warnings"][0]
+                .as_str()
+                .unwrap()
+                .contains("No GPUI runtime")
+        );
+    }
+
+    #[test]
+    fn checks_companion_crates_for_each_engine() {
+        for (engine, companion) in [
+            ("gpui", "gpui_macros"),
+            ("gpui-pre", "gpui-pre-macros"),
+            ("gpui-fast", "gpui-fast-platform"),
+        ] {
+            let matching = json!({"packages":[
+                {"name": engine, "id": "e", "version": "1.0.0", "source": "registry+x"},
+                {"name": companion, "id": "c", "version": "1.0.0", "source": "registry+x"}
+            ]});
+            assert_eq!(inspect(&matching)["ok"], true, "{engine}");
+
+            let version_mismatch = json!({"packages":[
+                {"name": engine, "id": "e", "version": "1.0.0", "source": "registry+x"},
+                {"name": companion, "id": "c", "version": "2.0.0", "source": "registry+x"}
+            ]});
+            assert_eq!(inspect(&version_mismatch)["ok"], false, "{engine}");
+
+            let source_mismatch = json!({"packages":[
+                {"name": engine, "id": "e", "version": "1.0.0", "source": "registry+x"},
+                {"name": companion, "id": "c", "version": "1.0.0", "source": "git+y"}
+            ]});
+            assert_eq!(inspect(&source_mismatch)["ok"], false, "{engine}");
+        }
+    }
+
+    #[test]
+    fn resolves_the_gpui_backend_of_each_consumer_package() {
+        let graph = json!({
+            "packages": [
+                {"name": "gpui", "id": "g", "version": "1.0.0", "source": "registry+x"},
+                {"name": "gpui-kit", "id": "kit", "version": "1.0.0", "source": "registry+x"},
+                {"name": "gpui-component", "id": "component", "version": "1.0.0", "source": "registry+x"},
+                {"name": "gpui-base", "id": "base", "version": "1.0.0", "source": "registry+x"},
+                {"name": "unrelated", "id": "u", "version": "1.0.0", "source": "registry+x"}
+            ],
+            "resolve": {
+                "nodes": [
+                    {"id": "g", "deps": []},
+                    {"id": "kit", "deps": [{"pkg": "g"}]},
+                    {"id": "component", "deps": [{"pkg": "g"}]},
+                    {"id": "base", "deps": [{"pkg": "g"}]}
+                ]
+            }
+        });
+        let report = inspect(&graph);
+        assert_eq!(report["ok"], true);
+        let consumers = report["consumers"].as_array().unwrap();
+        assert_eq!(consumers.len(), 3);
+        assert!(consumers.iter().all(|c| c["gpui"] == json!(["g"])));
+    }
+
+    #[test]
+    fn consumers_with_ambiguous_or_missing_backends_are_reported() {
+        let two = json!({"packages":[
+            {"name":"gpui","id":"a","version":"1.0.0","source":"registry+x"},
+            {"name":"gpui-pre","id":"b","version":"1.0.0","source":"registry+x"},
+            {"name":"gpui-kit","id":"kit","version":"1.0.0","source":"registry+x"}
+        ],"resolve":{"nodes":[
+            {"id":"a","deps":[]},
+            {"id":"b","deps":[]},
+            {"id":"kit","deps":[{"pkg":"a"},{"pkg":"b"}]}
+        ]}});
+        let report = inspect(&two);
+        assert_eq!(report["ok"], false);
+        assert!(
+            report["errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|e| e.as_str().unwrap().contains("resolves 2 GPUI backends"))
+        );
+
+        // A consumer without a resolve node is skipped, not treated as broken.
+        let missing = json!({"packages":[
+            {"name":"gpui","id":"a","version":"1.0.0","source":"registry+x"},
+            {"name":"gpui-kit","id":"kit","version":"1.0.0","source":"registry+x"}
+        ],"resolve":{"nodes":[]}});
+        let report = inspect(&missing);
+        assert_eq!(report["ok"], true);
+        assert!(report["consumers"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn malformed_metadata_is_treated_as_empty() {
+        let report = inspect(&json!({"packages": "not an array"}));
+        assert_eq!(report["ok"], true);
+        assert_eq!(report["engines"].as_array().unwrap().len(), 0);
+    }
 }

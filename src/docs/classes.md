@@ -189,6 +189,9 @@ Tokens are compile-time only: they are not available in dynamic `class={expr}` s
 ### The `class` Attribute — Dynamic (Runtime)
 
 When `class` receives an expression, a runtime matcher is generated.
+To share it across the crate, call [`rsx_runtime!`] once at the crate root and set
+`[options] dynamic-runtime = "rsx_runtime"` in `rsx.toml`. This optional setting reduces
+compilation work while retaining the same dynamic class support and callbacks.
 Supported classes: common layout/spacing/typography utilities, the full Tailwind
 color palette, arbitrary colors (`bg-[#ff0000]`, `text-[#f00]`,
 `bg-[rgba(15,23,42,0.8)]`), arbitrary lengths (`w-[280px]`, `gap-[14px]`),

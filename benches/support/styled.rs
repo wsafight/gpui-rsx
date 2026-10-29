@@ -6,6 +6,15 @@ include!("generated_styled.rs");
 // 必须与 generate_common_class_matches 生成的所有方法调用保持一致。
 #[allow(dead_code)] // benchmark 中并非所有 trait 方法都被使用
 pub(crate) trait Styled: Sized {
+    fn text_size(self, _: impl Sized) -> Self {
+        self
+    }
+    fn rounded(self, _: impl Sized) -> Self {
+        self
+    }
+    fn line_height(self, _: impl Sized) -> Self {
+        self
+    }
     generated_styled_defaults!();
     fn style(&mut self) -> &mut StyleRefinement;
 

@@ -58,6 +58,7 @@ pub struct ClassMode {
     theme: Option<Arc<Theme>>,
     /// 动态 class 中被忽略的 class 在进程退出时汇总打印（debug 构建），而不是逐条打印。
     report_dynamic_at_exit: bool,
+    dynamic_runtime_path: Option<String>,
 }
 
 impl ClassMode {
@@ -66,6 +67,7 @@ impl ClassMode {
         scale: SpacingScale::Px,
         theme: None,
         report_dynamic_at_exit: false,
+        dynamic_runtime_path: None,
     };
 
     /// Creates the default permissive class mode.
@@ -96,6 +98,20 @@ impl ClassMode {
     /// Returns whether ignored dynamic classes are reported at process exit.
     pub const fn reports_dynamic_at_exit(&self) -> bool {
         self.report_dynamic_at_exit
+    }
+
+    /// Configured helper module. Macro expansion resolves bare names across Cargo targets.
+    pub fn dynamic_runtime_path(&self) -> Option<syn::Path> {
+        self.dynamic_runtime_path
+            .as_deref()
+            .or_else(|| self.theme().and_then(Theme::dynamic_runtime))
+            .and_then(|path| syn::parse_str(path).ok())
+    }
+
+    /// Overrides the module path used to call shared dynamic helpers.
+    pub fn with_dynamic_runtime_path(mut self, path: syn::Path) -> Self {
+        self.dynamic_runtime_path = Some(quote!(#path).to_string());
+        self
     }
 
     /// Sets strict or permissive handling for unknown classes.
@@ -174,6 +190,7 @@ impl ClassModeBuilder {
             scale: self.scale,
             theme: self.theme,
             report_dynamic_at_exit: self.report_dynamic_at_exit,
+            dynamic_runtime_path: None,
         }
     }
 }
@@ -368,6 +385,28 @@ fn base_outcome(class: &str, mode: ClassMode) -> ClassOutcome {
 }
 
 fn unknown_outcome(class: &str, mode: ClassMode) -> ClassOutcome {
+    let unsupported = if class.starts_with("z-") {
+        Some("z-index; reorder elements or use GPUI's deferred painting")
+    } else if class.starts_with("space-x-") || class.starts_with("space-y-") {
+        Some("sibling spacing selectors; use gap-x-* or gap-y-* on the parent")
+    } else if class.starts_with("divide-") {
+        Some("sibling border selectors; add borders to individual children")
+    } else if ["transition", "duration-", "ease-", "delay-", "animate-"]
+        .iter()
+        .any(|prefix| class.starts_with(prefix))
+    {
+        Some("CSS transitions/animations; use GPUI's animation APIs")
+    } else {
+        None
+    };
+    if let Some(reason) = unsupported {
+        let message = format!("GPUI does not support `{class}` ({reason}).");
+        return if mode.is_strict() {
+            ClassOutcome::Error { message }
+        } else {
+            ClassOutcome::Ignored { message }
+        };
+    }
     let suggestion = suggest_class(class, mode.clone());
     if mode.strict {
         let message = if class.starts_with("font-") {
@@ -447,10 +486,20 @@ fn unsupported_class_message(class: &str, suggestion: Option<&str>) -> String {
 }
 
 fn passthrough_message(class: &str, suggestion: Option<&str>) -> String {
-    let method = class.replace(['-', '/'], "_");
     let hint = suggestion
         .map(|s| format!(" Did you mean `{s}`?"))
         .unwrap_or_default();
+    // Inside a variant the method is called on the variant's style closure, and a flag
+    // attribute cannot carry the variant, so name the generated call instead.
+    if let Some((variant, base)) = class.split_once(':') {
+        let method = base.replace(['-', '/'], "_");
+        return format!(
+            "`{base}` in `{class}` is not a known GPUI class and is passed through as \
+             `.{variant}(|style| style.{method}())`.{hint}\n \
+             help: use a supported class, or a GPUI method on the element for custom `{variant}` styles"
+        );
+    }
+    let method = class.replace(['-', '/'], "_");
     format!(
         "`{class}` is not a known GPUI class and is passed through as `.{method}()`.{hint}\n \
          help: for an extension method, use the explicit flag attribute `{method}` or `base={{...}}`; otherwise use a supported class"

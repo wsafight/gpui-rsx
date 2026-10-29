@@ -1,0 +1,11 @@
+[package]
+name = "binary-runtime-fixture"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+gpui-rsx = { path = "../../.." }
+gpui = { package = "gpui-rsx-gpui-stub", path = "../../../crates/gpui-stub" }
+
+[workspace]

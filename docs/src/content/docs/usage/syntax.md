@@ -78,7 +78,7 @@ rsx! {
 
 `base` is consumed by the macro. It does not generate a `.base(...)` method call.
 
-### Function components (unreleased)
+### Function components
 
 Use `#[component]` on a synchronous function to generate the same props builder as a
 struct component. The function runs during GPUI rendering:
@@ -118,9 +118,88 @@ children into `Vec<AnyElement>`. Module-qualified tags such as `<ui::Badge ...>`
 
 Optional `#[context]` parameters must be `&mut Window` or `&mut App`; they are supplied by
 GPUI, so callers never pass them as props. The macro does not capture the caller's `window`
-or `cx`. Prop types must be concrete and owned (or `'static` references); use boxed callbacks
-for callback props. Generic, async/unsafe functions and destructured parameters are unsupported.
+or `cx`. Prop types must be concrete and owned (or `'static` references). Async/unsafe
+functions and destructured parameters are unsupported.
 The original function name becomes a zero-argument builder constructor: `Badge().label("Inbox")`.
+
+### Struct components and deprecation
+
+Named structs use the same prop annotations. Implement `RenderOnce` and derive
+`gpui::IntoElement` to render the built value:
+
+```rust
+#[component]
+#[derive(gpui::IntoElement)]
+struct Panel {
+    title: gpui::SharedString,
+    #[prop(default)] compact: bool,
+    #[children] children: Vec<gpui::AnyElement>,
+}
+impl gpui::RenderOnce for Panel {
+    fn render(self, _: &mut gpui::Window, _: &mut gpui::App) -> impl gpui::IntoElement {
+        div().child(self.title).children(self.children)
+    }
+}
+// rsx! { <Panel title="Inbox" compact><span>{"Hello"}</span></Panel> }
+```
+
+Put `#[deprecated(note = "use NewPanel")]` on a `#[component]` struct or function to
+warn at `<Panel ...>` and `Panel()` call sites. Generated internals suppress their own
+warnings; callers still receive the deprecation notice.
+
+### Callbacks, optional props and generics
+
+`Box<dyn Fn...>` and `Rc<dyn Fn...>` setters take `impl Fn... + 'static` like GPUI's own
+event setters, so closure arguments are inferred (`on_press={|_, _, _| ...}`) and declared
+`Send`, `Sync` and lifetime bounds are kept. To pass an existing shared callback, forward it:
+`on_run={{ let run = run.clone(); move || run() }}`.
+
+Callback defaults can construct their container directly, for example
+`#[prop(default = Box::new(|_, _, _| {}))]` on a boxed GPUI handler. The default is
+coerced to the declared callback type, so closure arguments infer as they do in setters.
+
+The macro recognizes callbacks by their written type, so a `type OnPress = Rc<dyn Fn(...)>`
+alias is treated as an ordinary value prop. To name a long handler signature, declare a
+trait alias and mark the prop with `#[prop(callback)]` (combinable with `default`); closures
+still infer their arguments through the supertrait:
+
+```rust
+trait OnPress: Fn(&ClickEvent, &mut Window, &mut App) {}
+impl<F: Fn(&ClickEvent, &mut Window, &mut App)> OnPress for F {}
+
+#[component]
+fn Pressable(#[prop(callback)] on_press: Rc<dyn OnPress>) -> impl IntoElement {
+    div().id("pressable").on_click(move |e, w, cx| on_press(e, w, cx))
+}
+let pressable = rsx! { <Pressable on_press={|_, window, _| window.refresh()} /> };
+```
+
+`#[prop(callback)]` on a `type` alias is a compile error that points to this pattern.
+
+`Option<T>` setters accept `T`, `Some(T)` or `None`; the inner value must already have type
+`T` (for `Option<SharedString>`, convert a string to `SharedString` first).
+
+```rust
+#[component]
+fn Action<T: Into<gpui::SharedString>>(
+    label: T,
+    on_run: std::rc::Rc<dyn Fn()>,
+    #[prop(default)] hint: Option<gpui::SharedString>,
+) -> impl gpui::IntoElement {
+    let _ = (on_run, hint);
+    div().child(label.into())
+}
+let action = rsx! {
+    <Action label={String::from("Run")} on_run={|| println!("run")}
+        hint={gpui::SharedString::from("Ready")} />
+};
+```
+
+Type and const generics, defaults and `where` clauses are preserved. Function components
+add `'static` bounds required by GPUI. Types can infer from a prop typed directly as `T`;
+use explicit constructor arguments when inference is insufficient, for example
+`<ArrayCard base={ArrayCard::<3>()} values={[1, 2, 3]} />`. Tags use module paths rather
+than turbofish syntax. Generic struct components must satisfy their own GPUI trait bounds.
 
 ## Attributes
 
@@ -242,9 +321,9 @@ rsx! {
 }
 ```
 
-A fragment expands to `vec![...]`. Mixed concrete root types may need `into_any_element()` or a common wrapper element.
+A fragment expands to `vec![...]`. Mixed concrete root types may need `into_any_element()` or a common wrapper element. A root fragment that contains a `for` loop or a `{...spread}` expands to a `Vec<AnyElement>` instead, so every element keeps its order.
 
-Nested fragments are supported in the unreleased development version:
+Fragments can also be nested:
 
 ```rust
 rsx! {

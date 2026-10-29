@@ -1,5 +1,6 @@
 # Semantic colors resolve through Kit's component theme at render time.
 [options]
+dynamic-runtime = "rsx_runtime"
 preset = "gpui-component"
 
 [text-size]

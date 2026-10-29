@@ -18,6 +18,13 @@ Commands:
       Regenerate spec/rsx-spec.json (the LLM syntax package).
   compat-matrix [--check]
       Rewrite the verified-version blocks in README/docs from demo/Cargo.lock.
+  bump <version> | bump --check
+      Set the release version in manifests, workspace lockfile entries, editor packages and
+      install snippets, then refresh the compatibility matrix. --check verifies that every
+      site already matches [workspace.package].version.
+  line-limit [--max <lines>]
+      Fail when a hand-written Rust file has more than <lines> (default 600) non-blank
+      lines outside #[cfg(test)] items. Tests, benches and generated files are skipped.
   check-gpui\n      Require one matching published GPUI snapshot across Kit, base and components.\n      Print the verified package versions as JSON.\n  bench-check [--threshold <fraction>] [--criterion-dir <dir>]
       Fail when any criterion benchmark regressed more than <fraction> (default 0.10)
       against the baseline it was compared with (`cargo bench -- --baseline <name>`).
@@ -37,6 +44,15 @@ fn main() -> ExitCode {
         Some("check-gpui") if args.len() == 1 => gpui_api::demo_metadata(&workspace_root(), true)
             .and_then(|data| xtask::upstream::validate_graph(&data))
             .map(|versions| println!("{versions}")),
+        Some("bump") => match &args[1..] {
+            [flag] if flag == "--check" => xtask::bump::run(&workspace_root(), None, true),
+            [version] if !version.starts_with('-') => {
+                xtask::bump::run(&workspace_root(), Some(version), false)
+            }
+            _ => Err("expected `bump <version>` or `bump --check`".into()),
+        },
+        Some("line-limit") => line_limit_cmd(&args[1..])
+            .and_then(|max| xtask::line_limit::run(&workspace_root(), max)),
         Some("bench-check") => xtask::bench::run(&workspace_root(), &args[1..]),
         Some("help") | Some("-h") | Some("--help") | None => {
             print!("{HELP}");
@@ -58,6 +74,14 @@ fn check_flag(args: &[String]) -> Result<bool, String> {
         [] => Ok(false),
         [flag] if flag == "--check" => Ok(true),
         _ => Err("expected no options or --check".into()),
+    }
+}
+
+fn line_limit_cmd(args: &[String]) -> Result<usize, String> {
+    match args {
+        [] => Ok(xtask::line_limit::DEFAULT_MAX),
+        [flag, max] if flag == "--max" => max.parse().map_err(|_| format!("invalid --max {max}")),
+        _ => Err("expected no options or --max <lines>".into()),
     }
 }
 

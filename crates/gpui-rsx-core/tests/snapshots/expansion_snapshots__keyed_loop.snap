@@ -9,9 +9,82 @@ fn expanded() {
                 .into_iter()
                 .map(|item| {
                     div()
-                        .id(
-                            format!(concat!(file!(), "::__rsx_li_L1C26_", "{}"), item.id),
-                        )
+                        .id({
+                            struct __RsxKey<'a, T: ?Sized>(&'a T);
+                            trait __RsxKeyId {
+                                type Id;
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id;
+                            }
+                            impl<T: ::core::fmt::Display + ?Sized> __RsxKeyId
+                            for &__RsxKey<'_, T> {
+                                type Id = ::std::string::String;
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    ::std::format!("{}{}", prefix, self.0)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, u8> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, u16> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, u32> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, u64> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, usize> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, i8> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, i16> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, i32> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, i64> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            impl __RsxKeyId for __RsxKey<'_, isize> {
+                                type Id = (&'static str, u64);
+                                fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
+                                    (prefix, *self.0 as u64)
+                                }
+                            }
+                            __RsxKey(&(item.id))
+                                .__rsx_key_id(concat!(file!(), "::__rsx_li_L1C26_"))
+                        })
                         .on_click(handler)
                         .child(item.name.clone())
                 }),

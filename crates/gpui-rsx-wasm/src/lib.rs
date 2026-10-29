@@ -3,18 +3,41 @@ use wasm_bindgen::prelude::*;
 /// All operations use the same parser and code generator as the Rust macros.
 #[wasm_bindgen]
 pub fn analyze(source: &str, strict: bool, tailwind: bool) -> String {
-    let mode = gpui_rsx_core::ClassMode::builder()
-        .strict(strict)
-        .scale(if tailwind {
+    analyze_with_theme(source, strict, tailwind, "")
+}
+
+/// Parses an in-memory rsx.toml. Expressions are displayed but never executed.
+#[wasm_bindgen]
+pub fn analyze_with_theme(
+    source: &str,
+    strict: bool,
+    tailwind: bool,
+    theme_source: &str,
+) -> String {
+    let (theme, theme_diagnostics) = match gpui_rsx_core::Theme::parse(theme_source) {
+        Ok(theme) => (Some(std::sync::Arc::new(theme)), Vec::<String>::new()),
+        Err(error) => (None, vec![error]),
+    };
+    let scale = theme
+        .as_ref()
+        .and_then(|t| t.scale())
+        .unwrap_or(if tailwind {
             gpui_rsx_core::SpacingScale::Tailwind
         } else {
             gpui_rsx_core::SpacingScale::Px
-        })
+        });
+    let mode = gpui_rsx_core::ClassMode::builder()
+        .strict(strict)
+        .scale(scale)
+        .theme(theme)
         .build();
+    let report = gpui_rsx_tools::report_body(source, mode);
     let result = serde_json::json!({
-        "diagnostics": gpui_rsx_tools::analyze_body(source, mode.clone()),
-        "expansion": gpui_rsx_tools::expand(source, mode.clone()),
-        "preview": gpui_rsx_tools::preview::render(source, mode),
+        "diagnostics": report.diagnostics,
+        "theme_diagnostics": theme_diagnostics,
+        "tailwind": scale == gpui_rsx_core::SpacingScale::Tailwind,
+        "expansion": report.expansion,
+        "preview": report.preview,
     })
     .to_string();
     // The playground calls this on every keystroke; span bookkeeping would otherwise grow forever.
@@ -31,8 +54,17 @@ pub fn format(source: &str) -> Result<String, JsValue> {
 
 #[wasm_bindgen]
 pub fn convert(source: &str) -> String {
-    let result = serde_json::to_string(&gpui_rsx_tools::convert::convert(source))
-        .unwrap_or_else(|e| format!("{{\"Err\":{e:?}}}"));
+    convert_with_options(source, false)
+}
+
+#[wasm_bindgen]
+pub fn convert_with_options(source: &str, tailwind: bool) -> String {
+    let mut options = gpui_rsx_tools::convert::ConversionOptions::default();
+    options.tailwind = tailwind;
+    let result = serde_json::to_string(&gpui_rsx_tools::convert::convert_with_options(
+        source, options,
+    ))
+    .unwrap_or_else(|e| format!("{{\"Err\":{e:?}}}"));
     gpui_rsx_tools::release_span_memory();
     result
 }
@@ -104,5 +136,65 @@ mod tests {
 
         let failed: Value = serde_json::from_str(&convert("not jsx")).unwrap();
         assert!(failed["Err"].is_string(), "{failed}");
+    }
+
+    #[test]
+    fn analyze_with_theme_reports_theme_errors_without_panicking() {
+        let source = "<div class=\"bg-brand\"/>";
+        let themed = analyze_with_theme(source, false, false, "[colors]\nbrand = \"#123456\"\n");
+        let report: Value = serde_json::from_str(&themed).unwrap();
+        assert!(report["theme_diagnostics"].as_array().unwrap().is_empty());
+        assert!(report["expansion"]["Ok"].as_str().unwrap().contains("rgb"));
+
+        let broken = analyze_with_theme(source, false, false, "[nope]\n");
+        let report: Value = serde_json::from_str(&broken).unwrap();
+        assert_eq!(report["theme_diagnostics"].as_array().unwrap().len(), 1);
+        assert!(
+            report["theme_diagnostics"][0]
+                .as_str()
+                .unwrap()
+                .contains("unknown section")
+        );
+    }
+
+    #[test]
+    fn analyze_with_theme_prefers_theme_scale_over_the_tailwind_flag() {
+        let source = "<div class=\"gap-4\"/>";
+        let report: Value = serde_json::from_str(&analyze_with_theme(
+            source,
+            false,
+            false,
+            "[options]\nspacing-scale = \"tailwind\"\n",
+        ))
+        .unwrap();
+        assert_eq!(report["tailwind"], true);
+        assert!(
+            report["expansion"]["Ok"]
+                .as_str()
+                .unwrap()
+                .contains("16f32")
+        );
+    }
+
+    #[test]
+    fn format_returns_formatted_bodies() {
+        assert_eq!(
+            format("<div class=\"flex\"><span /></div>").unwrap(),
+            "<div class=\"flex\">\n    <span />\n</div>"
+        );
+        assert_eq!(format("<div />").unwrap(), "<div />");
+    }
+
+    #[test]
+    fn convert_with_options_honours_tailwind() {
+        // Tailwind conversion keeps numeric classes and switches to `rsx_tw!`.
+        let converted: Value =
+            serde_json::from_str(&convert_with_options("<div className=\"p-4\"/>", true)).unwrap();
+        assert!(converted["Ok"]["rsx"].as_str().unwrap().contains("rsx_tw!"));
+        assert!(converted["Ok"]["rsx"].as_str().unwrap().contains("p-4"));
+        // The pixel-preserving conversion rewrites the class instead.
+        let plain: Value =
+            serde_json::from_str(&convert_with_options("<div className=\"p-4\"/>", false)).unwrap();
+        assert_eq!(plain["Ok"]["rsx"], "<div class=\"p-16\" />");
     }
 }

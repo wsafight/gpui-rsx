@@ -1,0 +1,5 @@
+error: #[prop(callback)] needs a written-out `Box<dyn Trait>` or `Rc<dyn Trait>`; type aliases hide the closure signature, so declare `trait OnPress: Fn(..) {}` with a blanket impl and use `Rc<dyn OnPress>`
+ --> tests/ui/component_callback_type_alias.rs:8:39
+  |
+8 | fn Button(#[prop(callback)] on_press: OnPress) -> impl IntoElement {
+  |                                       ^^^^^^^

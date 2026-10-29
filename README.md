@@ -55,7 +55,7 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.9.0"
+gpui-rsx = "0.10.0"
 ```
 
 ### GPUI Version Target
@@ -75,14 +75,14 @@ application lockfile; update Kit and its matching snapshot together. See the
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.9.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
+| `0.10.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.9.0"
+gpui-rsx = "0.10.0"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -493,11 +493,12 @@ provide `id` or `key`, otherwise the macro emits a compile error:
 {for item in &self.items {
     <li key={item.id} onClick={handler}>{item.name.clone()}</li>
 }}
-// → div().id(format!("src/list.rs::__rsx_li_L42C8_{}", item.id)).on_click(handler)…
+// → div().id(("src/list.rs::__rsx_li_L42C8_", item.id as u64)).on_click(handler)…
 ```
 
 `key` is consumed by the macro and does **not** become a `.key()` method call.
-It accepts any type implementing `Display`. On elements without stateful attributes,
+Concrete integer values up to 64 bits avoid string allocation; other `Display` values use
+a borrowed formatting fallback. On elements without stateful attributes,
 `key` is silently ignored (no `.id()` is injected).
 
 For-loops also support ranges and method calls:
@@ -862,29 +863,21 @@ impl TodoApp {
 
 ### Custom Components
 
+`#[component]` accepts named-field structs and synchronous functions, generating compile-time
+required-prop checks, defaults and children builders:
+
 ```rust
-fn render_card(&self, title: &str, content: &str) -> impl IntoElement {
-    rsx! {
-        <div class="rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-bold">
-                {title}
-            </h2>
-            <p class="text-gray-600">
-                {content}
-            </p>
-        </div>
-    }
+#[gpui_rsx::component]
+fn Badge(label: SharedString, #[prop(default)] highlighted: bool) -> impl IntoElement {
+    rsx! { <div class="rounded-md p-2" whenClass={(highlighted, "bg-blue-500")}>{label}</div> }
 }
 
-fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-    rsx! {
-        <div>
-            {self.render_card("Title 1", "Content 1")}
-            {self.render_card("Title 2", "Content 2")}
-        </div>
-    }
-}
+let badge = rsx! { <Badge label="Inbox" highlighted /> };
 ```
+
+Struct components pair `#[derive(IntoElement)]` with `RenderOnce` and use the same prop rules.
+`#[deprecated(note = "use NewBadge")]` warns at component call sites.
+See the [component syntax guide](https://wsafight.github.io/gpui-rsx/usage/syntax/) for complete examples.
 
 ### Builder-backed Components
 
@@ -966,68 +959,21 @@ fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoE
 
 ## 📊 Performance
 
-GPUI-RSX is a **compile-time macro** that expands static RSX into direct GPUI builder calls. Static markup has no parser at runtime; dynamic `class={expr}` intentionally uses a small runtime matcher.
+Static classes, literal `if` / `match` branches and `whenClass` expand into ordinary GPUI
+builder calls. Dynamic strings are parsed at runtime. Concrete integer keys use GPUI's
+named integer IDs; string and custom `Display` keys retain a formatting fallback.
 
-| Metric | Traditional GPUI | GPUI-RSX |
-|--------|------------------|----------|
-| Code Size | 100 lines | 50 lines (-50%) |
-| Runtime Performance | Baseline | Same |
-| Type Safety | ✅ | ✅ |
-| Compile-time Checking | ✅ | ✅ |
+For many dynamic call sites, put `gpui_rsx::rsx_runtime!();` at the crate root and configure:
 
-### v0.3.2 Fixes & Improvements
-- **Fixed** `parse_single_class` panic on Tailwind variant syntax (`hover:bg-blue-500`): invalid
-  class names are now silently skipped instead of calling `syn::Ident::new` with illegal characters
-- **Added** 7 classes to dynamic match table: `rounded-none`, `rounded-xl`, `cursor-default`,
-  `cursor-text`, `shadow-sm`, `shadow-md`, `shadow-lg`
-- **Docs** styled defaults: added `li`, `p`, `label`, `form` entries; fixed `overflowX`/`overflowY`
-  method names; removed unsupported `text-4xl`/`text-5xl`; updated dynamic class description
+```toml
+[options]
+dynamic-runtime = "rsx_runtime"
+```
 
-### v0.3.1 Fixes & Features
-- **Fixed** `is_stateful_attr`: `hover`/`active`/`focus`/`group` are `Styled` trait methods and
-  no longer trigger unnecessary `.id()` injection
-- **Added** `key={expr}` attribute: composite auto ID for stateful elements in for-loops
-- **Added** compile error when a stateful element in a for-loop has no `id` or `key`
-- `key` on non-stateful elements is silently ignored (no unintended type change to `Stateful<Div>`)
-
-### v0.3.0 Refactoring
-- Eliminated ~60 duplicate method definitions in `tests/common/mod.rs` (823 → 456 lines)
-- Simplified black/white color entry generation in `runtime.rs` (method names encoded in data)
-- Extracted `is_directional_border()` helper in `class.rs` for clearer border logic
-
-### v0.2.2 Optimizations
-
-**Compile-time Performance:**
-- `split_ascii_whitespace` replaces `split_whitespace` in class parsing
-- Unified `text_` prefix handling (single `strip_prefix` call)
-- Early fast-path for empty elements
-- `Vec::with_capacity(attrs * 2 + children)` for class-heavy elements
-
-**Runtime Performance:**
-- `.children([...])` batching threshold lowered 3 → 2
-
-**Binary Size:**
-- Applications may opt into `panic = "abort"` in their own release profile to remove unwind tables
-
-### v0.2.1 Optimizations
-
-**Compile-time Performance:**
-- O(1) color / attribute / spacing lookups via `match` (jump table, no linear scan)
-- Single-pass attribute scanning in `generate_element`
-- Thread-local cache for dynamic class match arms (generated once per process)
-
-**Memory Allocation Reductions:**
-- `parse_class_string` returns an iterator (no intermediate `Vec`)
-- `generate_attr_methods` pushes directly into caller's buffer
-- `Cow<str>` for class name transformations (zero-copy when no `-` present)
-- `Vec::with_capacity` pre-allocation throughout
-
-**Runtime Performance:**
-- Zero-copy dynamic class strings via `AsRef<str>` (`&str` needs no allocation)
-
-**Binary Size:**
-- Dynamic class match table extracted to `#[inline(never)]` + LLVM ICF deduplication
-- Multiple `class={expr}` in same component share one function body
+A local 50-call-site stub comparison reduced release compilation from 12.84s to 0.89s.
+Dependencies were warmed and incremental compilation disabled; this isolates generated-code
+compilation costs. See [Performance](https://wsafight.github.io/gpui-rsx/guides/performance/)
+for setup and measurement conditions.
 
 ## 🛠️ Development
 
@@ -1244,7 +1190,7 @@ Inspired by:
 
 ## Development tools
 
-Install `cargo-rsx` 0.9.0 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
+Install `cargo-rsx` 0.10.0 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
 `preview --watch`, and the `lsp` server. See the [tooling guide](https://wsafight.github.io/gpui-rsx/guides/tooling/)
 and [WASM Playground](https://wsafight.github.io/gpui-rsx/playground/). VS Code and Zed adapters
 live in `editors/`; release assets include an installable VSIX.

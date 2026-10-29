@@ -167,14 +167,22 @@ fn test_path_component_with_base_attribute() {
 
 #[test]
 fn test_path_component_auto_id_with_stateful_attr() {
-    take_last_auto_id();
+    use gpui::StatefulInteractiveElement;
+
+    // Use a rendering element here: MockElement's inherent setters model a builder.
+    mod ui {
+        #[allow(non_snake_case)]
+        pub fn TaskCard() -> gpui::Div {
+            gpui::div()
+        }
+    }
 
     let _el = rsx! {
-        <ui::TaskCard onClick={|_: &mut MockElement| {}} />
+        <ui::TaskCard onClick={|_, _, _| {}} />
     };
 
-    let id = take_last_auto_id().expect("path component with stateful attr should get auto id");
-    assert!(id.contains("__rsx_ui::TaskCard_"));
+    let id = gpui::Element::id(&_el).expect("path component with stateful attr should get auto id");
+    assert!(format!("{id:?}").contains("__rsx_ui::TaskCard_"));
 }
 
 // ===========================================================================

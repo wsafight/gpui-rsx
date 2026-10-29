@@ -28,8 +28,21 @@ pub(crate) struct AttrHints<'a> {
     pub(crate) unknown_class_handler: Option<&'a syn::Expr>,
 }
 
-pub(crate) fn static_class_expr_needs_id(expr: &syn::Expr) -> bool {
-    static_class_expr_has_stateful_class(expr).unwrap_or(false)
+/// Whether a statically expanded class expression uses a class that needs an element ID.
+/// Includes supported static edges of format templates; fully dynamic tokens need no ID.
+pub(crate) fn static_class_expr_needs_id(expr: &syn::Expr, mode: ClassMode) -> bool {
+    if let Some(edges) = super::format_class::static_edges(expr, mode) {
+        return edges
+            .prefix
+            .split_ascii_whitespace()
+            .chain(edges.suffix.split_ascii_whitespace())
+            .any(is_stateful_class);
+    }
+    static_class_literals(expr).is_some_and(|literals| {
+        literals
+            .iter()
+            .any(|lit| lit.value().split_ascii_whitespace().any(is_stateful_class))
+    })
 }
 
 pub(crate) fn generate_attr_methods_with_mode(
@@ -71,19 +84,9 @@ pub(crate) fn generate_attr_methods_with_mode(
         RsxAttribute::Value { name, value } => {
             // class 属性 → 展开为多个样式方法（静态）或运行时解析（动态）
             if name == "class" {
-                // 情况 1：字符串字面量 → 编译期解析（最优性能）
+                // 情况 1：字符串字面量 → 编译期解析（最优性能）。调用方对字面量总会提供 hint。
                 if let Some(s) = hints.static_class {
                     out.extend(parse_class_string_with_mode(s, mode, value.span()));
-                    return;
-                }
-
-                if let syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(lit_str),
-                    ..
-                }) = value
-                {
-                    let s = lit_str.value();
-                    out.extend(parse_class_string_with_mode(&s, mode, lit_str.span()));
                     return;
                 }
 
@@ -264,42 +267,6 @@ fn generate_static_class_block_code(block: &syn::Block, mode: ClassMode) -> Opti
     generate_static_class_expr_code(expr, mode)
 }
 
-fn static_class_expr_has_stateful_class(expr: &syn::Expr) -> Option<bool> {
-    match expr {
-        syn::Expr::If(expr_if) => {
-            if static_class_block_has_stateful_class(&expr_if.then_branch)? {
-                return Some(true);
-            }
-            let (_, else_expr) = expr_if.else_branch.as_ref()?;
-            static_class_expr_has_stateful_class(else_expr)
-        }
-        syn::Expr::Match(expr_match) => {
-            for arm in &expr_match.arms {
-                if static_class_expr_has_stateful_class(&arm.body)? {
-                    return Some(true);
-                }
-            }
-            Some(false)
-        }
-        syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::Str(lit_str),
-            ..
-        }) => {
-            let class = lit_str.value();
-            Some(class.split_ascii_whitespace().any(is_stateful_class))
-        }
-        syn::Expr::Paren(expr) => static_class_expr_has_stateful_class(&expr.expr),
-        syn::Expr::Group(expr) => static_class_expr_has_stateful_class(&expr.expr),
-        syn::Expr::Block(expr) => static_class_block_has_stateful_class(&expr.block),
-        _ => None,
-    }
-}
-
-fn static_class_block_has_stateful_class(block: &syn::Block) -> Option<bool> {
-    let expr = block_tail_expr(block)?;
-    static_class_expr_has_stateful_class(expr)
-}
-
 fn block_tail_expr(block: &syn::Block) -> Option<&syn::Expr> {
     match block.stmts.as_slice() {
         [syn::Stmt::Expr(expr, None)] => Some(expr),
@@ -467,7 +434,7 @@ mod tests {
     fn static_class_expressions_detect_stateful_classes() {
         let needs_id = |source: &str| -> Option<bool> {
             let expr: syn::Expr = syn::parse_str(source).unwrap();
-            static_class_expr_needs_id(&expr).into()
+            static_class_expr_needs_id(&expr, ClassMode::PERMISSIVE).into()
         };
         assert_eq!(needs_id(r#""flex""#), Some(false));
         assert_eq!(needs_id(r#""active:opacity-75""#), Some(true));
@@ -484,6 +451,11 @@ mod tests {
             Some(true)
         );
         assert_eq!(needs_id("classes"), Some(false));
+        // Partly dynamic expressions expand at runtime, which needs no ID.
+        assert_eq!(
+            needs_id(r#"if a {"active:opacity-75"} else {classes}"#),
+            Some(false)
+        );
 
         // Stateful branches inside an element still trigger an auto ID.
         let expanded = expand(r#"<div class={if a {"flex"} else {"active:opacity-75"}} />"#);

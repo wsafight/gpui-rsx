@@ -273,3 +273,16 @@ fn suggestions_cover_theme_tokens_for_every_length_prefix() {
         Some("pt-gutter")
     );
 }
+
+#[test]
+fn passthrough_messages_inside_variants_name_valid_rust() {
+    let diagnostics = class_diagnostics("focus:ring-2 ring-2", ClassMode::PERMISSIVE);
+    assert_eq!(diagnostics.len(), 2);
+    let variant = &diagnostics[0].message;
+    assert!(
+        variant.contains("`.focus(|style| style.ring_2())`"),
+        "{variant}"
+    );
+    assert!(!variant.contains(".focus:"), "{variant}");
+    assert!(diagnostics[1].message.contains("`.ring_2()`"));
+}

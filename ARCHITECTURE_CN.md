@@ -2,7 +2,7 @@
 
 ## 概述
 
-GPUI-RSX 是一个为 GPUI UI 框架提供类 JSX 语法的过程宏。它在编译时将类 HTML 的标记转换为惯用的 GPUI 方法链，通过编译期代码生成实现**零运行时开销**。
+GPUI-RSX 是一个为 GPUI UI 框架提供类 JSX 语法的过程宏。它在编译时将类 HTML 的标记转换为惯用的 GPUI 方法链，静态标记等价于手写 builder；动态 class 字符串在运行时解析。
 
 ### 核心理念
 
@@ -64,31 +64,41 @@ GPUI-RSX 是一个为 GPUI UI 框架提供类 JSX 语法的过程宏。它在编
 ## 模块组织
 
 ```
-src/
-├── lib.rs                     (~123 行)  - 宏入口点
-├── parser.rs                  (~307 行)  - RSX → AST
-├── diagnostics.rs             (~210 行)  - 错误消息
-└── codegen/
-    ├── mod.rs                 (~24 行)   - 模块协调
-    ├── tables.rs              (~617 行)  - O(1) match 查找表
-    ├── class.rs               (~169 行)  - CSS class 解析
-    ├── attribute.rs           (~79 行)   - 属性 → 方法
-    ├── element.rs             (~248 行)  - 元素生成 + 自动 ID
-    └── runtime.rs             (~466 行)  - 动态 class 代码生成
+src/lib.rs                     gpui-rsx：轻量 proc-macro 外壳（rsx!、rsx_strict!、#[component] 等）
+crates/
+├── gpui-rsx-core/src/         解析器与代码生成器，作为普通库供所有宿主复用
+│   ├── lib.rs                 expand / expand_macro、间距单位优先级、公开门面
+│   ├── parser.rs              RSX → AST（元素、Fragment、循环、展开）
+│   ├── component/             #[component]：函数组件与 typestate props builder
+│   ├── theme/                 rsx.toml 设计令牌：解析、缓存（路径 + 内容）、builder
+│   ├── style.rs               StyleOperation：代码生成与预览共用的已解析 class
+│   ├── diagnostics.rs         带 span 的编译错误
+│   └── codegen/
+│       ├── element.rs         元素方法链、Fragment 展平、循环、自动 ID
+│       ├── attribute.rs       属性 → 方法、静态 class 表达式
+│       ├── class.rs + class/  class 解析、变体、取值、建议
+│       ├── runtime.rs         动态 class helper（每次宏调用一个）
+│       ├── tables.rs          基于生成表的手写查找
+│       └── tables_generated.rs  由 `cargo xtask gen-tables` 从 GPUI 源码生成
+├── gpui-rsx-tools/            与宿主无关的诊断、格式化、迁移、预览、转换
+├── cargo-rsx/                 CLI 与语言服务器（`src/lsp/`：protocol、document、features）
+├── gpui-rsx-wasm/             Playground 绑定
+└── gpui-stub*/                供 doctest 与编译测试使用的最小 GPUI 替身
+editors/{vscode,zed}/          启动 `cargo-rsx lsp` 的编辑器插件
+xtask/                         生成查找表与 spec、兼容性检查
 ```
 
 ### 模块职责
 
-| 模块 | 用途 | 依赖 | 关键函数 |
-|------|------|------|----------|
-| `lib.rs` | 宏入口点 | `parser`, `codegen` | `rsx!` 宏 |
-| `parser.rs` | RSX 语法解析 | `syn`, `quote` | `parse()`, AST 类型 |
-| `diagnostics.rs` | 错误消息 | `syn` | span 感知错误构造器 |
-| `codegen/tables.rs` | O(1) match 查找 | 无 | `lookup_color()`, `lookup_attr_method()` |
-| `codegen/class.rs` | class 解析 | `tables` | `parse_class_string()`, `parse_color_with_method()` |
-| `codegen/attribute.rs` | 属性处理 | `tables`, `class`, `runtime` | `generate_attr_methods()` |
-| `codegen/element.rs` | 元素生成 | 以上所有 | `generate_body()`, `generate_element()` |
-| `codegen/runtime.rs` | 动态 class 生成 | `class` | `generate_dynamic_class_code()` |
+| 模块 | 用途 |
+|------|------|
+| `gpui-rsx`（`src/lib.rs`） | 宏入口；解析宏选项后交给 core |
+| `core::parser` | RSX 语法与 AST 类型 |
+| `core::component` | `#[component]` 展开与必填属性诊断 |
+| `core::theme` / `core::style` | 主题令牌与已解析的样式操作 |
+| `core::codegen` | 元素、属性、class 与动态 class 代码生成 |
+| `gpui-rsx-tools` | 整个 Rust 文件的分析（含嵌套宏）、格式化、迁移、预览 |
+| `cargo-rsx` | CLI 命令、class 模式解析（`config.rs`）与 LSP |
 
 ## 数据流
 
@@ -349,7 +359,12 @@ div()
    ```
 
 6. **自动 ID 注入** — 优先级：显式 `id` > stateful + `key` > stateful 无 key > 非 stateful。
-   `key` 仅在元素已需要 `.id()` 时生效；非 stateful 元素上的 `key` 静默忽略，不注入 `.id()`：
+   `key` 仅在元素已需要 `.id()` 时生效；非 stateful 元素上的 `key` 静默忽略，不注入 `.id()`。
+   组件构造函数及 `base` 表达式通过 `codegen/auto_id.rs` 在调用点做 autoref 分派：
+   仅 `InteractiveElement + Element` 变为 `Stateful<T>`，其他构建器保留自身 setter，
+   key 表达式仍在调用处求值一次。无 `base` 的原生标签仍直接调用 `.id()`，显式 ID
+   则绕过分派。泛型或不透明返回类型须暴露两个约束；显式 ID 只要求类型支持 `.id()`。循环 key 检查
+   仍基于语法，也覆盖组件事件属性。
    ```rust
    // 显式 id
    <div id="my-id" onClick={h} />  →  div().id("my-id").on_click(h)
@@ -394,15 +409,9 @@ div()
    }
    ```
 
-8. **for 循环代码生成** — 单子节点用 `.map()`；多子节点用 `.flat_map()` + `vec![]`
-   以支持混合元素类型：
-   ```rust
-   // 单个子节点
-   (iter).into_iter().map(|binding| child_expr)
-
-   // 多个子节点（vec! 允许不同元素类型）
-   (iter).into_iter().flat_map(|binding| vec![child1, child2])
-   ```
+8. **For 循环代码生成** — 单个子节点直接映射迭代器；多个子节点使用 `once` / `chain`
+   将 `AnyElement` 迭代器展平，避免每次迭代分配 Fragment 向量。根 Fragment 最终收集为
+   `Vec<AnyElement>`。
 
 **自动 ID 生成**（基于 span，在增量编译中保持稳定）：
 ```rust
@@ -415,22 +424,20 @@ fn make_auto_id(tag_ident: &syn::Ident) -> TokenStream {
     quote! { concat!(file!(), "::", #id_suffix) }
 }
 
-// make_keyed_auto_id：编译期前缀 + 运行时 key，用于 for 循环场景
-// 格式：format!(concat!(file!(), "::{prefix}_{}"), key_expr)
-// key_expr 须实现 Display（整数、&str、UUID 等）
-fn make_keyed_auto_id(tag_ident: &syn::Ident, key_expr: &syn::Expr) -> TokenStream {
-    let loc = tag_ident.span().start();
-    let prefix_suffix = format!("::__rsx_{}_L{}C{}_", tag_ident, loc.line, loc.column);
-    quote! { format!(concat!(file!(), #prefix_suffix, "{}"), #key_expr) }
-}
+
 ```
+
+具体整数 key（不超过 64 位）使用命名整数元组，无需格式化；字面量使用 concat!。
+其他 Display 值（含 128 位整数、泛型 Display 参数与整数引用）可能使用借用的格式化路径。
+`codegen/key.rs` 通过 autoref 分派选择实现，表达式只求值一次。
 
 #### runtime.rs — 动态 class 代码生成
 
 **用途**：为 `class={expression}` 属性生成运行时代码。
 
-**重要限制**：运行时仅识别约 58 个预编译的常用 class。不在列表中的 class 会被**静默忽略**。
-建议优先使用静态字符串字面量以获得完整 class 支持。
+动态 class 支持常用生成方法、数值长度、任意颜色、Tailwind 色板与透明度修饰符。
+变体和主题 token 需静态字符串；未知 class 交给调用点的回调，默认 debug 警告、严格模式
+panic，可通过 `onUnknownClass` 替换。
 
 **预编译的常用 class**（部分示例）：
 ```
@@ -440,28 +447,10 @@ w-full, h-full, text-xs..text-3xl, font-bold, border, rounded-*,
 cursor-pointer, overflow-hidden, bg-white, bg-black, …
 ```
 
-**生成的代码模式**：
-```rust
-{
-    #[inline(never)]  // 阻止 match 表内联；支持 LLVM ICF 合并
-    fn __rsx_apply_class<E: Styled>(el: E, class: &str) -> E {
-        match class {
-            "flex" => el.flex(),
-            "gap-4" => el.gap(px(4.0)),
-            // … 约 58 个预编译 class …
-            _ => el,  // 未知 class → 静默忽略
-        }
-    }
-    let __class_expr = <expression>;
-    let __class_str: &str = __class_expr.as_ref();  // &str 零拷贝
-    // split_ascii_whitespace：class 名只含 ASCII，比 split_whitespace 更快
-    if __class_str.is_empty() {
-        __el                                         // 快速路径：跳过迭代器创建
-    } else {
-        __class_str.split_ascii_whitespace().fold(__el, __rsx_apply_class)
-    }
-}
-```
+内联 helper 接受调用点的 `on_unknown: &mut dyn FnMut(&str)`，按首字节匹配常用 class，
+再尝试颜色与数值前缀，最后调用未知 class 回调。动态字符串按 ASCII 空白拆分。
+配置 `dynamic-runtime` 后委托给生成的非泛型 `rsx_runtime::px` / `tailwind` helper。
+实际生成代码参见 `codegen/runtime.rs`。
 
 ## 设计模式
 
@@ -937,3 +926,20 @@ rsx! {
 | 2026-02-18 | `element.rs` | `Vec::with_capacity`：`attrs + children` → `attrs * 2 + children` |
 | 2026-02-18 | `element.rs` | `.children([...])` 聚合阈值：3 → 2 |
 | 2026-02-18 | `Cargo.toml` | `[profile.release]` 增加 `panic = "abort"` |
+
+## 0.10 的动态 runtime 与编辑器分析
+
+过程宏刻意不依赖运行时 GPUI：应用可使用 Kit、gpui-pre、gpui-fast 或别名，绑定某一来源会
+产生不兼容的 GPUI 身份。可选 `rsx_runtime!()` 在消费 crate 中生成 helper，每种刻度使用
+非泛型 `StyleRefinement` 函数；未知 class 回调保留在调用点，静态主题 token 仍由宏展开。
+Cargo 元数据解析库、bin、example 与集成测试路径，不假定包名等于库名。
+
+工具只长期保存字节偏移，不保存 span。单个平衡外层宏内的编辑仅重新发现该宏中的嵌套调用，
+并移动后续范围；结构性修改重新扫描整个 Rust token 流。未修改的宏体复用诊断、class 范围、
+语义分类与颜色。本文件组件目录读取命名结构体、函数与内联模块，提供补全和缺 prop 提示，
+不承担跨文件 Rust 类型解析。LSP 按顺序应用 UTF-16 编辑，并合并同 URI 的连续排队修改。
+宿主在 span 全部转换为偏移后释放 proc-macro2 源码映射内存。
+
+format 模板优化保留原格式化调用，仅裁剪受支持的完整静态首尾 token；Display 值可能含空格，
+因此无法安全判断中间边界。静态首尾与动态中间段按原顺序应用。Playground 主题使用共享解析器，
+预览只识别字面量，不执行任意 token 表达式。

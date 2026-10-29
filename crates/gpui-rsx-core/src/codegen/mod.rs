@@ -16,8 +16,11 @@
 //! - `element`: 元素和子节点的代码生成
 
 pub mod attribute;
+mod auto_id;
 pub mod class;
 pub mod element;
+mod format_class;
+mod key;
 pub mod runtime;
 pub mod tables;
 #[rustfmt::skip]

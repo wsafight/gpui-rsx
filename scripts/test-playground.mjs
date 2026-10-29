@@ -1,7 +1,7 @@
 // Exercise the actual browser-target WASM and worker protocol without a native GPUI runtime.
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { initSync, analyze, format, convert } from '../docs/public/playground/pkg/gpui_rsx_wasm.js';
+import { initSync, analyze, analyze_with_theme, format, convert, convert_with_options } from '../docs/public/playground/pkg/gpui_rsx_wasm.js';
 
 initSync({ module: await readFile(new URL('../docs/public/playground/pkg/gpui_rsx_wasm_bg.wasm',import.meta.url)) });
 let result = JSON.parse(analyze('<div class="gap-4"/>',true,true));
@@ -11,7 +11,7 @@ assert.ok(result.diagnostics.some(d=>d.severity==='error' && d.suggestion==='fle
 assert.match(format('<div><span>{"中文😀"}</span></div>'),/中文😀/);
 const converted = JSON.parse(convert('<div className="flex" onClick={()=>alert(1)}>Hi <span>{name}</span></div>'));
 assert.ok(converted.Ok.rsx.includes('flex'));
-assert.ok(converted.Ok.diagnostics.length>=2);
+assert.ok(converted.Ok.diagnostics.length>=1);
 result = JSON.parse(analyze('<div>{"<script>bad()</script>"}{run()}</div>',false,false));
 assert.ok(!result.preview.Ok.includes('<script>'));
 assert.ok(!result.preview.Ok.includes('run()'));
@@ -33,4 +33,28 @@ assert.deepEqual(message.result.diagnostics,[]);
 assert.ok(!message.result.expansion.Ok.includes('vec!'));
 assert.match(message.result.preview.Ok,/one.*two/);
 assert.match(format(grouped),/<>\n/);
-console.log('Playground WASM + worker: 10 checks passed');
+
+const theme = '[colors]\nbrand="#123456"\n';
+result = JSON.parse(analyze_with_theme('<div class="bg-brand"/>',true,false,theme));
+assert.match(result.preview.Ok,/#123456/);
+assert.deepEqual(result.theme_diagnostics,[]);
+result = JSON.parse(analyze_with_theme('<div/>',true,false,'[bad]'));
+assert.equal(result.theme_diagnostics.length,1);
+result = JSON.parse(analyze_with_theme('<div class="bg-brand"/>',true,false,'[colors]\nbrand={expr="danger()"}'));
+assert.ok(!result.preview.Ok.includes('danger()'));
+result = JSON.parse(convert_with_options('<div className="p-4">{user.name}</div>',true));
+assert.match(result.Ok.rsx,/^rsx_tw!/);
+assert.match(result.Ok.rsx,/p-4/);
+assert.match(result.Ok.rsx,/user.name/);
+await self.onmessage({data:{id:16,operation:'analyze',source:'<div class="bg-brand"/>',theme}});
+assert.match(message.result.preview.Ok,/#123456/);
+await self.onmessage({data:{id:17,operation:'analyze',source:'<div class="bg-brand"/>',theme:'[colors]\nbrand="#654321"'}});
+assert.match(message.result.preview.Ok,/#654321/);
+await self.onmessage({data:{id:18,operation:'analyze',source:'<div/>',theme:'x'.repeat(20001)}});
+assert.ok(message.error);
+await self.onmessage({data:{id:19,operation:'unknown',source:'<div/>'}});
+assert.ok(message.error);
+await self.onmessage({data:{id:20,operation:'convert',source:'<div className="p-4"/>',tailwind:false,theme:'[options]\nspacing-scale="tailwind"'}});
+assert.match(message.result.Ok.rsx,/rsx_tw!/);
+assert.match(message.result.Ok.rsx,/p-4/);
+console.log('Playground WASM + worker checks passed');

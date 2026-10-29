@@ -72,6 +72,10 @@ snapshot!(
     r#"<Button base={Button::new("save")} label={"Save"} small />"#
 );
 snapshot!(
+    component_auto_id,
+    r#"<ui::card key={item.id} onClick={handler} />"#
+);
+snapshot!(
     special_tags,
     r#"<div><img src={"logo.png"} /><svg src={"icon.svg"} class="size-4" /></div>"#
 );

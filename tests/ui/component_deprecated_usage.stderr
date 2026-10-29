@@ -1,0 +1,11 @@
+error: use of deprecated function `OldCard`: use NewCard
+  --> tests/ui/component_deprecated_usage.rs:14:21
+   |
+14 |     let _ = rsx! { <OldCard title="Inbox" /> };
+   |                     ^^^^^^^
+   |
+note: the lint level is defined here
+  --> tests/ui/component_deprecated_usage.rs:1:9
+   |
+ 1 | #![deny(deprecated)]
+   |         ^^^^^^^^^^

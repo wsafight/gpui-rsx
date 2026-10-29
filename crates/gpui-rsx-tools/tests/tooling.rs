@@ -2,9 +2,74 @@ use gpui_rsx_core::{ClassMode, SpacingScale};
 #[cfg(feature = "convert")]
 use gpui_rsx_tools::convert;
 use gpui_rsx_tools::{
-    analyze_body, analyze_rust, analyze_rust_document, class_literal_ranges, expand, format,
-    macro_calls, mode_for, preview,
+    DiagnosticSeverity, analyze_body, analyze_rust, analyze_rust_document, class_literal_ranges,
+    expand, format, macro_calls, mode_for, preview,
 };
+
+#[test]
+fn dynamic_class_compile_time_hint_only_appears_without_shared_runtime() {
+    let source = "<div class={classes} />";
+    let diagnostics = analyze_body(source, ClassMode::PERMISSIVE);
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(diagnostics[0].severity, DiagnosticSeverity::Information);
+    assert!(diagnostics[0].message.contains("dynamic-runtime"));
+    let theme =
+        gpui_rsx_core::Theme::parse("[options]\ndynamic-runtime = \"rsx_runtime\"").unwrap();
+    let diagnostics = analyze_body(source, ClassMode::PERMISSIVE.with_theme(Some(theme.into())));
+    assert_eq!(diagnostics.len(), 1);
+    assert!(!diagnostics[0].message.contains("dynamic-runtime"));
+    assert!(
+        diagnostics[0]
+            .message
+            .contains("theme tokens require static strings")
+    );
+}
+
+#[test]
+fn bare_text_has_an_applicable_quote_fix() {
+    let source = "<div>hello world</div>";
+    let diagnostics = analyze_body(source, ClassMode::PERMISSIVE);
+    assert_eq!(diagnostics.len(), 1);
+    assert_eq!(
+        diagnostics[0].suggestion.as_deref(),
+        Some("\"hello world\"")
+    );
+    let mut fixed = source.to_owned();
+    fixed.replace_range(
+        diagnostics[0].start..diagnostics[0].end,
+        diagnostics[0].suggestion.as_ref().unwrap(),
+    );
+    assert!(
+        analyze_body(&fixed, ClassMode::PERMISSIVE).is_empty(),
+        "{fixed}"
+    );
+}
+
+#[test]
+fn incremental_discovery_matches_a_full_scan_for_lexical_edits() {
+    let source = "fn outside(){ let _ = r#\"rsx!{}\"#; } fn view(){ rsx!{<div>{if a { rsx!{<b/>} }}</div>}; }";
+    let old = analyze_rust_document(source, ClassMode::PERMISSIVE);
+    for edit in [
+        "{if b { rsx!{<i/>} }}",
+        "{\"中文😀\"}",
+        "// comment",
+        "/* comment */",
+        "{format!(\"}\")}",
+    ] {
+        let changed = source.replace("{if a { rsx!{<b/>} }}", edit);
+        let updated =
+            gpui_rsx_tools::update_rust_document(&changed, ClassMode::PERMISSIVE, source, &old);
+        let full = analyze_rust_document(&changed, ClassMode::PERMISSIVE);
+        assert_eq!(updated.calls, full.calls, "{edit}");
+        assert_eq!(updated.diagnostics, full.diagnostics, "{edit}");
+        assert_eq!(updated.literals, full.literals, "{edit}");
+    }
+    assert!(
+        analyze_rust_document("fn broken( {", ClassMode::PERMISSIVE)
+            .diagnostics
+            .is_empty()
+    );
+}
 
 #[test]
 fn nested_fragments_preserve_formatting_diagnostics_migration_and_preview() {
@@ -100,6 +165,69 @@ fn incremental_analysis_matches_full_analysis_after_structural_and_unicode_edits
 }
 
 #[test]
+fn nested_macros_are_analyzed_once_and_kept_out_of_top_level_calls() {
+    let source = r#"fn f(){rsx!{<div class="flex-colum">{if a { rsx_strict!{<span class="nonsense flex-colum"/>} } else { rsx!{<b/>} }}</div>};}"#;
+    assert_eq!(macro_calls(source).unwrap().len(), 1);
+    let calls = gpui_rsx_tools::nested_macro_calls(source).unwrap();
+    assert_eq!(
+        calls
+            .iter()
+            .map(|call| call.name.as_str())
+            .collect::<Vec<_>>(),
+        ["rsx", "rsx_strict", "rsx"]
+    );
+
+    let analysis = analyze_rust_document(source, ClassMode::PERMISSIVE);
+    let flagged: Vec<_> = analysis
+        .diagnostics
+        .iter()
+        .map(|d| &source[d.start..d.end])
+        .collect();
+    // The outer and inner `flex-colum` once each; the nested strict macro rejects `nonsense`.
+    assert_eq!(
+        flagged.iter().filter(|&&c| c == "flex-colum").count(),
+        2,
+        "{flagged:?}"
+    );
+    assert!(flagged.contains(&"nonsense"), "{flagged:?}");
+    assert_eq!(analysis.literals.len(), 2);
+
+    let inner = source.find("nonsense").unwrap();
+    assert_eq!(
+        gpui_rsx_tools::call_at(&analysis.calls, inner)
+            .unwrap()
+            .name,
+        "rsx_strict"
+    );
+
+    // Editing only the outer body reuses the nested result without duplicating it.
+    let edited = source.replacen("flex-colum", "flex-col", 1);
+    let updated =
+        gpui_rsx_tools::update_rust_document(&edited, ClassMode::PERMISSIVE, source, &analysis);
+    let full = analyze_rust_document(&edited, ClassMode::PERMISSIVE);
+    assert_eq!(updated.literals, full.literals);
+    assert_eq!(updated.diagnostics, full.diagnostics);
+    // Editing only the inner body reuses the outer result.
+    let edited = source.replace("nonsense", "flex");
+    let updated =
+        gpui_rsx_tools::update_rust_document(&edited, ClassMode::PERMISSIVE, source, &analysis);
+    let full = analyze_rust_document(&edited, ClassMode::PERMISSIVE);
+    assert_eq!(updated.literals, full.literals);
+    assert_eq!(updated.diagnostics, full.diagnostics);
+}
+
+#[test]
+fn migrate_converts_nested_bodies_and_fmt_leaves_them_to_the_outer_body() {
+    let source = r#"fn f(){rsx!{<div class="gap-4">{if a { rsx!{<span class="p-8"/>} } else { rsx!{<b/>} }}</div>};}"#;
+    let migrated = format::migrate_rust(source).unwrap();
+    assert!(migrated.contains(r#"class="gap-1""#), "{migrated}");
+    assert!(migrated.contains(r#"class="p-2""#), "{migrated}");
+    // Formatting rewrites top-level bodies only, so nested ranges never collide.
+    let formatted = format::rust(source).unwrap();
+    assert_eq!(format::rust(&formatted).unwrap(), formatted);
+}
+
+#[test]
 fn unicode_and_raw_literal_positions_are_exact() {
     let source = "fn f(){let _=rsx!{<div>{\"中文😀\"}<div class=r#\"flex flex-colum\"#/></div>};}";
     let ds = analyze_rust(source, ClassMode::PERMISSIVE);
@@ -118,7 +246,10 @@ fn diagnoses_static_branches_and_reports_dynamic_limits() {
     let source = r#"<div><div class={if active {"dark:flex"} else {"flex-colum"}}/><div class={classes}/></div>"#;
     let ds = analyze_body(source, ClassMode::PERMISSIVE);
     assert_eq!(ds.len(), 3);
-    assert!(ds.iter().any(|d| d.severity == "information"));
+    assert!(
+        ds.iter()
+            .any(|d| d.severity == DiagnosticSeverity::Information)
+    );
 }
 
 #[test]
@@ -127,7 +258,7 @@ fn semantic_errors_and_strict_macro_modes_are_reported() {
         r#"fn f(){rsx_strict!{<div class="nonsense"/>};}"#,
         ClassMode::PERMISSIVE,
     );
-    assert!(ds.iter().any(|d| d.severity == "error"));
+    assert!(ds.iter().any(|d| d.severity == DiagnosticSeverity::Error));
     let ds = analyze_body(
         r#"<ul>{for x in xs {<li onClick={handler}/>} }</ul>"#,
         ClassMode::PERMISSIVE,
@@ -185,12 +316,12 @@ fn jsx_conversion_uses_tsx_parser_and_marks_unsupported_behavior() {
         "Tailwind units are rescaled to px"
     );
     assert!(!result.rsx.contains("md:hidden"));
-    assert!(result.rsx.contains("TODO: JavaScript expression"));
-    assert_eq!(result.diagnostics.len(), 3);
+    assert!(result.rsx.contains("{title}"));
+    assert_eq!(result.diagnostics.len(), 2);
     assert!(
         analyze_body(&result.rsx, ClassMode::STRICT)
             .iter()
-            .all(|d| d.severity != "error")
+            .all(|d| d.severity != DiagnosticSeverity::Error)
     );
     assert!(convert::convert("<div>").is_err());
 }
@@ -259,7 +390,7 @@ fn class_tools_do_not_rewrite_business_logic_or_runtime_format_strings() {
     assert!(migrated.contains(r#"format!("gap-{}",n)"#));
     let ds = analyze_rust(source, ClassMode::PERMISSIVE);
     assert_eq!(ds.len(), 1);
-    assert_eq!(ds[0].severity, "information");
+    assert_eq!(ds[0].severity, DiagnosticSeverity::Information);
 }
 
 #[test]
@@ -291,7 +422,7 @@ fn document_analysis_reports_unparsable_rust_and_bodies() {
     assert!(analysis.calls.is_empty());
     assert!(analysis.literals.is_empty());
     assert_eq!(analysis.diagnostics.len(), 1);
-    assert_eq!(analysis.diagnostics[0].severity, "error");
+    assert_eq!(analysis.diagnostics[0].severity, DiagnosticSeverity::Error);
     assert_eq!(
         (analysis.diagnostics[0].start, analysis.diagnostics[0].end),
         (0, 1)
@@ -304,7 +435,7 @@ fn document_analysis_reports_unparsable_rust_and_bodies() {
     assert!(analysis.literals.is_empty());
     assert_eq!(analysis.diagnostics.len(), 1);
     let diagnostic = &analysis.diagnostics[0];
-    assert_eq!(diagnostic.severity, "error");
+    assert_eq!(diagnostic.severity, DiagnosticSeverity::Error);
     assert!(
         diagnostic.message.contains("Unclosed tag"),
         "{diagnostic:?}"
@@ -576,11 +707,11 @@ fn conversion_notes_every_unsupported_jsx_construct() {
             "Boolean prop `disabled` needs a GPUI method; omitted",
         ),
         (
-            "const a = <div title={title}/>;",
+            "const a = <div title={getTitle()}/>;",
             "Expression prop `title` needs manual Rust conversion; omitted",
         ),
         (
-            "const a = <div>{name}</div>;",
+            "const a = <div>{name + suffix}</div>;",
             "JavaScript expression replaced with a text placeholder",
         ),
     ];
@@ -742,5 +873,49 @@ fn formatter_renders_spread_children_verbatim() {
     assert_eq!(
         format::body("<ul>{for row in rows {<li/>{...row}}}</ul>").unwrap(),
         "<ul>\n    {for row in rows {\n        <li />\n        {...row}\n    }}\n</ul>"
+    );
+}
+
+#[test]
+fn body_report_matches_the_separate_entry_points() {
+    for source in [
+        r#"<div class="flex flex-colum">{for x in xs {<span key={x}/>}}</div>"#,
+        r#"<><div class={c}/><img/></>"#,
+        "<div>",
+    ] {
+        let report = gpui_rsx_tools::report_body(source, ClassMode::PERMISSIVE);
+        assert_eq!(
+            report.diagnostics,
+            analyze_body(source, ClassMode::PERMISSIVE),
+            "{source}"
+        );
+        assert_eq!(
+            report.expansion,
+            gpui_rsx_tools::expand_summary(source, ClassMode::PERMISSIVE),
+            "{source}"
+        );
+        assert_eq!(
+            report.preview,
+            preview::render(source, ClassMode::PERMISSIVE),
+            "{source}"
+        );
+    }
+}
+
+#[test]
+fn summaries_omit_the_dynamic_helper_but_keep_the_call_site() {
+    let source = r#"<div class={cls}>{"x"}</div>"#;
+    let full = expand(source, ClassMode::PERMISSIVE).unwrap();
+    let summary = gpui_rsx_tools::expand_summary(source, ClassMode::PERMISSIVE).unwrap();
+    assert!(full.contains("fn __rsx_apply_class"));
+    assert!(!summary.contains("fn __rsx_apply_class"), "{summary}");
+    assert!(summary.starts_with("// `__rsx_apply_class`"), "{summary}");
+    assert!(summary.contains("__rsx_apply_class("), "{summary}");
+    assert!(summary.lines().count() * 20 < full.lines().count());
+    // Static bodies are unchanged and carry no note.
+    let static_source = r#"<div class="flex"/>"#;
+    assert_eq!(
+        gpui_rsx_tools::expand_summary(static_source, ClassMode::PERMISSIVE),
+        expand(static_source, ClassMode::PERMISSIVE)
     );
 }

@@ -3,15 +3,26 @@ members = [".", "crates/gpui-rsx-core", "crates/gpui-stub", "crates/gpui-stub-ma
 exclude = ["demo", "fuzz", "editors/zed"]
 resolver = "3"
 
+# Published crates release together; bump the version here and in the internal requirements.
+[workspace.package]
+version = "0.10.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/wsafight/gpui-rsx"
+
+[workspace.dependencies]
+gpui-rsx-core = { version = "0.10.0", path = "crates/gpui-rsx-core" }
+gpui-rsx-tools = { version = "0.10.0", path = "crates/gpui-rsx-tools", default-features = false }
+
 [package]
 name = "gpui-rsx"
-version = "0.9.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
 rust-version = "1.88"
 description = "A JSX-like macro for GPUI - simplify UI development with HTML-like syntax"
 authors = ["GPUI-RSX Contributors"]
-license = "MIT"
-repository = "https://github.com/wsafight/gpui-rsx"
+license.workspace = true
+repository.workspace = true
 homepage = "https://github.com/wsafight/gpui-rsx"
 documentation = "https://docs.rs/gpui-rsx"
 readme = "README.md"
@@ -30,7 +41,7 @@ include = [
 proc-macro = true
 
 [dependencies]
-gpui-rsx-core = { version = "0.9.0", path = "crates/gpui-rsx-core" }
+gpui-rsx-core.workspace = true
 syn = { version = "2.0.117", features = ["full"] }
 quote = "1.0.45"
 proc-macro2 = { version = "1.0.106", features = ["span-locations"] }

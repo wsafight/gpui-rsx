@@ -6,7 +6,7 @@ description: Compact reference for GPUI-RSX macros, tags, attributes, and genera
 ## Macros
 
 ```rust
-use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
+use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_runtime, rsx_strict, rsx_tw};
 ```
 
 | Macro | Behavior |
@@ -15,6 +15,8 @@ use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_strict};
 | `rsx_permissive!` | Explicit permissive mode; unsupported classes are ignored when safe. |
 | `rsx_strict!` | Unsupported static classes become compile errors; unsupported dynamic classes panic when evaluated. |
 | `rsx_expand!` | Returns a string preview of generated GPUI builder code. |
+| `rsx_tw!` | Uses Tailwind's 4px numeric spacing scale. |
+| `rsx_runtime!` | Generates shared dynamic class helpers at the crate root; enable with `[options] dynamic-runtime = "rsx_runtime"`. See [Performance](/gpui-rsx/guides/performance/). |
 
 ## Element Constructors
 
@@ -136,8 +138,17 @@ handlers are `InteractiveElement` methods and likewise remain non-stateful.
 | RSX body | Return expression |
 | --- | --- |
 | Single element | generated GPUI element expression |
-| Fragment `<>...</>` | `vec![...]` |
-| Nested fragment (unreleased) | children added directly to the enclosing element, fragment or loop |
+| Fragment `<>...</>` | `vec![...]`; `Vec<AnyElement>` when it contains a `for` loop or `{...spread}` |
+| Nested fragment | children added directly to the enclosing element, fragment or loop |
 | Child expression `{expr}` | `.child(expr)` |
 | Spread `{...iter}` | `.children(iter)` |
 | For loop `{for item in iter { ... }}` | `.children(iter.into_iter().map(...))` or `.flat_map(...)` |
+
+### Editor analysis and conversion options
+
+`RustAnalysis` includes local `components` and cached `class_tokens` (UTF-8 ranges,
+classification and optional RGBA). Use full analysis after mode/configuration changes.
+`convert::convert_with_options` accepts `ConversionOptions`; `tailwind = true` preserves
+numeric classes and returns an `rsx_tw!` expression. The original `convert` returns a pixel body.
+WASM adds `analyze_with_theme(source, strict, tailwind, theme)` with `theme_diagnostics`,
+and `convert_with_options(source, tailwind)`. Existing exports remain available.

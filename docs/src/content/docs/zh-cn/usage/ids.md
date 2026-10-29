@@ -31,6 +31,16 @@ rsx! {
 
 生成的 ID 对同一个宏展开调用点是确定的。
 
+对于 `<ui::card onClick={handler} />` 这样的组件标签，是否自动注入 ID 取决于构造函数
+的返回类型：同时实现 `gpui::InteractiveElement` 和 `gpui::Element` 的值会获得 ID，
+因此返回 `Div` 的函数仍保持原有行为。其他值（包括 `#[component]` 构建器和
+gpui-component 的 `Button`）保留自身的事件 setter，不会被自动 `.id()` 包装。
+`base={...}` 表达式也使用同样的规则。
+
+分派依据宏调用点可见的类型和 trait 约束。泛型或不透明返回类型需暴露上述两个约束才能
+自动注入 ID。如果类型已支持 `.id()`，但隐藏了 `Element` 约束，可以显式设置 `id={...}`。
+如果只返回 `impl IntoElement`，应在构造函数内部设置 ID 和有状态方法，此时具体类型仍可见。
+
 常见触发 ID 的属性包括 `onClick`、`onHover`、`onDrag`、`onAuxClick`、`onA11yAction`、`active`、`activeClass`、`groupActive`、`tooltip`、`tooltipShowDelay`、`focusable`、`role`、`accessibilityId`、`ariaLabel`、`ariaDescription`、`ariaKeyShortcuts`、`ariaActiveDescendant`、`a11ySyntheticChildren`、`ariaNumericValueStep`、`ariaValue`、`ariaPlaceholder`、`overflowScroll`、`overflowXScroll`、`overflowYScroll`、`restrictScrollToAxis`、`trackScroll`、`externalDragPayload`，以及静态 `overflow-scroll` class 变体。
 
 当前 GPUI 目标下，`hover`、`hoverClass`、`focus`、`focusClass`、`group`、`groupHover`、`scrollbarWidth`、`onMouseDown`、`onMouseExit`、`onMousePressure`、`captureMousePressure`、`onPinch`、`capturePinch`、`captureKeyDown` 等属性本身不会触发有状态 ID。
@@ -57,6 +67,10 @@ rsx! {
 
 如果循环中需要有状态 ID 但缺少 key，宏会给出编译错误，避免多行错误共享同一个生成 ID。
 
+循环中的组件标签只要带有状态属性名，就仍须提供 `key` 或 `id`，即使构建器最终不需要
+注入 ID：宏先检查循环安全，Rust 再解析实际类型。构建器即使不使用生成的 ID，key 表达式
+也仍会求值一次。
+
 `key` 是宏专用属性，不会变成 `.key(...)` 方法调用。
 
 ## 字面量 Key 与动态 Key
@@ -69,7 +83,13 @@ rsx! {
 }
 ```
 
-动态 key 使用格式化，以保证每行或每个有状态实例都有唯一身份。表达式需要实现 `Display`：
+字面量 key 使用 `concat!`。具体类型的动态整数（不超过 64 位，含 `usize` / `isize`）
+使用 GPUI 的 `(&'static str, u64)` ID，无需格式化或分配字符串。其他 `Display` 值保留
+字符串格式化路径，`u128` / `i128` 也走此路径以避免截断。整数引用和泛型 `T: Display`
+也可能走格式化路径。表达式借用求值一次，不会移动 String key；大型有状态列表优先
+使用 `key={task.id}` 这样的整数值。
+
+示例：
 
 ```rust
 rsx! {

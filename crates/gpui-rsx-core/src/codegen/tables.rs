@@ -201,6 +201,8 @@ impl LengthClassSpec {
 /// shorter prefixes like `w-` and `gap-`. Every `method` is checked against the generated
 /// GPUI facts by a unit test.
 pub const LENGTH_CLASS_SPECS: &[LengthClassSpec] = &[
+    LengthClassSpec::spacing("rounded-", "rounded"),
+    LengthClassSpec::spacing("leading-", "line_height"),
     LengthClassSpec::sizing("min-w-", "min_w"),
     LengthClassSpec::sizing("max-w-", "max_w"),
     LengthClassSpec::sizing("min-h-", "min_h"),
@@ -256,6 +258,19 @@ const NON_CLASS_METHODS: &[&str] = &[
     "text_style",
 ];
 
+/// `lookup_gpui_method(&class.replace('-', "_"))` without allocating; this runs for every class.
+fn lookup_gpui_method_kebab(class: &str) -> Option<&'static GpuiMethod> {
+    let snake = || {
+        class
+            .bytes()
+            .map(|byte| if byte == b'-' { b'_' } else { byte })
+    };
+    GPUI_METHODS
+        .binary_search_by(|method| method.name.bytes().cmp(snake()))
+        .ok()
+        .map(|index| &GPUI_METHODS[index])
+}
+
 /// class 名是否对应一个可以直接调用的 GPUI 无参方法。
 pub fn gpui_no_arg_class_method(class: &str) -> Option<&'static GpuiMethod> {
     if class.is_empty()
@@ -265,7 +280,7 @@ pub fn gpui_no_arg_class_method(class: &str) -> Option<&'static GpuiMethod> {
     {
         return None;
     }
-    let method = lookup_gpui_method(&class.replace('-', "_"))?;
+    let method = lookup_gpui_method_kebab(class)?;
     (method.arity == 0
         && method.traits & (T_STYLED | T_INTERACTIVE | T_STATEFUL) != 0
         && !NON_CLASS_METHODS.contains(&method.name))

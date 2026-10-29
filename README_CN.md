@@ -55,7 +55,7 @@ bun run dev
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.9.0"
+gpui-rsx = "0.10.0"
 ```
 
 ### GPUI 版本目标
@@ -73,14 +73,14 @@ demo 使用 GPUI Kit 0.8.1 及其固定的 `gpui-pre 0.3.10` 快照。Cargo 中�
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.9.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
+| `0.10.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.9.0"
+gpui-rsx = "0.10.0"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -490,11 +490,12 @@ for 循环内有 stateful 属性（`onClick`、`onHover`、`onDrag`、`onAuxClic
 {for item in &self.items {
     <li key={item.id} onClick={handler}>{item.name.clone()}</li>
 }}
-// → div().id(format!("src/list.rs::__rsx_li_L42C8_{}", item.id)).on_click(handler)…
+// → div().id(("src/list.rs::__rsx_li_L42C8_", item.id as u64)).on_click(handler)…
 ```
 
 `key` 由宏在编译期消费，**不会**生成 `.key()` 方法调用。
-可接受任何实现 `Display` 的类型。非 stateful 元素上的 `key` 会被静默忽略
+具体整数值（不超过 64 位）无需字符串分配，其他 `Display` 值保留借用格式化路径。
+非 stateful 元素上的 `key` 会被静默忽略
 （不会注入 `.id()`，不改变元素类型）。
 
 for 循环也支持 range 和方法调用：
@@ -864,29 +865,20 @@ impl TodoApp {
 
 ### 自定义组件
 
+`#[component]` 支持具名字段结构体和同步函数，生成必填 prop 的编译期检查、默认值及 children builder：
+
 ```rust
-fn render_card(&self, title: &str, content: &str) -> impl IntoElement {
-    rsx! {
-        <div class="rounded-lg shadow-md p-6">
-            <h2 class="text-xl font-bold">
-                {title}
-            </h2>
-            <p class="text-gray-600">
-                {content}
-            </p>
-        </div>
-    }
+#[gpui_rsx::component]
+fn Badge(label: SharedString, #[prop(default)] highlighted: bool) -> impl IntoElement {
+    rsx! { <div class="rounded-md p-2" whenClass={(highlighted, "bg-blue-500")}>{label}</div> }
 }
 
-fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-    rsx! {
-        <div>
-            {self.render_card("Title 1", "Content 1")}
-            {self.render_card("Title 2", "Content 2")}
-        </div>
-    }
-}
+let badge = rsx! { <Badge label="Inbox" highlighted /> };
 ```
+
+结构体组件配合 `#[derive(IntoElement)]` 与 `RenderOnce`，使用相同的 prop 规则。
+`#[deprecated(note = "use NewBadge")]` 会在组件使用处提示迁移。
+完整示例见[组件语法文档](https://wsafight.github.io/gpui-rsx/zh-cn/usage/syntax/)。
 
 ### Builder 构造组件
 
@@ -968,68 +960,20 @@ fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoE
 
 ## 📊 性能
 
-GPUI-RSX 是一个**编译时宏**，静态 RSX 会展开为直接的 GPUI builder 调用。静态标记没有运行时解析器；动态 `class={expr}` 会有意使用一个很小的运行时 matcher。
+静态 class、字面量 `if` / `match` 分支及 `whenClass` 在编译期生成普通 GPUI builder 调用。
+动态字符串在运行时解析；整数动态 key 使用 GPUI 的命名整数 ID，字符串及自定义 `Display`
+key 保留格式化回退。
 
-| 指标 | 传统 GPUI | GPUI-RSX |
-|------|----------|----------|
-| 代码量 | 100 行 | 50 行 (-50%) |
-| 运行时性能 | 基准 | 相同 |
-| 类型安全 | ✅ | ✅ |
-| 编译时检查 | ✅ | ✅ |
+调用点较多时，在 crate 根添加 `gpui_rsx::rsx_runtime!();`，并配置：
 
-### v0.3.2 修复与改进
-- **修复** `parse_single_class` 在 Tailwind 变体语法（如 `hover:bg-blue-500`）上的 panic：
-  含非法字符的 class 名现在静默跳过，而非触发 `syn::Ident::new` panic
-- **新增** 7 个动态 class：`rounded-none`、`rounded-xl`、`cursor-default`、`cursor-text`、
-  `shadow-sm`、`shadow-md`、`shadow-lg`
-- **文档** styled 默认表新增 `li`、`p`、`label`、`form`；同步 GPUI 0.2.2 方法名；
-  移除不存在的 `text-4xl`/`text-5xl`；更新动态 class 说明
+```toml
+[options]
+dynamic-runtime = "rsx_runtime"
+```
 
-### v0.3.1 修复与新增
-- **修复** `is_stateful_attr`：`hover`/`active`/`focus`/`group` 是 `Styled` trait 方法，
-  不再触发不必要的 `.id()` 注入
-- **新增** `key={expr}` 属性：为 for 循环内 stateful 元素生成复合自动 ID
-- **新增** for 循环内 stateful 元素缺少 `id` 或 `key` 时报编译错误
-- 非 stateful 元素上的 `key` 静默忽略（不改变 `Div` → `Stateful<Div>` 类型）
-
-### v0.3.0 重构亮点
-- 消除 `tests/common/mod.rs` 中约 60 个重复方法定义（823 → 456 行）
-- 简化 `runtime.rs` black/white 条目生成（方法名直接编码进数据）
-- 在 `class.rs` 中提取 `is_directional_border()` 辅助函数，逻辑更清晰
-
-### v0.2.2 优化亮点
-
-**编译时性能：**
-- class 解析改用 `split_ascii_whitespace`
-- 统一 `text_` 前缀处理（单次 `strip_prefix` 调用）
-- 空元素提前快速路径
-- `Vec::with_capacity(attrs * 2 + children)` 减少重分配
-
-**运行时性能：**
-- `.children([...])` 聚合阈值 3 → 2
-
-**二进制体积：**
-- 应用可在自己的 release profile 中选择启用 `panic = "abort"` 以移除展开表
-
-### v0.2.1 优化亮点
-
-**编译时性能：**
-- O(1) 颜色/属性/间距查找（`match` 跳转表，无线性扫描）
-- `generate_element` 单次属性扫描
-- 动态 class match 分支 thread_local 缓存（每进程只生成一次）
-
-**内存分配减少：**
-- `parse_class_string` 返回迭代器（无中间 `Vec`）
-- `generate_attr_methods` 直接推送到调用方缓冲区
-- `Cow<str>` 实现 class 名称转换（无连字符时零拷贝）
-- 全面使用 `Vec::with_capacity` 预分配
-
-**运行时性能：**
-- 动态 class 字符串通过 `AsRef<str>` 零拷贝传递（`&str` 无需分配）
-
-**二进制体积：**
-- 动态 class match 表通过 `#[inline(never)]` + LLVM ICF 去重
-- 同一组件内多个 `class={expr}` 共享同一函数体
+本机 50 个动态调用点的 stub 测试中，release 编译从 12.84s 降至 0.89s。
+该数据预热了依赖、关闭增量，仅反映生成代码的编译成本。
+设置说明和测量条件见[性能指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/performance/)。
 
 ## 🛠️ 开发
 
@@ -1245,7 +1189,7 @@ MIT License
 
 ## 开发工具
 
-安装 `cargo-rsx` 0.9.0（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
+安装 `cargo-rsx` 0.10.0（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
 `convert`、`preview --watch` 和 `lsp`。参见[工具指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/tooling/)
 与 [WASM Playground](https://wsafight.github.io/gpui-rsx/zh-cn/playground/)。
 编辑器适配位于 `editors/`，发布附件包含可安装的 VSIX，市场上架状态另行记录。

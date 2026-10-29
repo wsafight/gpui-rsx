@@ -1,8 +1,65 @@
 ---
 title: 迁移指南
-description: 从手写 GPUI builder 链迁移，并升级到 GPUI-RSX 0.6 的 GPUI 目标。
+description: 从手写 GPUI builder 链迁移，升级工具 API，并对齐 GPUI Kit 兼容目标。
 ---
 
+
+## 从 0.9 升级到 0.10
+
+根 Fragment 中包含 `for` 循环或 `{...spread}` 时，现在
+展开为 `Vec<AnyElement>`；此前会生成装着迭代器的 `vec!`，混合子节点时无法编译。用
+`#[deprecated]` 标记的组件现在在使用处给出警告，而不是在其生成代码内部报警。
+
+类型为 `Rc<dyn Fn...>` 的 `#[component]` 属性现在与 `Box<dyn Fn...>` 属性及 GPUI 事件 setter
+一样接收 `impl Fn... + 'static`，`on_press={|_, _, _| ...}` 可自动推导参数。原先传入已有
+`Rc` 回调的代码改为转发：
+
+```rust
+<Row on_select={{ let on_select = on_select.clone(); move |item, w, cx| on_select(item, w, cx) }} />
+```
+
+组件构造函数与 `base` 表达式仅在同时实现 `InteractiveElement` 和 `Element` 时自动注入 ID。
+返回原生元素的函数仍获得自动 ID；gpui-component 的 `Button` 和名为 `on_click` 的回调属性
+保留自身 setter。泛型与不透明返回类型须暴露所需约束，详见 [ID 与 Key](/gpui-rsx/zh-cn/usage/ids/)。
+
+宽松模式下，静态 CSS 专属 class（`z-*`、`space-x-*`、`space-y-*`、`divide-*`、
+`transition*`、`duration-*`、`ease-*`、`delay-*`、`animate-*`）现在会警告并忽略，不再透传
+为扩展方法。如果扩展 trait 实现了这些方法，将 `class="z-10"` 改为显式 flag `z_10`，
+或在 `base={...}` 中调用。严格模式下这些 class 会报错。
+
+`gpui-rsx-tools` 集成方需要注意的破坏性变更：
+
+- `Diagnostic::severity` 由 `String` 改为 `DiagnosticSeverity` 枚举，JSON 输出保持不变（`"error"`、
+  `"warning"`、`"information"`）。需要字符串时使用 `severity.as_str()` 或 `to_string()`；该枚举为
+  `#[non_exhaustive]`，匹配时需要兜底分支。
+- 整文件分析（`analyze_rust`、`analyze_rust_document`、`update_rust_document`）现在包含嵌套在其他
+  宏内部的 RSX 宏。`macro_calls` 仍只返回互不重叠的顶层调用；需要全部调用时使用
+  `nested_macro_calls`，用 `call_at` 查找某个偏移处最内层的调用。
+- `report_body` 一次解析即返回诊断、展开结果和预览。`BodyReport` 为 `#[non_exhaustive]`，请读取
+  字段而不要自行构造。它的展开结果与新增的 `expand_summary` 一样省略动态 class helper，`expand`
+  仍输出完整代码。
+
+CLI 会以退出码 2 拒绝命令不使用的选项（例如 `lint --port`），`lint` 会检查显式指定的任意扩展名
+文件。工具会自行识别 `gpui-rsx` 的 `tailwind-scale` feature，启用该 feature 的项目不再需要
+`--tailwind`。
+
+`RustAnalysis` 新增 `components` 与 `class_tokens` 字段。使用 `RustAnalysis::default()`
+与字段更新，或直接调用 `analyze_rust_document`，避免逐项列出结构体字段。class token 偏移
+仍是 UTF-8 字节，可复用分类与颜色结果。`update_rust_document` 的 mode 必须与上次一致；
+配置变更应完整分析。
+
+动态整数 key 改为 GPUI 命名整数表示。如其他代码读取或持久化旧的格式化 ID，请显式指定
+`id`；key 仍依赖源码位置，不保证编辑前后身份一致。
+
+`convert(source)` 保留原像素宏体输出。要保留 Tailwind 数值，将
+`ConversionOptions::default().tailwind` 设为 `true` 并调用 `convert_with_options`，
+此时 `rsx` 字段包含完整 `rsx_tw!` 表达式。WASM 新增 `analyze_with_theme` 与
+`convert_with_options`，原有导出保留。
+
+转换器现在原样保留 `{items}`、`{item.title}` 等简单表达式，不再给出需要手动转换的诊断。
+这里只检查语法，仍须核对 Rust 类型和所有权。集合子节点可能需要 `{...items}` 或 `{for ...}`；
+保留 `{items}` 不代表已把 JavaScript 的渲染语义转换为 GPUI 子节点。调用、运算符、索引、
+可选链和事件处理仍会给出人工检查诊断。
 
 ## 从 0.8 升级到 0.9
 
@@ -33,7 +90,7 @@ UTF-16 位置依次应用，未修改的宏复用诊断结果。同一次 RSX �
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.9.0"
+gpui-rsx = "0.10.0"
 ```
 
 Kit 0.8.1 固定 `gpui-pre = 0.3.10`。从 `gpui::component` 导入带样式控件，

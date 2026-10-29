@@ -223,17 +223,28 @@ location. The ID is chosen by the following priority:
 
 1. **Explicit `id`** — always wins, `key` is ignored.
 2. **`key` present** (and element is stateful) — composite ID. Literal keys use
-   `concat!(...)`; dynamic keys use `format!(concat!(file!(), "::{prefix}_{}"), key_expr)`.
+   `concat!(...)`; concrete integer values up to 64 bits use a named-integer tuple without
+   string allocation. Other Display values use the borrowed formatting fallback.
 3. **No `key`** (and element is stateful) — pure compile-time source-location ID:
    `concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")`
 4. **Not stateful** — no `.id()` injected; `key` is silently ignored.
+
+Component tags and `base` expressions receive an automatic ID only when their type
+implements both `gpui::InteractiveElement` and `gpui::Element`. Functions returning
+`Div` keep auto IDs, while `#[component]` builders and gpui-component's `Button` keep
+their own event setters. Key expressions are still evaluated once at the call site.
+Generic or opaque types must expose both bounds for automatic IDs. Explicit IDs
+always call `.id(...)` directly and require that method to be available.
+Loop checks remain syntax-based, so component
+event props still require `key` or `id` inside `{for ...}`.
 
 ```text
 // Format (no key): concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")
 // Example:         "src/views/counter.rs::__rsx_button_L42C8"
 //
 // Format (literal key): concat!(file!(), "::__rsx_{tag}_L{line}C{col}_", "42")
-// Format (dynamic key): format!(concat!(file!(), "::__rsx_{tag}_L{line}C{col}_{}"), key)
+// Format (dynamic integer key): (concat!(file!(), "::__rsx_{tag}_L{line}C{col}_"), key as u64)
+// Other Display values: format!(concat!(file!(), "::__rsx_{tag}_L{line}C{col}_{}"), &key)
 // Example:              "src/views/list.rs::__rsx_li_L55C12_42"
 ```
 
