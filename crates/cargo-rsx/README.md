@@ -24,6 +24,12 @@ cargo rsx lsp                              # stdio language server
 source positions, suggestions and dynamic-class limitations. `--json` produces structured
 reports. Diagnostics in dynamic strings happen at runtime.
 
+Spacing follows `--tailwind`, then the selected package's `rsx.toml`, then Cargo's
+resolved `gpui-rsx/tailwind-scale` feature, including features enabled by sibling
+workspace members. Feature resolution is cached per workspace. With stdin, both
+`cargo rsx expand` and `cargo rsx expand -` use `--manifest-path` to select the
+package configuration, falling back to the current directory when omitted.
+
 `fmt` only rewrites RSX macro bodies. Commented macro bodies remain unchanged so comments
 are never lost. `migrate` converts numeric px values to equivalent Tailwind units, including
 literal branches and state classes. Back up/review the diff, run it once, then enable

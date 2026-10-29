@@ -40,6 +40,9 @@
 
 ### 修复
 
+- CLI 按 Cargo 解析后的 feature 判断间距，支持仅由兄弟 workspace 成员启用 `tailwind-scale`，
+  使展开结果与 workspace 构建一致，并拒绝重复迁移。显式 `expand - --manifest-path ...`
+  与省略 `-` 时一样读取指定包的主题及间距配置。
 - 静态 grid 与 line-clamp 整数 class 使用 GPUI 对应类型的 setter，并拒绝溢出；动态长度
   在缩放或除法后检查溢出。被同名宏覆盖的 `format!` 按实际输出处理，避免错误样式或字符串切片越界。
 - 嵌套 RSX 循环可借用外层绑定和调用方状态：嵌套迭代器在每次外层闭包返回前收集一次，

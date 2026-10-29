@@ -24,10 +24,15 @@ pub(crate) fn mode(options: ModeOptions, path: Option<&Path>) -> Result<ClassMod
         Some(dir) => Theme::load_from_dir(dir)?,
         None => None,
     };
-    let feature_default = package
-        .as_deref()
-        .map_or(SpacingScale::Px, |dir| feature_scale(dir, options.offline));
     let forced = options.tailwind.then_some(SpacingScale::Tailwind);
+    let feature_default = if forced.is_some() || theme.as_deref().and_then(Theme::scale).is_some() {
+        // Explicit choices do not need dependency resolution.
+        SpacingScale::Px
+    } else {
+        package
+            .as_deref()
+            .map_or(SpacingScale::Px, |dir| feature_scale(dir, options.offline))
+    };
     Ok(ClassMode::builder()
         .strict(options.strict)
         .scale(resolve_spacing_scale(
@@ -82,17 +87,10 @@ pub(crate) fn clear_feature_cache() {
 
 /// The scale implied by `gpui-rsx/tailwind-scale` for the package in `dir`.
 ///
-/// Manifests that never name the feature skip `cargo metadata`, which keeps the common case
-/// free. Features unify across a workspace, so `cargo metadata` runs once per workspace root
-/// and every member shares the result.
+/// A sibling member or transitive dependency can enable the feature without mentioning it
+/// in this package's ancestor manifests. Resolve the actual Cargo graph once per workspace
+/// root and share the result between members.
 fn feature_scale(dir: &Path, offline: bool) -> SpacingScale {
-    let mentioned = dir.ancestors().any(|ancestor| {
-        std::fs::read_to_string(ancestor.join("Cargo.toml"))
-            .is_ok_and(|manifest| manifest.contains("tailwind-scale"))
-    });
-    if !mentioned {
-        return SpacingScale::Px;
-    }
     let root = workspace_root(dir);
     let mut cache = FEATURE_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     let cache = cache.get_or_insert_with(HashMap::new);

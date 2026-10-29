@@ -47,6 +47,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CLI spacing detection reads Cargo's resolved features even when only a sibling
+  workspace member enables `tailwind-scale`, so expansion matches the workspace build
+  and migration refuses a second conversion. Explicit `expand - --manifest-path ...`
+  reads the selected package's theme and spacing just like implicit stdin.
 - Static grid and line-clamp integer classes use GPUI's typed setters and reject overflow.
   Dynamic lengths reject overflow after scaling or division, and shadowed `format!` macros
   fall back to their actual output instead of invalid static edges or out-of-bounds slicing.

@@ -196,7 +196,10 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
         "expand" | "convert" => {
             let source = input(opt.path.as_deref())?;
             let result = if command == "expand" {
-                gpui_rsx_tools::expand(&source, mode(&opt, opt.path.as_deref())?)?
+                gpui_rsx_tools::expand(
+                    &source,
+                    mode(&opt, opt.path.as_deref().and_then(mode_path))?,
+                )?
             } else {
                 serde_json::to_string_pretty(&gpui_rsx_tools::convert::convert_with_options(
                     &source,
