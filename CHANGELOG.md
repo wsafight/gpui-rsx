@@ -47,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- CLI spacing detection reports Cargo metadata failures before expansion or migration
+  instead of assuming px. Failed resolutions can be retried; explicit scale settings
+  still work without dependency resolution.
+- Mixed root fragments and nested loop bodies consume loops/spreads in source order,
+  allowing siblings to share mutable state without overlapping iterator borrows.
+  Generated collection bindings do not shadow caller variables.
+- `cargo rsx doctor` follows the selected Kit backend, ignores inactive test-support
+  dependencies and still rejects multiple active engines or inconsistent backend features.
 - CLI spacing detection reads Cargo's resolved features even when only a sibling
   workspace member enables `tailwind-scale`, so expansion matches the workspace build
   and migration refuses a second conversion. Explicit `expand - --manifest-path ...`

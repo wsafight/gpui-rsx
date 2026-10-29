@@ -40,6 +40,12 @@
 
 ### 修复
 
+- CLI 判断间距时会在展开或迁移前报告 Cargo metadata 失败，避免误用 px。失败后可重新解析，
+  显式间距配置仍可在依赖无法解析时使用。
+- 混合根 Fragment 和嵌套循环体按源码顺序执行完每段循环或 spread，再构造下一兄弟节点，
+  避免共享可变状态时迭代器借用重叠；生成的集合变量不会遮蔽调用方变量。
+- `cargo rsx doctor` 按 Kit 实际选中的后端检查，忽略未启用的测试支持依赖，同时继续拒绝
+  多个活跃引擎或各组件后端 feature 不一致的配置。
 - CLI 按 Cargo 解析后的 feature 判断间距，支持仅由兄弟 workspace 成员启用 `tailwind-scale`，
   使展开结果与 workspace 构建一致，并拒绝重复迁移。显式 `expand - --manifest-path ...`
   与省略 `-` 时一样读取指定包的主题及间距配置。

@@ -66,6 +66,7 @@ From inside `demo/`, omit `--manifest-path demo/Cargo.toml`. These tests use Kit
 | Static/dynamic colors, lengths, fractions, grids, theme tokens and unknown handlers | `tests/syntax_styles.rs`, `tests/shared_runtime.rs` |
 | Function/struct props, defaults, boolean setters, `Option`, callbacks, generics, const parameters and children | `tests/syntax_components.rs`, `tests/component_props.rs` |
 | Render-time `Window`/`App` injection, fragments, spread and nested loop order | `tests/ui_syntax.rs` |
+| Fragment construction order, shared mutable state and generated binding hygiene | `tests/syntax_styles.rs` |
 | Native/path/base constructors, third-party builders, auto IDs and explicit IDs/keys | `tests/auto_id.rs`, `tests/key_identity.rs` |
 | Click/mouse/keyboard callbacks, hover styles and keyed row reordering | Native event dispatch in `tests/ui_syntax.rs` |
 | SVG, both image source spellings, grayscale and canvas | `tests/syntax_styles.rs`; canvas prepaint/paint assertions in `tests/ui_syntax.rs` |
@@ -74,7 +75,9 @@ From inside `demo/`, omit `--manifest-path demo/Cargo.toml`. These tests use Kit
 The headless tests check layout, identity, evaluation order and callbacks; they do
 not compare rendered pixels. Static fragments add no wrapper element. Directly
 nested iterators are collected once per outer iteration so inner closures can
-safely borrow the outer loop's pattern and the caller's state.
+safely borrow the outer loop's pattern and the caller's state. Root fragments and
+mixed loop bodies consume each loop or spread before constructing the next sibling,
+preserving source order and releasing mutable borrows between siblings.
 
 `api_contract`, `generated_api_contract` and `semantics_contract` are compile-only
 contracts. They cover GPUI methods, every generated theme color, the Kit alias,
@@ -86,6 +89,7 @@ From the repository root, verify or update the matching dependency set:
 
 ```bash
 cargo xtask check-gpui
+cargo run --quiet -p cargo-rsx -- doctor --manifest-path demo/Cargo.toml
 cargo xtask gen-tables --check
 cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
 cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings

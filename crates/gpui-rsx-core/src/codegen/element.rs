@@ -99,7 +99,7 @@ fn analyze_attr(attr: &RsxAttribute, mode: ClassMode) -> AttrAnalysis {
 }
 
 use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxElementName, RsxNode};
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 
 type CodegenResult = Result<TokenStream, TokenStream>;
@@ -148,10 +148,10 @@ fn generate_body_checked(
             let child_exprs = generate_flattened_nodes(children, false, mode, dynamic_used)?;
             if child_exprs.iter().any(|(_, yields_many)| *yields_many) {
                 // A loop or spread contributes many elements, so erase types and collect.
-                let chained = chain_any_elements(&child_exprs);
-                return Ok(quote! {
-                    #chained.collect::<::std::vec::Vec<::gpui::AnyElement>>()
-                });
+                return Ok(collect_any_elements(
+                    &child_exprs,
+                    quote! { ::gpui::AnyElement },
+                ));
             }
             let exprs = child_exprs.iter().map(|(expr, _)| expr);
             // Fragment 保持 vec![] —— 返回类型是用户可见 API
@@ -189,7 +189,7 @@ fn generate_node_checked(
 /// 生成 for 循环的迭代器代码
 ///
 /// 单个子节点 → `.map()`，多个子节点 → `.flat_map()` + `AnyElement` 数组；
-/// 循环体中含嵌套 `for` 或展开 `{...iter}` 时改用 `.flat_map()` 拍平（多子节点时用 `chain`）。
+/// 循环体中含嵌套 `for` 或展开 `{...iter}` 时改用 `.flat_map()`，按源码顺序收集子节点。
 ///
 /// 多子节点使用 `AnyElement` 做类型擦除后放入数组，避免每轮循环分配 `Vec`，
 /// 同时允许循环体内混合不同具体元素类型（如 `div()` 和自定义组件）。
@@ -222,9 +222,9 @@ fn generate_for_loop_checked(
             Ok(quote! { (#iter).into_iter().map(|#binding| #single) })
         }
     } else if body_exprs.iter().any(|(_, yields_many)| *yields_many) {
-        let chained = chain_any_elements(&body_exprs);
+        let collected = collect_any_elements(&body_exprs, quote! { _ });
         Ok(quote! {
-            (#iter).into_iter().flat_map(|#binding| #chained.collect::<::std::vec::Vec<_>>())
+            (#iter).into_iter().flat_map(|#binding| #collected)
         })
     } else {
         let exprs = body_exprs.iter().map(|(expr, _)| expr);
@@ -251,20 +251,25 @@ fn generate_flattened_nodes(
         .collect()
 }
 
-/// Chains single elements and element iterators into one `AnyElement` iterator.
-fn chain_any_elements(exprs: &[(TokenStream, bool)]) -> TokenStream {
-    let mut pieces = exprs.iter().map(|(expr, yields_many)| {
+/// Consume each iterator before evaluating the next node, preserving construction order
+/// and releasing mutable borrows between siblings. The result uses one shared collection.
+fn collect_any_elements(exprs: &[(TokenStream, bool)], element_type: TokenStream) -> TokenStream {
+    let children = syn::Ident::new("__rsx_children", Span::mixed_site());
+    let append = exprs.iter().map(|(expr, yields_many)| {
         if *yields_many {
             quote! {
-                ::core::iter::IntoIterator::into_iter(#expr)
-                    .map(|__rsx_child| __rsx_child.into_any_element())
+                #children.extend(::core::iter::IntoIterator::into_iter(#expr)
+                    .map(|__rsx_child| __rsx_child.into_any_element()));
             }
         } else {
-            quote! { ::core::iter::once((#expr).into_any_element()) }
+            quote! { #children.push((#expr).into_any_element()); }
         }
     });
-    let first = pieces.next().expect("chained nodes are non-empty");
-    quote! { #first #(.chain(#pieces))* }
+    quote! {{
+        let mut #children = ::std::vec::Vec::<#element_type>::new();
+        #(#append)*
+        #children
+    }}
 }
 
 /// Flatten syntax groups during expansion; nested fragments allocate no runtime Vec.
@@ -689,11 +694,11 @@ mod tests {
             "div () . children ((rows) . into_iter () . flat_map (| row | { :: core :: iter :: IntoIterator :: into_iter (row) . collect :: < :: std :: vec :: Vec < _ >> () }))"
         );
 
-        // Mixed bodies collect the chained pieces before the outer binding expires.
+        // Mixed bodies collect each piece before constructing its next sibling.
         let mixed = expand("<ul>{for row in rows {<li/> {...row}}}</ul>");
         assert!(mixed.contains("flat_map"), "{mixed}");
-        assert!(mixed.contains(". chain ("), "{mixed}");
-        assert!(mixed.contains("once ("), "{mixed}");
+        assert!(mixed.contains(". push ("), "{mixed}");
+        assert!(mixed.contains(". extend ("), "{mixed}");
         assert!(!mixed.contains("vec !"), "{mixed}");
     }
 
@@ -735,10 +740,10 @@ mod tests {
             let expanded = expand(source);
             assert!(!expanded.contains("vec !"), "{source}: {expanded}");
             assert!(
-                expanded
-                    .ends_with("collect :: < :: std :: vec :: Vec < :: gpui :: AnyElement >> ()"),
+                expanded.contains("Vec :: < :: gpui :: AnyElement >"),
                 "{source}: {expanded}"
             );
+            assert!(expanded.contains(". extend ("), "{source}: {expanded}");
         }
         assert!(expand("<><div/><span/></>").starts_with("vec !"));
     }

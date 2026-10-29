@@ -20,13 +20,17 @@ cargo rsx lsp                              # stdio language server
 ```
 
 `doctor` accepts registry, Git, Kit and standalone GPUI graphs, including aliases.
+It follows Kit's selected backend, ignoring inactive test-support edges while reporting
+multiple active engines or consumers that select different backends.
 `lint` walks Cargo workspace packages, respects each package's `rsx.toml`, and reports
 source positions, suggestions and dynamic-class limitations. `--json` produces structured
 reports. Diagnostics in dynamic strings happen at runtime.
 
 Spacing follows `--tailwind`, then the selected package's `rsx.toml`, then Cargo's
 resolved `gpui-rsx/tailwind-scale` feature, including features enabled by sibling
-workspace members. Feature resolution is cached per workspace. With stdin, both
+workspace members. Successful feature resolution is cached per workspace. If Cargo
+cannot resolve the graph, commands return an error before expansion or migration;
+an explicit scale still takes precedence without resolving dependencies. With stdin, both
 `cargo rsx expand` and `cargo rsx expand -` use `--manifest-path` to select the
 package configuration, falling back to the current directory when omitted.
 

@@ -225,6 +225,7 @@ fn preview_accepts_directories_and_watch_refreshes_after_theme_edits() {
     )
     .unwrap();
     std::fs::write(root.join("rsx.toml"), "[colors]\nbrand = \"#123456\"\n").unwrap();
+    std::fs::write(root.join("src/lib.rs"), "").unwrap();
     std::fs::write(root.join("src/empty.rs"), "fn none() {}\n").unwrap();
     std::fs::write(
         root.join("src/view.rs"),

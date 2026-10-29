@@ -10,6 +10,7 @@ Runs the standard local validation suite:
   cargo xtask spec --check
   cargo xtask compat-matrix --check
   cargo xtask check-gpui
+  cargo run --quiet -p cargo-rsx -- doctor --manifest-path demo/Cargo.toml --offline
   cargo test --workspace
   cargo test --workspace --all-features
   cargo test -p gpui-rsx-tools --no-default-features
@@ -93,6 +94,7 @@ run cargo clippy --workspace --all-targets --all-features -- -D warnings
 
 if [[ "$skip_demo" -eq 0 ]]; then
     run cargo xtask check-gpui
+    run cargo run --quiet -p cargo-rsx -- doctor --manifest-path demo/Cargo.toml --offline
     run cargo xtask gen-tables --check
     GPUI_API_SNAPSHOT_REQUIRED=1 run cargo test -p xtask --test gpui_api_snapshot
     run cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked

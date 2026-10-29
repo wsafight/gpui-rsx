@@ -1,6 +1,64 @@
 use serde_json::{Value, json};
+use std::collections::{HashMap, HashSet};
 
 const ENGINES: &[&str] = &["gpui", "gpui-pre", "gpui-fast"];
+
+// Kit's backend feature controls which dependency it re-exports. Cargo metadata also
+// lists weak optional test-support edges to the unselected backend and its platform.
+fn selected_dependency(package: &Value, node: &Value, target: &Value) -> bool {
+    if !matches!(
+        package["name"].as_str(),
+        Some("gpui-kit" | "gpui-base" | "gpui-component" | "gpui-kit-assets")
+    ) {
+        return true;
+    }
+    let fast = node["features"]
+        .as_array()
+        .is_some_and(|features| features.iter().any(|f| f == "gpui-fast"));
+    match target["name"].as_str() {
+        Some("gpui-fast" | "gpui-fast-platform" | "gpui-fast-web") => fast,
+        Some(
+            "gpui" | "gpui-pre" | "gpui_platform" | "gpui-pre-platform" | "gpui_web"
+            | "gpui-pre-web",
+        ) => !fast,
+        _ => true,
+    }
+}
+
+fn active_packages(
+    metadata: &Value,
+    packages: &[Value],
+    nodes: &[Value],
+) -> Option<HashSet<String>> {
+    let roots = metadata["workspace_members"].as_array()?;
+    let by_id: HashMap<_, _> = packages
+        .iter()
+        .filter_map(|p| Some((p["id"].as_str()?, p)))
+        .collect();
+    let by_node: HashMap<_, _> = nodes
+        .iter()
+        .filter_map(|n| Some((n["id"].as_str()?, n)))
+        .collect();
+    let mut pending: Vec<_> = roots.iter().filter_map(Value::as_str).collect();
+    let mut active = HashSet::new();
+    while let Some(id) = pending.pop() {
+        if !active.insert(id.to_owned()) {
+            continue;
+        }
+        let (Some(package), Some(node)) = (by_id.get(id), by_node.get(id)) else {
+            continue;
+        };
+        for dep in node["deps"].as_array().into_iter().flatten() {
+            if let Some(id) = dep["pkg"].as_str()
+                && let Some(target) = by_id.get(id)
+                && selected_dependency(package, node, target)
+            {
+                pending.push(id);
+            }
+        }
+    }
+    Some(active)
+}
 
 /// Analyze resolved identities, including dependency aliases. Valid for Git and registry GPUI.
 pub fn inspect(metadata: &Value) -> Value {
@@ -9,8 +67,15 @@ pub fn inspect(metadata: &Value) -> Value {
         .as_array()
         .cloned()
         .unwrap_or_default();
+    let active = active_packages(metadata, &packages, &nodes);
+    let is_active = |p: &&Value| {
+        active
+            .as_ref()
+            .is_none_or(|active| p["id"].as_str().is_some_and(|id| active.contains(id)))
+    };
     let engines: Vec<_> = packages
         .iter()
+        .filter(is_active)
         .filter(|p| ENGINES.contains(&p["name"].as_str().unwrap_or("")))
         .collect();
     let mut errors = Vec::new();
@@ -22,7 +87,7 @@ pub fn inspect(metadata: &Value) -> Value {
         warnings.push("No GPUI runtime found. This is normal for macro/tooling crates.".into());
     }
     let mut consumers = Vec::new();
-    for package in &packages {
+    for package in packages.iter().filter(is_active) {
         let name = package["name"].as_str().unwrap_or("");
         if !matches!(name, "gpui-kit" | "gpui-component" | "gpui-base") {
             continue;
@@ -32,6 +97,12 @@ pub fn inspect(metadata: &Value) -> Value {
             let resolved: Vec<_> = deps
                 .iter()
                 .filter(|dep| engines.iter().any(|engine| engine["id"] == dep["pkg"]))
+                .filter(|dep| {
+                    packages
+                        .iter()
+                        .find(|p| p["id"] == dep["pkg"])
+                        .is_some_and(|target| selected_dependency(package, node, target))
+                })
                 .map(|dep| dep["pkg"].clone())
                 .collect();
             if resolved.len() != 1 {
@@ -52,6 +123,7 @@ pub fn inspect(metadata: &Value) -> Value {
         };
         for companion in packages
             .iter()
+            .filter(is_active)
             .filter(|p| companion_names.contains(&p["name"].as_str().unwrap_or("")))
         {
             if companion["source"] != engine["source"] || companion["version"] != engine["version"]
@@ -69,6 +141,99 @@ pub fn inspect(metadata: &Value) -> Value {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn kit_metadata(fast: bool) -> Value {
+        let features = if fast {
+            json!(["test-support", "gpui-fast"])
+        } else {
+            json!(["test-support"])
+        };
+        let packages = [
+            ("app", "app", "0.1.0"),
+            ("kit", "gpui-kit", "0.8.1"),
+            ("base", "gpui-base", "0.8.1"),
+            ("component", "gpui-component", "0.8.1"),
+            ("pre", "gpui-pre", "0.3.10"),
+            ("fast", "gpui-fast", "0.1.12"),
+            ("platform", "gpui-fast-platform", "0.1.12"),
+        ];
+        json!({
+            "workspace_members": ["app"],
+            "packages": packages.map(|(id, name, version)| json!({"id": id, "name": name, "version": version, "source": "registry+x"})),
+            "resolve": {"nodes": [
+                {"id": "app", "deps": [{"pkg": "kit"}]},
+                {"id": "kit", "features": features, "deps": [{"pkg": "pre"}, {"pkg": "fast"}, {"pkg": "platform"}, {"pkg": "base"}, {"pkg": "component"}]},
+                {"id": "base", "features": features, "deps": [{"pkg": "pre"}, {"pkg": "fast"}]},
+                {"id": "component", "features": features, "deps": [{"pkg": "pre"}, {"pkg": "fast"}]},
+                {"id": "pre", "deps": []},
+                {"id": "fast", "deps": []},
+                {"id": "platform", "deps": [{"pkg": "fast"}]},
+            ]},
+        })
+    }
+
+    #[test]
+    fn ignores_unselected_weak_test_support_dependencies() {
+        let mut graph = kit_metadata(false);
+        // Even an unrelated inactive companion version must not affect the selected engine.
+        graph["packages"][6]["version"] = json!("9.9.9");
+        let report = inspect(&graph);
+        assert_eq!(report["ok"], true, "{report}");
+        assert_eq!(report["engines"].as_array().unwrap().len(), 1);
+        assert_eq!(report["engines"][0]["name"], "gpui-pre");
+        assert!(
+            report["consumers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|c| c["gpui"] == json!(["pre"]))
+        );
+    }
+
+    #[test]
+    fn accepts_the_selected_fast_backend_with_default_metadata_present() {
+        let report = inspect(&kit_metadata(true));
+        assert_eq!(report["ok"], true, "{report}");
+        assert_eq!(report["engines"].as_array().unwrap().len(), 1);
+        assert_eq!(report["engines"][0]["name"], "gpui-fast");
+        assert!(
+            report["consumers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|c| c["gpui"] == json!(["fast"]))
+        );
+    }
+
+    #[test]
+    fn still_reports_a_direct_second_engine_with_default_kit() {
+        let mut graph = kit_metadata(false);
+        graph["resolve"]["nodes"][0]["deps"]
+            .as_array_mut()
+            .unwrap()
+            .push(json!({"pkg": "fast"}));
+        let report = inspect(&graph);
+        assert_eq!(report["ok"], false);
+        assert_eq!(report["engines"].as_array().unwrap().len(), 2);
+        // Kit itself continues to select only its default backend.
+        assert!(
+            report["consumers"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|c| c["gpui"] == json!(["pre"]))
+        );
+    }
+
+    #[test]
+    fn rejects_different_backend_features_between_consumers() {
+        let mut graph = kit_metadata(true);
+        graph["resolve"]["nodes"][3]["features"] = json!(["test-support"]);
+        let report = inspect(&graph);
+        assert_eq!(report["ok"], false);
+        assert_eq!(report["engines"].as_array().unwrap().len(), 2);
+    }
+
     #[test]
     fn finds_mixed_backends_even_when_aliased() {
         let graph = json!({"packages":[{"name":"gpui-pre","id":"pre","version":"0.3.9","source":"registry+x"},{"name":"gpui","id":"git","version":"0.2.2","source":"git+x"}]});

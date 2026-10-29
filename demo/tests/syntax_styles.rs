@@ -344,6 +344,64 @@ fn nested_iterators_can_borrow_outer_patterns_and_mutable_caller_state() {
 }
 
 #[test]
+fn fragment_construction_evaluates_loops_spreads_and_siblings_in_source_order() {
+    let order = std::cell::RefCell::new(Vec::new());
+    let children = rsx! {
+        <>
+            <div>{{ order.borrow_mut().push(0); "first" }}</div>
+            {for n in 1..3 { <div>{{ order.borrow_mut().push(n); "loop" }}</div> }}
+            <div>{{ order.borrow_mut().push(3); "middle" }}</div>
+            {...(4..6).map(|n| { order.borrow_mut().push(n); div() })}
+            <span>{{ order.borrow_mut().push(6); "last" }}</span>
+        </>
+    };
+    assert_eq!(*order.borrow(), [0, 1, 2, 3, 4, 5, 6]);
+    assert_eq!(children.len(), 7);
+}
+
+#[test]
+fn fragment_siblings_can_share_mutable_state_and_keep_user_bindings() {
+    let mut order = Vec::new();
+    let __rsx_children = vec![div(), div()];
+    let children = rsx! {
+        <>
+            {for n in 0..2 { <div>{{ order.push(n); "loop" }}</div> }}
+            <div>{{ order.push(2); "middle" }}</div>
+            {for n in 3..5 { <div>{{ order.push(n); "loop" }}</div> }}
+            {...__rsx_children}
+        </>
+    };
+    assert_eq!(order, [0, 1, 2, 3, 4]);
+    assert_eq!(children.len(), 7);
+}
+
+#[test]
+fn mixed_nested_loop_bodies_finish_each_iterator_before_the_next_sibling() {
+    let mut order = Vec::new();
+    let children = rsx! {
+        <>{for row in 0..2 {
+            <span>{{ order.push((row, 0)); "before" }}</span>
+            {for col in 1..3 { <div>{{ order.push((row, col)); "inner" }}</div> }}
+            <span>{{ order.push((row, 3)); "after" }}</span>
+        }}</>
+    };
+    assert_eq!(
+        order,
+        [
+            (0, 0),
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (1, 0),
+            (1, 1),
+            (1, 2),
+            (1, 3)
+        ]
+    );
+    assert_eq!(children.len(), 8);
+}
+
+#[test]
 fn special_image_tags_use_real_constructors_and_sources() {
     let source = gpui_rsx_demo::syntax::sample_image();
     same_style(

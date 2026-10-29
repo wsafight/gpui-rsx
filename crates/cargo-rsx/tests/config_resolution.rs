@@ -57,6 +57,45 @@ impl Drop for Project {
 }
 
 #[test]
+fn unresolved_dependencies_block_expansion_and_migration_without_writing() {
+    let project = Project::new();
+    project.write(
+        "Cargo.toml",
+        "[package]\nname = \"unresolved\"\nversion = \"0.1.0\"\n\
+         [dependencies]\nmissing-dependency = { path = \"missing-dependency\" }\n",
+    );
+    let source = "fn view(){rsx!{<div class=\"gap-4\"/>};}\n";
+    project.write("src/lib.rs", source);
+    let (code, stdout, stderr) = project.run(
+        &["expand", "-", "--manifest-path", "Cargo.toml", "--offline"],
+        "<div class=\"gap-4\"/>",
+    );
+    assert_eq!(code, Some(2), "{stdout} {stderr}");
+    assert!(stdout.is_empty());
+    assert!(
+        stderr.contains("cannot determine spacing scale"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("missing-dependency"), "{stderr}");
+
+    let (code, _, stderr) = project.run(&["migrate", "src/lib.rs", "--offline", "--write"], "");
+    assert_eq!(code, Some(2), "{stderr}");
+    assert_eq!(
+        fs::read_to_string(project.0.join("src/lib.rs")).unwrap(),
+        source
+    );
+
+    // An explicit scale does not depend on a resolvable Cargo graph.
+    project.write("rsx.toml", "[options]\nspacing-scale = \"px\"\n");
+    let (code, _, stderr) = project.run(&["migrate", "src/lib.rs", "--offline", "--write"], "");
+    assert_eq!(code, Some(0), "{stderr}");
+    assert_eq!(
+        fs::read_to_string(project.0.join("src/lib.rs")).unwrap(),
+        source.replace("gap-4", "gap-1")
+    );
+}
+
+#[test]
 fn sibling_features_unify_for_expansion_and_prevent_a_second_migration() {
     let project = Project::new();
     project.write(

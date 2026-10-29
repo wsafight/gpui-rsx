@@ -29,9 +29,9 @@ pub(crate) fn mode(options: ModeOptions, path: Option<&Path>) -> Result<ClassMod
         // Explicit choices do not need dependency resolution.
         SpacingScale::Px
     } else {
-        package
-            .as_deref()
-            .map_or(SpacingScale::Px, |dir| feature_scale(dir, options.offline))
+        package.as_deref().map_or(Ok(SpacingScale::Px), |dir| {
+            feature_scale(dir, options.offline)
+        })?
     };
     Ok(ClassMode::builder()
         .strict(options.strict)
@@ -90,17 +90,21 @@ pub(crate) fn clear_feature_cache() {
 /// A sibling member or transitive dependency can enable the feature without mentioning it
 /// in this package's ancestor manifests. Resolve the actual Cargo graph once per workspace
 /// root and share the result between members.
-fn feature_scale(dir: &Path, offline: bool) -> SpacingScale {
+fn feature_scale(dir: &Path, offline: bool) -> Result<SpacingScale, String> {
     let root = workspace_root(dir);
     let mut cache = FEATURE_CACHE.lock().unwrap_or_else(|e| e.into_inner());
     let cache = cache.get_or_insert_with(HashMap::new);
-    *cache.entry(root.clone()).or_insert_with(|| {
-        if metadata_enables_tailwind(&root, offline).unwrap_or(false) {
-            SpacingScale::Tailwind
-        } else {
-            SpacingScale::Px
-        }
-    })
+    if let Some(scale) = cache.get(&root) {
+        return Ok(*scale);
+    }
+    let scale = if metadata_enables_tailwind(&root, offline)? {
+        SpacingScale::Tailwind
+    } else {
+        SpacingScale::Px
+    };
+    // Only cache successful resolutions; a missing dependency may become available later.
+    cache.insert(root, scale);
+    Ok(scale)
 }
 
 /// The nearest ancestor whose manifest declares `[workspace]`, or `dir` itself.
@@ -114,7 +118,7 @@ fn workspace_root(dir: &Path) -> PathBuf {
         .to_owned()
 }
 
-fn metadata_enables_tailwind(dir: &Path, offline: bool) -> Option<bool> {
+fn metadata_enables_tailwind(dir: &Path, offline: bool) -> Result<bool, String> {
     let mut command = Command::new("cargo");
     command
         .args(["metadata", "--format-version", "1", "--manifest-path"])
@@ -122,12 +126,20 @@ fn metadata_enables_tailwind(dir: &Path, offline: bool) -> Option<bool> {
     if offline {
         command.arg("--offline");
     }
-    let output = command.output().ok()?;
+    let context = || format!("cannot determine spacing scale for {}", dir.display());
+    let output = command
+        .output()
+        .map_err(|error| format!("{}: cannot run cargo metadata: {error}", context()))?;
     if !output.status.success() {
-        return None;
+        return Err(format!(
+            "{}: cargo metadata failed:\n{}",
+            context(),
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
     }
-    let metadata: Value = serde_json::from_slice(&output.stdout).ok()?;
-    Some(resolves_tailwind_feature(&metadata))
+    let metadata: Value = serde_json::from_slice(&output.stdout)
+        .map_err(|error| format!("{}: invalid cargo metadata: {error}", context()))?;
+    Ok(resolves_tailwind_feature(&metadata))
 }
 
 fn resolves_tailwind_feature(metadata: &Value) -> bool {
@@ -196,5 +208,29 @@ mod tests {
         // Another package's feature of the same name does not count.
         assert!(!resolves_tailwind_feature(&metadata(json!([]))));
         assert!(!resolves_tailwind_feature(&json!({})));
+    }
+
+    #[test]
+    fn failed_feature_resolution_is_retried_after_dependencies_become_available() {
+        let root = std::env::temp_dir().join(format!("rsx-feature-retry-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("src")).unwrap();
+        std::fs::write(root.join("src/lib.rs"), "").unwrap();
+        std::fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"retry\"\nversion = \"0.1.0\"\n\
+             [dependencies]\ngpui-rsx = { path = \"runtime\", features = [\"tailwind-scale\"] }\n",
+        )
+        .unwrap();
+        assert!(feature_scale(&root, true).is_err());
+        std::fs::create_dir_all(root.join("runtime/src")).unwrap();
+        std::fs::write(root.join("runtime/src/lib.rs"), "").unwrap();
+        std::fs::write(
+            root.join("runtime/Cargo.toml"),
+            "[package]\nname = \"gpui-rsx\"\nversion = \"0.1.0\"\n\
+             [features]\ntailwind-scale = []\n",
+        )
+        .unwrap();
+        assert_eq!(feature_scale(&root, true).unwrap(), SpacingScale::Tailwind);
+        std::fs::remove_dir_all(root).unwrap();
     }
 }
