@@ -34,12 +34,47 @@ cargo run --bin project_dashboard --locked
 cargo run --bin incident_console --locked
 cargo run --bin api_surface --locked
 cargo run --bin component --locked
+cargo run --bin syntax_gallery --locked
 ```
 
 `project_dashboard` demonstrates keyed lists, selection, conditional classes,
 progress, density controls and item mutations. `incident_console` combines
 filters, sorting, incident lifecycle transitions, a timeline and empty states;
 its model and UI modules live under `src/bin/incident_console/`.
+
+`syntax_gallery` is an interactive reference for the RSX grammar. Toggle conditions,
+click the event example, reverse keyed rows, and inspect function/struct components,
+fragments, spread children, nested loops, state classes, themes, SVG, images and canvas.
+Its view lives in `src/syntax/` and is also rendered by the automated tests.
+
+Run the demo tests without opening a desktop window:
+
+```bash
+cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
+cargo +1.98.1 test --manifest-path demo/Cargo.toml --doc --locked
+```
+
+From inside `demo/`, omit `--manifest-path demo/Cargo.toml`. These tests use Kit's
+`test-support` feature only for development; regular builds keep the normal backend.
+
+| Syntax / behavior | Real GPUI coverage |
+| --- | --- |
+| HTML aliases, paired/self-closing tags, flags, values and camelCase aliases | `tests/syntax_styles.rs` |
+| `styled`, conditional class expressions, `when`, `whenSome`, `whenClass`, visibility | Refinement assertions plus rendered bounds in `tests/ui_syntax.rs` |
+| `rsx!`, `rsx_strict!`, `rsx_permissive!`, `rsx_tw!`, `rsx_expand!` | `tests/syntax_styles.rs` |
+| `rsx_runtime!`, default and explicit GPUI paths, both spacing scales | `tests/shared_runtime.rs`, `tests/runtime_paths.rs` |
+| Static/dynamic colors, lengths, fractions, grids, theme tokens and unknown handlers | `tests/syntax_styles.rs`, `tests/shared_runtime.rs` |
+| Function/struct props, defaults, boolean setters, `Option`, callbacks, generics, const parameters and children | `tests/syntax_components.rs`, `tests/component_props.rs` |
+| Render-time `Window`/`App` injection, fragments, spread and nested loop order | `tests/ui_syntax.rs` |
+| Native/path/base constructors, third-party builders, auto IDs and explicit IDs/keys | `tests/auto_id.rs`, `tests/key_identity.rs` |
+| Click/mouse/keyboard callbacks, hover styles and keyed row reordering | Native event dispatch in `tests/ui_syntax.rs` |
+| SVG, both image source spellings, grayscale and canvas | `tests/syntax_styles.rs`; canvas prepaint/paint assertions in `tests/ui_syntax.rs` |
+| Invalid syntax, missing props/IDs, invalid values and unsupported annotations | Compiler rejection tests in `src/syntax/rejected.rs` (`--doc`) |
+
+The headless tests check layout, identity, evaluation order and callbacks; they do
+not compare rendered pixels. Static fragments add no wrapper element. Directly
+nested iterators are collected once per outer iteration so inner closures can
+safely borrow the outer loop's pattern and the caller's state.
 
 `api_contract`, `generated_api_contract` and `semantics_contract` are compile-only
 contracts. They cover GPUI methods, every generated theme color, the Kit alias,
@@ -53,8 +88,9 @@ From the repository root, verify or update the matching dependency set:
 cargo xtask check-gpui
 cargo xtask gen-tables --check
 cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
-cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --bins --locked -- -D warnings
-cargo +1.98.1 test --manifest-path demo/Cargo.toml --bins --locked
+cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings
+cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
+cargo +1.98.1 test --manifest-path demo/Cargo.toml --doc --locked
 ```
 
 The compatibility workflow follows stable, non-yanked Kit releases and verifies

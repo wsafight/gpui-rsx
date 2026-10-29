@@ -97,11 +97,23 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
             super::class::parse_class_string_with_mode(&edges.suffix, mode, class_expr.span());
         let prefix_len = edges.prefix.len();
         let suffix_len = edges.suffix.len();
+        let prefix_text = &edges.prefix;
+        let suffix_text = &edges.suffix;
+        let min_len = prefix_len + suffix_len;
         quote! {
-            let __class_str = &__class_str[#prefix_len..__class_str.len() - #suffix_len];
-            let __el = __el #(#prefix)*;
-            let __el = #result;
-            __el #(#suffix)*
+            // An unqualified format! can be shadowed by a user macro. Verify its
+            // actual output before assuming literal edges or slicing byte offsets.
+            if __class_str.len() >= #min_len
+                && __class_str.starts_with(#prefix_text)
+                && __class_str.ends_with(#suffix_text)
+            {
+                let __class_str = &__class_str[#prefix_len..__class_str.len() - #suffix_len];
+                let __el = __el #(#prefix)*;
+                let __el = #result;
+                __el #(#suffix)*
+            } else {
+                #result
+            }
         }
     } else {
         result
@@ -351,8 +363,9 @@ fn generate_length_fallback(spec: &super::tables::LengthClassSpec, factor: f32) 
                     num.parse::<f32>().__rsx_finite(),
                     den.parse::<f32>().__rsx_finite(),
                 ) {
-                    if den > 0.0 {
-                        return el.#method(relative(num / den));
+                    let ratio = num / den;
+                    if den > 0.0 && ratio.is_finite() {
+                        return el.#method(relative(ratio));
                     }
                 }
             }
@@ -378,7 +391,10 @@ fn generate_length_fallback(spec: &super::tables::LengthClassSpec, factor: f32) 
             }
             #fraction
             if let Ok(n) = rest.parse::<f32>().__rsx_finite() {
-                return el.#method(px(n * #factor));
+                let scaled = n * #factor;
+                if scaled.is_finite() {
+                    return el.#method(px(scaled));
+                }
             }
         }
     }

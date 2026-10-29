@@ -18,6 +18,7 @@ Runs the standard local validation suite:
   cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
   cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings
   cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
+  cargo +1.98.1 test --manifest-path demo/Cargo.toml --doc --locked
 
 With --release, also runs:
   cargo bench --bench class_performance --no-run
@@ -97,6 +98,7 @@ if [[ "$skip_demo" -eq 0 ]]; then
     run cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
     run cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings
     run cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
+    run cargo +1.98.1 test --manifest-path demo/Cargo.toml --doc --locked
 fi
 
 if [[ "$release" -eq 1 ]]; then

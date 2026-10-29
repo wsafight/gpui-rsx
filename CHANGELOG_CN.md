@@ -13,6 +13,8 @@
 
 ### 新增
 
+- demo 新增可交互语法展示和真实 GPUI 测试，覆盖元素、组件、回调、条件样式、Fragment、
+  嵌套循环、ID、主题与特殊标签。无窗口测试分发输入事件并检查布局，编译失败文档测试验证非法语法。
 - 可选的 `rsx_runtime!()` 与 `[options] dynamic-runtime = "rsx_runtime"` 在 crate 内
   共享非泛型动态 class helper，覆盖测试、example 和 bin，支持 GPUI 别名和两种间距刻度。
   lint 与 LSP 会为未配置的动态 class 给出建议。本地 50 调用点 stub 测试的 release 编译
@@ -38,6 +40,11 @@
 
 ### 修复
 
+- 静态 grid 与 line-clamp 整数 class 使用 GPUI 对应类型的 setter，并拒绝溢出；动态长度
+  在缩放或除法后检查溢出。被同名宏覆盖的 `format!` 按实际输出处理，避免错误样式或字符串切片越界。
+- 嵌套 RSX 循环可借用外层绑定和调用方状态：嵌套迭代器在每次外层闭包返回前收集一次，
+  普通节点循环仍使用无需临时集合的 map / 数组路径。
+- GPUI 依赖校验接受未启用 Fast 后端的测试支持元数据，同时继续拒绝启用 Fast 或 GPUI 类型不一致的配置。
 - 组件标签及 `base` 表达式只为 GPUI 渲染元素自动注入 ID。gpui-component 的 `Button`
   和带 `on_click` / `on_hover` 属性的 `#[component]` 构建器保留自身 setter，返回原生
   元素的路径函数则继续获得自动 ID。

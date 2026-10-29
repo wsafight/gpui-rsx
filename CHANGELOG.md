@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Interactive `demo` syntax gallery and real-GPUI tests for elements, components,
+  callbacks, conditional styles, fragments, nested loops, IDs, themes and special tags.
+  Headless tests dispatch input and check layout; compile-fail doctests cover rejected syntax.
 - Optional `rsx_runtime!()` and `[options] dynamic-runtime = "rsx_runtime"` share
   non-generic dynamic class helpers across a crate, including its tests, examples and
   binaries. GPUI aliases and both spacing scales are supported; lint and LSP suggest
@@ -44,6 +47,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Static grid and line-clamp integer classes use GPUI's typed setters and reject overflow.
+  Dynamic lengths reject overflow after scaling or division, and shadowed `format!` macros
+  fall back to their actual output instead of invalid static edges or out-of-bounds slicing.
+- Nested RSX loops can borrow outer bindings and caller state. Nested iterators are collected
+  once per outer iteration before returning from the closure; ordinary node loops keep their
+  allocation-free map/array paths.
+- GPUI dependency validation accepts inactive Fast test-support metadata while still rejecting
+  an enabled Fast backend or mismatched GPUI types.
 - Auto IDs on component tags and `base` expressions only wrap GPUI rendering elements.
   gpui-component `Button` and `#[component]` builders with `on_click` / `on_hover` props
   retain their own setters, while path functions returning native elements keep auto IDs.

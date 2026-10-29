@@ -10,5 +10,8 @@ publish = false
 gpui = { package = "gpui-kit", version = "=0.8.1" }
 gpui-rsx = { path = ".." }
 
+[dev-dependencies]
+gpui = { package = "gpui-kit", version = "=0.8.1", features = ["test-support"] }
+
 # Keep the real rendering backend out of the proc-macro workspace and its MSRV.
 [workspace]

@@ -193,6 +193,7 @@ fn generate_node_checked(
 ///
 /// 多子节点使用 `AnyElement` 做类型擦除后放入数组，避免每轮循环分配 `Vec`，
 /// 同时允许循环体内混合不同具体元素类型（如 `div()` 和自定义组件）。
+/// 直接嵌套的迭代器在每轮外层循环内收集，避免借用外层 pattern 的闭包逃逸。
 ///
 /// 安全检查：循环体内所有 stateful 元素（含深层嵌套）都必须提供 `id` 或 `key`，
 /// 否则每次迭代会生成相同的自动 ID，导致 GPUI 状态冲突，因此在此阶段给出编译错误。
@@ -210,14 +211,20 @@ fn generate_for_loop_checked(
         })
     } else if let [(single, yields_many)] = body_exprs.as_slice() {
         if *yields_many {
-            Ok(quote! { (#iter).into_iter().flat_map(|#binding| #single) })
+            // Consume nested iterators while the outer pattern is still alive. Their
+            // closures may borrow that binding (or mutable state from the caller).
+            Ok(quote! {
+                (#iter).into_iter().flat_map(|#binding| {
+                    ::core::iter::IntoIterator::into_iter(#single).collect::<::std::vec::Vec<_>>()
+                })
+            })
         } else {
             Ok(quote! { (#iter).into_iter().map(|#binding| #single) })
         }
     } else if body_exprs.iter().any(|(_, yields_many)| *yields_many) {
         let chained = chain_any_elements(&body_exprs);
         Ok(quote! {
-            (#iter).into_iter().flat_map(|#binding| #chained)
+            (#iter).into_iter().flat_map(|#binding| #chained.collect::<::std::vec::Vec<_>>())
         })
     } else {
         let exprs = body_exprs.iter().map(|(expr, _)| expr);
@@ -672,17 +679,17 @@ mod tests {
         let nested = expand("<ul>{for row in rows {{for cell in row {<li>{cell}</li>}}}}</ul>");
         assert_eq!(
             nested,
-            "div () . children ((rows) . into_iter () . flat_map (| row | (row) . into_iter () . map (| cell | div () . child (cell))))"
+            "div () . children ((rows) . into_iter () . flat_map (| row | { :: core :: iter :: IntoIterator :: into_iter ((row) . into_iter () . map (| cell | div () . child (cell))) . collect :: < :: std :: vec :: Vec < _ >> () }))"
         );
 
         // A spread body yields an iterator too.
         let spread = expand("<ul>{for row in rows {{...row}}}</ul>");
         assert_eq!(
             spread,
-            "div () . children ((rows) . into_iter () . flat_map (| row | row))"
+            "div () . children ((rows) . into_iter () . flat_map (| row | { :: core :: iter :: IntoIterator :: into_iter (row) . collect :: < :: std :: vec :: Vec < _ >> () }))"
         );
 
-        // Mixed bodies chain the per-iteration pieces instead of building a Vec.
+        // Mixed bodies collect the chained pieces before the outer binding expires.
         let mixed = expand("<ul>{for row in rows {<li/> {...row}}}</ul>");
         assert!(mixed.contains("flat_map"), "{mixed}");
         assert!(mixed.contains(". chain ("), "{mixed}");

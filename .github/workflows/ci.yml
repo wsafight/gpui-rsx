@@ -170,7 +170,9 @@ jobs:
         run: cargo check --manifest-path demo/Cargo.toml --bins --locked
 
       - name: Link and test demo targets
-        run: cargo test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
+        run: |
+          cargo test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
+          cargo test --manifest-path demo/Cargo.toml --doc --locked
 
   fmt:
     name: Rustfmt

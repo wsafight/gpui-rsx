@@ -52,9 +52,12 @@ fn field<'a>(block: &'a str, key: &str) -> Option<&'a str> {
     })
 }
 
-/// Reject duplicate engines and ensure that Kit, base and components share GPUI types.
+/// Ensure that Kit, base and components export the same default GPUI types.
 pub fn validate_graph(metadata: &Value) -> Result<Value, String> {
     let packages = metadata["packages"].as_array().ok_or("missing packages")?;
+    let nodes = metadata["resolve"]["nodes"]
+        .as_array()
+        .ok_or("missing resolved dependency graph")?;
     let one = |names: &[&str]| -> Result<&Value, String> {
         let matches: Vec<_> = packages
             .iter()
@@ -68,13 +71,33 @@ pub fn validate_graph(metadata: &Value) -> Result<Value, String> {
         }
         Ok(matches[0])
     };
-    let engine = one(&["gpui-pre", "gpui", "gpui-fast"])?;
-    if engine["name"] != "gpui-pre" {
-        return Err("the demo must use Kit's default gpui-pre backend".into());
-    }
     let kit = one(&["gpui-kit"])?;
     let component = one(&["gpui-component"])?;
     let base = one(&["gpui-base"])?;
+    let has_feature = |package: &Value, feature: &str| {
+        nodes
+            .iter()
+            .find(|node| node["id"] == package["id"])
+            .and_then(|node| node["features"].as_array())
+            .is_some_and(|features| features.iter().any(|value| value == feature))
+    };
+    if [kit, component, base]
+        .iter()
+        .any(|package| has_feature(package, "gpui-fast"))
+    {
+        return Err("the demo must use Kit's default gpui-pre backend".into());
+    }
+    // Cargo metadata includes weak optional gpui-fast?/test-support edges even
+    // when the Fast backend is disabled (cargo tree/build do not activate them).
+    let names: &[&str] = if has_feature(kit, "test-support") {
+        &["gpui-pre", "gpui"]
+    } else {
+        &["gpui-pre", "gpui", "gpui-fast"]
+    };
+    let engine = one(names)?;
+    if engine["name"] != "gpui-pre" {
+        return Err("the demo must use Kit's default gpui-pre backend".into());
+    }
     let version = engine["version"].as_str().ok_or("missing GPUI version")?;
     let source = engine["source"].as_str().ok_or("missing GPUI source")?;
     if !source.starts_with("registry+") {
@@ -89,9 +112,6 @@ pub fn validate_graph(metadata: &Value) -> Result<Value, String> {
             return Err(format!("{} must match gpui-pre@{version}", package["name"]));
         }
     }
-    let nodes = metadata["resolve"]["nodes"]
-        .as_array()
-        .ok_or("missing resolved dependency graph")?;
     for package in [kit, component, base] {
         let node = nodes
             .iter()
@@ -155,6 +175,32 @@ mod tests {
             .unwrap()
             .push(json!({"name": "gpui"}));
         assert!(validate_graph(&data).unwrap_err().contains("found 2"));
+    }
+
+    #[test]
+    fn allows_test_support_metadata_without_enabling_the_fast_backend() {
+        let mut data = metadata();
+        data["packages"].as_array_mut().unwrap().push(json!({
+            "name": "gpui-fast", "id": "gpui-fast", "version": "0.1.12",
+        }));
+        assert!(validate_graph(&data).unwrap_err().contains("found 2"));
+        data["resolve"]["nodes"][0]["features"] = json!(["test-support"]);
+        assert_eq!(validate_graph(&data).unwrap()["gpui"], "gpui-pre@0.3.9");
+        for index in 0..3 {
+            let mut fast = data.clone();
+            fast["resolve"]["nodes"][index]["features"] = json!(["test-support", "gpui-fast"]);
+            assert!(
+                validate_graph(&fast)
+                    .unwrap_err()
+                    .contains("default gpui-pre")
+            );
+        }
+        data["resolve"]["nodes"][1]["deps"][0]["pkg"] = json!("gpui-fast");
+        assert!(
+            validate_graph(&data)
+                .unwrap_err()
+                .contains("different GPUI")
+        );
     }
 
     #[test]

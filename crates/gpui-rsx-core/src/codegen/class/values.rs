@@ -38,9 +38,6 @@ pub(super) fn expand_known_class(
         return Some(Ok(quote! { .group(#name) }));
     }
 
-    if let Some(token) = parse_direct_line_clamp_class(class) {
-        return Some(Ok(token));
-    }
     if let Some(token) = parse_direct_directional_border_class(class) {
         return Some(Ok(token));
     }
@@ -112,7 +109,7 @@ pub(super) fn resolve_style(
     if let Some(method) = gpui_no_arg_class_method(class) {
         return Some(Ok(StyleOperation::new(method.name, None)));
     }
-    None
+    parse_integer_class(class)
 }
 
 impl LengthKind {
@@ -242,10 +239,39 @@ fn parse_direct_opacity_class(class: &str) -> Option<Result<StyleOperation, Stri
     )))
 }
 
-fn parse_direct_line_clamp_class(class: &str) -> Option<TokenStream> {
-    let rest = class.strip_prefix("line-clamp-")?;
-    let lines = rest.parse::<usize>().ok()?;
-    Some(quote! { .line_clamp(#lines) })
+fn parse_integer_class(class: &str) -> Option<Result<StyleOperation, String>> {
+    let (prefix, method, ty) = [
+        ("line-clamp-", "line_clamp", "usize"),
+        ("grid-cols-", "grid_cols", "u16"),
+        ("grid-rows-", "grid_rows", "u16"),
+        ("col-span-", "col_span", "u16"),
+        ("row-span-", "row_span", "u16"),
+        ("col-start-", "col_start", "i16"),
+        ("col-end-", "col_end", "i16"),
+        ("row-start-", "row_start", "i16"),
+        ("row-end-", "row_end", "i16"),
+    ]
+    .into_iter()
+    .find(|(prefix, _, _)| class.starts_with(prefix))?;
+    let raw = &class[prefix.len()..];
+    let value = match ty {
+        "usize" => raw.parse::<usize>().ok().map(|n| format!("{n}usize")),
+        "u16" => raw.parse::<u16>().ok().map(|n| format!("{n}u16")),
+        _ => raw.parse::<i16>().ok().map(|n| format!("{n}i16")),
+    };
+    Some(value.map_or_else(
+        || {
+            Err(format!(
+                "Invalid integer value in `{class}`: expected a value in the `{ty}` range."
+            ))
+        },
+        |value| {
+            Ok(StyleOperation::new(
+                method,
+                Some(StyleValue::Expression(value)),
+            ))
+        },
+    ))
 }
 
 fn parse_direct_directional_border_class(class: &str) -> Option<TokenStream> {
