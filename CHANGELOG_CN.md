@@ -9,6 +9,33 @@
 
 ## [未发布]
 
+## [0.10.2] - 2026-10-31
+
+### 修复
+
+- `InteractiveText` 的 `onClick` 和 `on_click` 元组属性展开为
+  `.on_click(ranges, listener)`，普通 Div 的单监听器事件保持原有行为。
+  使用真实 GPUI Kit 后端编译反馈中的原始示例，覆盖回归。
+- `cargo xtask bump` 同步更新 fuzz 与测试 fixture 的 lockfile 版本。
+- fuzz 目标在重复调用分析函数前克隆 `ClassMode`，修复所有权错误导致的编译失败。
+- 修复 macOS Bash 3.2 下 wasm-pack 需要安装匹配的 wasm-bindgen CLI 时的 Playground 构建。
+
+### 变更
+
+- 文档站升级到 Astro 7.4.4、Starlight 0.42.8 和 sharp 0.35.5；保留 Astro
+  检查器支持的 TypeScript 6。
+- VS Code 扩展升级到 language client 11、vsce 4.1、esbuild 0.28 和
+  TypeScript 7，显式配置 Node 模块解析与类型。保留 VS Code 1.96 支持，并通过
+  可复现安装的补丁适配已修复的 minimatch API。
+- 转换器升级配套 SWC 包，wasm-bindgen 升级到 0.2.130，并同步 Playground
+  CLI 版本检查。保留公开的 syn 2 AST 类型和 Rust 1.88 MSRV。
+
+### 安全
+
+- 刷新文档、编辑器和 demo 的传递依赖，包含 demo 的 XML、HTTP、QUIC、TLS
+  与 crossbeam 修复，继续使用 GPUI Kit 0.8.1。
+- CI 审计四个活跃 Rust 项目与两个 Bun 项目的 lockfile。
+
 ## [0.10.1] - 2026-10-31
 
 ### 新增
@@ -773,7 +800,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...v0.9.0

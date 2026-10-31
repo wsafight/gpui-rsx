@@ -9,8 +9,8 @@ fuzz_target!(|source: &str| {
         ClassMode::STRICT,
         ClassMode::PERMISSIVE.with_scale(SpacingScale::Tailwind),
     ] {
-        let _ = analyze_class(source, mode);
-        let _ = class_diagnostics(source, mode);
+        let _ = analyze_class(source, mode.clone());
+        let _ = class_diagnostics(source, mode.clone());
         if let Ok(tokens) = source.parse::<proc_macro2::TokenStream>() {
             let _ = expand(tokens, mode);
         }

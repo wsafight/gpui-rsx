@@ -8,7 +8,7 @@ CLI 与编辑器语言服务共用宏的解析器和 class 配置。安装需要
 ## 安装与环境检查
 
 ```sh
-cargo install cargo-rsx --version 0.10.1 --locked
+cargo install cargo-rsx --version 0.10.2 --locked
 cargo rsx doctor --manifest-path demo/Cargo.toml
 ```
 
@@ -73,7 +73,7 @@ cargo rsx migrate src/main.rs --write   # 应用一次
 
 | 编辑器 | 安装方式 |
 | --- | --- |
-| VS Code | 从 [0.10.1 Release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.10.1) 下载 `.vsix`，执行 **Extensions: Install from VSIX**。 |
+| VS Code | 从 [0.10.2 Release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.10.2) 下载 `.vsix`，执行 **Extensions: Install from VSIX**。 |
 | Zed | 将仓库中的 `editors/zed` 安装为开发扩展；若自定义 Rust 语言服务列表，将 `"gpui-rsx"` 加到 `"rust-analyzer"` 旁边。 |
 
 两个插件均通过 `cargo rsx lsp` 提供：

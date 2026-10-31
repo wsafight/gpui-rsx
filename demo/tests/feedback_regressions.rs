@@ -1,7 +1,9 @@
 #![allow(unknown_lints)]
 #![deny(float_literal_f32_fallback)]
 
-use gpui::{AnyElement, Element, ElementId, SharedString, div, prelude::*};
+use gpui::{
+    AnyElement, Element, ElementId, InteractiveText, SharedString, StyledText, div, prelude::*,
+};
 use gpui_rsx::{component, rsx, rsx_fragment};
 
 #[component]
@@ -82,4 +84,36 @@ fn erased_fragments_accept_mixed_roots_and_preserve_ordinary_fragment_types() {
     let _: AnyElement = rsx! { <div>{...parts}</div> }.into_any_element();
     let concrete: Vec<gpui::Div> = rsx! { <><div /><div /></> };
     assert_eq!(concrete.len(), 2);
+}
+
+#[test]
+fn interactive_text_click_attributes_accept_range_listener_tuples() {
+    fn view() -> impl IntoElement {
+        rsx! {
+            <div base={InteractiveText::new("text", StyledText::new("reserve"))}
+                onClick={(vec![0..7], |_, _, _| {})} />
+        }
+    }
+
+    let _: AnyElement = view().into_any_element();
+    let text: InteractiveText = rsx! {
+        <div base={InteractiveText::new("text-snake", StyledText::new("reserve"))}
+            on_click={(vec![0..7], |_, _, _| {})} />
+    };
+    assert_eq!(
+        Element::id(&text),
+        Some(ElementId::Name("text-snake".into()))
+    );
+    let _: AnyElement = text.into_any_element();
+}
+
+#[test]
+fn div_click_attributes_keep_single_listeners_and_auto_ids() {
+    let elements = [
+        rsx! { <div onClick={|_, _, _| {}} /> },
+        rsx! { <div on_click={|_, _, _| {}} /> },
+    ];
+    for element in elements {
+        assert!(matches!(Element::id(&element), Some(ElementId::Name(_))));
+    }
 }

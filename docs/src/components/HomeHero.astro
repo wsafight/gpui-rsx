@@ -11,13 +11,13 @@ const text = zh ? {
   description: '用 JSX 风格的语法编写原生 GPUI 视图。静态标记在编译期展开为 Rust builder 调用，布局、状态与类型检查自然衔接。',
   start: '开始构建', try: '打开在线体验', note: '从第一个视图，到完整的桌面应用。',
   pipeline: ['声明界面', '编译为 Rust', '原生 GPUI'],
-  release: '0.10.1 已发布',
+  release: '0.10.2 已发布',
 } : {
   first: 'Native views.', second: 'Readable Rust.',
   description: 'Write native GPUI views with JSX-like syntax. Static markup becomes Rust builder calls at compile time, bringing layout, state, and type checking together.',
   start: 'Start building', try: 'Open playground', note: 'From your first view to a complete desktop app.',
   pipeline: ['Declare your UI', 'Compile to Rust', 'Native GPUI'],
-  release: '0.10.1 is here',
+  release: '0.10.2 is here',
 };
 const code = `rsx! {
     <div class="flex flex-col gap-[12px] p-[24px]">
@@ -55,7 +55,7 @@ const code = `rsx! {
 </section>
 
 <div class="compat-strip">
-  <span>GPUI-RSX <strong>0.10.1</strong></span>
+  <span>GPUI-RSX <strong>0.10.2</strong></span>
   <span>GPUI Kit <strong>0.8.1</strong></span>
   <span>Rust <strong>1.88+</strong> <small>{zh ? '宏 / core' : 'macro / core'}</small></span>
   <a href={`${base}compatibility/`}>{zh ? '兼容性矩阵' : 'Compatibility matrix'} <span aria-hidden="true">↗</span></a>

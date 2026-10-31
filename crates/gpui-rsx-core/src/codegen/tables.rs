@@ -86,7 +86,7 @@ pub fn lookup_attr_method_info(name: &str) -> Option<AttrMethodInfo> {
     Some(AttrMethodInfo {
         method,
         needs_id,
-        multi_arg,
+        multi_arg: multi_arg || method == "on_click",
     })
 }
 

@@ -224,6 +224,18 @@ rsx! {
 }
 ```
 
+`InteractiveText` 的 `onClick` 和 `on_click` 也支持通过 tuple 传入两个参数：
+
+```rust
+rsx! {
+    <div base={InteractiveText::new("text", StyledText::new("reserve"))}
+        onClick={(vec![0..7], |_, _, _| {})} />
+}
+```
+
+该写法展开为 `.on_click(ranges, listener)`。普通 `Div` 的监听器继续使用
+单参数写法 `onClick={listener}`。
+
 常见 CamelCase alias 会映射到 GPUI 的 snake_case 方法：
 
 | RSX 属性 | GPUI 方法 |

@@ -2,12 +2,18 @@
   "name": "gpui-rsx",
   "displayName": "GPUI RSX",
   "description": "Class completion, diagnostics, expansion hover and formatting for GPUI RSX macros.",
-  "version": "0.10.1",
+  "version": "0.10.2",
   "publisher": "wsafight",
   "license": "MIT",
-  "engines": { "vscode": "^1.96.0" },
+  "engines": {
+    "vscode": "^1.96.0"
+  },
   "categories": ["Programming Languages", "Formatters", "Linters"],
-  "repository": { "type": "git", "url": "https://github.com/wsafight/gpui-rsx.git", "directory": "editors/vscode" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/wsafight/gpui-rsx.git",
+    "directory": "editors/vscode"
+  },
   "activationEvents": ["onLanguage:rust"],
   "main": "./dist/extension.cjs",
   "scripts": {
@@ -19,9 +25,21 @@
   },
   "contributes": {
     "semanticTokenTypes": [
-      { "id": "rsxClass", "superType": "string", "description": "Supported GPUI RSX utility class." },
-      { "id": "rsxThemeToken", "superType": "variable", "description": "Class resolved from rsx.toml." },
-      { "id": "rsxInvalidClass", "superType": "string", "description": "Unrecognized or unsupported GPUI RSX class." }
+      {
+        "id": "rsxClass",
+        "superType": "string",
+        "description": "Supported GPUI RSX utility class."
+      },
+      {
+        "id": "rsxThemeToken",
+        "superType": "variable",
+        "description": "Class resolved from rsx.toml."
+      },
+      {
+        "id": "rsxInvalidClass",
+        "superType": "string",
+        "description": "Unrecognized or unsupported GPUI RSX class."
+      }
     ],
     "semanticTokenScopes": [
       {
@@ -36,16 +54,48 @@
     "configuration": {
       "title": "GPUI RSX",
       "properties": {
-        "gpuiRsx.serverPath": { "type": "string", "default": "cargo-rsx", "description": "Path to cargo-rsx (install with cargo install cargo-rsx)." },
-        "gpuiRsx.autoStart": { "type": "boolean", "default": true, "description": "Start the GPUI RSX language server only in workspaces that contain gpui-rsx or rsx.toml." },
-        "gpuiRsx.format.enable": { "type": "boolean", "default": false, "description": "Offer GPUI RSX as a Rust formatter. It formats RSX macro bodies only and leaves the surrounding Rust unchanged, so keep rust-analyzer as the default formatter unless you only want RSX formatting." }
+        "gpuiRsx.serverPath": {
+          "type": "string",
+          "default": "cargo-rsx",
+          "description": "Path to cargo-rsx (install with cargo install cargo-rsx)."
+        },
+        "gpuiRsx.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Start the GPUI RSX language server only in workspaces that contain gpui-rsx or rsx.toml."
+        },
+        "gpuiRsx.format.enable": {
+          "type": "boolean",
+          "default": false,
+          "description": "Offer GPUI RSX as a Rust formatter. It formats RSX macro bodies only and leaves the surrounding Rust unchanged, so keep rust-analyzer as the default formatter unless you only want RSX formatting."
+        }
       }
     },
     "commands": [
-      { "command": "gpuiRsx.restart", "title": "GPUI RSX: Restart language server" },
-      { "command": "gpuiRsx.install", "title": "GPUI RSX: Install cargo-rsx" }
+      {
+        "command": "gpuiRsx.restart",
+        "title": "GPUI RSX: Restart language server"
+      },
+      {
+        "command": "gpuiRsx.install",
+        "title": "GPUI RSX: Install cargo-rsx"
+      }
     ]
   },
-  "dependencies": { "vscode-languageclient": "^9.0.1" },
-  "devDependencies": { "@types/vscode": "^1.96.0", "@types/node": "^22.0.0", "@vscode/vsce": "^3.0.0", "esbuild": "^0.25.0", "typescript": "^5.8.0" }
+  "dependencies": {
+    "vscode-languageclient": "^11.0.0"
+  },
+  "devDependencies": {
+    "@types/vscode": "~1.96.0",
+    "@types/node": "^22.20.5",
+    "@vscode/vsce": "^4.1.0",
+    "esbuild": "^0.28.2",
+    "typescript": "^7.0.2"
+  },
+  "overrides": {
+    "minimatch": "^11.0.3"
+  },
+  "patchedDependencies": {
+    "vscode-languageclient@11.0.0": "patches/vscode-languageclient@11.0.0.patch"
+  }
 }

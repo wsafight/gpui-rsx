@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.2] - 2026-10-31
+
+### Fixed
+
+- Expand `InteractiveText` click tuples through both `onClick` and `on_click` into
+  `.on_click(ranges, listener)`, while preserving ordinary single-listener Div events.
+  Regression tests compile the reported example against the real GPUI Kit backend.
+- Keep fuzz and test fixture lockfile versions in sync with `cargo xtask bump`.
+- Clone `ClassMode` before repeated analysis calls so the standalone fuzz target compiles.
+- Build the playground with macOS Bash 3.2 when wasm-pack needs to install the
+  matching wasm-bindgen CLI.
+
+### Changed
+
+- Update the documentation stack to Astro 7.4.4, Starlight 0.42.8 and sharp 0.35.5.
+  Keep TypeScript 6 while the Astro checker requires it.
+- Update the VS Code extension to language client 11, vsce 4.1, esbuild 0.28 and
+  TypeScript 7, with explicit Node module resolution and types. Keep VS Code 1.96
+  support and patch client glob validation for the fixed minimatch API.
+- Update the converter's matching SWC packages and wasm-bindgen 0.2.130, including
+  the playground CLI version check. Preserve the public syn 2 AST and Rust 1.88 MSRV.
+
+### Security
+
+- Refresh documentation, editor and demo transitive dependencies, including the
+  demo's XML, HTTP, QUIC, TLS and crossbeam fixes, while retaining GPUI Kit 0.8.1.
+- Audit all four active Rust lockfiles and both Bun lockfiles in CI.
+
 ## [0.10.1] - 2026-10-31
 
 ### Added
@@ -869,7 +897,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...HEAD
+[0.10.2]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...v0.9.0

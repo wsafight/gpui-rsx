@@ -46,12 +46,16 @@ cargo publish --dry-run --allow-dirty
 发布前还需要：
 
 - 用 `cargo xtask bump <version>` 统一设置版本：workspace manifest 与内部依赖要求、
-  `Cargo.lock`、`demo/Cargo.lock`、`editors/zed/Cargo.lock` 中的 workspace 条目、VS Code 与 Zed
+  根目录、demo、Zed、fuzz 和测试 fixture 的 lockfile 中的 workspace 条目、VS Code 与 Zed
   插件 manifest、README 和文档中的安装片段，以及兼容性矩阵。CI 会运行 `cargo xtask bump --check`；
 - 更新 `CHANGELOG.md` 和 `CHANGELOG_CN.md`，并标注破坏性 API 变更；
 - 去掉已发布功能的“未发布”标记：`rg -n -i 'unreleased|未发布' docs/src README*.md`；
 - 确认 demo lockfile 仍指向预期的 Kit 与 GPUI 快照版本；
 - 合并后确认 GitHub Pages 部署成功。
+
+CI 会审计四个活跃 Rust 项目与两个 Bun 项目的 lockfile。更新依赖后，发布前对各 Rust
+项目运行 `cargo audit --file <lockfile>`，并运行 `bun audit --cwd docs` 和
+`bun audit --cwd editors/vscode`。
 
 ## 工具包
 

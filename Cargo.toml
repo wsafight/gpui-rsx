@@ -5,14 +5,14 @@ resolver = "3"
 
 # Published crates release together; bump the version here and in the internal requirements.
 [workspace.package]
-version = "0.10.1"
+version = "0.10.2"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/wsafight/gpui-rsx"
 
 [workspace.dependencies]
-gpui-rsx-core = { version = "0.10.1", path = "crates/gpui-rsx-core" }
-gpui-rsx-tools = { version = "0.10.1", path = "crates/gpui-rsx-tools", default-features = false }
+gpui-rsx-core = { version = "0.10.2", path = "crates/gpui-rsx-core" }
+gpui-rsx-tools = { version = "0.10.2", path = "crates/gpui-rsx-tools", default-features = false }
 
 [package]
 name = "gpui-rsx"
@@ -42,9 +42,9 @@ proc-macro = true
 
 [dependencies]
 gpui-rsx-core.workspace = true
-syn = { version = "2.0.117", features = ["full"] }
-quote = "1.0.45"
-proc-macro2 = { version = "1.0.106", features = ["span-locations"] }
+syn = { version = "2.0.119", features = ["full"] }
+quote = "1.0.47"
+proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
 
 [features]
 default = []
@@ -57,7 +57,7 @@ dynamic-class-report = []
 # Doctests compile against a GPUI stand-in so documentation examples are verified.
 gpui = { package = "gpui-rsx-gpui-stub", path = "crates/gpui-stub" }
 criterion = { version = "0.8.2", features = ["html_reports"] }
-trybuild = "1.0.116"
+trybuild = "1.0.122"
 
 [[bench]]
 name = "class_performance"

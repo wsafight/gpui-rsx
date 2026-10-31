@@ -288,6 +288,17 @@ fn attr_method_info_keeps_behavior_flags_together() {
     }
 }
 
+#[test]
+fn click_attributes_allow_inherent_multi_argument_overloads() {
+    assert_eq!(lookup_gpui_method("on_click").unwrap().arity, 1);
+    for attr in ["onClick", "on_click"] {
+        let info = lookup_attr_method_info(attr).unwrap();
+        assert_eq!(info.method, "on_click");
+        assert!(info.needs_id, "{attr}");
+        assert!(info.multi_arg, "{attr}");
+    }
+}
+
 // --- is_stateful_attr ---
 
 #[test]

@@ -47,13 +47,17 @@ cargo publish --dry-run --allow-dirty
 Before publishing:
 
 - set the version everywhere with `cargo xtask bump <version>`: workspace manifests and
-  internal requirements, workspace entries in `Cargo.lock`, `demo/Cargo.lock` and
-  `editors/zed/Cargo.lock`, the VS Code and Zed extension manifests, install snippets in the
+  internal requirements, workspace entries in the root, demo, Zed, fuzz and test fixture
+  lockfiles, the VS Code and Zed extension manifests, install snippets in the
   README and docs, and the compatibility matrix. CI runs `cargo xtask bump --check`,
 - update `CHANGELOG.md` and `CHANGELOG_CN.md`, and mark breaking API changes,
 - remove "unreleased" labels for shipped features: `rg -n -i 'unreleased|未发布' docs/src README*.md`,
 - ensure the demo lockfile still reflects the intended Kit and GPUI snapshot versions,
 - confirm GitHub Pages deployment succeeds after merge.
+
+CI audits all four active Rust lockfiles and both Bun lockfiles. Before releasing,
+run `cargo audit --file <lockfile>` for each Rust project and `bun audit --cwd docs`
+and `bun audit --cwd editors/vscode` after updating dependencies.
 
 ## Tooling packages
 

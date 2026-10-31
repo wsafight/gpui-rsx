@@ -504,6 +504,29 @@ mod tests {
     }
 
     #[test]
+    fn click_attributes_support_both_gpui_signatures() {
+        for attr in ["onClick", "on_click"] {
+            for (value, expected) in [
+                ("(ranges, handler)", ". on_click (ranges , handler)"),
+                ("handler", ". on_click (handler)"),
+                ("(handler)", ". on_click ((handler))"),
+                ("|_, _, _| {}", ". on_click (| _ , _ , _ | { })"),
+            ] {
+                let expanded = expand(&format!("<div {attr}={{{value}}} />"));
+                assert!(expanded.contains(expected), "{attr}={value}: {expanded}");
+            }
+        }
+    }
+
+    #[test]
+    fn single_argument_attributes_preserve_tuple_values() {
+        for attr in ["bg", "customProp"] {
+            let expanded = expand(&format!("<div {attr}={{(first, second)}} />"));
+            assert!(expanded.contains("((first , second))"), "{expanded}");
+        }
+    }
+
+    #[test]
     fn id_key_base_and_unknown_handler_attributes_are_not_methods() {
         // These are consumed by element generation, so no stray `.id()`/`.key()` appears twice.
         let expanded =

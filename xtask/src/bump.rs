@@ -100,7 +100,23 @@ fn targets(root: &Path) -> Result<Vec<(PathBuf, Vec<Site>)>, String> {
             root.join("editors/zed/Cargo.lock"),
             vec![lock_entry("gpui-rsx-zed")],
         ),
+        (
+            root.join("fuzz/Cargo.lock"),
+            vec![lock_entry("gpui-rsx-core")],
+        ),
     ];
+    for fixture in ["binary-runtime", "shared-runtime", "gpui-0.2.2"] {
+        let lockfile = root.join(format!("tests/fixtures/{fixture}/Cargo.lock"));
+        if lockfile.is_file() {
+            targets.push((
+                lockfile,
+                ["gpui-rsx", "gpui-rsx-core"]
+                    .into_iter()
+                    .map(lock_entry)
+                    .collect(),
+            ));
+        }
+    }
     let mut docs = vec![
         root.join("README.md"),
         root.join("README_CN.md"),
@@ -275,6 +291,27 @@ mod tests {
     fn run_rejects_invalid_versions_before_touching_files() {
         let error = run(Path::new("."), Some("1.2"), false).unwrap_err();
         assert!(error.contains("not a MAJOR.MINOR.PATCH"), "{error}");
+    }
+
+    #[test]
+    fn targets_allow_missing_generated_fixture_lockfiles() {
+        let dir = std::env::temp_dir().join(format!("rsx-bump-targets-{}", std::process::id()));
+        std::fs::create_dir_all(dir.join("docs/src/content/docs")).unwrap();
+        let fixture_dir = dir.join("tests/fixtures/binary-runtime");
+        let lockfile = fixture_dir.join("Cargo.lock");
+        let initial = targets(&dir).unwrap();
+        assert!(!initial.iter().any(|(path, _)| path == &lockfile));
+        assert!(
+            initial
+                .iter()
+                .any(|(path, _)| path == &dir.join("fuzz/Cargo.lock"))
+        );
+
+        std::fs::create_dir_all(&fixture_dir).unwrap();
+        std::fs::write(&lockfile, "").unwrap();
+        let generated = targets(&dir).unwrap();
+        assert!(generated.iter().any(|(path, _)| path == &lockfile));
+        std::fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

@@ -208,6 +208,10 @@ For a fully stable custom ID that survives refactors, use the `id` attribute ins
 Multi-argument GPUI methods use tuple syntax in RSX, e.g.
 `onMouseDown={(MouseButton::Left, handler)}`.
 
+For `InteractiveText`, `onClick={(ranges, listener)}` and
+`on_click={(ranges, listener)}` expand to `.on_click(ranges, listener)`.
+Ordinary `Div` listeners keep the single-argument form `onClick={listener}`.
+
 ### Expressions and Children
 
 ```

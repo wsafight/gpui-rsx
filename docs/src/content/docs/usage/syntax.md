@@ -229,6 +229,18 @@ rsx! {
 }
 ```
 
+`InteractiveText` also accepts two arguments through `onClick` or `on_click`:
+
+```rust
+rsx! {
+    <div base={InteractiveText::new("text", StyledText::new("reserve"))}
+        onClick={(vec![0..7], |_, _, _| {})} />
+}
+```
+
+This expands to `.on_click(ranges, listener)`. Ordinary `Div` listeners keep
+the single-argument form `onClick={listener}`.
+
 CamelCase aliases map to GPUI snake_case methods where needed:
 
 | RSX attribute | GPUI method |

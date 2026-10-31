@@ -14,14 +14,14 @@ RSX 展开与 GPUI derive 使用的 `gpui::` 路径。
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.10.1` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
+| `0.10.2` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.1"
+gpui-rsx = "0.10.2"
 ```
 <!-- gpui-rsx:compat:end -->
 
