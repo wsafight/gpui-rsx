@@ -92,7 +92,7 @@ use gpui_rsx::{component, rsx};
 fn Badge(
     label: SharedString,
     #[prop(default)] highlighted: bool,
-    #[prop(default = 2u8)] depth: u8,
+    #[prop(default = 2)] depth: u8,
     #[children] children: Vec<AnyElement>,
     #[context] cx: &mut App,
 ) -> impl IntoElement {
@@ -115,6 +115,10 @@ let badge = rsx! {
 `#[prop(default = expr)]` 提供显式默认值。带默认值的布尔属性使用 flag setter
 （`highlighted`）或条件 setter（`highlightedIf={active}`）。`#[children]` 将子节点
 收集到 `Vec<AnyElement>`。也支持 `<ui::Badge ...>` 这样的模块路径标签。
+
+无后缀数值字面量与纯数值表达式按声明的基础数值类型推断，例如
+`#[prop(default = 7)] value: u32`、`#[prop(default = 7.0)] ratio: f32`。
+带后缀的数值保留 `Into` 转换，字符串默认值也保留转换能力，例如 `SharedString` 的 `"ready"`。
 
 可选的 `#[context]` 参数必须是 `&mut Window` 或 `&mut App`，由 GPUI 渲染时传入，
 调用方无需将它们作为属性传递；宏也不会隐式捕获调用方的 `window` 或 `cx`。
@@ -317,6 +321,21 @@ rsx! {
 ```
 
 Fragment 会展开为 `vec![...]`。如果根元素具体类型不同，通常需要 `into_any_element()` 或包一层共同父元素。根 Fragment 中包含 `for` 循环或 `{...spread}` 时，会展开为 `Vec<AnyElement>`，元素顺序保持不变。
+
+需要混合不同根元素类型时，使用始终返回 `Vec<gpui::AnyElement>` 的 `rsx_fragment!`：
+
+```rust
+let parts = gpui_rsx::rsx_fragment! {
+    <>
+        <div />
+        <div id="stateful" />
+    </>
+};
+rsx! { <div>{...parts}</div> }
+```
+
+它沿用 `rsx!` 的间距刻度与项目配置。单根元素返回只有一项的向量，空 Fragment 返回空向量。
+普通 `rsx!` Fragment 继续保留原来的具体元素类型。
 
 Fragment 也可以嵌套：
 

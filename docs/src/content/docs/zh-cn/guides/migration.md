@@ -90,7 +90,7 @@ UTF-16 位置依次应用，未修改的宏复用诊断结果。同一次 RSX �
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.0"
+gpui-rsx = "0.10.1"
 ```
 
 Kit 0.8.1 固定 `gpui-pre = 0.3.10`。从 `gpui::component` 导入带样式控件，

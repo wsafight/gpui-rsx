@@ -177,6 +177,18 @@ jobs:
       - name: Check resolved demo backend
         run: cargo run --quiet -p cargo-rsx -- doctor --manifest-path demo/Cargo.toml
 
+  gpui-022:
+    name: GPUI 0.2.2 Feedback Regressions
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: tests/fixtures/gpui-0.2.2
+      - name: Compile regressions against published GPUI 0.2.2
+        run: cargo check --manifest-path tests/fixtures/gpui-0.2.2/Cargo.toml --tests
+
   fmt:
     name: Rustfmt
     runs-on: ubuntu-latest

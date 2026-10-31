@@ -15,14 +15,14 @@ The macro and core crates have no GPUI runtime dependency. The demo names
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.10.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
+| `0.10.1` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.0"
+gpui-rsx = "0.10.1"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -37,6 +37,19 @@ gpui-rsx = "0.10.0"
 
 The root MSRV and demo toolchain are managed separately. Working on the macro does
 not require GPUI platform dependencies.
+
+## Published GPUI 0.2.2 Regression Checks
+
+A separate macOS fixture compiles dynamic string keys, numeric component defaults and
+mixed root fragments against `gpui = "=0.2.2"`, with `font-kit`, `runtime_shaders` and
+GPUI-RSX's `tailwind-scale`. It shares regression sources with the Kit demo tests:
+
+```bash
+cargo check --manifest-path tests/fixtures/gpui-0.2.2/Cargo.toml --tests
+```
+
+These checks cover the reported macro behaviors; the full generated GPUI API surface
+continues to target the Kit snapshot in the matrix above.
 
 ## Share One GPUI Type Identity
 

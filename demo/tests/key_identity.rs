@@ -73,6 +73,22 @@ fn display_keys_are_borrowed_and_integer_references_remain_usable() {
 }
 
 #[test]
+fn borrowed_and_shared_string_keys_produce_named_ids() {
+    fn view(key: &str) -> gpui::Stateful<gpui::Div> {
+        gpui_rsx::rsx! { <div key={key} onClick={|_, _, _| {}} /> }
+    }
+
+    let owned = String::from("row");
+    let borrowed = view(&owned);
+    assert!(matches!(Element::id(&borrowed), Some(ElementId::Name(_))));
+    let shared = gpui::SharedString::from("shared");
+    let element = gpui_rsx::rsx! { <div key={shared} focusable /> };
+    assert!(matches!(Element::id(&element), Some(ElementId::Name(_))));
+    assert_eq!(shared.as_ref(), "shared");
+    assert_eq!(owned, "row");
+}
+
+#[test]
 fn auto_ids_are_stable_at_one_call_site_and_distinct_between_siblings() {
     fn render() -> gpui::Stateful<gpui::Div> {
         gpui_rsx::rsx! { <div onClick={|_, _, _| {}} /> }

@@ -8,7 +8,7 @@ The CLI and editor language server share the macro's parser and class configurat
 ## Install and diagnose
 
 ```sh
-cargo install cargo-rsx --version 0.10.0 --locked
+cargo install cargo-rsx --version 0.10.1 --locked
 cargo rsx doctor --manifest-path demo/Cargo.toml
 ```
 
@@ -77,7 +77,7 @@ Migration divides numeric class values by four to preserve pixel dimensions when
 
 | Editor | Setup |
 | --- | --- |
-| VS Code | Download the `.vsix` from the [0.10.0 release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.10.0), then run **Extensions: Install from VSIX**. |
+| VS Code | Download the `.vsix` from the [0.10.1 release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.10.1), then run **Extensions: Install from VSIX**. |
 | Zed | Install `editors/zed` from the repository as a development extension. If you customize Rust language servers, add `"gpui-rsx"` alongside `"rust-analyzer"`. |
 
 Both integrations use `cargo rsx lsp` and provide:

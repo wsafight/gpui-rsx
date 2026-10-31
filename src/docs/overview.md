@@ -11,7 +11,7 @@ and readable while generating **zero-overhead** native GPUI method chains at com
 # #![allow(unused)]
 # use gpui::prelude::*;
 # use gpui::*;
-# use gpui_rsx::rsx;
+# use gpui_rsx::rsx_tw;
 # #[derive(Clone)]
 # struct Item { id: usize, name: SharedString }
 # struct Task { id: usize, title: SharedString }
@@ -56,7 +56,7 @@ let before = div()
     );
 
 // After — concise RSX (~50% less code)
-let after = rsx! {
+let after = rsx_tw! {
     <div class="flex flex-col gap-4 p-4 bg-blue-500">
         <h1 class="text-xl font-bold">{"Hello GPUI"}</h1>
         <button
@@ -67,7 +67,7 @@ let after = rsx! {
         </button>
     </div>
 };
-// Both produce the same method chain.
+// Both use the same spacing, layout and colors.
 # };
 # div()
 # }
@@ -78,7 +78,9 @@ let after = rsx! {
 # }
 ```
 
-The two snippets produce **identical** compiled output.
+`rsx_tw!` uses Tailwind's 4px spacing units, so `gap-4` and `p-4` are 16px.
+The default `rsx!` uses pixel units unless `tailwind-scale` or project configuration
+selects the Tailwind scale.
 
 ## Features
 
@@ -91,7 +93,7 @@ The two snippets produce **identical** compiled output.
 | `class` (dynamic) | Runtime expression with colors, sizing, spacing, and common utilities |
 | Full color palette | 242 Tailwind colors + arbitrary hex/RGB/RGBA (`bg-[#ff0000]`) |
 | Desktop sizing | `w-[280px]`, `w-[37.5%]`, `w-6/24`, `min-w-0` |
-| Fragments | `<>...</>` — returns `vec![...]` |
+| Fragments | `<>...</>` returns `vec![...]`; `rsx_fragment!` returns `Vec<AnyElement>` for mixed root types |
 | For-loop sugar | `{for item in iter { ... }}` |
 | Spread | `{...iterator}` |
 | Conditional | `when` / `whenSome` attributes |

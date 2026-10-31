@@ -18,6 +18,8 @@ arbitrary color and length families. These are GPUI builder calls, not browser C
   types, `#[prop(default)]` / `#[prop(default = expr)]`, `#[prop(callback)]` for
   `Rc<dyn TraitAlias>`, and `#[children] Vec<AnyElement>`.
   Use `#[context]` only for `&mut Window` / `&mut App`; contexts are supplied during rendering.
+- Use `rsx_fragment!` for mixed root types; it always returns `Vec<gpui::AnyElement>`.
+  Ordinary `rsx!` fragments without loops or spreads retain their concrete element types.
 - Import GPUI's prelude and the concrete types/functions used by the expansion.
   Validate the application with `cargo check`; macro expansion alone is not type checking.
 

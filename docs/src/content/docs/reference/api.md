@@ -6,12 +6,13 @@ description: Compact reference for GPUI-RSX macros, tags, attributes, and genera
 ## Macros
 
 ```rust
-use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_runtime, rsx_strict, rsx_tw};
+use gpui_rsx::{rsx, rsx_expand, rsx_fragment, rsx_permissive, rsx_runtime, rsx_strict, rsx_tw};
 ```
 
 | Macro | Behavior |
 | --- | --- |
 | `rsx!` | Default permissive RSX macro. |
+| `rsx_fragment!` | Always returns `Vec<gpui::AnyElement>` for mixed root types; otherwise follows `rsx!`. |
 | `rsx_permissive!` | Explicit permissive mode; unsupported classes are ignored when safe. |
 | `rsx_strict!` | Unsupported static classes become compile errors; unsupported dynamic classes panic when evaluated. |
 | `rsx_expand!` | Returns a string preview of generated GPUI builder code. |

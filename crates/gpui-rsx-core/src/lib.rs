@@ -35,6 +35,7 @@ pub use codegen::class::{
 };
 pub use codegen::element::{
     generate_body_expansion_preview, generate_body_with_mode, generate_body_without_runtime,
+    generate_fragment_with_mode, generate_fragment_without_runtime,
 };
 pub use codegen::runtime::generate_runtime_module;
 pub use codegen::tables::{GPUI_COMPONENT_REV, GPUI_SOURCE_REV};
@@ -57,6 +58,7 @@ pub const MACRO_NAMES: &[&str] = &[
     "rsx_permissive",
     "rsx_tw",
     "rsx_expand",
+    "rsx_fragment",
 ];
 
 /// Parses and expands an RSX macro body. Parse errors become `compile_error!` tokens.
@@ -78,6 +80,7 @@ pub fn expand_str(source: &str, mode: ClassMode) -> Result<TokenStream, syn::Err
 #[derive(Clone, Copy, Debug, Default)]
 pub struct MacroOptions {
     strict: bool,
+    erased_roots: bool,
     /// Scale forced by the macro itself (`rsx_tw!`), overriding `rsx.toml`.
     forced_scale: Option<SpacingScale>,
     /// Scale used when neither the macro nor `rsx.toml` chooses one (Cargo feature).
@@ -90,6 +93,7 @@ impl MacroOptions {
     pub const fn new() -> Self {
         Self {
             strict: false,
+            erased_roots: false,
             forced_scale: None,
             default_scale: SpacingScale::Px,
             report_dynamic_at_exit: false,
@@ -98,6 +102,14 @@ impl MacroOptions {
 
     pub const fn with_strict(self, strict: bool) -> Self {
         Self { strict, ..self }
+    }
+
+    /// Makes every root an `AnyElement` and returns a `Vec`, including a single root.
+    pub const fn with_erased_roots(self, erased_roots: bool) -> Self {
+        Self {
+            erased_roots,
+            ..self
+        }
     }
 
     pub const fn with_forced_scale(self, scale: Option<SpacingScale>) -> Self {
@@ -176,7 +188,14 @@ pub fn expand_macro(input: TokenStream, options: MacroOptions) -> TokenStream {
     if let Some(path) = theme.as_deref().and_then(Theme::dynamic_runtime) {
         mode = mode.with_dynamic_runtime_path(runtime_config::runtime_path(path));
     }
-    let code = expand(input, mode);
+    let code = if options.erased_roots {
+        match syn::parse2::<RsxBody>(input) {
+            Ok(body) => generate_fragment_with_mode(&body, mode),
+            Err(error) => error.to_compile_error(),
+        }
+    } else {
+        expand(input, mode)
+    };
     match theme.as_deref().and_then(theme::rebuild_tracker) {
         Some(tracker) => quote::quote! { { #tracker #code } },
         None => code,

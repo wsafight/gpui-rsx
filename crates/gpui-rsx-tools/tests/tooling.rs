@@ -919,3 +919,21 @@ fn summaries_omit_the_dynamic_helper_but_keep_the_call_site() {
         expand(static_source, ClassMode::PERMISSIVE)
     );
 }
+
+#[test]
+fn erased_fragment_macros_are_discovered_formatted_and_expanded() {
+    let source = "fn view(){rsx_fragment!{<><div/><div id=\"stateful\"/></>};}";
+    let calls = macro_calls(source).unwrap();
+    assert_eq!(calls.len(), 1);
+    assert_eq!(calls[0].name, "rsx_fragment");
+    let formatted = format::rust(source).unwrap();
+    assert_eq!(format::rust(&formatted).unwrap(), formatted);
+    let summary = gpui_rsx_tools::expand_summary_for_macro(
+        &source[calls[0].start..calls[0].end],
+        &calls[0].name,
+        ClassMode::PERMISSIVE,
+    )
+    .unwrap();
+    assert!(summary.contains("::gpui::AnyElement"), "{summary}");
+    assert_eq!(summary.matches("into_any_element()").count(), 2);
+}

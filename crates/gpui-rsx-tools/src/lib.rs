@@ -585,6 +585,20 @@ pub fn expand_summary(source: &str, mode: ClassMode) -> Result<String, String> {
     pretty_expansion(code).map(|code| with_helper_note(code, dynamic))
 }
 
+pub fn expand_summary_for_macro(
+    source: &str,
+    name: &str,
+    mode: ClassMode,
+) -> Result<String, String> {
+    let mode = mode_for(name, mode);
+    if name != "rsx_fragment" {
+        return expand_summary(source, mode);
+    }
+    let body = syn::parse_str::<RsxBody>(source).map_err(|e| e.to_string())?;
+    let (code, dynamic) = gpui_rsx_core::generate_fragment_without_runtime(&body, mode);
+    pretty_expansion(code).map(|code| with_helper_note(code, dynamic))
+}
+
 fn with_helper_note(code: String, dynamic: bool) -> String {
     if dynamic {
         format!(

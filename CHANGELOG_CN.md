@@ -9,6 +9,25 @@
 
 ## [未发布]
 
+## [0.10.1] - 2026-10-31
+
+### 新增
+
+- 可选的 `rsx_fragment!` 始终返回 `Vec<gpui::AnyElement>`，支持混合不同类型的根节点，
+  并支持格式化、宏发现与展开 hover。普通 `rsx!` Fragment 保留原有具体元素类型。
+- 新增针对官方 GPUI 0.2.2 的 macOS 回归 fixture 与 CI 编译检查，与 Kit demo 共用
+  key、组件默认值和 Fragment 的回归测试源码。
+
+### 修复
+
+- 动态 `Display` key 将格式化结果转换为 GPUI 的 `SharedString`，使 `String`、借用
+  字符串和 `SharedString` 可在 GPUI 0.2.2 下编译。具体整数保留命名整数快路径，
+  key 仍只借用求值一次。
+- 组件的无后缀数值默认值按声明的基础数值类型推断，支持算术与位运算表达式。
+  字符串、回调、带后缀数值以及其他 `Into` 默认值保留原有转换。
+- 快速对比示例显式使用 `rsx_tw!` 表达 16px 间距，说明默认像素刻度，移除编译结果
+  完全相同的错误表述。
+
 ## [0.10.0] - 2026-10-29
 
 ### 新增
@@ -754,7 +773,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...v0.8.3

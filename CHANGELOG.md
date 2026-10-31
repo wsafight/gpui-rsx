@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-31
+
+### Added
+
+- Opt-in `rsx_fragment!` always returns `Vec<gpui::AnyElement>` for mixed root types,
+  with formatting, macro discovery and expansion hover support. Ordinary `rsx!`
+  fragments retain their existing concrete element types.
+- A macOS regression fixture and CI compile check against published GPUI 0.2.2,
+  sharing tests for keys, component defaults and fragments with the Kit demo.
+
+### Fixed
+
+- Dynamic `Display` keys convert formatted strings to GPUI's `SharedString`, so
+  `String`, borrowed strings and `SharedString` compile with GPUI 0.2.2. Concrete
+  integer keys keep their named-integer fast path and keys are still borrowed once.
+- Unsuffixed numeric component defaults infer the declared primitive field type,
+  including arithmetic and bitwise expressions. String, callback, suffixed numeric
+  and other `Into` defaults retain their conversions.
+- The quick comparison explicitly uses `rsx_tw!` for 16px spacing and documents
+  the default pixel scale instead of claiming identical compiled output.
+
 ## [0.10.0] - 2026-10-29
 
 ### Added
@@ -848,7 +869,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/wsafight/gpui-rsx/compare/v0.8.3...v0.9.0
 [0.8.3]: https://github.com/wsafight/gpui-rsx/compare/v0.8.2...v0.8.3

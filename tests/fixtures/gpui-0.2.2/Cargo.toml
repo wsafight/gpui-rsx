@@ -1,0 +1,15 @@
+[package]
+name = "gpui-022-feedback-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+gpui = { version = "=0.2.2", default-features = false, features = ["font-kit", "runtime_shaders"] }
+gpui-rsx = { path = "../../..", features = ["tailwind-scale"] }
+
+[[test]]
+name = "feedback_regressions"
+path = "../../../demo/tests/feedback_regressions.rs"
+
+[workspace]

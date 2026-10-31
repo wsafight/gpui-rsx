@@ -101,7 +101,7 @@ dependencies with Kit, preserving the `gpui` crate name for generated code:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.0"
+gpui-rsx = "0.10.1"
 ```
 
 Kit 0.8.1 pins `gpui-pre = 0.3.10`. Use `gpui::component` for styled controls and

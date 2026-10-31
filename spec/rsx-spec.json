@@ -17963,7 +17963,8 @@
     "rsx_strict",
     "rsx_permissive",
     "rsx_tw",
-    "rsx_expand"
+    "rsx_expand",
+    "rsx_fragment"
   ],
   "runtime_macro": "rsx_runtime",
   "schema_version": 1,

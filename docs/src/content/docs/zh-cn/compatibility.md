@@ -14,14 +14,14 @@ RSX 展开与 GPUI derive 使用的 `gpui::` 路径。
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.10.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
+| `0.10.1` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.0"
+gpui-rsx = "0.10.1"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -35,6 +35,18 @@ gpui-rsx = "0.10.0"
 | Demo 检查命令 | `cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked` |
 
 根 crate 的 MSRV 与 demo 的工具链分开管理；编写宏无需安装 GPUI 平台依赖。
+
+## 官方 GPUI 0.2.2 回归检查
+
+独立的 macOS fixture 使用 `gpui = "=0.2.2"`，启用 `font-kit`、`runtime_shaders`
+与 GPUI-RSX 的 `tailwind-scale`，编译验证动态字符串 key、组件数值默认值和混合根节点
+Fragment。它与 Kit demo 测试共用回归源码：
+
+```bash
+cargo check --manifest-path tests/fixtures/gpui-0.2.2/Cargo.toml --tests
+```
+
+此检查覆盖上述反馈中的宏行为；完整生成的 GPUI API 仍以上方矩阵中的 Kit 快照为目标。
 
 ## 保持同一份 GPUI 类型
 

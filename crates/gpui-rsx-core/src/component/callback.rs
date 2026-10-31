@@ -10,10 +10,85 @@ pub(super) struct Setter {
 /// A typed binding supplies the coercion site needed by `Box::new` / `Rc::new` closures.
 /// Ordinary defaults still accept `Into` conversions, such as `&str` to `SharedString`.
 pub(super) fn default_value(ty: &syn::Type, expr: &syn::Expr, explicit: bool) -> TokenStream {
-    if callback_parts(ty).is_some_and(|(_, object)| explicit || is_callable(object)) {
+    if callback_parts(ty).is_some_and(|(_, object)| explicit || is_callable(object))
+        || (is_numeric_type(ty) && is_inferred_number(expr))
+    {
         quote! {{ let __rsx_default: #ty = #expr; __rsx_default }}
     } else {
         quote! { (#expr).into() }
+    }
+}
+
+fn is_numeric_type(ty: &syn::Type) -> bool {
+    match ty {
+        syn::Type::Group(group) => return is_numeric_type(&group.elem),
+        syn::Type::Paren(paren) => return is_numeric_type(&paren.elem),
+        _ => {}
+    }
+    let syn::Type::Path(path) = ty else {
+        return false;
+    };
+    if path.qself.is_some() {
+        return false;
+    }
+    let segments = &path.path.segments;
+    let Some(last) = segments.last() else {
+        return false;
+    };
+    let primitive_path = segments.len() == 1
+        || (segments.len() == 3
+            && matches!(segments[0].ident.to_string().as_str(), "core" | "std")
+            && segments[1].ident == "primitive");
+    primitive_path
+        && matches!(
+            last.ident.to_string().as_str(),
+            "u8" | "u16"
+                | "u32"
+                | "u64"
+                | "u128"
+                | "usize"
+                | "i8"
+                | "i16"
+                | "i32"
+                | "i64"
+                | "i128"
+                | "isize"
+                | "f32"
+                | "f64"
+        )
+}
+
+fn is_inferred_number(expr: &syn::Expr) -> bool {
+    match expr {
+        syn::Expr::Lit(literal) => match &literal.lit {
+            syn::Lit::Int(number) => number.suffix().is_empty(),
+            syn::Lit::Float(number) => number.suffix().is_empty(),
+            _ => false,
+        },
+        syn::Expr::Unary(unary) => is_inferred_number(&unary.expr),
+        syn::Expr::Paren(paren) => is_inferred_number(&paren.expr),
+        syn::Expr::Group(group) => is_inferred_number(&group.expr),
+        syn::Expr::Binary(binary) => {
+            matches!(
+                binary.op,
+                syn::BinOp::Add(_)
+                    | syn::BinOp::Sub(_)
+                    | syn::BinOp::Mul(_)
+                    | syn::BinOp::Div(_)
+                    | syn::BinOp::Rem(_)
+                    | syn::BinOp::BitXor(_)
+                    | syn::BinOp::BitAnd(_)
+                    | syn::BinOp::BitOr(_)
+                    | syn::BinOp::Shl(_)
+                    | syn::BinOp::Shr(_)
+            ) && is_inferred_number(&binary.left)
+                && is_inferred_number(&binary.right)
+        }
+        syn::Expr::Block(block) => match block.block.stmts.as_slice() {
+            [syn::Stmt::Expr(expr, None)] => is_inferred_number(expr),
+            _ => false,
+        },
+        _ => false,
     }
 }
 

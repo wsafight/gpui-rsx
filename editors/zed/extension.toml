@@ -1,6 +1,6 @@
 id = "gpui-rsx"
 name = "GPUI RSX"
-version = "0.10.0"
+version = "0.10.1"
 schema_version = 1
 authors = ["wsafight"]
 description = "Class diagnostics, completion and expansion hover for GPUI RSX macros"

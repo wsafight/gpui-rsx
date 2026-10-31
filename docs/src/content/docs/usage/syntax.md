@@ -92,7 +92,7 @@ use gpui_rsx::{component, rsx};
 fn Badge(
     label: SharedString,
     #[prop(default)] highlighted: bool,
-    #[prop(default = 2u8)] depth: u8,
+    #[prop(default = 2)] depth: u8,
     #[children] children: Vec<AnyElement>,
     #[context] cx: &mut App,
 ) -> impl IntoElement {
@@ -115,6 +115,10 @@ Plain parameters are required props. `#[prop(default)]` uses `Default::default()
 `#[prop(default = expr)]` supplies an explicit default. Defaulted booleans use flag setters
 (`highlighted`) or conditional setters (`highlightedIf={active}`). `#[children]` collects
 children into `Vec<AnyElement>`. Module-qualified tags such as `<ui::Badge ...>` work too.
+
+Unsuffixed numeric literals and pure numeric expressions infer the declared primitive
+field type, such as `#[prop(default = 7)] value: u32` or `#[prop(default = 7.0)] ratio: f32`.
+Suffixed values retain `Into` conversions, as do string defaults such as `"ready"` for `SharedString`.
 
 Optional `#[context]` parameters must be `&mut Window` or `&mut App`; they are supplied by
 GPUI, so callers never pass them as props. The macro does not capture the caller's `window`
@@ -322,6 +326,22 @@ rsx! {
 ```
 
 A fragment expands to `vec![...]`. Mixed concrete root types may need `into_any_element()` or a common wrapper element. A root fragment that contains a `for` loop or a `{...spread}` expands to a `Vec<AnyElement>` instead, so every element keeps its order.
+
+Use `rsx_fragment!` to always return `Vec<gpui::AnyElement>`, including mixed root types:
+
+```rust
+let parts = gpui_rsx::rsx_fragment! {
+    <>
+        <div />
+        <div id="stateful" />
+    </>
+};
+rsx! { <div>{...parts}</div> }
+```
+
+It follows the same spacing scale and project configuration as `rsx!`. A single root
+returns a one-element vector, and an empty fragment returns an empty vector. Ordinary
+`rsx!` fragments keep their existing concrete element types.
 
 Fragments can also be nested:
 

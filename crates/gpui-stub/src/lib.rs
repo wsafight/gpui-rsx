@@ -112,11 +112,6 @@ impl From<&str> for ElementId {
         Self(value.to_owned())
     }
 }
-impl From<String> for ElementId {
-    fn from(value: String) -> Self {
-        Self(value)
-    }
-}
 impl From<SharedString> for ElementId {
     fn from(value: SharedString) -> Self {
         Self(value.0)

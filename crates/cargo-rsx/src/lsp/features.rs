@@ -132,9 +132,10 @@ pub(super) fn request(
                 && let Some(call) = gpui_rsx_tools::call_at(&document.analysis.calls, cursor)
             {
                 // Code being edited often fails to expand; diagnostics already report that.
-                Ok(gpui_rsx_tools::expand_summary(
+                Ok(gpui_rsx_tools::expand_summary_for_macro(
                     &source[call.start..call.end],
-                    gpui_rsx_tools::mode_for(&call.name, document.mode.clone()),
+                    &call.name,
+                    document.mode.clone(),
                 )
                 .map_or(Value::Null, |expansion| {
                     json!({"contents":{"kind":"markdown","value":format!("```rust\n{expansion}\n```")}})

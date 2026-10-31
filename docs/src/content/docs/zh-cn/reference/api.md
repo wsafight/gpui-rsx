@@ -6,12 +6,13 @@ description: GPUI-RSX 宏、标签、属性和生成映射的速查。
 ## 宏
 
 ```rust
-use gpui_rsx::{rsx, rsx_expand, rsx_permissive, rsx_runtime, rsx_strict, rsx_tw};
+use gpui_rsx::{rsx, rsx_expand, rsx_fragment, rsx_permissive, rsx_runtime, rsx_strict, rsx_tw};
 ```
 
 | 宏 | 行为 |
 | --- | --- |
 | `rsx!` | 默认 permissive RSX 宏。 |
+| `rsx_fragment!` | 始终返回 `Vec<gpui::AnyElement>`，支持不同类型的根元素；其他行为与 `rsx!` 一致。 |
 | `rsx_permissive!` | 显式 permissive 模式；安全情况下忽略不支持的 class。 |
 | `rsx_strict!` | 不支持的静态 class 编译时报错；不支持的动态 class 求值时 panic。 |
 | `rsx_expand!` | 返回生成 GPUI builder 代码的字符串预览。 |

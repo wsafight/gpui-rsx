@@ -371,6 +371,28 @@ pub fn rsx(input: TokenStream) -> TokenStream {
     expand_macro(input.into(), options(false)).into()
 }
 
+/// Returns `Vec<gpui::AnyElement>`, allowing fragments with different concrete element types.
+///
+/// Uses the same class handling, spacing scale and project configuration as [`rsx!`].
+/// A single root returns a one-element vector; an empty fragment returns an empty vector.
+///
+/// ```
+/// use gpui::{div, prelude::*};
+/// use gpui_rsx::{rsx, rsx_fragment};
+///
+/// let parts = rsx_fragment! {
+///     <>
+///         <div />
+///         <div id="stateful" />
+///     </>
+/// };
+/// let view = rsx! { <div>{...parts}</div> };
+/// ```
+#[proc_macro]
+pub fn rsx_fragment(input: TokenStream) -> TokenStream {
+    expand_macro(input.into(), options(false).with_erased_roots(true)).into()
+}
+
 /// Transforms RSX into GPUI method chains and rejects unsupported static classes.
 ///
 /// Static unknown classes emit a compile error (with a "did you mean" suggestion) instead of

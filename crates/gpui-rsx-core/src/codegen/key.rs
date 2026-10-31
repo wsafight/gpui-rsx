@@ -11,9 +11,9 @@ pub(super) fn dynamic_key(prefix: &str, expr: &syn::Expr) -> TokenStream {
         }
         // Autoref fallback preserves every Display key without moving its value.
         impl<T: ::core::fmt::Display + ?Sized> __RsxKeyId for &__RsxKey<'_, T> {
-            type Id = ::std::string::String;
+            type Id = ::gpui::SharedString;
             fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
-                ::std::format!("{}{}", prefix, self.0)
+                ::gpui::SharedString::from(::std::format!("{}{}", prefix, self.0))
             }
         }
         // Let rustc repeat the identical impl rather than emitting its token tree ten times.

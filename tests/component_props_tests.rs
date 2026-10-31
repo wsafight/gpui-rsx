@@ -2,6 +2,104 @@ use gpui::{SharedString, div, prelude::*};
 use gpui_rsx::{component, rsx};
 use std::{cell::Cell, rc::Rc};
 
+#[allow(unknown_lints)]
+#[deny(float_literal_f32_fallback)]
+mod numeric_defaults {
+    use super::*;
+
+    #[component]
+    fn Counter(#[prop(default = 7)] value: u32) -> impl IntoElement {
+        div().child(value.to_string())
+    }
+
+    #[component]
+    #[derive(gpui::IntoElement)]
+    struct Defaults {
+        #[prop(default = 7)]
+        count: u32,
+        #[prop(default = 7)]
+        size: usize,
+        #[prop(default = 7.0)]
+        ratio: f32,
+        #[prop(default = -7.0)]
+        negative: f32,
+        #[prop(default = 7 + 2)]
+        sum: u32,
+        #[prop(default = { 1 << 8 })]
+        shifted: core::primitive::u32,
+        #[prop(default = 7u8)]
+        widened: u32,
+        #[prop(default = 7 < 8)]
+        compared: u32,
+        #[prop(default = "ready")]
+        label: SharedString,
+    }
+
+    impl RenderOnce for Defaults {
+        fn render(self, _: &mut gpui::Window, _: &mut gpui::App) -> impl IntoElement {
+            div().child(self.label)
+        }
+    }
+
+    #[test]
+    fn numeric_defaults_infer_field_types_and_preserve_conversions() {
+        assert_eq!(rsx! { <Counter /> }.build().value, 7);
+        let defaults = rsx! { <Defaults /> }.build();
+        assert_eq!(defaults.count, 7);
+        assert_eq!(defaults.size, 7);
+        assert_eq!(defaults.ratio, 7.0);
+        assert_eq!(defaults.negative, -7.0);
+        assert_eq!(defaults.sum, 9);
+        assert_eq!(defaults.shifted, 256);
+        assert_eq!(defaults.widened, 7);
+        assert_eq!(defaults.compared, 1);
+        assert_eq!(defaults.label, SharedString::from("ready"));
+        assert_eq!(rsx! { <Counter value={11u32} /> }.build().value, 11);
+    }
+
+    #[test]
+    fn integer_defaults_support_signed_unsigned_and_qualified_types() {
+        macro_rules! check {
+            ($ty:ty, $value:expr) => {{
+                #[component]
+                fn Value(#[prop(default = $value)] value: $ty) -> impl IntoElement {
+                    div().child(value.to_string())
+                }
+                assert_eq!(rsx! { <Value /> }.build().value, $value);
+            }};
+        }
+        check!(u8, 255);
+        check!(u16, 65535);
+        check!(u64, 18446744073709551615);
+        check!(u128, 340282366920938463463374607431768211455);
+        check!(i8, -128);
+        check!(i16, -32768);
+        check!(i32, -2147483648);
+        check!(i64, -9223372036854775808);
+        check!(i128, -170141183460469231731687303715884105728);
+        check!(isize, -7);
+        check!(std::primitive::usize, 7);
+    }
+
+    #[test]
+    fn numeric_newtypes_keep_their_into_defaults() {
+        struct Number(i32);
+
+        impl From<i32> for Number {
+            fn from(value: i32) -> Self {
+                Self(value)
+            }
+        }
+
+        #[component]
+        fn Converted(#[prop(default = 7)] value: Number) -> impl IntoElement {
+            div().child(value.0.to_string())
+        }
+
+        assert_eq!(rsx! { <Converted /> }.build().value.0, 7);
+    }
+}
+
 #[component]
 fn Callbacks(
     boxed: Box<dyn Fn(u8)>,

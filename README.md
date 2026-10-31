@@ -55,7 +55,7 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.0"
+gpui-rsx = "0.10.1"
 ```
 
 ### GPUI Version Target
@@ -75,14 +75,14 @@ application lockfile; update Kit and its matching snapshot together. See the
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.10.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
+| `0.10.1` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.0"
+gpui-rsx = "0.10.1"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -1142,13 +1142,13 @@ rsx! {
 }
 ```
 
-If you really need a Fragment, erase the mixed items explicitly:
+Use `rsx_fragment!` to erase mixed root types into `Vec<gpui::AnyElement>`:
 
 ```rust
-rsx! {
+gpui_rsx::rsx_fragment! {
     <>
-        {div().into_any_element()}
-        {Button::new("save").into_any_element()}
+        <div />
+        {Button::new("save")}
     </>
 }
 ```
@@ -1190,7 +1190,7 @@ Inspired by:
 
 ## Development tools
 
-Install `cargo-rsx` 0.10.0 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
+Install `cargo-rsx` 0.10.1 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
 `preview --watch`, and the `lsp` server. See the [tooling guide](https://wsafight.github.io/gpui-rsx/guides/tooling/)
 and [WASM Playground](https://wsafight.github.io/gpui-rsx/playground/). VS Code and Zed adapters
 live in `editors/`; release assets include an installable VSIX.

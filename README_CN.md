@@ -55,7 +55,7 @@ bun run dev
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.0"
+gpui-rsx = "0.10.1"
 ```
 
 ### GPUI 版本目标
@@ -73,14 +73,14 @@ demo 使用 GPUI Kit 0.8.1 及其固定的 `gpui-pre 0.3.10` 快照。Cargo 中�
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.10.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
+| `0.10.1` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.0"
+gpui-rsx = "0.10.1"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -1141,13 +1141,13 @@ rsx! {
 }
 ```
 
-如果确实需要 Fragment，可以显式做类型擦除：
+需要混合不同根元素类型时，使用 `rsx_fragment!` 统一返回 `Vec<gpui::AnyElement>`：
 
 ```rust
-rsx! {
+gpui_rsx::rsx_fragment! {
     <>
-        {div().into_any_element()}
-        {Button::new("save").into_any_element()}
+        <div />
+        {Button::new("save")}
     </>
 }
 ```
@@ -1189,7 +1189,7 @@ MIT License
 
 ## 开发工具
 
-安装 `cargo-rsx` 0.10.0（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
+安装 `cargo-rsx` 0.10.1（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
 `convert`、`preview --watch` 和 `lsp`。参见[工具指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/tooling/)
 与 [WASM Playground](https://wsafight.github.io/gpui-rsx/zh-cn/playground/)。
 编辑器适配位于 `editors/`，发布附件包含可安装的 VSIX，市场上架状态另行记录。

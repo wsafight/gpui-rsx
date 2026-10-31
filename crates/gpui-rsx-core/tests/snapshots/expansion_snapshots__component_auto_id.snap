@@ -42,9 +42,11 @@ fn expanded() {
                     fn __rsx_key_id(self, prefix: &'static str) -> Self::Id;
                 }
                 impl<T: ::core::fmt::Display + ?Sized> __RsxKeyId for &__RsxKey<'_, T> {
-                    type Id = ::std::string::String;
+                    type Id = ::gpui::SharedString;
                     fn __rsx_key_id(self, prefix: &'static str) -> Self::Id {
-                        ::std::format!("{}{}", prefix, self.0)
+                        ::gpui::SharedString::from(
+                            ::std::format!("{}{}", prefix, self.0),
+                        )
                     }
                 }
                 macro_rules! __rsx_integer_keys {

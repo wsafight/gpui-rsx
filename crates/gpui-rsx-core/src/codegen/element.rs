@@ -112,9 +112,21 @@ type CodegenResult = Result<TokenStream, TokenStream>;
 /// - 单个元素：返回实现 `IntoElement` 的表达式
 /// - Fragment：返回 `Vec<impl IntoElement>`
 pub fn generate_body_with_mode(body: &RsxBody, mode: ClassMode) -> TokenStream {
+    generate_body_with_erased_roots(body, mode, false)
+}
+
+pub fn generate_fragment_with_mode(body: &RsxBody, mode: ClassMode) -> TokenStream {
+    generate_body_with_erased_roots(body, mode, true)
+}
+
+fn generate_body_with_erased_roots(
+    body: &RsxBody,
+    mode: ClassMode,
+    erase_roots: bool,
+) -> TokenStream {
     let mut dynamic_used = false;
-    let code =
-        generate_body_checked(body, mode.clone(), &mut dynamic_used).unwrap_or_else(|err| err);
+    let code = generate_body_checked(body, mode.clone(), &mut dynamic_used, erase_roots)
+        .unwrap_or_else(|err| err);
     if dynamic_used && mode.dynamic_runtime_path().is_none() {
         let helper = super::runtime::get_cached_dynamic_class_helper(mode);
         quote! { { #helper #code } }
@@ -127,9 +139,22 @@ pub fn generate_body_with_mode(body: &RsxBody, mode: ClassMode) -> TokenStream {
 /// 1,400 lines; tools that only analyze or display the call site use this. The flag reports
 /// whether the omitted helper (`__rsx_apply_class`) is referenced.
 pub fn generate_body_without_runtime(body: &RsxBody, mode: ClassMode) -> (TokenStream, bool) {
+    generate_body_without_runtime_with_erased_roots(body, mode, false)
+}
+
+pub fn generate_fragment_without_runtime(body: &RsxBody, mode: ClassMode) -> (TokenStream, bool) {
+    generate_body_without_runtime_with_erased_roots(body, mode, true)
+}
+
+fn generate_body_without_runtime_with_erased_roots(
+    body: &RsxBody,
+    mode: ClassMode,
+    erase_roots: bool,
+) -> (TokenStream, bool) {
     let inline_runtime = mode.dynamic_runtime_path().is_none();
     let mut dynamic_used = false;
-    let code = generate_body_checked(body, mode, &mut dynamic_used).unwrap_or_else(|err| err);
+    let code =
+        generate_body_checked(body, mode, &mut dynamic_used, erase_roots).unwrap_or_else(|err| err);
     (code, dynamic_used && inline_runtime)
 }
 
@@ -141,12 +166,23 @@ fn generate_body_checked(
     body: &RsxBody,
     mode: ClassMode,
     dynamic_used: &mut bool,
+    erase_roots: bool,
 ) -> CodegenResult {
     match body {
-        RsxBody::Single(element) => generate_element_checked(element, false, mode, dynamic_used),
+        RsxBody::Single(element) => {
+            let expr = generate_element_checked(element, false, mode, dynamic_used)?;
+            if erase_roots {
+                Ok(collect_any_elements(
+                    &[(expr, false)],
+                    quote! { ::gpui::AnyElement },
+                ))
+            } else {
+                Ok(expr)
+            }
+        }
         RsxBody::Fragment(children) => {
             let child_exprs = generate_flattened_nodes(children, false, mode, dynamic_used)?;
-            if child_exprs.iter().any(|(_, yields_many)| *yields_many) {
+            if erase_roots || child_exprs.iter().any(|(_, yields_many)| *yields_many) {
                 // A loop or spread contributes many elements, so erase types and collect.
                 return Ok(collect_any_elements(
                     &child_exprs,

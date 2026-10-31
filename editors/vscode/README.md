@@ -24,7 +24,7 @@ cd editors/vscode
 bun install --frozen-lockfile
 bun run check
 bun run package
-code --install-extension gpui-rsx-0.10.0.vsix
+code --install-extension gpui-rsx-0.10.1.vsix
 ```
 
 Formatting leaves commented macro bodies unchanged to preserve comments. Dynamic class
