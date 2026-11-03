@@ -468,8 +468,9 @@ parameters and borrowed integers) may use the borrowed formatting fallback. See
 **Purpose**: Generate runtime code for `class={expression}` attributes.
 
 Dynamic classes support the common generated GPUI methods, numeric lengths, arbitrary
-colors, the Tailwind palette and opacity modifiers. Variants and theme tokens require static
-strings. Unknown classes invoke the call-site handler (debug warning by default, panic in
+colors, the Tailwind palette and opacity modifiers. Negated spacing and sizing values
+(`-mt-2`, `-gap-4`) resolve through the same numeric fallback with the sign preserved.
+Variants and theme tokens require static strings. Unknown classes invoke the call-site handler (debug warning by default, panic in
 strict mode), which `onUnknownClass` can replace.
 
 **Pre-compiled common classes** (selected examples):

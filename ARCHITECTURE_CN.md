@@ -435,7 +435,7 @@ fn make_auto_id(tag_ident: &syn::Ident) -> TokenStream {
 
 **用途**：为 `class={expression}` 属性生成运行时代码。
 
-动态 class 支持常用生成方法、数值长度、任意颜色、Tailwind 色板与透明度修饰符。
+动态 class 支持常用生成方法、数值长度、任意颜色、Tailwind 色板与透明度修饰符，负值间距/尺寸（`-mt-2`、`-gap-4`）通过同一数值回退解析并保留符号。
 变体和主题 token 需静态字符串；未知 class 交给调用点的回调，默认 debug 警告、严格模式
 panic，可通过 `onUnknownClass` 替换。
 

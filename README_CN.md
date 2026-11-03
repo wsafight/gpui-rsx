@@ -318,6 +318,7 @@ rsx! { <button class="bg-blue-500 hover:bg-blue-600 active:opacity-75" /> }
 - `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`
 - `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, `ml-4`, `mr-4`
 - 任意间距：`gap-[14px]`, `gap-x-[0.75rem]`, `p-[18px]`, `mx-[1.25rem]`
+- 负值间距与尺寸：`-m-4` → `.m(px(-4.0))`、`-mt-1.5`、`-ml-[13px]`、`-w-1/2`、`-m-px`（也可用于 `hover:-mt-2` 这类状态前缀；`-auto` 与 `-full` 不能取负，`rounded-*` / `leading-*` 保持非负）
 - `gap-[10%]` 这类百分比间距会报错，因为 GPUI 间距使用 definite length
 
 **尺寸：**
@@ -539,6 +540,7 @@ rsx! {
 > **运行时支持范围：** 常用布局/间距/文字排版工具类、完整 Tailwind 色板、
 > 任意颜色（如 `bg-[#ff0000]`、`text-[#f00]`、`bg-[rgba(15,23,42,0.8)]`）、
 > 任意间距和尺寸长度（如 `w-[280px]`、`h-[50%]`、`gap-[14px]`、`mx-[1.25rem]`）、
+> 负值间距与尺寸（如 `-mt-2`、`-gap-4`、`-w-1/2`）、
 > 分数尺寸（如 `w-6/24`），以及数值前缀回退（如 `gap-7`、`p-5`、`opacity-33`）。
 > 真正不受支持的 class（如 Tailwind variants 或未知工具类）在 release 构建中**静默忽略**，
 > 在 debug 构建中按调用点去重警告；`dynamic-class-report` 可在退出时汇总，
@@ -591,6 +593,7 @@ strict 模式下，动态 class 在运行时遇到不支持的 token 默认 pani
 | 颜色和透明度 | 支持 | 支持 |
 | 任意长度/颜色 | 支持 | 支持 |
 | 分数尺寸 | 支持 | 支持 |
+| 负值间距/尺寸 | 支持 | 支持（数值形式） |
 | stateful scroll class | 支持并自动注入 ID | 不支持 |
 | 状态前缀（`hover:`、`focus:`、`active:`、group） | 支持 | 不支持 |
 | 响应式 / `dark:` 前缀 | permissive 警告，strict 报错 | permissive 在 debug 提示；strict panic 或自定义回调 |
