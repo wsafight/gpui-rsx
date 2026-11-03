@@ -100,6 +100,67 @@ fn tailwind_scale_multiplies_numeric_lengths_only() {
 }
 
 #[test]
+fn tailwind_scale_multiplies_negative_lengths_too() {
+    let mode = ClassMode::PERMISSIVE.with_scale(SpacingScale::Tailwind);
+    assert_eq!(expand("-gap-4", mode.clone()), ". gap (px (- 16f32))");
+    assert_eq!(expand("-p-2.5", mode.clone()), ". p (px (- 10f32))");
+    assert_eq!(expand("-gap-[14px]", mode), ". gap (px (- 14f32))");
+    assert_eq!(
+        expand("-gap-4", ClassMode::PERMISSIVE),
+        ". gap (px (- 4f32))"
+    );
+}
+
+#[test]
+fn negative_spacing_classes_expand_inside_variants() {
+    let tokens = expand("hover:-mt-2 active:-ml-[6px]", ClassMode::STRICT);
+    assert!(
+        tokens.contains(". hover (| __style | __style . mt (px (- 2f32)))"),
+        "{tokens}"
+    );
+    assert!(
+        tokens.contains(". active (| __style | __style . ml (px (- 6f32)))"),
+        "{tokens}"
+    );
+}
+
+#[test]
+fn unsupported_negative_classes_explain_the_limitation() {
+    let tokens = expand("-mx-auto -rounded-4 -m-foo", ClassMode::PERMISSIVE);
+    assert!(
+        tokens.contains("GPUI does not support `-mx-auto`"),
+        "{tokens}"
+    );
+    assert!(
+        tokens.contains("`auto` and `full` cannot be negative"),
+        "{tokens}"
+    );
+    assert!(
+        tokens.contains("GPUI does not support `-rounded-4`"),
+        "{tokens}"
+    );
+    assert!(tokens.contains("negative values"), "{tokens}");
+    assert!(!tokens.contains("compile_error"), "{tokens}");
+
+    let strict = expand("-mx-auto", ClassMode::STRICT);
+    assert!(strict.contains("compile_error"), "{strict}");
+}
+
+#[test]
+fn negative_length_classes_never_pass_through_as_method_idents() {
+    // A leading `-` cannot become a method name: negated length families that cannot
+    // expand are reported, never passed through as `_mx_auto`-style calls.
+    for class in ["-mx-auto", "-m-foo", "-rounded-4", "-w-full", "-m-"] {
+        let tokens = expand(class, ClassMode::PERMISSIVE);
+        assert!(
+            tokens.contains("GPUI does not support"),
+            "{class}: {tokens}"
+        );
+        assert!(!tokens.contains("passed through"), "{class}: {tokens}");
+    }
+}
+
+#[test]
 fn suggestions_cover_typos_prefixes_and_variants() {
     let mode = ClassMode::PERMISSIVE;
     assert_eq!(
