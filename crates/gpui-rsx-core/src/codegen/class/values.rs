@@ -54,6 +54,9 @@ pub(super) fn resolve_style(
     {
         return Some(Ok(operation));
     }
+    if let Some(result) = resolve_negative_length_class(class, mode.scale()) {
+        return Some(result);
+    }
     if let Some((_, weight)) = FONT_WEIGHTS.iter().find(|(name, _)| *name == class) {
         return Some(Ok(StyleOperation::new(
             "font_weight",
@@ -197,6 +200,103 @@ fn parse_fraction_length_class(class: &str) -> Option<Result<StyleOperation, Str
     }
 
     Some(LengthKind::parse_fraction(class, value).map(|length| length_method_call(method, length)))
+}
+
+/// Negated spacing/sizing class (`-m-4`, `-mt-1.5`, `-ml-[13px]`, `-w-1/2`).
+///
+/// Mirrors the positive length paths with negated values; GPUI's `*_neg_*` presets
+/// define which families accept negative values at all. Non-length classes
+/// (`-font-bold`), `-auto` / `-full` and non-negatable families return `None`, so the
+/// caller reports the usual unknown-class diagnostics instead.
+fn resolve_negative_length_class(
+    class: &str,
+    scale: SpacingScale,
+) -> Option<Result<StyleOperation, String>> {
+    let rest = class.strip_prefix('-')?;
+    let (method, value, family) = split_length_class(rest)?;
+    if !supports_negative_length(method) {
+        return None;
+    }
+
+    if value.starts_with('[') {
+        let length = match value
+            .strip_prefix('[')
+            .and_then(|inner| inner.strip_suffix(']'))
+            .map(|inner| LengthKind::parse_arbitrary(class, inner))
+        {
+            Some(Ok(length)) => length,
+            Some(Err(message)) => return Some(Err(message)),
+            None => return Some(Err(invalid_length_value_message(class))),
+        };
+        return Some(family_length_operation(class, method, length, family));
+    }
+
+    if value.contains('/') {
+        if !family.allows_fraction() {
+            return Some(Err(format!(
+                "Invalid fraction `{class}`: fractions are only supported for sizing classes."
+            )));
+        }
+        return Some(
+            LengthKind::parse_fraction(class, value)
+                .map(|length| negated_length_operation(method, length)),
+        );
+    }
+
+    if let Some(px) = parse_length_number(value)
+        .map(|value| value * scale.factor())
+        .filter(|px| px.is_finite())
+    {
+        return Some(Ok(negated_length_operation(method, LengthKind::Px(px))));
+    }
+
+    // GPUI preset values such as `-m-px` or `-m-0p5` call the `*_neg_*` preset method.
+    if let Some(twin) = negated_preset_method(rest) {
+        return Some(Ok(StyleOperation::new(twin, None)));
+    }
+
+    None
+}
+
+/// Applies the percent gate shared with positive arbitrary values, then negates.
+fn family_length_operation(
+    class: &str,
+    method: &'static str,
+    length: LengthKind,
+    family: LengthClassFamily,
+) -> Result<StyleOperation, String> {
+    if matches!(length, LengthKind::Relative(_)) && !family.allows_percent() {
+        return Err(format!(
+            "Invalid spacing class `{class}`. Percentage values are only supported for sizing \
+             classes such as `w-*` and `h-*`."
+        ));
+    }
+    Ok(negated_length_operation(method, length))
+}
+
+/// Negates a resolved length so `-m-4` expands like `m-[-4px]` would.
+fn negated_length_operation(method: &'static str, length: LengthKind) -> StyleOperation {
+    let length = match length {
+        LengthKind::Px(px) => LengthKind::Px(-px),
+        LengthKind::Rem(rem) => LengthKind::Rem(-rem),
+        LengthKind::Relative(ratio) => LengthKind::Relative(-ratio),
+    };
+    StyleOperation::new(method, Some(StyleValue::Length(length)))
+}
+
+/// `-m-px` → preset `m_px` → the GPUI `m_neg_px` twin method.
+///
+/// `auto` and `full` are excluded: GPUI generates `mx_neg_auto` mechanically, but a
+/// negative `auto` / `full` has no meaning, so the class stays unsupported.
+fn negated_preset_method(rest: &str) -> Option<&'static str> {
+    let method = gpui_no_arg_class_method(rest)?;
+    if method.family_prefix.is_empty() || matches!(method.family_suffix, "auto" | "full") {
+        return None;
+    }
+    let twin = format!("{}_neg_{}", method.family_prefix, method.family_suffix);
+    lookup_gpui_method(&twin)
+        .filter(|twin| twin.arity == 0 && twin.traits & T_STYLED != 0)
+        .map(|twin| twin.name)
 }
 
 fn parse_numeric_length_class(class: &str, scale: SpacingScale) -> Option<StyleOperation> {

@@ -396,6 +396,18 @@ fn unknown_outcome(class: &str, mode: ClassMode) -> ClassOutcome {
         .any(|prefix| class.starts_with(prefix))
     {
         Some("CSS transitions/animations; use GPUI's animation APIs")
+    } else if let Some(rest) = class.strip_prefix('-')
+        && let Some((method, value, _)) = split_length_class(rest)
+    {
+        // Negative classes only fail for values or families that cannot be negated.
+        Some(if !supports_negative_length(method) {
+            "this length family cannot be negative"
+        } else if value == "auto" || value == "full" {
+            "`auto` and `full` cannot be negative"
+        } else {
+            "negative values are only supported for numeric spacing and sizing values, \
+             for example `-m-4`"
+        })
     } else {
         None
     };

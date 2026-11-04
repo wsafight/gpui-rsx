@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Support negative Tailwind spacing and sizing classes (`-m-4`, `-mt-1.5`, `-ml-[13px]`,
+  `-w-1/2`, `-m-px`, `hover:-mt-2`) in static literals and dynamic class expressions.
+  Negative classes expand to negated lengths (`.m(px(-4.0))`) or GPUI's `*_neg_*` preset
+  methods, matching the families for which GPUI itself ships negated presets. Percentages,
+  fractions, Tailwind scale and the dynamic runtime matcher all respect the sign.
+
+### Changed
+
+- Unknown negative classes now report a specific reason instead of suggesting the
+  sign-flipped positive class (`-mx-auto` explains that `auto` cannot be negative
+  rather than recommending `mx-auto`).
+- JSX/TSX conversion rescales negative spacing to keep sizes (`-mt-4` → `-mt-16`)
+  instead of dropping the class as unsupported.
+
 ## [0.10.2] - 2026-10-31
 
 ### Fixed

@@ -305,16 +305,22 @@ fn is_rust_ident(name: &str) -> bool {
 }
 
 /// JSX uses Tailwind's 4px scale (`p-4` is 16px) while `rsx!` defaults to pixels, so numeric
-/// length classes are rescaled to keep the same size (`p-4` → `p-16`).
+/// length classes are rescaled to keep the same size (`p-4` → `p-16`). Negated classes keep
+/// their sign (`-mt-4` → `-mt-16`); non-negatable families and non-numeric values are kept
+/// as-is and validated by the strict class analysis afterwards.
 fn tailwind_to_px(class: &str) -> String {
     let (variant, base) = class.rsplit_once(':').map_or(("", class), |(v, b)| (v, b));
+    let (sign, base) = match base.strip_prefix('-') {
+        Some(rest) => ("-", rest),
+        None => ("", base),
+    };
     if let Some((_, value, _)) = gpui_rsx_core::codegen::tables::split_length_class(base)
         && let Ok(n) = value.parse::<f32>()
         && n.is_finite()
     {
         let prefix = &base[..base.len() - value.len()];
         let separator = if variant.is_empty() { "" } else { ":" };
-        return format!("{variant}{separator}{prefix}{}", n * 4.0);
+        return format!("{variant}{separator}{sign}{prefix}{}", n * 4.0);
     }
     class.to_owned()
 }

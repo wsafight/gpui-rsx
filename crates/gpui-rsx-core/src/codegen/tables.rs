@@ -239,6 +239,22 @@ pub fn split_length_class(class: &str) -> Option<(&'static str, &str, LengthClas
     None
 }
 
+/// Spacing/sizing length families whose values may be negated (`-m-4`, `-mt-1.5`).
+///
+/// The list mirrors GPUI's own generated `*_neg_*` preset methods: every family here
+/// ships negated presets, while `rounded` and `line_height` do not. The unit tests in
+/// `tables/tests.rs` keep this table and the generated GPUI facts in sync, so a future
+/// `cargo xtask gen-tables` run that adds or removes `_neg_` presets is caught in CI.
+pub const NEGATABLE_LENGTH_METHODS: &[&str] = &[
+    "gap", "gap_x", "gap_y", "h", "m", "max_h", "max_w", "mb", "min_h", "min_w", "ml", "mr", "mt",
+    "mx", "my", "p", "pb", "pl", "pr", "pt", "px", "py", "size", "w",
+];
+
+/// Whether the length family accepts negative values (`-m-4` → `.m(px(-4.0))`).
+pub fn supports_negative_length(method: &str) -> bool {
+    NEGATABLE_LENGTH_METHODS.contains(&method)
+}
+
 /// class 别名：语义上属于 Tailwind、但 GPUI 方法名不同或需要特殊展开的无参 class。
 pub const SEMANTIC_NO_ARG_CLASSES: &[&str] = &[
     "border",

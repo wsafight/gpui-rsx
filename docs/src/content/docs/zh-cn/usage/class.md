@@ -108,7 +108,7 @@ permissive 模式下，未知动态 class 会被忽略。debug 构建中，每�
 | --- | --- |
 | 布局 | `flex`、`flex-col`、`flex-row`、`flex-wrap`、`grid`、`hidden`、`absolute`、`relative`、grow/shrink 辅助类。 |
 | 对齐 | GPUI 支持的 `items-*`、`justify-*`、`content-*`、`self-*`。 |
-| 间距 | `gap-*`、`gap-x-*`、`gap-y-*`、`p-*`、`px-*`、`m-*` 以及方向变体。 |
+| 间距 | `gap-*`、`gap-x-*`、`gap-y-*`、`p-*`、`px-*`、`m-*` 以及方向变体。间距与尺寸家族支持 `-m-4`、`-mt-1.5` 这样的负值。 |
 | 尺寸 | `w-*`、`h-*`、`size-*`、`min-*`、`max-*`、`*-full`、`*-auto`、百分比、分数和任意长度。 |
 | 颜色 | 完整 Tailwind 色名，以及任意 `hex`、`rgb`、`rgba` 形式。 |
 | 排版 | 字号、字重、文字对齐、装饰、截断、whitespace 和 line clamp。 |
@@ -144,6 +144,23 @@ rsx! {
 ```
 
 `gap-[10%]` 这类百分比间距会被拒绝，因为 GPUI 间距 API 需要确定长度。
+
+## 负值
+
+GPUI 自带 `*_neg_*` 预设的间距与尺寸家族支持前导负号，字面量 class、状态前缀和动态
+ class 表达式均可用：
+
+```rust
+rsx! {
+    <div class="-m-2 -mt-1.5 -ml-[13px] -w-1/2 hover:-gap-1" />
+}
+```
+
+负值 class 展开为取负的长度，例如 `-m-4` 是 `.m(px(-4.0))`（Tailwind 刻度下为 16px），
+预设值如 `-m-px` 则调用 GPUI 的 `m_neg_px()` 方法。`-auto` 与 `-full` 仍不受支持，
+因为负的 `auto` / `full` 没有意义；`rounded-*` / `leading-*` 会被拒绝，因为 GPUI
+没有为它们生成负值预设。未知的负值 class 会给出具体原因，而不是推荐符号相反的正值
+ class。
 
 ## 颜色格式
 

@@ -749,9 +749,14 @@ fn conversion_keeps_string_and_number_children_and_normalizes_classes() {
     assert_eq!(classes.rsx, "<div class=\"flex gap-16\" />");
 
     // Unsupported classes are dropped with a note instead of producing invalid RSX.
+    // Negative spacing classes survive with the same rescale (JSX `-mt-4` is -16px).
     let dropped = convert::convert("const a = <div class=\"flex -mt-4 md:hidden\"/>;").unwrap();
-    assert_eq!(dropped.rsx, "<div class=\"flex\" />");
-    assert_eq!(dropped.diagnostics.len(), 2);
+    assert_eq!(dropped.rsx, "<div class=\"flex -mt-16\" />");
+    assert_eq!(dropped.diagnostics.len(), 1);
+    assert!(dropped.diagnostics[0].message.contains("md:hidden"));
+
+    let variant = convert::convert("const a = <div class=\"hover:-ml-2\"/>;").unwrap();
+    assert_eq!(variant.rsx, "<div class=\"hover:-ml-8\" />");
 }
 
 #[test]

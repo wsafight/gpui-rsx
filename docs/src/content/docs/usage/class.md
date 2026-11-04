@@ -109,7 +109,7 @@ Unknown dynamic classes are ignored in permissive mode. In debug builds, each un
 | --- | --- |
 | Layout | `flex`, `flex-col`, `flex-row`, `flex-wrap`, `grid`, `hidden`, `absolute`, `relative`, grow/shrink helpers. |
 | Alignment | `items-*`, `justify-*`, `content-*`, and `self-*` helpers supported by GPUI. |
-| Spacing | `gap-*`, `gap-x-*`, `gap-y-*`, `p-*`, `px-*`, `m-*`, and directional variants. |
+| Spacing | `gap-*`, `gap-x-*`, `gap-y-*`, `p-*`, `px-*`, `m-*`, and directional variants. Negative values like `-m-4` or `-mt-1.5` work for spacing and sizing families. |
 | Sizing | `w-*`, `h-*`, `size-*`, `min-*`, `max-*`, `*-full`, `*-auto`, percentages, fractions, arbitrary lengths. |
 | Colors | Full Tailwind color names plus arbitrary `hex`, `rgb`, and `rgba` forms. |
 | Typography | Text sizes, font weights, text alignment, decoration, truncation, whitespace, and line clamp. |
@@ -145,6 +145,24 @@ rsx! {
 ```
 
 Percentage spacing such as `gap-[10%]` is rejected because GPUI spacing APIs expect definite lengths.
+
+## Negative Values
+
+Spacing and sizing families that GPUI itself ships `*_neg_*` presets for accept a leading
+minus sign, in literal classes, state variants, and dynamic class expressions:
+
+```rust
+rsx! {
+    <div class="-m-2 -mt-1.5 -ml-[13px] -w-1/2 hover:-gap-1" />
+}
+```
+
+Negated classes expand to negated lengths, so `-m-4` is `.m(px(-4.0))` (16px under
+Tailwind scale), and preset values such as `-m-px` call GPUI's `m_neg_px()` method.
+`-auto` and `-full` stay unsupported because a negative `auto` or `full` has no meaning,
+and `rounded-*` / `leading-*` are rejected because GPUI generates no negated presets for
+them. Unknown negative classes report a specific reason instead of suggesting the
+sign-flipped positive class.
 
 ## Color Formats
 

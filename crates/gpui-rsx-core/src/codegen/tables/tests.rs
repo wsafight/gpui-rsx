@@ -544,6 +544,56 @@ fn length_specs_are_unique_and_prefer_long_prefixes() {
     }
 }
 
+// --- negative length families ---
+
+#[test]
+fn negatable_length_methods_exist_as_gpui_setters_with_negated_presets() {
+    for method in NEGATABLE_LENGTH_METHODS {
+        let setter =
+            lookup_gpui_method(method).unwrap_or_else(|| panic!("{method} is not a GPUI method"));
+        assert_eq!(setter.arity, 1, "{method}");
+        assert!(setter.traits & T_STYLED != 0, "{method}");
+        // The generated facts must contain at least one `*_neg_*` preset for the family,
+        // otherwise the macro would accept a negative GPUI itself cannot express.
+        let twin = format!("{method}_neg_0");
+        let preset =
+            lookup_gpui_method(&twin).unwrap_or_else(|| panic!("{method} has no `{twin}` preset"));
+        assert_eq!(preset.family_prefix, *method, "{method}");
+        assert!(preset.negated, "{method}");
+    }
+}
+
+#[test]
+fn non_negatable_length_families_have_no_gpui_negated_presets() {
+    // `rounded` and `line_height` are the only spec methods outside the negatable list;
+    // GPUI generates no `rounded_neg_*` / `line_height_neg_*` presets for them.
+    for method in ["rounded", "line_height"] {
+        assert!(
+            !NEGATABLE_LENGTH_METHODS.contains(&method),
+            "{method} must stay non-negatable"
+        );
+        let has_preset = GPUI_METHODS
+            .iter()
+            .any(|m| m.family_prefix == method && m.negated);
+        assert!(!has_preset, "{method} unexpectedly gained _neg_ presets");
+    }
+}
+
+#[test]
+fn negatable_length_methods_cover_every_sizing_and_spacing_spec() {
+    for spec in LENGTH_CLASS_SPECS {
+        let negatable = NEGATABLE_LENGTH_METHODS.contains(&spec.method);
+        let has_preset = GPUI_METHODS
+            .iter()
+            .any(|m| m.family_prefix == spec.method && m.negated);
+        assert_eq!(
+            negatable, has_preset,
+            "{}: NEGATABLE_LENGTH_METHODS and GPUI _neg_ presets disagree",
+            spec.method
+        );
+    }
+}
+
 #[test]
 fn kebab_method_lookup_matches_the_allocating_lookup() {
     for method in GPUI_METHODS {

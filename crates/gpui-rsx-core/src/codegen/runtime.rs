@@ -6,7 +6,7 @@
 //! 优化：使用进程级缓存保存完整 helper 源码，避免多个动态 class 重复生成和分段解析。
 
 use super::class::{ClassMode, SpacingScale, parse_single_class_with_mode};
-use super::tables::{LENGTH_CLASS_SPECS, dynamic_common_classes};
+use super::tables::{LENGTH_CLASS_SPECS, dynamic_common_classes, supports_negative_length};
 mod color;
 use color::generate_color_fallback_code;
 use proc_macro2::{Span, TokenStream};
@@ -285,6 +285,10 @@ fn generate_numeric_fallback_code(scale: SpacingScale) -> TokenStream {
     let length_fallbacks = LENGTH_CLASS_SPECS
         .iter()
         .map(|spec| generate_length_fallback(spec, factor));
+    let negative_length_fallbacks = LENGTH_CLASS_SPECS
+        .iter()
+        .filter(|spec| supports_negative_length(spec.method))
+        .map(|spec| generate_negative_length_fallback(spec, factor));
     let usize_fallbacks = [("line-clamp-", "line_clamp")]
         .into_iter()
         .map(|(prefix, method)| generate_integer_fallback(prefix, method, "usize"));
@@ -358,6 +362,7 @@ fn generate_numeric_fallback_code(scale: SpacingScale) -> TokenStream {
         }
 
         #(#length_fallbacks)*
+        #(#negative_length_fallbacks)*
         if let Some(inner) = class.strip_prefix("text-[").and_then(|rest| rest.strip_suffix(']')) {
             if let Some(raw) = inner.strip_suffix("px") {
                 if let Ok(n) = raw.parse::<f32>().__rsx_finite() { return el.text_size(px(n)); }
@@ -398,6 +403,37 @@ fn generate_length_fallback(spec: &super::tables::LengthClassSpec, factor: f32) 
             match __rsx_parse_length(rest, #factor, #percent, #fraction) {
                 Some(__RsxLength::Px(n)) => return el.#method(px(n)),
                 Some(__RsxLength::Rem(n)) => return el.#method(rems(n)),
+                #relative
+                _ => {}
+            }
+        }
+    }
+}
+
+/// Numeric fallback for negated classes (`-m-4`): identical prefix matching with
+/// negated values. Only families GPUI itself ships `*_neg_*` presets for are matched;
+/// the spec order keeps longer prefixes (`-gap-x-` before `-gap-`) ahead.
+fn generate_negative_length_fallback(
+    spec: &super::tables::LengthClassSpec,
+    factor: f32,
+) -> TokenStream {
+    let negative_prefix = format!("-{}", spec.prefix);
+    let method = syn::Ident::new(spec.method, Span::call_site());
+    let percent = spec.family.allows_percent();
+    let fraction = spec.family.allows_fraction();
+    let relative = if percent || fraction {
+        quote! {
+            Some(__RsxLength::Relative(n)) => return el.#method(relative(-n)),
+        }
+    } else {
+        quote! {}
+    };
+
+    quote! {
+        if let Some(rest) = class.strip_prefix(#negative_prefix) {
+            match __rsx_parse_length(rest, #factor, #percent, #fraction) {
+                Some(__RsxLength::Px(n)) => return el.#method(px(-n)),
+                Some(__RsxLength::Rem(n)) => return el.#method(rems(-n)),
                 #relative
                 _ => {}
             }

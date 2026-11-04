@@ -67,6 +67,50 @@ fn tailwind_scale_macro_uses_4px_units() {
 }
 
 #[test]
+fn negative_spacing_classes_apply_negated_lengths() {
+    take_length_calls();
+    let _el = rsx_tw! { <div class="-gap-4 -p-2.5 -w-64 -h-[14px] -w-1/2" /> };
+    assert_eq!(
+        take_length_calls(),
+        vec![
+            ("px", -16.0),
+            ("px", -10.0),
+            ("px", -256.0),
+            ("px", -14.0),
+            ("relative", -0.5),
+        ]
+    );
+
+    // Dynamic classes resolve negatives at runtime too.
+    let cls = String::from("-gap-3 -mx-0.5");
+    let _el = rsx_tw! { <div class={cls} /> };
+    assert_eq!(take_length_calls(), vec![("px", -12.0), ("px", -2.0)]);
+
+    // Dynamic format! templates keep their negative sign in the runtime matcher.
+    let sign = "-";
+    let cls = format!("{sign}mt-2");
+    let _el = rsx_tw! { <div class={cls} /> };
+    assert_eq!(take_length_calls(), vec![("px", -8.0)]);
+
+    // The default macro follows the crate's feature selection.
+    let _el = rsx! { <div class="-gap-4" /> };
+    assert_eq!(take_length_calls(), vec![("px", scaled_px(-4.0))]);
+}
+
+#[test]
+fn negative_variant_classes_expand_inside_state_hooks() {
+    // Variant closures only run when the state hook fires, so assert on the expansion.
+    let expanded = rsx_expand! { <button class="-mt-2 hover:-mt-4 active:-gap-1" /> };
+    let compact = expanded.split_whitespace().collect::<String>();
+    let base = format!(".mt(px({}f32))", scaled_px(-2.0));
+    let hover = format!(".hover(|__style|__style.mt(px({}f32)))", scaled_px(-4.0));
+    let active = format!(".active(|__style|__style.gap(px({}f32)))", scaled_px(-1.0));
+    assert!(compact.contains(&base), "{compact}");
+    assert!(compact.contains(&hover), "{compact}");
+    assert!(compact.contains(&active), "{compact}");
+}
+
+#[test]
 fn strict_dynamic_classes_can_report_instead_of_panicking() {
     let seen = Rc::new(RefCell::new(Vec::new()));
     let sink = seen.clone();

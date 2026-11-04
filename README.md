@@ -321,6 +321,7 @@ provide the current class vocabulary and limitations for code-generation tools.
 - `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`
 - `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, `ml-4`, `mr-4`
 - Arbitrary spacing: `gap-[14px]`, `gap-x-[0.75rem]`, `p-[18px]`, `mx-[1.25rem]`
+- Negative spacing and sizing: `-m-4` → `.m(px(-4.0))`, `-mt-1.5`, `-ml-[13px]`, `-w-1/2`, `-m-px` (works inside variants like `hover:-mt-2` too; `-auto` and `-full` cannot be negative, and `rounded-*` / `leading-*` stay non-negative)
 - Percent spacing such as `gap-[10%]` intentionally errors because GPUI spacing uses definite lengths
 
 **Sizing:**
@@ -552,6 +553,7 @@ rsx! {
 > **Supported at runtime:** common layout/spacing/typography utilities, the full Tailwind color
 > palette, arbitrary colors (e.g. `bg-[#ff0000]`, `text-[#f00]`, `bg-[rgba(15,23,42,0.8)]`),
 > arbitrary spacing and sizing lengths (`w-[280px]`, `h-[50%]`, `gap-[14px]`, `mx-[1.25rem]`),
+> negative spacing and sizing values (`-mt-2`, `-gap-4`, `-w-1/2`),
 > fraction sizing (`w-6/24`), and numeric prefix fallback (e.g. `gap-7`, `p-5`, `opacity-33`).
 > Truly unsupported classes (e.g. Tailwind variants or unknown utilities) are **silently ignored**
 > in release builds and print each warning once per call site in debug builds. Enable
@@ -604,6 +606,7 @@ Dynamic class capability summary:
 | Colors and opacity | Supported | Supported |
 | Arbitrary lengths/colors | Supported | Supported |
 | Fraction sizing | Supported | Supported |
+| Negative spacing/sizing values | Supported | Supported (numeric values) |
 | Stateful scroll classes | Supported with auto ID | Not supported |
 | State variants (`hover:`, `focus:`, `active:`, group variants) | Supported | Not supported |
 | Responsive / `dark:` variants | Warning in permissive, error in strict | Debug report in permissive; strict panic or custom handler |
