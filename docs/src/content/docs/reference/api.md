@@ -6,7 +6,10 @@ description: Compact reference for GPUI-RSX macros, tags, attributes, and genera
 ## Macros
 
 ```rust
-use gpui_rsx::{rsx, rsx_expand, rsx_fragment, rsx_permissive, rsx_runtime, rsx_strict, rsx_tw};
+use gpui_rsx::{
+    component, rsx, rsx_expand, rsx_fragment, rsx_listener, rsx_permissive,
+    rsx_runtime, rsx_strict, rsx_tw, rsx_update,
+};
 ```
 
 | Macro | Behavior |
@@ -14,10 +17,17 @@ use gpui_rsx::{rsx, rsx_expand, rsx_fragment, rsx_permissive, rsx_runtime, rsx_s
 | `rsx!` | Default permissive RSX macro. |
 | `rsx_fragment!` | Always returns `Vec<gpui::AnyElement>` for mixed root types; otherwise follows `rsx!`. |
 | `rsx_permissive!` | Explicit permissive mode; unsupported classes are ignored when safe. |
-| `rsx_strict!` | Unsupported static classes become compile errors; unsupported dynamic classes panic when evaluated. |
+| `rsx_strict!` | Unsupported static classes become compile errors; unsupported dynamic classes panic unless `onUnknownClass` handles them. |
 | `rsx_expand!` | Returns a string preview of generated GPUI builder code. |
 | `rsx_tw!` | Uses Tailwind's 4px numeric spacing scale. |
 | `rsx_runtime!` | Generates shared dynamic class helpers at the crate root; enable with `[options] dynamic-runtime = "rsx_runtime"`. See [Performance](/gpui-rsx/guides/performance/). |
+| `rsx_listener!` | `rsx_listener!(cx, handler)` delegates to `cx.listener`; the `notify` form adds a notification after normal return. See [Event listeners](/gpui-rsx/usage/syntax/#event-listeners). |
+| `rsx_update!` | Runs a synchronous `FnOnce` update, calls `cx.notify()` after normal return and preserves the result. See [Explicit state updates](/gpui-rsx/usage/syntax/#explicit-state-updates). |
+| `#[component]` | Generates props and a builder for a named-field struct or synchronous function. See [Components](/gpui-rsx/usage/syntax/#components). |
+
+Generated GPUI paths default to `::gpui`. Configure `[options] gpui-path` for a renamed
+dependency or crate-root re-export; see [Compatibility](/gpui-rsx/compatibility/#existing-dependency-aliases)
+for supported paths, target placement and derive limitations.
 
 ## Element Constructors
 

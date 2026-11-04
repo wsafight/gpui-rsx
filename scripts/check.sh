@@ -7,6 +7,7 @@ Usage: scripts/check.sh [--proxy] [--skip-demo] [--release] [--skip-docs] [--ski
 
 Runs the standard local validation suite:
   cargo fmt --all -- --check
+  node --test scripts/dev-reload*.test.mjs
   cargo xtask spec --check
   cargo xtask compat-matrix --check
   cargo xtask check-gpui
@@ -20,6 +21,7 @@ Runs the standard local validation suite:
   cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings
   cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
   cargo +1.98.1 test --manifest-path demo/Cargo.toml --doc --locked
+  cargo +1.98.1 test --manifest-path tests/fixtures/gpui-renamed/Cargo.toml --target-dir demo/target
 
 With --release, also runs:
   cargo bench --bench class_performance --no-run
@@ -82,6 +84,7 @@ run() {
 }
 
 run cargo fmt --all -- --check
+run node --test scripts/dev-reload*.test.mjs
 run cargo xtask spec --check
 run cargo xtask compat-matrix --check
 run cargo xtask line-limit
@@ -101,6 +104,7 @@ if [[ "$skip_demo" -eq 0 ]]; then
     run cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings
     run cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
     run cargo +1.98.1 test --manifest-path demo/Cargo.toml --doc --locked
+    run cargo +1.98.1 test --manifest-path tests/fixtures/gpui-renamed/Cargo.toml --target-dir demo/target
 fi
 
 if [[ "$release" -eq 1 ]]; then

@@ -95,6 +95,12 @@ impl ClassMode {
         self.theme.as_deref()
     }
 
+    /// Resolves generated GPUI references without rewriting user expressions.
+    pub fn gpui_path(&self) -> syn::Path {
+        self.theme()
+            .map_or_else(|| syn::parse_quote!(::gpui), Theme::gpui_syn_path)
+    }
+
     /// Returns whether ignored dynamic classes are reported at process exit.
     pub const fn reports_dynamic_at_exit(&self) -> bool {
         self.report_dynamic_at_exit
@@ -242,6 +248,36 @@ pub struct ClassDiagnostic {
     pub suggestion: Option<String>,
 }
 
+impl ClassAnalysis {
+    /// Converts an existing analysis into a diagnostic at byte offset zero.
+    /// `class` and `mode` must match those passed to [`analyze_class`].
+    pub fn into_diagnostic(self, class: &str, mode: ClassMode) -> Option<ClassDiagnostic> {
+        let (severity, message, suggestion) = match self.outcome {
+            ClassOutcome::Supported(_) => {
+                (Severity::Warning, negative_size_warning(class, mode)?, None)
+            }
+            ClassOutcome::PassThrough { suggestion, .. } => (
+                Severity::Warning,
+                passthrough_message(class, suggestion.as_deref()),
+                suggestion,
+            ),
+            ClassOutcome::Ignored { message } => {
+                (Severity::Warning, message, suggest_class(class, mode))
+            }
+            ClassOutcome::Error { message } => {
+                (Severity::Error, message, suggest_class(class, mode))
+            }
+        };
+        Some(ClassDiagnostic {
+            class: class.to_owned(),
+            offset: 0,
+            severity,
+            message,
+            suggestion,
+        })
+    }
+}
+
 /// 分析单个 class（含状态前缀）。
 pub fn analyze_class(class: &str, mode: ClassMode) -> ClassAnalysis {
     let Some((prefix, rest)) = class.split_once(':') else {
@@ -297,29 +333,12 @@ pub fn class_diagnostics(class_str: &str, mode: ClassMode) -> Vec<ClassDiagnosti
     let base = class_str.as_ptr() as usize;
     for class in class_str.split_ascii_whitespace() {
         let offset = class.as_ptr() as usize - base;
-        let (severity, message, suggestion) = match analyze_class(class, mode.clone()).outcome {
-            ClassOutcome::Supported(_) => continue,
-            ClassOutcome::PassThrough { suggestion, .. } => (
-                Severity::Warning,
-                passthrough_message(class, suggestion.as_deref()),
-                suggestion,
-            ),
-            ClassOutcome::Ignored { message } => (
-                Severity::Warning,
-                message,
-                suggest_class(class, mode.clone()),
-            ),
-            ClassOutcome::Error { message } => {
-                (Severity::Error, message, suggest_class(class, mode.clone()))
-            }
-        };
-        out.push(ClassDiagnostic {
-            class: class.to_owned(),
-            offset,
-            severity,
-            message,
-            suggestion,
-        });
+        if let Some(mut diagnostic) =
+            analyze_class(class, mode.clone()).into_diagnostic(class, mode.clone())
+        {
+            diagnostic.offset = offset;
+            out.push(diagnostic);
+        }
     }
     out
 }
@@ -340,7 +359,12 @@ pub fn parse_class_string_with_mode(
     for class in class_str.split_ascii_whitespace() {
         let analysis = analyze_class(class, mode.clone());
         let tokens = match analysis.outcome {
-            ClassOutcome::Supported(tokens) => tokens,
+            ClassOutcome::Supported(tokens) => {
+                if let Some(message) = negative_size_warning(class, mode.clone()) {
+                    methods.push(warning(&message, span));
+                }
+                tokens
+            }
             ClassOutcome::PassThrough { tokens, suggestion } => {
                 methods.push(warning(
                     &passthrough_message(class, suggestion.as_deref()),
@@ -470,6 +494,46 @@ fn is_method_ident(name: &str) -> bool {
 pub(crate) fn compile_error_at(message: &str, span: Span) -> TokenStream {
     let error = quote_spanned! {span=> compile_error!(#message); };
     quote! { .map(|__el| { #error __el }) }
+}
+
+/// Warning for negative sizing classes that expand fine but have no useful layout effect.
+///
+/// GPUI accepts `-w-4`, `-size-2`, `-max-h-1`, … and so does this crate, but GPUI's layout
+/// clamps a negative size to zero (the element collapses) and ignores a negative minimum
+/// size. `demo/tests/negative_layout.rs` pins both behaviours. The class stays supported;
+/// this only explains the result, and is not an error even in strict mode.
+fn negative_size_warning(class: &str, mode: ClassMode) -> Option<String> {
+    let base = class.rsplit_once(':').map_or(class, |(_, base)| base);
+    let (method, value, _) = split_length_class(base.strip_prefix('-').unwrap_or(base))?;
+    let consequence = match method {
+        "w" | "h" | "size" | "max_w" | "max_h" => {
+            "GPUI's layout clamps a negative size to 0, so the element collapses"
+        }
+        "min_w" | "min_h" => "GPUI's layout ignores a negative minimum size",
+        _ => return None,
+    };
+    if !base.starts_with('-') && !value.contains('-') {
+        return None;
+    }
+    let operation = values::resolve_style(base, mode)?.ok()?;
+    let negative = match operation.value() {
+        Some(crate::StyleValue::Length(
+            crate::StyleLength::Px(value)
+            | crate::StyleLength::Rem(value)
+            | crate::StyleLength::Relative(value),
+        )) => *value < 0.0,
+        None => lookup_gpui_method(operation.method()).is_some_and(|method| {
+            method.negated && !matches!(method.family_suffix, "0" | "auto" | "full")
+        }),
+        _ => false,
+    };
+    if !negative {
+        return None;
+    }
+    Some(format!(
+        "`{class}` is accepted, but {consequence}.\n  \
+         help: use a negative margin such as `-mt-2` to move or overlap elements"
+    ))
 }
 
 /// 编译期警告：stable 上借用 `#[deprecated]` lint，警告定位到 class 字面量。

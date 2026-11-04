@@ -1,0 +1,17 @@
+error[E0308]: mismatched types
+ --> tests/ui/state_update_immutable_view.rs:7:17
+  |
+7 |     rsx_update!(&view, &mut context, |_, _| {});
+  |     ------------^^^^^--------------------------
+  |     |           |
+  |     |           types differ in mutability
+  |     arguments to this function are incorrect
+  |
+  = note: expected mutable reference `&mut usize`
+                     found reference `&usize`
+note: function defined here
+ --> tests/ui/state_update_immutable_view.rs:7:5
+  |
+7 |     rsx_update!(&view, &mut context, |_, _| {});
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: this error originates in the macro `rsx_update` (in Nightly builds, run with -Z macro-backtrace for more info)

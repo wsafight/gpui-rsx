@@ -5,6 +5,10 @@ description: Install GPUI-RSX and render a first GPUI view.
 
 GPUI-RSX is a procedural macro for writing GPUI views with JSX-like syntax. Static markup expands to normal GPUI builder calls during compilation, so the generated UI remains ordinary Rust code.
 
+:::note[GPUI elements and HTML-like names]
+Names such as `button` and `input` are aliases for GPUI `div()`, with no HTML input or form behavior. For a component library's controls, use explicit constructors such as `<Button base={Button::new("save")} label={"Save"} />`; see [Components](/gpui-rsx/usage/syntax/#components) for imports and construction rules.
+:::
+
 ## Install
 
 Add GPUI Kit, aliased as `gpui` for macro-generated paths, and GPUI-RSX:
@@ -12,7 +16,7 @@ Add GPUI Kit, aliased as `gpui` for macro-generated paths, and GPUI-RSX:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.2"
+gpui-rsx = "0.11.0"
 ```
 
 Kit pins its matching `gpui-pre` snapshot and re-exports GPUI, components and assets. Commit `Cargo.lock` to reproduce the complete dependency graph.
@@ -124,7 +128,7 @@ rsx! {
 ```
 
 :::note[Pixel spacing by default]
-`p-4` and `gap-4` mean 4px. For Tailwind's 4px units, use `rsx_tw!` or a [project configuration](/gpui-rsx/guides/theming/).
+`p-4` and `gap-4` mean 4px. For Tailwind's 4px units, use `rsx_tw!` or a [project configuration](/gpui-rsx/guides/theming/). Named attributes such as `gap_4` keep GPUI's native units, independently of the class scale.
 :::
 
 Static class strings are parsed by the macro. Dynamic strings are handled by a generated runtime matcher and are useful for values assembled at runtime:
@@ -136,6 +140,8 @@ rsx! {
     <div class={row_class}>{label.as_str()}</div>
 }
 ```
+
+Dynamic strings support a smaller set of classes: state variants and stateful scroll classes require static markup. Unknown dynamic classes are ignored in permissive release builds; strict mode panics unless an `onUnknownClass` handler is supplied. See [Class Handling](/gpui-rsx/usage/class/) for the support matrix.
 
 Prefer direct attributes when the value is already a Rust expression:
 

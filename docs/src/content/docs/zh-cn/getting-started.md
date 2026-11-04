@@ -5,6 +5,10 @@ description: 安装 GPUI-RSX 并渲染第一个 GPUI 视图。
 
 GPUI-RSX 是一个用于编写 GPUI 视图的过程宏。静态标记会在编译期展开为普通 GPUI builder 调用，因此最终 UI 仍是常规 Rust 代码。
 
+:::note[GPUI 元素与 HTML-like 名称]
+`button`、`input` 等名称是 GPUI `div()` 的别名，不提供 HTML 输入和表单行为。使用组件库控件时，请显式指定构造方式，例如 `<Button base={Button::new("save")} label={"Save"} />`；导入和构造规则见[组件](/gpui-rsx/zh-cn/usage/syntax/#组件)。
+:::
+
 ## 安装
 
 在应用的 `Cargo.toml` 中添加 GPUI Kit 和 GPUI-RSX；将 Kit 命名为 `gpui`，供宏展开使用：
@@ -12,7 +16,7 @@ GPUI-RSX 是一个用于编写 GPUI 视图的过程宏。静态标记会在编�
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.2"
+gpui-rsx = "0.11.0"
 ```
 
 Kit 固定配套的 `gpui-pre` 快照，并导出 GPUI、组件和资源。应用应提交 `Cargo.lock`，固定完整依赖图。
@@ -124,7 +128,7 @@ rsx! {
 ```
 
 :::note[默认间距以像素为单位]
-`p-4` 和 `gap-4` 表示 4px。若需要每单位 4px 的 Tailwind 刻度，请使用 `rsx_tw!` 或[项目配置](/gpui-rsx/zh-cn/guides/theming/)。
+`p-4` 和 `gap-4` 表示 4px。若需要每单位 4px 的 Tailwind 刻度，请使用 `rsx_tw!` 或[项目配置](/gpui-rsx/zh-cn/guides/theming/)。`gap_4` 等具名属性继续使用 GPUI 原生单位，不受 class 刻度影响。
 :::
 
 静态 class 字符串由宏在编译期解析。动态字符串由生成的运行时 matcher 处理，适合必须运行时组装的场景：
@@ -136,6 +140,8 @@ rsx! {
     <div class={row_class}>{label.as_str()}</div>
 }
 ```
+
+动态字符串的支持范围更小：状态前缀和有状态滚动 class 需要静态标记。permissive 模式的 release 构建会忽略未知动态 class；strict 模式默认 panic，除非提供 `onUnknownClass` 处理器。完整范围见 [Class 处理](/gpui-rsx/zh-cn/usage/class/)。
 
 如果值本来就是 Rust 表达式，优先使用直接属性：
 

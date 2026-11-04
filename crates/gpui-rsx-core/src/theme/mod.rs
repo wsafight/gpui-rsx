@@ -117,6 +117,7 @@ pub struct Theme {
     path: Option<PathBuf>,
     scale: Option<SpacingScale>,
     dynamic_runtime: Option<String>,
+    gpui_path: Option<String>,
     colors: BTreeMap<String, TokenValue>,
     radius: BTreeMap<String, TokenValue>,
     spacing: BTreeMap<String, TokenValue>,
@@ -145,6 +146,18 @@ impl Theme {
     /// Module used for shared dynamic class helpers, when explicitly configured.
     pub fn dynamic_runtime(&self) -> Option<&str> {
         self.dynamic_runtime.as_deref()
+    }
+
+    /// GPUI crate or re-export path used by generated code.
+    pub fn gpui_path(&self) -> Option<&str> {
+        self.gpui_path.as_deref()
+    }
+
+    /// Parsed GPUI path for generated code, defaulting to `::gpui`.
+    pub fn gpui_syn_path(&self) -> syn::Path {
+        self.gpui_path()
+            .and_then(|path| syn::parse_str(path).ok())
+            .unwrap_or_else(|| syn::parse_quote!(::gpui))
     }
 
     /// Returns the source path when this theme was loaded from `rsx.toml`.

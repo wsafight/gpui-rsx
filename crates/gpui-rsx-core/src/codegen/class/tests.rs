@@ -347,3 +347,138 @@ fn passthrough_messages_inside_variants_name_valid_rust() {
     assert!(!variant.contains(".focus:"), "{variant}");
     assert!(diagnostics[1].message.contains("`.ring_2()`"));
 }
+
+#[test]
+fn negative_sizes_warn_that_layout_clamps_them_but_still_expand() {
+    for class in [
+        "-w-4",
+        "-h-4",
+        "-size-2",
+        "-max-w-4",
+        "-max-h-4",
+        "-w-1/2",
+        "-w-[10px]",
+        "-w-px",
+        "hover:-w-4",
+        "w-[-4px]",
+        "h--4",
+        "size-[-2rem]",
+        "max-w-[-50%]",
+        "w-neg-px",
+        "focus:w-[-4px]",
+    ] {
+        for mode in [ClassMode::PERMISSIVE, ClassMode::STRICT] {
+            let tokens = expand(class, mode);
+            assert!(
+                tokens.contains("unsupported_rsx_class"),
+                "{class}: {tokens}"
+            );
+            assert!(
+                tokens.contains("clamps a negative size to 0"),
+                "{class}: {tokens}"
+            );
+            // Still expanded, and never promoted to an error.
+            assert!(!tokens.contains("compile_error"), "{class}: {tokens}");
+        }
+    }
+    assert!(expand("-w-4", ClassMode::STRICT).contains(". w (px (- 4f32))"));
+}
+
+#[test]
+fn negative_minimum_sizes_warn_that_layout_ignores_them() {
+    for class in [
+        "-min-w-4",
+        "-min-h-4",
+        "focus:-min-w-4",
+        "min-w-[-4px]",
+        "min-h--4",
+        "focus:min-h-[-2rem]",
+    ] {
+        let tokens = expand(class, ClassMode::STRICT);
+        assert!(
+            tokens.contains("ignores a negative minimum size"),
+            "{class}: {tokens}"
+        );
+        assert!(!tokens.contains("compile_error"), "{class}: {tokens}");
+    }
+}
+
+#[test]
+fn negative_margin_padding_gap_and_positive_sizes_do_not_warn() {
+    for class in [
+        "-m-2",
+        "-mt-px",
+        "-mx-[4px]",
+        "-p-2",
+        "-pl-1",
+        "-gap-4",
+        "-gap-x-2",
+        "w-4",
+        "min-w-4",
+        "hover:-mt-2",
+        "-w-[-4px]",
+        "-size-[-2rem]",
+        "-max-w-[-50%]",
+        "-min-w-[-4px]",
+        "-w--4",
+        "-w-0",
+        "w-[-0px]",
+        "-min-w-0",
+        "w-neg-0",
+        "hover:-w-[-4px]",
+    ] {
+        let tokens = expand(class, ClassMode::STRICT);
+        assert!(
+            !tokens.contains("unsupported_rsx_class"),
+            "{class}: {tokens}"
+        );
+    }
+}
+
+#[test]
+fn negative_size_warnings_reach_lint_and_lsp_diagnostics() {
+    let diagnostics = class_diagnostics("flex -w-4 -mt-2 hover:-min-h-1", ClassMode::STRICT);
+    let found: Vec<_> = diagnostics
+        .iter()
+        .map(|d| (d.class.as_str(), d.offset, d.severity))
+        .collect();
+    assert_eq!(
+        found,
+        [
+            ("-w-4", 5, Severity::Warning),
+            ("hover:-min-h-1", 16, Severity::Warning)
+        ]
+    );
+    assert!(diagnostics[0].message.contains("collapses"));
+    assert!(diagnostics[0].suggestion.is_none());
+}
+
+#[test]
+fn size_diagnostics_follow_resolved_signs_in_both_scales() {
+    for scale in [SpacingScale::Px, SpacingScale::Tailwind] {
+        for mode in [ClassMode::PERMISSIVE, ClassMode::STRICT] {
+            let mode = mode.with_scale(scale);
+            for (class, warns) in [
+                ("w-[-4px]", true),
+                ("hover:max-h-[-25%]", true),
+                ("min-w-[-1rem]", true),
+                ("-w-[-4px]", false),
+                ("hover:-max-h-[-25%]", false),
+                ("-min-w-[-1rem]", false),
+                ("-w-0", false),
+                ("w-[-0px]", false),
+                ("-min-w-0", false),
+            ] {
+                let diagnostics = class_diagnostics(class, mode.clone());
+                assert_eq!(
+                    diagnostics.len(),
+                    usize::from(warns),
+                    "{class}: {diagnostics:?}"
+                );
+                if warns {
+                    assert_eq!(diagnostics[0].severity, Severity::Warning);
+                }
+            }
+        }
+    }
+}

@@ -1,6 +1,6 @@
 use gpui::prelude::*;
 use gpui::*;
-use gpui_rsx::rsx;
+use gpui_rsx::{rsx, rsx_listener};
 
 use crate::domain::{DetailTab, Incident, SeverityFilter};
 use crate::model::IncidentConsole;
@@ -22,11 +22,10 @@ pub(crate) fn render(
                             } else {
                                 "px-10 py-6 rounded-md text-zinc-500 cursor-pointer"
                             }}
-                            onClick={cx.listener({
+                            onClick={rsx_listener!(cx, notify, {
                                 let filter = *filter;
-                                move |view, _, _window, cx| {
+                                move |view, _, _window, _| {
                                     view.severity_filter = filter;
-                                    cx.notify();
                                 }
                             })}
                         >
@@ -58,13 +57,12 @@ pub(crate) fn render(
                                     } else {
                                         "w-full flex items-center gap-12 px-12 py-10 border-b border-zinc-800 cursor-pointer"
                                     }}
-                                    onClick={cx.listener({
+                                    onClick={rsx_listener!(cx, notify, {
                                         let incident_id = incident.id;
-                                        move |view, _, _window, cx| {
+                                        move |view, _, _window, _| {
                                             view.selected_id = incident_id;
                                             view.detail_tab = DetailTab::Overview;
                                             view.last_action = format!("Selected incident #{incident_id}");
-                                            cx.notify();
                                         }
                                     })}
                                 >

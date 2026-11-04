@@ -152,15 +152,37 @@ GPUI 自带 `*_neg_*` 预设的间距与尺寸家族支持前导负号，字面�
 
 ```rust
 rsx! {
-    <div class="-m-2 -mt-1.5 -ml-[13px] -w-1/2 hover:-gap-1" />
+    <div class="-m-2 -mt-1.5 -ml-[13px] -p-1 hover:-gap-1" />
 }
 ```
 
-负值 class 展开为取负的长度，例如 `-m-4` 是 `.m(px(-4.0))`（Tailwind 刻度下为 16px），
+负值 class 展开为取负的长度，例如 `-m-4` 是 `.m(px(-4.0))`（Tailwind 刻度下为 -16px），
 预设值如 `-m-px` 则调用 GPUI 的 `m_neg_px()` 方法。`-auto` 与 `-full` 仍不受支持，
 因为负的 `auto` / `full` 没有意义；`rounded-*` / `leading-*` 会被拒绝，因为 GPUI
-没有为它们生成负值预设。未知的负值 class 会给出具体原因，而不是推荐符号相反的正值
- class。
+没有为它们生成负值预设。未知的负值 class 会给出具体原因，而不是推荐符号相反的正值 class。
+
+负值的实际效果由 GPUI 布局引擎决定。下表对应 `demo/tests/negative_layout.rs` 中的
+固定尺寸 flex 布局；正最小尺寸、flex 增长和内容尺寸等其他约束可能改变最终边界。
+
+| class | 布局结果 |
+| --- | --- |
+| `-m-*`、`-mx-*`、`-my-*`、`-mt-*`、`-ml-*` | 元素及其后续兄弟向负方向移动，与相邻元素重叠（`-mt-5` 使其上移 5px）。 |
+| `-mb-*`、`-mr-*` | 沿布局方向把下一个兄弟拉近；在交叉轴上不产生位移。 |
+| `-gap-*` | 兄弟元素按该数值相互靠拢。 |
+| `-gap-x-*`、`-gap-y-*` | 同上，但只作用于对应轴（`gap-x` 用于横排，`gap-y` 用于竖排）。 |
+| `-p-*`、`-px-*`、`-py-*`、`-pt-*`、`-pl-*` | 内容向外偏移，超出容器边缘。 |
+| `-pb-*`、`-pr-*` | 只改变远端边缘，子元素不移动。 |
+| `-w-*`、`-h-*`、`-size-*`、`-max-w-*`、`-max-h-*`（包括 `-w-1/2` 这类分数） | 被钳制为 `0`，元素塌缩。 |
+| `-min-w-*`、`-min-h-*` | 没有效果。 |
+
+上述结果由 `demo/tests/negative_layout.rs` 固定，它在 GPUI 真实布局引擎上逐个家族验证。
+尺寸类之所以被接受，是因为 GPUI 提供了对应方法，但它们几乎没有实用价值，因此静态字面量
+如 `-w-4`、`-min-w-4` 在编译时会给出说明结果的警告。strict 模式保留警告级别，
+但 Rust 的 `#[deny(deprecated)]` / `-D warnings` 和 `cargo rsx lint --deny-warnings`
+仍可使验证失败。`cargo rsx lint` 与语言服务器报告同样的警告。判断依据是解析后的长度：
+`w-[-4px]` 会提示，而 `-w-[-4px]` 的结果是正的 4px，不会误报；零尺寸也不会触发
+负尺寸警告。`-mt-px` 这类预设值需要使用静态字面量：动态运行时匹配器不解析
+`px`、`0p5` 这类预设，无论正值还是负值。
 
 ## 颜色格式
 
@@ -183,6 +205,25 @@ rsx! {
 ```
 
 ## Strict 与预览宏
+
+错误处理与数值刻度分别选择：
+
+| 需求 | 入口 | 行为 |
+| --- | --- | --- |
+| 常规 GPUI 布局 | `rsx!` | 宽松处理 class；未配置时使用像素刻度 |
+| 拒绝不支持的 class | `rsx_strict!` | 静态 class 编译时报错；未处理的未知动态 token 会 panic |
+| 显式允许不支持的 class | `rsx_permissive!` | class 策略与默认 `rsx!` 相同，保留已配置的刻度 |
+| 使用 Tailwind 数值间距 | `rsx_tw!` | 宽松处理 class，数值单位为 4px；不会启用 strict 检查 |
+| 检查生成代码 | `rsx_expand!` | 返回字符串，不做类型检查或渲染 |
+
+同时需要 strict 检查与 Tailwind 刻度时，使用 `rsx_strict!`，并开启
+`tailwind-scale` feature 或设置 `[options] spacing-scale = "tailwind"`。
+`w-[8px]` 等显式长度和原生 GPUI 属性在各模式下保持原单位。
+
+例如，`class="md:flex"` 在宽松模式下警告并忽略，在 strict 模式下编译报错；
+`class={String::from("md:flex")}` 则遵循动态策略。`onUnknownClass` 只处理不支持的
+**动态** token，不能屏蔽静态错误。`w-[oops]` 这样的非法值在两种静态模式下都会报错。
+将字面量移入变量前，先核对[静态与动态能力表](#动态-class)。
 
 需要让未知静态 class 直接失败时，使用 `rsx_strict!`：
 
@@ -217,7 +258,8 @@ let preview = rsx_expand! {
 [迁移指南](/gpui-rsx/zh-cn/guides/migration/)。
 
 静态字面量支持 `hover:`、`focus:`、`focus-visible:`、`active:`、`group-hover:` 和
-`group-active:`，也可写具名组 `group-hover/menu:`。有状态的前缀会注入 ID，循环内要提供稳定 key。
+`group-active:`，也可写具名组 `group-hover/menu:`。有状态的前缀会注入 ID，循环内要提供
+稳定 key 或显式的唯一 ID。
 主题令牌通过 `rsx.toml` 的 `[colors]`、`[radius]`、`[spacing]` 定义；还支持
 `[text-size]`（`text-size-body`）、`[line-height]`（`leading-body`）、`[opacity]`
 （`opacity-muted`）和只接受表达式的 `[shadow]`（`shadow-card`）。gpui-component

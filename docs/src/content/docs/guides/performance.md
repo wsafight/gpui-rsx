@@ -5,6 +5,30 @@ description: How GPUI-RSX code expands, where runtime work can appear, and how t
 
 GPUI-RSX is designed so the common path is ordinary GPUI code generated at compile time. Most performance work is therefore about keeping markup static where possible and avoiding unnecessary allocation or state churn in render methods.
 
+## Measure development reloads
+
+From the repository root, run the build/restart prototype with Node.js 22 or newer:
+
+```sh
+node scripts/dev-reload.mjs --manifest-path demo/Cargo.toml --bin counter --offline --report /tmp/rsx-reload.json
+```
+
+It polls Rust, TOML and lockfiles every 300 ms, serializes builds and restarts after
+success. A failed build leaves the previous application running. Use repeated
+`--watch PATH` arguments to replace the default source roots, and `--toolchain VERSION`
+to override Rust 1.98.1. Stop with Ctrl-C to close the application and write the report.
+
+The Counter emits `GPUI_RSX_READY` at its first render invocation when launched by
+the script. Report fields are build duration (`buildMs`), launch to render marker
+(`restartMs`) and change detection to marker (`editToReadyMs`). Other binaries need
+their own marker to measure readiness. Polling time precedes change detection.
+This prototype rebuilds and restarts the process; application state is reset.
+
+On 2026-11-03, one Counter view edit took about 1.44 s to build and 3.43 s from
+detection to the render marker on macOS arm64. Those are warm-cache observations
+with concurrent validation, not a performance guarantee or a speedup comparison.
+The marker does not measure GPU presentation or the time the user sees the frame.
+
 ## Mental Model
 
 Static RSX expands during macro execution:
@@ -315,6 +339,39 @@ For documentation examples and navigation, build the docs site:
 ```bash
 cd docs
 bun run build
+```
+
+## Incremental analysis measurements (2026-11-04)
+
+On an Apple M3 Pro with Rust 1.99.1, Criterion runs with 30 samples, a 1-second
+warmup and a 2-second measurement produced these local estimates:
+
+| Workload | Before indexing and class reuse | After |
+| --- | --- | --- |
+| Edit one of 80 macros | 0.21 ms | 0.042 ms |
+| Edit one of 320 macros | 3.03 ms | 0.126 ms |
+| Edit one of 1280 macros | 50.6 ms | 0.507 ms |
+| Full analysis of 80 macros | 1.42 ms | 1.34 ms |
+| Edit a 5000-line file with 50 macros | 0.133 ms | 0.094 ms |
+
+The macro-count fixtures repeat small static bodies. The 5000-line fixture includes
+ordinary comment lines; these are analysis timings, not end-to-end editor latency.
+An index assigns literals, diagnostics and class tokens to their innermost macro once
+per update. Reusing an unchanged body then copies only its own results and shifts byte
+offsets. Class diagnostic, classification and color results are shared within one body;
+generated syntax and spans are not cached across requests.
+
+The expansion benchmark also covers the existing shared runtime: a single dynamic
+call site took about 511 µs with an inline helper versus 13 µs when configured to use
+the shared module. Its stringified expansion was about 47 KB versus 1.1 KB. The
+shared module has a separate one-time generation and compilation cost, so these
+numbers do not describe the whole application's build time or runtime frame rate.
+
+```bash
+cargo bench -p gpui-rsx-tools --bench analysis --no-default-features -- \
+  --sample-size 30 --warm-up-time 1 --measurement-time 2
+cargo bench -p gpui-rsx-core --bench expansion -- dynamic_class \
+  --sample-size 30 --warm-up-time 1 --measurement-time 2
 ```
 
 ## Editor and matcher measurements (2026-10-29)

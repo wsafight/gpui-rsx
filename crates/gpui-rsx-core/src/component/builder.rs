@@ -22,6 +22,7 @@ struct Prop {
 pub(super) fn expand_struct(
     mut input: syn::ItemStruct,
     gates: &[syn::Attribute],
+    gpui: &syn::Path,
 ) -> syn::Result<TokenStream> {
     let syn::Fields::Named(fields) = &mut input.fields else {
         return Err(syn::Error::new(
@@ -284,8 +285,8 @@ pub(super) fn expand_struct(
                     impl<#(#impl_parameters,)* #(#type_params),*> #builder<#(#original_arguments,)* #(#type_params),*> #where_clause {
                         /// Appends one child element.
                         #[must_use]
-                        pub fn child(mut self, child: impl ::gpui::IntoElement) -> Self {
-                            self.#ident.push(::gpui::IntoElement::into_any_element(child));
+                        pub fn child(mut self, child: impl #gpui::IntoElement) -> Self {
+                            self.#ident.push(#gpui::IntoElement::into_any_element(child));
                             self
                         }
 
@@ -293,10 +294,10 @@ pub(super) fn expand_struct(
                         #[must_use]
                         pub fn children(
                             mut self,
-                            children: impl ::core::iter::IntoIterator<Item = impl ::gpui::IntoElement>,
+                            children: impl ::core::iter::IntoIterator<Item = impl #gpui::IntoElement>,
                         ) -> Self {
                             self.#ident
-                                .extend(children.into_iter().map(::gpui::IntoElement::into_any_element));
+                                .extend(children.into_iter().map(#gpui::IntoElement::into_any_element));
                             self
                         }
                     }
@@ -318,7 +319,7 @@ pub(super) fn expand_struct(
     element_generics
         .make_where_clause()
         .predicates
-        .push(syn::parse_quote!(#name<#(#original_arguments),*>: ::gpui::IntoElement));
+        .push(syn::parse_quote!(#name<#(#original_arguments),*>: #gpui::IntoElement));
     let (element_impl, element_args, element_where) = element_generics.split_for_impl();
     let build_fields = props.iter().map(|p| {
         let ident = &p.ident;
@@ -401,11 +402,11 @@ pub(super) fn expand_struct(
 
         #(#gates)*
         #[allow(deprecated)]
-        impl #element_impl ::gpui::IntoElement for #builder #element_args #element_where {
-            type Element = <#name<#(#original_arguments),*> as ::gpui::IntoElement>::Element;
+        impl #element_impl #gpui::IntoElement for #builder #element_args #element_where {
+            type Element = <#name<#(#original_arguments),*> as #gpui::IntoElement>::Element;
 
             fn into_element(self) -> Self::Element {
-                ::gpui::IntoElement::into_element(self.build())
+                #gpui::IntoElement::into_element(self.build())
             }
         }
 

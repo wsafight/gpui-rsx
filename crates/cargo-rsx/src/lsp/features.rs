@@ -646,6 +646,27 @@ mod tests {
     }
 
     #[test]
+    fn repeated_loop_errors_have_independent_utf16_quick_fixes() {
+        let source = "fn f(){let label=\"中文😀\";rsx!{<div>{for row in rows {<div onClick={first}/><div onClick={second}/>}}</div>};}";
+        for needle in ["<div onClick={first}", "<div onClick={second}"] {
+            let start = source.find(needle).unwrap() + 1;
+            let at = position(source, start);
+            let (response, _) = request_at(
+                "textDocument/codeAction",
+                source,
+                start,
+                json!({"range":{"start":at,"end":at}}),
+            );
+            let actions = response.as_array().unwrap();
+            assert_eq!(actions.len(), 1, "{actions:?}");
+            let edit = &actions[0]["edit"]["changes"]["file:///tmp/rsx-lsp-test.rs"][0];
+            assert_eq!(edit["range"]["start"], position(source, start));
+            assert_eq!(edit["range"]["end"], position(source, start + 3));
+            assert!(edit["newText"].as_str().unwrap().contains("key="));
+        }
+    }
+
+    #[test]
     fn diagnostics_map_severities_and_carry_suggestions() {
         let source =
             "fn f(){rsx!{<div class=\"flex-colum\"/>};rsx_strict!{<p class=\"nonsense\"/>};}";

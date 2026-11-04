@@ -8,7 +8,7 @@ CLI 与编辑器语言服务共用宏的解析器和 class 配置。安装需要
 ## 安装与环境检查
 
 ```sh
-cargo install cargo-rsx --version 0.10.2 --locked
+cargo install cargo-rsx --version 0.11.0 --locked
 cargo rsx doctor --manifest-path demo/Cargo.toml
 ```
 
@@ -48,6 +48,10 @@ cargo rsx preview src/main.rs --watch
 
 预览在 `http://127.0.0.1:9230` 提供近似静态布局，并标记未执行的行为。`--index N` 可选择指定宏。[在线体验](/gpui-rsx/zh-cn/playground/)在浏览器本地运行相同的解析器、转换器与预览；最终渲染和交互请在原生 GPUI 应用中验证。
 
+两种预览都不执行任意 Rust 表达式或事件处理器。预览和展开成功，不代表生成代码通过
+类型检查，也不代表焦点、滚动、无障碍及平台行为已验证。请编译应用并在 GPUI 中验证
+这些行为；动态 class 匹配还受其运行时支持范围限制。
+
 ## 查看生成的 Rust
 
 ```sh
@@ -71,9 +75,12 @@ cargo rsx migrate src/main.rs --write   # 应用一次
 
 ## 接入编辑器
 
+本地原生界面迭代还可使用仓库中的[构建/重启原型](/gpui-rsx/zh-cn/guides/performance/#测量开发重载)，
+它提供构建失败恢复和耗时报告。
+
 | 编辑器 | 安装方式 |
 | --- | --- |
-| VS Code | 从 [0.10.2 Release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.10.2) 下载 `.vsix`，执行 **Extensions: Install from VSIX**。 |
+| VS Code | 从 [0.11.0 Release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.11.0) 下载 `.vsix`，执行 **Extensions: Install from VSIX**。 |
 | Zed | 将仓库中的 `editors/zed` 安装为开发扩展；若自定义 Rust 语言服务列表，将 `"gpui-rsx"` 加到 `"rust-analyzer"` 旁边。 |
 
 两个插件均通过 `cargo rsx lsp` 提供：
@@ -91,6 +98,10 @@ rustfmt 的格式化器。在 VS Code 中设置 `"gpuiRsx.format.enable": true`�
 语言服务增量应用编辑，并复用未变更宏体的分析结果。补全适用于括号完整的 RSX 宏内静态字符串；Rust 类型检查继续由 rust-analyzer 执行。
 
 若 VS Code 找不到服务，设置 `gpuiRsx.serverPath` 为 `cargo-rsx` 可执行文件路径，再执行 **GPUI RSX: Restart language server**。扩展市场的上架状态单独记录在发布说明中。
+
+仓库的隔离 VS Code 集成测试验证 RSX 诊断、补全、格式化与 rust-analyzer 原生 Rust
+服务的共存。测试使用 GPUI 签名 stub，并关闭 rust-analyzer 的过程宏展开。
+原生 GPUI 行为和完整应用检查单独验证，见[兼容性验证范围](/gpui-rsx/zh-cn/compatibility/#验证范围)。
 
 ## 诊断过滤与本文件组件提示
 

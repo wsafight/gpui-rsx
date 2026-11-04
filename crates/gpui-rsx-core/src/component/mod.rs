@@ -35,13 +35,31 @@ use syn::spanned::Spanned;
 
 /// Expands `#[component]`. Errors are returned as `compile_error!` tokens.
 pub fn expand_component(attr: TokenStream, item: TokenStream) -> TokenStream {
-    match expand(attr, item) {
+    expand_component_with_path(attr, item, &syn::parse_quote!(::gpui))
+}
+
+/// Expands a component using an explicit GPUI crate or re-export path.
+pub fn expand_component_with_path(
+    attr: TokenStream,
+    item: TokenStream,
+    gpui: &syn::Path,
+) -> TokenStream {
+    match expand_with_path(attr, item, gpui) {
         Ok(tokens) => tokens,
         Err(error) => error.to_compile_error(),
     }
 }
 
+#[cfg(test)]
 fn expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
+    expand_with_path(attr, item, &syn::parse_quote!(::gpui))
+}
+
+fn expand_with_path(
+    attr: TokenStream,
+    item: TokenStream,
+    gpui: &syn::Path,
+) -> syn::Result<TokenStream> {
     if !attr.is_empty() {
         return Err(syn::Error::new(
             attr.span(),
@@ -60,8 +78,8 @@ fn expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     .collect();
     // Every generated item, including builders and impls, is gated along with its source.
     match input {
-        syn::Item::Struct(input) => expand_struct(input, &gates),
-        syn::Item::Fn(input) => expand_function(input, &gates),
+        syn::Item::Struct(input) => expand_struct(input, &gates, gpui),
+        syn::Item::Fn(input) => expand_function(input, &gates, gpui),
         input => Err(syn::Error::new_spanned(
             input,
             "#[component] requires a struct with named fields or a synchronous function",

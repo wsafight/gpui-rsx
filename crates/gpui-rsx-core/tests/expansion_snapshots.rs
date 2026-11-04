@@ -96,7 +96,7 @@ snapshot!(
 snapshot!(
     tailwind_scale_negated,
     ClassMode::PERMISSIVE.with_scale(SpacingScale::Tailwind),
-    r#"<div class="-gap-4 -p-2.5 -w-64 -gap-[14px] -m-px hover:-mt-2" />"#
+    r#"<div class="-gap-4 -p-2.5 -gap-[14px] -m-px hover:-mt-2" />"#
 );
 
 #[test]

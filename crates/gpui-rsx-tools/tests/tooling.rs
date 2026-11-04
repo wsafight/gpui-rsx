@@ -267,6 +267,26 @@ fn semantic_errors_and_strict_macro_modes_are_reported() {
 }
 
 #[test]
+fn repeated_semantic_errors_keep_each_source_location_and_fix() {
+    let source = r#"<div>{for row in rows {<div onClick={first}/><div onClick={second}/>}}</div>"#;
+    let diagnostics = analyze_body(source, ClassMode::PERMISSIVE);
+    let missing_keys: Vec<_> = diagnostics
+        .iter()
+        .filter(|diagnostic| diagnostic.message.contains("has no `id` or `key`"))
+        .collect();
+    assert_eq!(missing_keys.len(), 2, "{diagnostics:?}");
+    assert_ne!(missing_keys[0].start, missing_keys[1].start);
+    let mut fixed = source.to_owned();
+    for diagnostic in missing_keys.into_iter().rev() {
+        fixed.replace_range(
+            diagnostic.start..diagnostic.end,
+            diagnostic.suggestion.as_deref().unwrap(),
+        );
+    }
+    assert!(analyze_body(&fixed, ClassMode::PERMISSIVE).is_empty());
+}
+
+#[test]
 fn formatting_is_idempotent_and_preserves_comments_and_string_contents() {
     let source = "// keep\nfn f(){ let a=rsx!{<div class=\"flex\"><span>{\"https://example.com\"}</span></div>};let b=rsx!{ /*keep*/ <div/>}; }";
     let formatted = format::rust(source).unwrap();

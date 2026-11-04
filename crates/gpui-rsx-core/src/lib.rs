@@ -22,11 +22,13 @@ pub mod codegen;
 pub mod component;
 #[doc(hidden)]
 pub mod diagnostics;
+mod listener;
 #[doc(hidden)]
 pub mod parser;
 mod runtime_config;
 pub mod style;
 pub mod theme;
+mod update;
 
 pub use codegen::class::{
     ClassAnalysis, ClassDiagnostic, ClassMode, ClassModeBuilder, ClassOutcome, SUPPORTED_VARIANTS,
@@ -39,10 +41,12 @@ pub use codegen::element::{
 };
 pub use codegen::runtime::generate_runtime_module;
 pub use codegen::tables::{GPUI_COMPONENT_REV, GPUI_SOURCE_REV};
-pub use component::expand_component;
+pub use component::{expand_component, expand_component_with_path};
+pub use listener::{expand_listener, expand_listener_with_path};
 pub use parser::{RsxAttribute, RsxBody, RsxElement, RsxElementName, RsxNode};
 pub use style::{StyleLength, StyleOperation, StyleValue};
 pub use theme::{Theme, ThemeBuilder, ThemeExplanation, ThemeToken, ThemeTokenKind, TokenValue};
+pub use update::expand_update_with_path;
 
 /// Parsed RSX syntax. Match enums with a fallback arm for future syntax additions.
 pub mod syntax {

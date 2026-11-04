@@ -153,16 +153,44 @@ minus sign, in literal classes, state variants, and dynamic class expressions:
 
 ```rust
 rsx! {
-    <div class="-m-2 -mt-1.5 -ml-[13px] -w-1/2 hover:-gap-1" />
+    <div class="-m-2 -mt-1.5 -ml-[13px] -p-1 hover:-gap-1" />
 }
 ```
 
-Negated classes expand to negated lengths, so `-m-4` is `.m(px(-4.0))` (16px under
+Negated classes expand to negated lengths, so `-m-4` is `.m(px(-4.0))` (-16px under
 Tailwind scale), and preset values such as `-m-px` call GPUI's `m_neg_px()` method.
 `-auto` and `-full` stay unsupported because a negative `auto` or `full` has no meaning,
 and `rounded-*` / `leading-*` are rejected because GPUI generates no negated presets for
 them. Unknown negative classes report a specific reason instead of suggesting the
 sign-flipped positive class.
+
+What a negative value does is up to GPUI's layout engine. The table describes the
+fixed-size flex layouts in `demo/tests/negative_layout.rs`; other constraints, such as
+positive minimum sizes, flex growth and content sizing, can change the final bounds.
+
+| Classes | Layout result |
+| --- | --- |
+| `-m-*`, `-mx-*`, `-my-*`, `-mt-*`, `-ml-*` | The element and its following siblings move toward the negative edge, so neighbours overlap (`-mt-5` moves it 5px up). |
+| `-mb-*`, `-mr-*` | Pull the next sibling closer along the layout direction; on the cross axis nothing moves. |
+| `-gap-*` | Siblings are pulled together by that amount. |
+| `-gap-x-*`, `-gap-y-*` | Same, but only along the matching axis (`gap-x` in a row, `gap-y` in a column). |
+| `-p-*`, `-px-*`, `-py-*`, `-pt-*`, `-pl-*` | Content is shifted outward past the container edge. |
+| `-pb-*`, `-pr-*` | Only change the far edge, so no child moves. |
+| `-w-*`, `-h-*`, `-size-*`, `-max-w-*`, `-max-h-*`, including fractions such as `-w-1/2` | Clamped to `0`, so the element collapses. |
+| `-min-w-*`, `-min-h-*` | Have no effect. |
+
+These results are pinned by `demo/tests/negative_layout.rs`, which runs every family on
+GPUI's real layout engine. The sizing classes are accepted because GPUI exposes them, but
+they are rarely useful, so a static literal such as `-w-4` or `-min-w-4` compiles with a
+warning that explains the result. Strict mode keeps it a warning; Rust's
+`#[deny(deprecated)]` / `-D warnings` and `cargo rsx lint --deny-warnings` can still
+make warnings fail validation. `cargo rsx lint` and the language server report the
+same warning. Warnings follow the
+resolved length: `w-[-4px]` warns, while `-w-[-4px]` resolves to positive 4px and does
+not warn. Zero sizes do not trigger a negative-size warning either.
+Preset values such as `-mt-px` need a static literal: the dynamic
+runtime matcher does not resolve presets like `px` or `0p5`, for positive or negative
+values alike.
 
 ## Color Formats
 
@@ -185,6 +213,27 @@ rsx! {
 ```
 
 ## Strict and Preview Macros
+
+Choose error handling and spacing independently:
+
+| Need | Entry point | Behavior |
+| --- | --- | --- |
+| Normal GPUI layouts | `rsx!` | Permissive classes; pixel scale unless configured otherwise |
+| Reject unsupported classes | `rsx_strict!` | Static errors at compile time; unsupported dynamic tokens panic unless handled |
+| Explicitly allow unsupported classes | `rsx_permissive!` | Same class policy as default `rsx!`; keeps the configured spacing scale |
+| Tailwind numeric spacing | `rsx_tw!` | Permissive classes with 4px numeric units; does not enable strict checking |
+| Inspect generated code | `rsx_expand!` | Returns a string; does not type-check or render the result |
+
+To combine strict checking with Tailwind spacing, use `rsx_strict!` with the
+`tailwind-scale` feature or `[options] spacing-scale = "tailwind"`. Explicit lengths
+such as `w-[8px]` and direct GPUI attributes keep their units in every mode.
+
+For example, `class="md:flex"` warns and is ignored in permissive mode, and is a
+compile error in strict mode. `class={String::from("md:flex")}` follows the dynamic
+policy instead. `onUnknownClass` handles unsupported **dynamic** tokens; it cannot
+suppress a static error. Invalid values such as `w-[oops]` remain errors in either
+static mode. See the [static/dynamic capability table](#dynamic-classes) before
+moving a literal into a variable.
 
 Use `rsx_strict!` when unsupported static classes should fail the build:
 
@@ -220,7 +269,7 @@ use 4px units. Arbitrary values, fractions and GPUI presets are unchanged. See t
 
 Static literals support `hover:`, `focus:`, `focus-visible:`, `active:`, `group-hover:`
 and `group-active:`, including named groups such as `group-hover/menu:`. Stateful
-variants inject IDs; supply stable keys in loops. Theme tokens in `rsx.toml` support
+variants inject IDs; supply a stable key or an explicit unique ID in loops. Theme tokens in `rsx.toml` support
 `[colors]`, `[radius]`, `[spacing]` and a gpui-component preset that maps semantic
 classes such as `bg-primary` to `cx.theme()` calls. Token sections also support
 `[text-size]` (`text-size-body`), `[line-height]` (`leading-body`), `[opacity]`

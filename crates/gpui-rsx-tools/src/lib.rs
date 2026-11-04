@@ -4,14 +4,16 @@ pub mod completion;
 pub mod components;
 #[cfg(feature = "convert")]
 pub mod convert;
+mod diagnostics;
 pub mod format;
 mod incremental;
+mod reuse;
 pub use class_tokens::{ClassToken, ClassTokenKind};
 pub mod preview;
 
 use gpui_rsx_core::codegen::attribute::static_class_literals;
 use gpui_rsx_core::syntax::{RsxAttribute, RsxBody, RsxElement, RsxNode};
-use gpui_rsx_core::{ClassMode, Severity, SpacingScale, class_diagnostics};
+use gpui_rsx_core::{ClassMode, SpacingScale};
 use proc_macro2::{Ident, Span, TokenStream, TokenTree};
 use serde::{Deserialize, Serialize};
 use syn::{Expr, Lit, spanned::Spanned};
@@ -141,20 +143,6 @@ pub fn call_at(calls: &[MacroCall], offset: usize) -> Option<&MacroCall> {
         .min_by_key(|call| call.end - call.start)
 }
 
-/// Whether `start..end` belongs to `call` itself rather than to a call nested inside it.
-/// Each body analysis treats nested macros as opaque, so every range has one owner.
-fn owned_by(calls: &[MacroCall], call: &MacroCall, start: usize, end: usize) -> bool {
-    start >= call.start
-        && end <= call.end
-        && !calls.iter().any(|inner| {
-            inner != call
-                && inner.start >= call.start
-                && inner.end <= call.end
-                && start >= inner.start
-                && end <= inner.end
-        })
-}
-
 pub fn mode_for(name: &str, mode: ClassMode) -> ClassMode {
     let strict = name == "rsx_strict" || (mode.is_strict() && name != "rsx_permissive");
     let scale = if name == "rsx_tw" {
@@ -252,60 +240,15 @@ fn analyze_document(
         components,
         ..RustAnalysis::default()
     };
-    let mut reusable = std::collections::HashMap::new();
-    if let Some((previous_source, previous)) = previous {
-        for call in &previous.calls {
-            if previous.components != analysis.components {
-                break;
-            }
-            if let Some(body) = previous_source.get(call.start..call.end) {
-                reusable.entry((call.name.as_str(), body)).or_insert(call);
-            }
-        }
-    }
+    let reusable = previous
+        .filter(|(_, previous)| previous.components == analysis.components)
+        .map(|(source, previous)| reuse::ReuseIndex::new(source, previous));
     for call in &analysis.calls {
         let body = &source[call.start..call.end];
-        if let Some(old_call) = reusable.get(&(call.name.as_str(), body))
-            && let Some((_, previous)) = previous
-        {
-            analysis.literals.extend(
-                previous
-                    .literals
-                    .iter()
-                    .filter(|&&(start, end)| owned_by(&previous.calls, old_call, start, end))
-                    .map(|&(start, end)| {
-                        (
-                            call.start + start - old_call.start,
-                            call.start + end - old_call.start,
-                        )
-                    }),
-            );
-            analysis.diagnostics.extend(
-                previous
-                    .diagnostics
-                    .iter()
-                    .filter(|diagnostic| {
-                        owned_by(&previous.calls, old_call, diagnostic.start, diagnostic.end)
-                    })
-                    .map(|diagnostic| {
-                        let mut diagnostic = diagnostic.clone();
-                        diagnostic.start = call.start + diagnostic.start - old_call.start;
-                        diagnostic.end = call.start + diagnostic.end - old_call.start;
-                        diagnostic
-                    }),
-            );
-            analysis.class_tokens.extend(
-                previous
-                    .class_tokens
-                    .iter()
-                    .filter(|t| owned_by(&previous.calls, old_call, t.start, t.end))
-                    .map(|t| {
-                        let mut t = t.clone();
-                        t.start = call.start + t.start - old_call.start;
-                        t.end = call.start + t.end - old_call.start;
-                        t
-                    }),
-            );
+        if let Some(reused) = reusable.as_ref().and_then(|index| index.get(call, body)) {
+            analysis.literals.extend(reused.literals);
+            analysis.diagnostics.extend(reused.diagnostics);
+            analysis.class_tokens.extend(reused.class_tokens);
             continue;
         }
         let body_analysis = analyze_body_with_ranges(
@@ -407,17 +350,14 @@ fn analyze_parsed_body(
         literals: Vec::new(),
         diagnostics: Vec::new(),
     };
+    let mut classes = class_tokens::ClassAnalyzer::new(mode.clone());
     walk_body(body, &mut |el| {
         for attr in &el.attributes {
             match attr {
                 RsxAttribute::Value { name, value } if name == "class" => {
                     if let Some(literals) = class_literals(attr) {
                         for lit in literals {
-                            if let Some(range) =
-                                lint_literal(source, lit, mode.clone(), &mut analysis.diagnostics)
-                            {
-                                analysis.literals.push(range);
-                            }
+                            lint_literal(source, lit, &mut classes, &mut analysis);
                         }
                     } else {
                         let mut message = "Dynamic class expression: values are checked at runtime; variants and theme tokens require static strings.".to_owned();
@@ -435,11 +375,7 @@ fn analyze_parsed_body(
                 }
                 RsxAttribute::WhenClass { .. } | RsxAttribute::StateClass { .. } => {
                     for lit in class_literals(attr).into_iter().flatten() {
-                        if let Some(range) =
-                            lint_literal(source, lit, mode.clone(), &mut analysis.diagnostics)
-                        {
-                            analysis.literals.push(range);
-                        }
+                        lint_literal(source, lit, &mut classes, &mut analysis);
                     }
                 }
                 _ => {}
@@ -448,39 +384,8 @@ fn analyze_parsed_body(
     });
     // Include semantic errors (required constructors, loop keys, unsupported state classes).
     // The dynamic class helper holds no diagnostics and would dominate the walk below.
-    analysis.class_tokens = class_tokens::collect(source, &analysis.literals, mode.clone());
     let (expanded, dynamic) = gpui_rsx_core::generate_body_without_runtime(body, mode);
-    fn semantic_errors(tokens: TokenStream, source: &str, out: &mut Vec<Diagnostic>) {
-        let tokens: Vec<_> = tokens.into_iter().collect();
-        for (i, token) in tokens.iter().enumerate() {
-            if let TokenTree::Ident(name) = token
-                && name == "compile_error"
-                && let Some(TokenTree::Group(group)) = tokens.get(i + 2)
-                && let Ok(lit) = syn::parse2::<syn::LitStr>(group.stream())
-            {
-                let d = Diagnostic {
-                    start: byte_offset(source, name.span(), false),
-                    end: byte_offset(source, name.span(), true),
-                    severity: DiagnosticSeverity::Error,
-                    message: lit.value(),
-                    suggestion: lit.value().contains("has no `id` or `key`").then(|| {
-                        format!(
-                            "{} key={{todo!(\"choose a stable unique key\") as usize}}",
-                            &source[byte_offset(source, name.span(), false)
-                                ..byte_offset(source, name.span(), true)]
-                        )
-                    }),
-                };
-                if !out.iter().any(|prev| prev.message == d.message) {
-                    out.push(d);
-                }
-            }
-            if let TokenTree::Group(group) = token {
-                semantic_errors(group.stream(), source, out);
-            }
-        }
-    }
-    semantic_errors(expanded.clone(), source, &mut analysis.diagnostics);
+    diagnostics::semantic_errors(expanded.clone(), source, &mut analysis.diagnostics);
     (analysis, (expanded, dynamic))
 }
 
@@ -515,31 +420,15 @@ fn literal_source_range(
 fn lint_literal(
     source: &str,
     lit: &syn::LitStr,
-    mode: ClassMode,
-    out: &mut Vec<Diagnostic>,
-) -> Option<(usize, usize)> {
+    classes: &mut class_tokens::ClassAnalyzer,
+    analysis: &mut BodyAnalysis,
+) {
     let value = lit.value();
     let (start, end, exact_range) = literal_source_range(source, lit, &value);
-    for d in class_diagnostics(&value, mode) {
-        out.push(Diagnostic {
-            start: exact_range.map_or(start, |(content_start, _)| content_start + d.offset),
-            end: exact_range.map_or(end, |(content_start, _)| {
-                content_start + d.offset + d.class.len()
-            }),
-            severity: if d.severity == Severity::Error {
-                DiagnosticSeverity::Error
-            } else {
-                DiagnosticSeverity::Warning
-            },
-            message: d.message,
-            suggestion: if exact_range.is_some() {
-                d.suggestion
-            } else {
-                None
-            },
-        });
+    classes.collect_literal(&value, (start, end), exact_range, analysis);
+    if let Some(range) = exact_range {
+        analysis.literals.push(range);
     }
-    exact_range
 }
 
 pub fn walk_body(body: &RsxBody, visitor: &mut impl FnMut(&RsxElement)) {

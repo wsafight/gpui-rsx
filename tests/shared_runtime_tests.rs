@@ -6,7 +6,7 @@ fn shared_runtime_compiles_across_cargo_targets() {
         .map(std::path::PathBuf::from)
         .unwrap_or_else(|| root.join("target"))
         .join("shared-runtime-fixtures");
-    for fixture in ["shared-runtime", "binary-runtime"] {
+    for fixture in ["shared-runtime", "binary-runtime", "gpui-reexport"] {
         let output = std::process::Command::new(env!("CARGO"))
             .args(["test", "--offline", "--all-targets", "--manifest-path"])
             .arg(root.join(format!("tests/fixtures/{fixture}/Cargo.toml")))

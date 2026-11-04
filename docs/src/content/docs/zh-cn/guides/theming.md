@@ -131,3 +131,17 @@ spacing-scale = "tailwind"
 并在 `[options]` 设置 `dynamic-runtime = "rsx_runtime"`。该选项独立于
 `spacing-scale`，不会让动态字符串支持主题 token。
 目标放置方式、GPUI 别名和测量结果见[性能指南](/gpui-rsx/zh-cn/guides/performance/)。
+
+## 配置生成的 GPUI 路径
+
+GPUI 依赖名为 `engine` 时，在与间距刻度、运行时设置共用的 `[options]` 段中配置路径：
+
+```toml title="rsx.toml"
+[options]
+gpui-path = "::engine"
+```
+
+默认路径为 `::gpui`，也接受 `crate::ui` 这样的 crate 根部重新导出路径。
+该设置用于生成路径，覆盖组件、ID、事件/更新辅助宏和 `rsx_runtime!()`。
+用户表达式和上游 derive 仍需各自的导入。函数组件限制，以及通过 `build.rs`
+追踪首次新增配置的方式，见[兼容性](/gpui-rsx/zh-cn/compatibility/#已有依赖别名)。

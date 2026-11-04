@@ -73,6 +73,11 @@ impl Theme {
                         }
                         "preset" => preset = Some(value),
                         "context" => context = value,
+                        "gpui-path" => {
+                            validate_gpui_path(&value)
+                                .map_err(|error| format!("rsx.toml:{line_no}: {error}"))?;
+                            theme.gpui_path = Some(value);
+                        }
                         "dynamic-runtime" => {
                             validate_runtime_path(&value)
                                 .map_err(|e| format!("rsx.toml:{line_no}: {e}"))?;
@@ -80,7 +85,7 @@ impl Theme {
                         }
                         other => {
                             return Err(format!(
-                                "rsx.toml:{line_no}: unknown option `{other}` (expected spacing-scale, preset, context or dynamic-runtime)"
+                                "rsx.toml:{line_no}: unknown option `{other}` (expected spacing-scale, preset, context, dynamic-runtime or gpui-path)"
                             ));
                         }
                     }
@@ -165,6 +170,9 @@ impl Theme {
 
     /// Validates in-memory token types, names and expressions before expansion.
     pub fn validate(&self) -> Result<(), String> {
+        if let Some(path) = self.gpui_path() {
+            validate_gpui_path(path)?;
+        }
         if let Some(path) = self.dynamic_runtime() {
             validate_runtime_path(path)?;
         }
@@ -215,6 +223,21 @@ impl Theme {
             );
         }
         Ok(())
+    }
+}
+
+fn validate_gpui_path(value: &str) -> Result<(), String> {
+    let valid = syn::parse_str::<syn::Path>(value).is_ok_and(|path| {
+        (path.leading_colon.is_some() || path.segments[0].ident == "crate")
+            && path
+                .segments
+                .iter()
+                .all(|segment| matches!(segment.arguments, syn::PathArguments::None))
+    });
+    if valid {
+        Ok(())
+    } else {
+        Err("gpui-path must be an absolute Rust path such as \"::engine\" or \"crate::ui\"".into())
     }
 }
 

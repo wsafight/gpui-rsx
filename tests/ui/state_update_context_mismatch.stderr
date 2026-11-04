@@ -1,0 +1,17 @@
+error[E0308]: mismatched types
+ --> tests/ui/state_update_context_mismatch.rs:7:28
+  |
+7 |     rsx_update!(&mut view, &mut context, |_, _| {});
+  |     -----------------------^^^^^^^^^^^^------------
+  |     |                      |
+  |     |                      expected `&mut Context<'_, String>`, found `&mut Context<'_, usize>`
+  |     arguments to this function are incorrect
+  |
+  = note: expected mutable reference `&mut Context<'_, String>`
+             found mutable reference `&mut Context<'_, usize>`
+note: function defined here
+ --> tests/ui/state_update_context_mismatch.rs:7:5
+  |
+7 |     rsx_update!(&mut view, &mut context, |_, _| {});
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  = note: this error originates in the macro `rsx_update` (in Nightly builds, run with -Z macro-backtrace for more info)

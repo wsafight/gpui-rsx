@@ -1,0 +1,13 @@
+error: expected `,`
+ --> tests/ui/state_update_syntax.rs:4:5
+  |
+4 |     rsx_update!(view, cx);
+  |     ^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the macro `rsx_update` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: unexpected token
+ --> tests/ui/state_update_syntax.rs:5:38
+  |
+5 |     rsx_update!(view, cx, |_, _| {}, extra);
+  |                                      ^^^^^

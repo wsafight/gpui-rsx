@@ -1,0 +1,20 @@
+error[E0308]: mismatched types
+ --> tests/ui/state_update_async.rs:7:5
+  |
+7 | /     rsx_update!(&mut view, &mut context, async |view, _| {
+8 | |         *view += 1;
+9 | |     });
+  | |______^ one type is more general than the other
+  |
+  = note: expected `async` closure body `{async closure body@$DIR/tests/ui/state_update_async.rs:7:58: 9:6}`
+             found `async` closure body `{async closure body@$DIR/tests/ui/state_update_async.rs:7:58: 9:6}`
+  = note: no two async blocks, even if identical, have the same type
+  = help: consider pinning your async block and casting it to a trait object
+note: the lifetime requirement is introduced here
+ --> tests/ui/state_update_async.rs:7:5
+  |
+7 | /     rsx_update!(&mut view, &mut context, async |view, _| {
+8 | |         *view += 1;
+9 | |     });
+  | |______^
+  = note: this error originates in the macro `rsx_update` (in Nightly builds, run with -Z macro-backtrace for more info)

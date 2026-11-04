@@ -9,11 +9,7 @@ impl Theme {
         static CACHE: OnceLock<Mutex<ThemeCache>> = OnceLock::new();
 
         let requested_path = dir.join(CONFIG_FILE);
-        // Different relative paths can point at the same workspace config. Canonicalizing
-        // avoids retaining duplicate entries and makes the cache bound meaningful.
-        let cache_path =
-            std::fs::canonicalize(&requested_path).unwrap_or_else(|_| requested_path.clone());
-        let source = match std::fs::read_to_string(&cache_path) {
+        let source = match std::fs::read_to_string(&requested_path) {
             Ok(source) => source,
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             Err(error) => {
@@ -23,6 +19,8 @@ impl Theme {
                 ));
             }
         };
+        let cache_path =
+            std::fs::canonicalize(&requested_path).unwrap_or_else(|_| requested_path.clone());
         let fingerprint = content_fingerprint(source.as_bytes());
         let cache = CACHE.get_or_init(Default::default);
         if let Ok(mut cache) = cache.lock()

@@ -5,6 +5,27 @@ description: GPUI-RSX 如何展开、哪些路径会产生运行时工作，以�
 
 GPUI-RSX 的设计目标是让常见路径在编译期生成普通 GPUI 代码。因此，性能优化的重点通常是：尽量保持标记静态，避免在 render 中产生不必要的分配和状态刷新。
 
+## 测量开发重载
+
+在仓库根目录使用 Node.js 22 或更新版本运行构建/重启原型：
+
+```sh
+node scripts/dev-reload.mjs --manifest-path demo/Cargo.toml --bin counter --offline --report /tmp/rsx-reload.json
+```
+
+脚本每 300 ms 检查 Rust、TOML 与 lockfile 变化，串行构建并在成功后重启应用。
+构建失败时保留原应用。重复传入 `--watch PATH` 可替换默认监视目录，
+`--toolchain VERSION` 可覆盖默认 Rust 1.98.1。Ctrl-C 退出时关闭应用并写出报告。
+
+Counter 在脚本启动下首次调用 render 时输出 `GPUI_RSX_READY`。报告包含构建耗时
+`buildMs`、启动到 render 标记的 `restartMs`、检测到改动至标记的 `editToReadyMs`。
+其他 binary 需自行输出标记才能测量就绪时间；轮询等待发生在检测之前。
+原型通过重新构建和重启进程生效，应用状态会重置。
+
+2026-11-03 在 macOS arm64 上修改一次 Counter 视图，构建约 1.44 秒，检测到改动至
+render 标记约 3.43 秒。该观测有热缓存且并行执行其他验证，不能作为性能承诺或加速对比。
+标记不代表 GPU 已呈现帧，也不等于用户实际看到更新的时间。
+
 ## 心智模型
 
 静态 RSX 会在宏执行期间展开：
@@ -304,6 +325,35 @@ cargo check --manifest-path demo/Cargo.toml --bins --locked
 ```bash
 cd docs
 bun run build
+```
+
+## 增量分析实测（2026-11-04）
+
+Apple M3 Pro、Rust 1.99.1 下，Criterion 使用 30 个样本、预热 1 秒、测量 2 秒，
+得到以下本地估计值：
+
+| 场景 | 索引和 class 复用优化前 | 优化后 |
+| --- | --- | --- |
+| 修改 80 个宏中的一个 | 0.21 ms | 0.042 ms |
+| 修改 320 个宏中的一个 | 3.03 ms | 0.126 ms |
+| 修改 1280 个宏中的一个 | 50.6 ms | 0.507 ms |
+| 完整分析 80 个宏 | 1.42 ms | 1.34 ms |
+| 增量分析含 50 个宏的 5000 行文件 | 0.133 ms | 0.094 ms |
+
+宏数量测试重复使用较小的静态宏体；5000 行测试包含普通注释行。这些数值只测分析，
+不代表编辑器端到端延迟。每次更新先建立索引，将字面量、诊断和 class token 分配给
+所属的最内层宏。复用未修改宏体时只复制对应结果并平移字节偏移。同一宏体内复用
+class 诊断、分类和颜色；生成的语法对象和 span 不跨请求缓存。
+
+展开基准也覆盖已有的共享 runtime：单个动态调用点的内联 helper 约需 511 µs，
+配置共享模块后约 13 µs，字符串化的展开体积从约 47 KB 降至 1.1 KB。共享模块还有
+一次性的生成和编译成本，因此这些数值不代表整个应用的构建耗时或运行时帧率。
+
+```bash
+cargo bench -p gpui-rsx-tools --bench analysis --no-default-features -- \
+  --sample-size 30 --warm-up-time 1 --measurement-time 2
+cargo bench -p gpui-rsx-core --bench expansion -- dynamic_class \
+  --sample-size 30 --warm-up-time 1 --measurement-time 2
 ```
 
 ## 编辑器与 matcher 实测（2026-10-29）

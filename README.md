@@ -19,11 +19,18 @@ A Rust procedural macro that provides JSX-like syntax for GPUI, making UI develo
 - 💡 **Type Safe** - Full compile-time type checking
 - 🧩 **Fragment Support** - Return multiple root elements with `<>...</>`
 - 🔁 **For-loop Sugar** - Iterate with `{for item in iter { ... }}`
-- 🔑 **Loop-safe IDs** - `key={expr}` generates unique IDs per iteration; compile error on missing key
-- 🎨 **Full Tailwind Colors** - 242 built-in colors + arbitrary hex/RGB/RGBA values
+- 🔑 **Loop-safe IDs** - Stateful elements in loops require `key={expr}` or an explicit `id={expr}`
+- 🎨 **Full Tailwind Colors** - Built-in color families + black/white + arbitrary hex/RGB/RGBA values
 - 📐 **Desktop Layout Utilities** - Arbitrary lengths, percentages, and fraction sizing for panels and split views
 - ⚡ **Dynamic Class** - Runtime class switching with colors, sizing, spacing, and numeric prefix fallback
 - 🔍 **Diagnostics & Preview** - Strict/permissive macros, readable errors, and `rsx_expand!`
+
+### Semantics and Defaults
+
+- Common HTML-like names, including `button` and `input`, construct GPUI `div()` elements. They do not create browser controls or supply HTML form behavior. Use components such as `Button` with `base={Button::new("save")}` when you need their control behavior.
+- Numeric classes use pixels by default: `gap-4` means 4px. Use `rsx_tw!`, `tailwind-scale`, or project configuration for Tailwind's 4px units. Named GPUI attributes such as `gap_4` keep GPUI's native units.
+- Literal classes have no runtime class parser. Dynamic strings use a runtime matcher with a smaller support surface; see [Class Handling](https://wsafight.github.io/gpui-rsx/usage/class/).
+- Playground and browser previews approximate static layouts. They do not execute Rust event handlers or validate native rendering. `rsx_expand!` shows generated Rust without type checking it; use `cargo check` and a native GPUI application for validation.
 
 ## 📚 Documentation
 
@@ -55,7 +62,7 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.2"
+gpui-rsx = "0.11.0"
 ```
 
 ### GPUI Version Target
@@ -64,6 +71,11 @@ The demo uses GPUI Kit 0.8.1 and its exact `gpui-pre 0.3.10` snapshot. The Cargo
 alias `gpui` preserves the paths used by RSX expansions and GPUI derives. Kit
 re-exports the matching engine, platform entry point, components and assets.
 The macro and core crates have no GPUI runtime dependency.
+
+The matrix below identifies the full generated API target. A separate fixture checks
+specific regressions against official `gpui = "=0.2.2"`; it does not verify that target's
+entire API. Other combinations need their own validation. Having no GPUI runtime dependency
+does not imply that generated code works with every GPUI version.
 
 Import components through `gpui::component`, call `gpui::init(cx)` before opening
 windows, and use `gpui::open_window(...)` to mount Kit's root. Commit the
@@ -75,14 +87,14 @@ application lockfile; update Kit and its matching snapshot together. See the
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.10.2` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
+| `0.11.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.2"
+gpui-rsx = "0.11.0"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -321,7 +333,8 @@ provide the current class vocabulary and limitations for code-generation tools.
 - `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`
 - `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, `ml-4`, `mr-4`
 - Arbitrary spacing: `gap-[14px]`, `gap-x-[0.75rem]`, `p-[18px]`, `mx-[1.25rem]`
-- Negative spacing and sizing: `-m-4` → `.m(px(-4.0))`, `-mt-1.5`, `-ml-[13px]`, `-w-1/2`, `-m-px` (works inside variants like `hover:-mt-2` too; `-auto` and `-full` cannot be negative, and `rounded-*` / `leading-*` stay non-negative)
+- Negative spacing: `-m-4` → `.m(px(-4.0))`, `-mt-1.5`, `-ml-[13px]`, `-p-1`, `-gap-1`, `-m-px`; static variants such as `hover:-mt-2` are supported. `auto` and `full` cannot be negated, and `rounded-*` / `leading-*` stay non-negative.
+- Negative sizing is accepted but emits a static warning: GPUI clamps negative dimensions and maximum sizes to 0, subject to other layout constraints; negative minimum sizes do not impose a useful lower bound. See [Class Handling](https://wsafight.github.io/gpui-rsx/usage/class/) for tested layouts and runtime limits.
 - Percent spacing such as `gap-[10%]` intentionally errors because GPUI spacing uses definite lengths
 
 **Sizing:**
@@ -378,6 +391,23 @@ rsx! {
     </button>
 }
 ```
+
+For state changes, `gpui_rsx::rsx_listener!(cx, notify, |view, _, _, _| { view.count += 1; })`
+keeps the four-argument view callback and notifies after normal return, including early return.
+The plain form `rsx_listener!(cx, handler)` delegates to `cx.listener(handler)`; the handler
+owns notification responsibility. See the syntax guide for event types and mouse button tuples.
+
+Use `gpui_rsx::rsx_update!(view, cx, |view, cx| { ... })` to run synchronous field changes
+and call `cx.notify()` after normal return. It returns the closure's result and accepts moved or borrowed
+captures. Use it with a native listener or the plain `rsx_listener!` form so notification
+has one owner. Each invocation adds its own notification; separate calls are not batched.
+Ordinary assignments and asynchronous work retain GPUI's explicit update rules.
+
+Renamed GPUI dependencies can set `[options] gpui-path = "::engine"` in `rsx.toml`;
+generated components, IDs, event/update helpers and the default shared runtime use that path.
+To detect config files first created after compilation, add `println!("cargo:rerun-if-changed=rsx.toml");`
+to the consuming package's `build.rs`, as the demo does. See the
+[compatibility guide](docs/src/content/docs/compatibility.md) for configuration tracking, imports and derive limits.
 
 Supported events (camelCase / snake_case):
 
@@ -1193,7 +1223,7 @@ Inspired by:
 
 ## Development tools
 
-Install `cargo-rsx` 0.10.2 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
+Install `cargo-rsx` 0.11.0 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
 `preview --watch`, and the `lsp` server. See the [tooling guide](https://wsafight.github.io/gpui-rsx/guides/tooling/)
 and [WASM Playground](https://wsafight.github.io/gpui-rsx/playground/). VS Code and Zed adapters
 live in `editors/`; release assets include an installable VSIX.

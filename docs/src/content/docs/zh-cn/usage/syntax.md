@@ -26,6 +26,10 @@ rsx! {
 | 表单 | `button`, `input`, `textarea`, `select`, `form` |
 | 列表 | `ul`, `ol`, `li` |
 
+这些名称不提供 HTML 语义：`<input />` 不能直接编辑文本，`<button />` 不会自动获得
+组件库的键盘和焦点行为，`<form>` 不会提交数据。`styled` 只添加默认样式。
+需要控件时，请显式使用组件构造函数，见下方[组件](#组件)。
+
 无子节点时，自闭合和成对标签等价：
 
 ```rust
@@ -67,6 +71,9 @@ rsx! {
 当 builder 需要参数，或来自组件库时，使用 `base={expr}`：
 
 ```rust
+use gpui::component::button::Button;
+use gpui::component::Sizable as _;
+
 rsx! {
     <Button
         base={Button::new("save")}
@@ -77,6 +84,18 @@ rsx! {
 ```
 
 `base` 会被宏消费，不会生成 `.base(...)` 方法调用。
+
+| 构造需求 | 推荐写法 |
+| --- | --- |
+| 有无参构造函数的 builder | `<Card title="Inbox" />` 或 `<ui::Card ... />` |
+| 构造函数需要参数，或复用已配置的 builder | `<Button base={Button::new("save")} ... />` |
+| 可省略的属性 | 声明 `#[prop(default)]` 或 `#[prop(default = expr)]`；省略属性时使用默认值 |
+| 不同类型的根节点，或需要保存的子节点集合 | 使用 [`rsx_fragment!`](#fragment)，再用 `{...parts}` 展开 |
+| 多个根节点还需调用具体 builder 方法 | 保留普通 `rsx!` Fragment，并使用兼容的根节点类型 |
+
+`base` 只求值一次，并保留 builder 自身的 setter。事件回调遵循该 builder 的 API；
+组件上的 `onClick` prop 不会自动变成视图 listener。建议 GPUI 事件属性使用 camelCase，
+直接调用原生方法时使用 snake_case；两种已支持的拼写会生成相同调用。
 
 ### 函数式组件
 
@@ -224,6 +243,8 @@ rsx! {
 }
 ```
 
+### 事件监听器
+
 `InteractiveText` 的 `onClick` 和 `on_click` 也支持通过 tuple 传入两个参数：
 
 ```rust
@@ -235,6 +256,54 @@ rsx! {
 
 该写法展开为 `.on_click(ranges, listener)`。普通 `Div` 的监听器继续使用
 单参数写法 `onClick={listener}`。
+
+视图回调可以使用可选的 `rsx_listener!` 宏，处理器保留 GPUI 的
+`(view, event, window, cx)` 四参签名：
+
+```rust
+use gpui_rsx::rsx_listener;
+
+rsx! {
+    <button onClick={rsx_listener!(cx, notify, |view, _, _, _| {
+        view.count += 1;
+    })}>{"Increment"}</button>
+}
+```
+
+`rsx_listener!(cx, handler)` 直接调用 `cx.listener(handler)`，由处理器负责通知。
+显式使用 `notify` 时，宏会在处理器正常返回后调用 `cx.notify()`，包括没有修改状态就提前
+返回的情况；此时避免在处理器中再添加无条件通知。上下文和处理器表达式均只求值一次。
+支持 `move` 闭包和函数表达式；回调仍是同步 `Fn`，不保证 panic 或异步任务结束时通知。
+读取泛型事件字段时可能需要标注 `event: &MouseDownEvent`。
+鼠标按钮仍使用原有 tuple 写法：
+`onMouseDown={(MouseButton::Right, rsx_listener!(cx, notify, handler))}`。
+
+### 显式状态更新
+
+`rsx_update!(view, cx, update)` 接收可变视图及其匹配的 `Context<View>`，执行同步
+`FnOnce` 更新，在正常返回后调用 `cx.notify()`，并返回更新结果。多项字段修改可以共用一次通知：
+
+```rust
+use gpui_rsx::{rsx_listener, rsx_update};
+
+rsx! {
+    <div onClick={rsx_listener!(cx, |view, _, _, cx| {
+        rsx_update!(view, cx, |view, _| {
+            view.count += 1;
+            view.label = String::from("updated");
+        });
+    })}>{"Update"}</div>
+}
+```
+
+视图、上下文和更新表达式各求值一次；支持移动值和借用捕获，无需 `'static`。
+提前返回、没有字段变化时仍会通知。此处由 `rsx_update!` 负责通知，因此使用普通监听器形式。
+宏不会拦截其他赋值，不提供 panic 回滚或异步完成通知；异步结果就绪后应再次显式更新实体。
+实体及其生命周期仍由 GPUI 管理。
+
+每次调用各自执行 `cx.notify()`，不会自动合并多次调用，也不会抑制更新闭包内部的通知。
+
+### 属性别名
 
 常见 CamelCase alias 会映射到 GPUI 的 snake_case 方法：
 

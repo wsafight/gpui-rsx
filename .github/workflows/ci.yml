@@ -50,6 +50,7 @@ jobs:
         with:
           node-version: 22
       - run: node --test .github/scripts/*.test.cjs
+      - run: node --test scripts/dev-reload*.test.mjs
       - run: bash -n scripts/check.sh
 
       - name: Check documentation dependency examples
@@ -177,6 +178,9 @@ jobs:
       - name: Check resolved demo backend
         run: cargo run --quiet -p cargo-rsx -- doctor --manifest-path demo/Cargo.toml
 
+      - name: Test renamed GPUI dependency
+        run: cargo test --manifest-path tests/fixtures/gpui-renamed/Cargo.toml --target-dir demo/target
+
   gpui-022:
     name: GPUI 0.2.2 Feedback Regressions
     runs-on: macos-latest
@@ -186,8 +190,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: tests/fixtures/gpui-0.2.2
-      - name: Compile regressions against published GPUI 0.2.2
-        run: cargo check --manifest-path tests/fixtures/gpui-0.2.2/Cargo.toml --tests
+      - name: Test regressions against published GPUI 0.2.2
+        run: cargo test --manifest-path tests/fixtures/gpui-0.2.2/Cargo.toml
 
   fmt:
     name: Rustfmt
@@ -435,6 +439,12 @@ jobs:
           bun run --cwd editors/vscode check
           bun run --cwd editors/vscode test
           bun run --cwd editors/vscode package
+      - name: Test VS Code with rust-analyzer
+        run: |
+          cargo build -p cargo-rsx --locked
+          xvfb-run -a bun run --cwd editors/vscode test:integration
+      - name: Test development reload prototype
+        run: node --test scripts/dev-reload*.test.mjs
       - name: Build Zed extension
         run: cargo +1.98.1 build --manifest-path editors/zed/Cargo.toml --target wasm32-wasip1 --release --locked
       - uses: actions/upload-artifact@v4

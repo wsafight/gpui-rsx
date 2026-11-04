@@ -9,19 +9,52 @@
 
 ## [未发布]
 
+## [0.11.0] - 2026-11-05
+
 ### 新增
 
 - 支持 Tailwind 负值间距与尺寸 class（`-m-4`、`-mt-1.5`、`-ml-[13px]`、`-w-1/2`、
   `-m-px`、`hover:-mt-2`），静态字面量与动态 class 表达式均可用。负值 class 展开为
   取负的长度（`.m(px(-4.0))`）或 GPUI 的 `*_neg_*` 预设方法，覆盖范围与 GPUI 自带
   负值预设的家族一致。百分比、分数、Tailwind 刻度与动态运行时匹配均保留符号。
+- 静态 class 解析为负尺寸时给出警告：负宽度、高度、整体尺寸和最大尺寸会被 GPUI 布局
+  钳制为 0，负最小尺寸会被忽略。`w-[-4px]` 同样会提示；零值和 `-w-[-4px]` 这类
+  解析结果为正的 class 不会误报。strict 模式不会把该警告升级为错误；
+  `cargo rsx lint` 与语言服务器同样会提示。
+  `demo/tests/negative_layout.rs` 在 GPUI 真实布局引擎上逐个验证所有可取负的家族。
+- 项目级 `[options] gpui-path` 覆盖标记、组件、ID、事件/更新辅助和默认共享运行时中的
+  GPUI 生成路径；真实 Kit fixture 验证改名依赖无需 `gpui` 别名。
+- 新增 `rsx_update!(view, cx, update)`，执行同步更新闭包，在正常返回后调用
+  `cx.notify()`；保留返回值并支持 `FnOnce` 捕获。
+- 开发构建/重启原型，包含构建失败恢复与 render 标记计时；重启应用，不保留状态，
+  不进行进程内代码替换。
+- 可选的 `rsx_listener!(cx, handler)` 和 `rsx_listener!(cx, notify, handler)`
+  保留 GPUI 视图回调签名，显式选择通知责任。真实后端回归覆盖点击、鼠标事件、
+  move 捕获和提前返回。
+
+### 修复
+
+- 开发重载脚本能够识别大块输出中的就绪标记，并在等待旧应用退出期间发生源码改动时
+  跳过过时的启动。
+- 同时报告兄弟 RSX 节点中的独立语义错误；重复的缺 key 等错误保留各自的源码位置
+  和 LSP 快速修复。
 
 ### 变更
 
-- 未知的负值 class 现在给出具体原因，而不是推荐符号相反的正值 class
+- 按所属宏索引增量分析结果，避免复用每个未修改宏体时重新扫描全部旧结果；同一宏体
+  内复用 class 诊断、分类和颜色，缓存不跨请求保留 token stream。
+- 开发监控去重重叠路径，在 `stat` 前过滤无关文件；减少预览 HTML 转义的中间分配。
+- 缺少 `rsx.toml` 时跳过配置路径规范化；配置修改、删除和重建仍按文件内容检测。
+- 未知的负值 class 给出具体原因，而不是推荐符号相反的正值 class
   （`-mx-auto` 会解释 `auto` 不能取负，而不是建议 `mx-auto`）。
-- JSX/TSX 转换会按同样的规则缩放负值间距以保持尺寸（`-mt-4` → `-mt-16`），
+- JSX/TSX 转换按同样的规则缩放负值间距以保持尺寸（`-mt-4` → `-mt-16`），
   不再把它当作不受支持的 class 丢弃。
+- 明确 HTML 标签别名、间距刻度、动态 class 限制、预览边界、循环显式 ID、组件构造
+  和 GPUI 兼容性验证范围。
+- 独立 Kit fixture 验证依赖改名；新增列表重排后显式 ID 和焦点布局的无窗口交互回归。
+- 官方 GPUI 0.2.2 运行共用的身份标识和状态更新回归。
+- 隔离的 VS Code 扩展宿主测试验证与 rust-analyzer 共存时的语言服务，以及服务重启
+  前后的可选格式化行为。
 
 ## [0.10.2] - 2026-10-31
 
@@ -814,7 +847,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...v0.10.0
