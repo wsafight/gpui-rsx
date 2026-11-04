@@ -14,6 +14,7 @@ const profile = path.join(temporary, 'profile');
 const cargoRsx = process.env.GPUI_RSX_SERVER_PATH ?? path.join(repository, 'target/debug', process.platform === 'win32' ? 'cargo-rsx.exe' : 'cargo-rsx');
 
 try {
+  execFileSync('rustfmt', ['--version'], { stdio: 'inherit' });
   const executable = process.env.GPUI_RSX_VSCODE_EXECUTABLE ?? await downloadAndUnzipVSCode({
     version: '1.96.4',
     cachePath: path.join(os.tmpdir(), 'gpui-rsx-vscode-cache'),
