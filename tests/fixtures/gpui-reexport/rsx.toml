@@ -1,0 +1,3 @@
+[options]
+gpui-path = "crate::ui"
+dynamic-runtime = "crate::rsx_runtime"

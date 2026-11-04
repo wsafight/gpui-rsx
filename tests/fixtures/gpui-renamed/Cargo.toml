@@ -1,0 +1,11 @@
+[package]
+name = "gpui-renamed-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+engine = { package = "gpui-kit", version = "=0.8.1" }
+gpui-rsx = { path = "../../.." }
+
+[workspace]

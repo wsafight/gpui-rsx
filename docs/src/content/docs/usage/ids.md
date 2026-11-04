@@ -31,6 +31,15 @@ rsx! {
 
 The generated ID is deterministic for the macro expansion site.
 
+Its prefix contains the file path and the element's source line and column. A `key`
+distinguishes repeated values at that site; it does not remove source position from the
+prefix. Use explicit IDs when identity must survive source edits. Editing and recompiling
+alone does not preserve application state across process restarts.
+
+Repeated instances also need distinct identities within their GPUI identity scope. Calling
+the same helper twice does not give its internal auto ID a new instance suffix. Give the
+instances distinct parent IDs or pass explicit IDs into the helper.
+
 For component tags such as `<ui::card onClick={handler} />`, automatic ID injection depends
 on the constructor's return type. Values implementing both `gpui::InteractiveElement` and
 `gpui::Element` receive an ID, so functions returning `Div` keep working. Other values,
@@ -53,7 +62,7 @@ GPUI element identity created by `.id(...)`; the macro still injects a separate 
 
 ## Keys in Loops
 
-When rendering repeated stateful elements, provide `key={...}`:
+When rendering repeated stateful elements, provide `key={...}` or an explicit, distinct `id={...}`:
 
 ```rust
 rsx! {
@@ -67,7 +76,9 @@ rsx! {
 }
 ```
 
-Loops that need stateful IDs produce a compile error if the key is missing. This prevents repeated rows from accidentally sharing the same generated ID.
+Loops that need stateful IDs produce a compile error if both `key` and `id` are missing.
+An explicit ID takes precedence over `key`; its value must distinguish repeated rows in
+the same identity scope.
 
 Component tags with stateful attribute names still require `key` or `id` inside loops,
 even when their builders do not need an injected ID: the macro checks loop safety before

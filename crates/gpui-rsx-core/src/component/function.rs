@@ -7,6 +7,7 @@ use syn::ext::IdentExt;
 pub(super) fn expand_function(
     mut input: syn::ItemFn,
     gates: &[syn::Attribute],
+    gpui: &syn::Path,
 ) -> syn::Result<TokenStream> {
     let sig = &input.sig;
     if sig.asyncness.is_some()
@@ -188,21 +189,39 @@ pub(super) fn expand_function(
         fields.push(quote! { #[doc(hidden)] #[prop(default)] #phantom_name: ::core::marker::PhantomData<(#(#phantom_types,)*)> });
     }
     let props_where = &render_generics.where_clause;
+    let default_gpui = gpui.segments.len() == 1 && gpui.segments[0].ident == "gpui";
+    let derive = default_gpui.then(|| quote!(#[derive(#gpui::IntoElement)]));
+    // `derive(IntoElement)` hardcodes the `gpui::` path, so a configured path needs a manual
+    // impl. It names `ViewElement`, which GPUI releases before it (0.2.x `Component`) lack.
+    let into_element = (!default_gpui).then(|| {
+        quote! {
+            #(#gates)*
+            #[allow(deprecated)]
+            impl #render_impl #gpui::IntoElement for #name #render_type #render_where {
+                type Element = #gpui::ViewElement<Self>;
+                #[track_caller]
+                fn into_element(self) -> Self::Element {
+                    #gpui::ViewElement::new(self)
+                }
+            }
+        }
+    });
     let props: syn::ItemStruct = syn::parse2(quote! {
         #(#gates)*
         #(#attrs)*
-        #[derive(::gpui::IntoElement)]
+        #derive
         #vis struct #name #render_generics #props_where { #(#fields,)* }
     })?;
-    let builder = expand_struct(props, gates)?;
+    let builder = expand_struct(props, gates, gpui)?;
     Ok(quote! {
         #builder
         #input
+        #into_element
 
         #(#gates)*
         #[allow(deprecated)]
-        impl #render_impl ::gpui::RenderOnce for #name #render_type #render_where {
-            fn render(self, __rsx_window: &mut ::gpui::Window, __rsx_cx: &mut ::gpui::App) -> impl ::gpui::IntoElement {
+        impl #render_impl #gpui::RenderOnce for #name #render_type #render_where {
+            fn render(self, __rsx_window: &mut #gpui::Window, __rsx_cx: &mut #gpui::App) -> impl #gpui::IntoElement {
                 #render_fn::<#(#render_args),*>(#(#arguments),*)
             }
         }

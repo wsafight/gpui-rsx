@@ -6,7 +6,10 @@ description: GPUI-RSX 宏、标签、属性和生成映射的速查。
 ## 宏
 
 ```rust
-use gpui_rsx::{rsx, rsx_expand, rsx_fragment, rsx_permissive, rsx_runtime, rsx_strict, rsx_tw};
+use gpui_rsx::{
+    component, rsx, rsx_expand, rsx_fragment, rsx_listener, rsx_permissive,
+    rsx_runtime, rsx_strict, rsx_tw, rsx_update,
+};
 ```
 
 | 宏 | 行为 |
@@ -14,10 +17,17 @@ use gpui_rsx::{rsx, rsx_expand, rsx_fragment, rsx_permissive, rsx_runtime, rsx_s
 | `rsx!` | 默认 permissive RSX 宏。 |
 | `rsx_fragment!` | 始终返回 `Vec<gpui::AnyElement>`，支持不同类型的根元素；其他行为与 `rsx!` 一致。 |
 | `rsx_permissive!` | 显式 permissive 模式；安全情况下忽略不支持的 class。 |
-| `rsx_strict!` | 不支持的静态 class 编译时报错；不支持的动态 class 求值时 panic。 |
+| `rsx_strict!` | 不支持的静态 class 产生编译错误；动态 class 若未由 `onUnknownClass` 处理则 panic。 |
 | `rsx_expand!` | 返回生成 GPUI builder 代码的字符串预览。 |
 | `rsx_tw!` | 数值间距使用 Tailwind 的每单位 4px 刻度。 |
 | `rsx_runtime!` | 在 crate 根生成共用动态 class helper，配合 `[options] dynamic-runtime = "rsx_runtime"` 启用，见[性能指南](/gpui-rsx/zh-cn/guides/performance/)。 |
+| `rsx_listener!` | `rsx_listener!(cx, handler)` 委托给 `cx.listener`；带 `notify` 的形式在正常返回后追加通知。见[事件监听器](/gpui-rsx/zh-cn/usage/syntax/#事件监听器)。 |
+| `rsx_update!` | 执行同步 `FnOnce` 更新，正常返回后调用 `cx.notify()`，保留返回值。见[显式状态更新](/gpui-rsx/zh-cn/usage/syntax/#显式状态更新)。 |
+| `#[component]` | 为具名字段结构体或同步函数生成 props 和 builder。见[组件](/gpui-rsx/zh-cn/usage/syntax/#组件)。 |
+
+生成的 GPUI 路径默认为 `::gpui`。依赖改名或从 crate 根部重新导出时，可配置
+`[options] gpui-path`；支持的路径、target 放置和 derive 限制见
+[兼容性](/gpui-rsx/zh-cn/compatibility/#已有依赖别名)。
 
 ## 元素构造器
 

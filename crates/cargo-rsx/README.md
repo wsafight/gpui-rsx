@@ -26,6 +26,11 @@ multiple active engines or consumers that select different backends.
 source positions, suggestions and dynamic-class limitations. `--json` produces structured
 reports. Diagnostics in dynamic strings happen at runtime.
 
+Independent semantic errors retain separate source ranges, including repeated missing
+loop keys. Negative static dimensions produce warnings based on the resolved length:
+`w-[-4px]` warns, while `-w-[-4px]` is positive and does not. `--deny-warnings` makes
+these warnings fail lint validation even though the classes remain supported.
+
 Spacing follows `--tailwind`, then the selected package's `rsx.toml`, then Cargo's
 resolved `gpui-rsx/tailwind-scale` feature, including features enabled by sibling
 workspace members. Successful feature resolution is cached per workspace. If Cargo

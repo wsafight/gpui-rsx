@@ -91,7 +91,7 @@ selects the Tailwind scale.
 | Value attributes | `<div gap={px(4.0)} />` → `.gap(px(4.0))` |
 | `class` (static) | Tailwind-like subset, parsed at compile time |
 | `class` (dynamic) | Runtime expression with colors, sizing, spacing, and common utilities |
-| Full color palette | 242 Tailwind colors + arbitrary hex/RGB/RGBA (`bg-[#ff0000]`) |
+| Color palette | Built-in Tailwind color families + black/white + arbitrary hex/RGB/RGBA (`bg-[#ff0000]`) |
 | Desktop sizing | `w-[280px]`, `w-[37.5%]`, `w-6/24`, `min-w-0` |
 | Fragments | `<>...</>` returns `vec![...]`; `rsx_fragment!` returns `Vec<AnyElement>` for mixed root types |
 | For-loop sugar | `{for item in iter { ... }}` |
@@ -99,6 +99,9 @@ selects the Tailwind scale.
 | Conditional | `when` / `whenSome` attributes |
 | State classes | `hover:` / `focus:` / `active:` / `group-hover:` prefixes, `hoverClass`, `focusClass`, `activeClass` |
 | Components | `#[component]` typestate props builders: `<Card title="…" elevated>` |
+| View listeners | `rsx_listener!(cx, handler)` delegates to GPUI; add `notify` for notification after normal return |
+| State updates | `rsx_update!(view, cx, update)` runs a synchronous closure, notifies and returns its result |
+| GPUI paths | `[options] gpui-path` selects the crate or re-export used in generated references |
 | Design tokens | `rsx.toml` colors/radius/spacing, gpui-component theme preset |
 | Spacing scale | `rsx_tw!` / `tailwind-scale` for Tailwind's 4px units |
 | Styled defaults | `<h1 styled>` injects sensible tag defaults |

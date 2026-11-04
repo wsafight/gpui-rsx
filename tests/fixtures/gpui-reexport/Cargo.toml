@@ -1,0 +1,11 @@
+[package]
+name = "gpui-reexport-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[dependencies]
+engine = { package = "gpui-rsx-gpui-stub", path = "../../../crates/gpui-stub" }
+gpui-rsx = { path = "../../.." }
+
+[workspace]

@@ -25,3 +25,9 @@ bun ../scripts/test-playground.mjs
 `build` compiles the actual WASM parser, generates both locales and the search index, then checks internal page links, anchors, and asset paths. It uses `astro build --force` so cached Markdown cannot retain obsolete code-theme asset paths after configuration changes. `bun run check:links` can repeat the link check against an existing `dist/` directory. `bun run preview` serves the production output locally.
 
 Content lives in `src/content/docs/`; Chinese translations mirror the same paths under `zh-cn/`. Keep examples, links, and version guidance aligned in both languages. Shared colors and reading styles live in `src/styles/custom.css`; the landing page and playground use the same visual tokens. They use system fonts and do not require external font requests.
+
+For API changes, update both root changelogs, the macro table in each API reference,
+the relevant guides, and any Rustdoc examples under `../src/docs/`. Keep generated
+`../spec/prompt.md` aligned by editing `../xtask/data/spec-prompt.md` and running
+`cargo xtask spec` from the repository root. Describe validation scope explicitly:
+stub compilation, native backend tests and desktop checks provide different evidence.

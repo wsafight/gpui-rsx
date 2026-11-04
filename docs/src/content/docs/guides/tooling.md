@@ -8,7 +8,7 @@ The CLI and editor language server share the macro's parser and class configurat
 ## Install and diagnose
 
 ```sh
-cargo install cargo-rsx --version 0.10.2 --locked
+cargo install cargo-rsx --version 0.11.0 --locked
 cargo rsx doctor --manifest-path demo/Cargo.toml
 ```
 
@@ -64,6 +64,11 @@ layout or the editor's expansion hover; `cargo check` validates the generated Ru
 
 Preview serves an approximate static layout at `http://127.0.0.1:9230` and labels omitted behavior. Use `--index N` to choose a macro. The [Playground](/gpui-rsx/playground/) runs the same parser, converter, and preview locally in your browser. Verify final rendering and interactions in a native GPUI application.
 
+Neither preview executes arbitrary Rust expressions or event handlers. A successful
+preview or expansion does not type-check the generated code or verify focus, scrolling,
+accessibility, and platform behavior. Compile the application and exercise those behaviors
+in GPUI; dynamic class matching has its own runtime support limits.
+
 ## Migrate spacing
 
 ```sh
@@ -75,9 +80,13 @@ Migration divides numeric class values by four to preserve pixel dimensions when
 
 ## Connect your editor
 
+For local native iteration, the repository also has a
+[build/restart prototype](/gpui-rsx/guides/performance/#measure-development-reloads)
+with failure recovery and timing reports.
+
 | Editor | Setup |
 | --- | --- |
-| VS Code | Download the `.vsix` from the [0.10.2 release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.10.2), then run **Extensions: Install from VSIX**. |
+| VS Code | Download the `.vsix` from the [0.11.0 release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.11.0), then run **Extensions: Install from VSIX**. |
 | Zed | Install `editors/zed` from the repository as a development extension. If you customize Rust language servers, add `"gpui-rsx"` alongside `"rust-analyzer"`. |
 
 Both integrations use `cargo rsx lsp` and provide:
@@ -96,6 +105,11 @@ available.
 The server applies incremental edits and reuses analysis for unchanged macro bodies. Class completion operates in static literals within balanced RSX macros. Keep rust-analyzer enabled for Rust type checking.
 
 If VS Code cannot find the server, set `gpuiRsx.serverPath` to the `cargo-rsx` executable, then run **GPUI RSX: Restart language server**. Extension marketplace status is recorded separately in release notes.
+
+The repository's isolated VS Code integration test checks RSX diagnostics, completion
+and formatting alongside rust-analyzer's native Rust services. It uses the GPUI signature
+stub with rust-analyzer proc-macro expansion disabled. Native GPUI behavior and full
+application checks are covered separately; see the [compatibility scope](/gpui-rsx/compatibility/#verification-scope).
 
 ## Diagnostic filters and local component hints
 

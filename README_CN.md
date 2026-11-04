@@ -19,11 +19,18 @@
 - 💡 **类型安全** - 完全的编译时检查
 - 🧩 **Fragment 支持** - 使用 `<>...</>` 返回多个根元素
 - 🔁 **For 循环语法糖** - 使用 `{for item in iter { ... }}` 迭代
-- 🔑 **循环安全 ID** - `key={expr}` 为每次迭代生成唯一 ID；缺少 key 时报编译错误
+- 🔑 **循环安全 ID** - 循环中的有状态元素需提供 `key={expr}` 或显式 `id={expr}`
 - 🎨 **完整 Tailwind 色板** - 22 个色系 × 11 个色阶 + black/white + 任意 hex/RGB/RGBA 值
 - 📐 **桌面布局工具类** - 支持任意长度、百分比和分数尺寸，适合面板和分栏布局
 - ⚡ **动态 Class** - 支持运行时 class 切换：颜色、尺寸、间距和数值前缀回退
 - 🔍 **诊断与预览** - strict/permissive 宏、可读错误和 `rsx_expand!`
+
+### 语义与默认行为
+
+- `button`、`input` 等常见 HTML-like 名称构造的是 GPUI `div()`，不会创建浏览器控件或提供 HTML 表单行为。需要组件的控件行为时，使用 `Button` 等真实组件，并通过 `base={Button::new("save")}` 指定构造方式。
+- 数值 class 默认按像素解释：`gap-4` 为 4px。使用 `rsx_tw!`、`tailwind-scale` 或项目配置可启用 Tailwind 每单位 4px 的刻度。`gap_4` 等具名 GPUI 属性继续使用 GPUI 原生单位。
+- 字面量 class 无运行时 class 解析成本；动态字符串使用支持范围更小的运行时 matcher，详见 [Class 处理](https://wsafight.github.io/gpui-rsx/zh-cn/usage/class/)。
+- Playground 和浏览器预览近似展示静态布局，不执行 Rust 事件处理器，也不验证原生渲染。`rsx_expand!` 只展示生成的 Rust，不做类型检查；请使用 `cargo check` 和原生 GPUI 应用验证。
 
 ## 📚 文档资源
 
@@ -55,7 +62,7 @@ bun run dev
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.2"
+gpui-rsx = "0.11.0"
 ```
 
 ### GPUI 版本目标
@@ -63,6 +70,10 @@ gpui-rsx = "0.10.2"
 demo 使用 GPUI Kit 0.8.1 及其固定的 `gpui-pre 0.3.10` 快照。Cargo 中的 `gpui`
 别名保留了 RSX 展开和 GPUI derive 所需的路径；Kit 统一导出配套的渲染引擎、
 平台入口、组件和资源。宏与 core crate 不依赖 GPUI 运行时。
+
+下方矩阵标识完整生成 API 的目标。另有 fixture 针对官方 `gpui = "=0.2.2"` 验证特定
+回归行为，但不验证其全部 API。其他组合需独立验证；宏不依赖 GPUI 运行时，不代表
+生成代码兼容任意 GPUI 版本。
 
 通过 `gpui::component` 导入组件，在打开窗口前调用 `gpui::init(cx)`，使用
 `gpui::open_window(...)` 挂载 Kit 的根视图。应用应提交 lockfile，并随 Kit 一起
@@ -73,14 +84,14 @@ demo 使用 GPUI Kit 0.8.1 及其固定的 `gpui-pre 0.3.10` 快照。Cargo 中�
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.10.2` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
+| `0.11.0` | `0.8.1` | `gpui-pre@0.3.10` | `gpui-component@0.8.1` |
 
 此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.2"
+gpui-rsx = "0.11.0"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -318,7 +329,8 @@ rsx! { <button class="bg-blue-500 hover:bg-blue-600 active:opacity-75" /> }
 - `p-4`, `px-4`, `py-4`, `pt-4`, `pb-4`, `pl-4`, `pr-4`
 - `m-4`, `mx-4`, `my-4`, `mt-4`, `mb-4`, `ml-4`, `mr-4`
 - 任意间距：`gap-[14px]`, `gap-x-[0.75rem]`, `p-[18px]`, `mx-[1.25rem]`
-- 负值间距与尺寸：`-m-4` → `.m(px(-4.0))`、`-mt-1.5`、`-ml-[13px]`、`-w-1/2`、`-m-px`（也可用于 `hover:-mt-2` 这类状态前缀；`-auto` 与 `-full` 不能取负，`rounded-*` / `leading-*` 保持非负）
+- 负值间距：`-m-4` → `.m(px(-4.0))`、`-mt-1.5`、`-ml-[13px]`、`-p-1`、`-gap-1`、`-m-px`；静态 class 也支持 `hover:-mt-2` 这类状态前缀。`auto` 与 `full` 不能取负，`rounded-*` / `leading-*` 保持非负。
+- 负尺寸被接受，但静态 class 会发出警告：GPUI 将负宽高和负最大尺寸钳制为 0，最终结果仍受其他布局约束影响；负最小尺寸不能提供有用的下限。验证布局和运行时限制见 [Class 处理](https://wsafight.github.io/gpui-rsx/zh-cn/usage/class/)。
 - `gap-[10%]` 这类百分比间距会报错，因为 GPUI 间距使用 definite length
 
 **尺寸：**
@@ -375,6 +387,22 @@ rsx! {
     </button>
 }
 ```
+
+修改状态时，可使用 `gpui_rsx::rsx_listener!(cx, notify, |view, _, _, _| { view.count += 1; })`，
+保留视图回调的四参签名，并在正常返回后通知，包括提前返回。
+普通形式 `rsx_listener!(cx, handler)` 直接调用 `cx.listener(handler)`，由处理器负责通知。
+
+可用 `gpui_rsx::rsx_update!(view, cx, |view, cx| { ... })` 执行同步字段更新，在正常返回后调用 `cx.notify()`，
+并返回闭包结果；支持 move 捕获和借用捕获。搭配原生监听器或普通 `rsx_listener!`
+形式，明确由一个入口负责通知。每次调用各自添加通知，不会自动合并多次调用。
+普通赋值和异步任务仍遵循 GPUI 的显式更新规则。
+
+GPUI 依赖改名时，可在 `rsx.toml` 中配置 `[options] gpui-path = "::engine"`；
+生成的组件、ID、事件/更新辅助与默认共享运行时使用该路径。
+首次编译后新增配置的追踪需要在使用宏的包的 `build.rs` 中加入
+`println!("cargo:rerun-if-changed=rsx.toml");`，demo 已接入。
+配置追踪、导入要求和 derive 限制见[兼容性指引](docs/src/content/docs/zh-cn/compatibility.md)。
+事件类型标注和鼠标按钮 tuple 写法见语法指南。
 
 支持的事件（camelCase / snake_case）：
 
@@ -1192,7 +1220,7 @@ MIT License
 
 ## 开发工具
 
-安装 `cargo-rsx` 0.10.2（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
+安装 `cargo-rsx` 0.11.0（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
 `convert`、`preview --watch` 和 `lsp`。参见[工具指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/tooling/)
 与 [WASM Playground](https://wsafight.github.io/gpui-rsx/zh-cn/playground/)。
 编辑器适配位于 `editors/`，发布附件包含可安装的 VSIX，市场上架状态另行记录。

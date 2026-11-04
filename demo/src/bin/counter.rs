@@ -2,7 +2,7 @@ mod common;
 
 use gpui::prelude::*;
 use gpui::*;
-use gpui_rsx::rsx;
+use gpui_rsx::{rsx, rsx_listener, rsx_update};
 
 #[derive(Default)]
 struct CounterView {
@@ -11,6 +11,10 @@ struct CounterView {
 
 impl Render for CounterView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if std::env::var_os("GPUI_RSX_DEV_READY").is_some() {
+            static READY: std::sync::Once = std::sync::Once::new();
+            READY.call_once(|| println!("GPUI_RSX_READY"));
+        }
         let is_positive = self.count > 0;
         let is_negative = self.count < 0;
 
@@ -55,9 +59,8 @@ impl Render for CounterView {
 
                         <button
                             class="px-4 py-2 rounded-md bg-neutral-700 text-white cursor-pointer"
-                            onClick={cx.listener(|view, _, _window, cx| {
-                                view.count = 0;
-                                cx.notify();
+                            onClick={rsx_listener!(cx, |view, _, _window, cx| {
+                                rsx_update!(view, cx, |view, _| view.count = 0);
                             })}
                         >
                             {"Reset"}

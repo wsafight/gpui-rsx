@@ -16,6 +16,7 @@
 
 use super::attribute::{AttrHints, generate_attr_methods_with_mode, static_class_expr_needs_id};
 use super::class::{ClassMode, parse_class_string_with_mode};
+use super::key::static_key_suffix;
 use super::tables::{
     HTML_TAGS, is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
 };
@@ -101,6 +102,7 @@ fn analyze_attr(attr: &RsxAttribute, mode: ClassMode) -> AttrAnalysis {
 use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxElementName, RsxNode};
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
+use std::cell::OnceCell;
 
 type CodegenResult = Result<TokenStream, TokenStream>;
 
@@ -168,25 +170,29 @@ fn generate_body_checked(
     dynamic_used: &mut bool,
     erase_roots: bool,
 ) -> CodegenResult {
+    let gpui = OnceCell::new();
     match body {
         RsxBody::Single(element) => {
-            let expr = generate_element_checked(element, false, mode, dynamic_used)?;
+            let expr = generate_element_checked(element, false, mode.clone(), dynamic_used, &gpui)?;
             if erase_roots {
+                let gpui = gpui.get_or_init(|| mode.gpui_path());
                 Ok(collect_any_elements(
                     &[(expr, false)],
-                    quote! { ::gpui::AnyElement },
+                    quote! { #gpui::AnyElement },
                 ))
             } else {
                 Ok(expr)
             }
         }
         RsxBody::Fragment(children) => {
-            let child_exprs = generate_flattened_nodes(children, false, mode, dynamic_used)?;
+            let child_exprs =
+                generate_flattened_nodes(children, false, mode.clone(), dynamic_used, &gpui)?;
             if erase_roots || child_exprs.iter().any(|(_, yields_many)| *yields_many) {
+                let gpui = gpui.get_or_init(|| mode.gpui_path());
                 // A loop or spread contributes many elements, so erase types and collect.
                 return Ok(collect_any_elements(
                     &child_exprs,
-                    quote! { ::gpui::AnyElement },
+                    quote! { #gpui::AnyElement },
                 ));
             }
             let exprs = child_exprs.iter().map(|(expr, _)| expr);
@@ -204,10 +210,11 @@ fn generate_node_checked(
     require_loop_key: bool,
     mode: ClassMode,
     dynamic_used: &mut bool,
+    gpui: &OnceCell<syn::Path>,
 ) -> CodegenResult {
     match node {
         RsxNode::Element(elem) => {
-            generate_element_checked(elem, require_loop_key, mode, dynamic_used)
+            generate_element_checked(elem, require_loop_key, mode, dynamic_used, gpui)
         }
         // Every caller iterates `flattened_nodes`, which never yields a fragment group.
         RsxNode::Fragment(_) => unreachable!("nested fragment was not flattened"),
@@ -218,7 +225,7 @@ fn generate_node_checked(
             binding,
             iter,
             body,
-        } => generate_for_loop_checked(binding, iter, body, mode, dynamic_used),
+        } => generate_for_loop_checked(binding, iter, body, mode, dynamic_used, gpui),
     }
 }
 
@@ -239,11 +246,13 @@ fn generate_for_loop_checked(
     body: &[RsxNode],
     mode: ClassMode,
     dynamic_used: &mut bool,
+    gpui: &OnceCell<syn::Path>,
 ) -> CodegenResult {
-    let body_exprs = generate_flattened_nodes(body, true, mode, dynamic_used)?;
+    let body_exprs = generate_flattened_nodes(body, true, mode.clone(), dynamic_used, gpui)?;
     if body_exprs.is_empty() {
+        let gpui = gpui.get_or_init(|| mode.gpui_path());
         Ok(quote! {
-            (#iter).into_iter().flat_map(|#binding| ::core::iter::empty::<::gpui::AnyElement>())
+            (#iter).into_iter().flat_map(|#binding| ::core::iter::empty::<#gpui::AnyElement>())
         })
     } else if let [(single, yields_many)] = body_exprs.as_slice() {
         if *yields_many {
@@ -277,14 +286,24 @@ fn generate_flattened_nodes(
     require_loop_key: bool,
     mode: ClassMode,
     dynamic_used: &mut bool,
+    gpui: &OnceCell<syn::Path>,
 ) -> Result<Vec<(TokenStream, bool)>, TokenStream> {
-    flattened_nodes(nodes)
-        .map(|node| {
-            let expr = generate_node_checked(node, require_loop_key, mode.clone(), dynamic_used)?;
-            let yields_many = matches!(node, RsxNode::For { .. } | RsxNode::Spread(_));
-            Ok((expr, yields_many))
-        })
-        .collect()
+    let mut expressions = Vec::new();
+    let mut errors = TokenStream::new();
+    for node in flattened_nodes(nodes) {
+        match generate_node_checked(node, require_loop_key, mode.clone(), dynamic_used, gpui) {
+            Ok(expression) => expressions.push((
+                expression,
+                matches!(node, RsxNode::For { .. } | RsxNode::Spread(_)),
+            )),
+            Err(error) => errors.extend(error),
+        }
+    }
+    if errors.is_empty() {
+        Ok(expressions)
+    } else {
+        Err(quote! {{ #errors }})
+    }
 }
 
 /// Consume each iterator before evaluating the next node, preserving construction order
@@ -339,6 +358,7 @@ fn generate_element_checked(
     require_loop_key: bool,
     mode: ClassMode,
     dynamic_used: &mut bool,
+    gpui: &OnceCell<syn::Path>,
 ) -> CodegenResult {
     // 缓存标签名字符串，避免多次 to_string() 堆分配
     let tag_str = element.name.to_string();
@@ -436,8 +456,9 @@ fn generate_element_checked(
     let base = if let Some(id_value) = user_id {
         quote! { #tag.id(#id_value) }
     } else if needs_id {
+        let gpui = gpui.get_or_init(|| mode.gpui_path());
         let auto_id = if let Some(key_expr) = user_key {
-            make_keyed_auto_id(&element.name, key_expr)
+            make_keyed_auto_id(&element.name, key_expr, gpui)
         } else {
             make_auto_id(&element.name)
         };
@@ -447,7 +468,7 @@ fn generate_element_checked(
             && (HTML_TAGS.contains(&tag_str.as_str())
                 || matches!(tag_str.as_str(), "svg" | "img" | "canvas"));
         if base_expr.is_some() || !native_tag {
-            super::auto_id::with_auto_id(tag, auto_id)
+            super::auto_id::with_auto_id(tag, auto_id, gpui)
         } else {
             quote! { #tag.id(#auto_id) }
         }
@@ -470,6 +491,7 @@ fn generate_element_checked(
         &mut methods,
         mode.clone(),
         dynamic_used,
+        gpui,
     )?;
 
     Ok(quote! { #base #(#default_methods)* #(#methods)* })
@@ -482,9 +504,10 @@ fn generate_children_methods(
     methods: &mut Vec<TokenStream>,
     mode: ClassMode,
     dynamic_used: &mut bool,
+    gpui: &OnceCell<syn::Path>,
 ) -> Result<(), TokenStream> {
     for (expr, yields_many) in
-        generate_flattened_nodes(children, require_loop_key, mode, dynamic_used)?
+        generate_flattened_nodes(children, require_loop_key, mode, dynamic_used, gpui)?
     {
         methods.push(if yields_many {
             quote! { .children(#expr) }
@@ -573,7 +596,11 @@ fn make_auto_id(tag_name: &RsxElementName) -> TokenStream {
 ///
 /// 字面量 key 使用 concat!；具体整数值使用命名整数 ID（无字符串分配）。
 /// 其他 Display 值保留格式化路径，表达式借用求值一次。
-fn make_keyed_auto_id(tag_name: &RsxElementName, key_expr: &syn::Expr) -> TokenStream {
+fn make_keyed_auto_id(
+    tag_name: &RsxElementName,
+    key_expr: &syn::Expr,
+    gpui: &syn::Path,
+) -> TokenStream {
     let span = tag_name.span();
     let loc = span.start();
     // 编译期常量前缀，包含文件路径 + 源码位置，格式如：
@@ -584,44 +611,7 @@ fn make_keyed_auto_id(tag_name: &RsxElementName, key_expr: &syn::Expr) -> TokenS
     }
     // 运行时将 key 追加到前缀后，生成如：
     //   "src/views/list.rs::__rsx_li_L42C8_item_42"
-    super::key::dynamic_key(&prefix_suffix, key_expr)
-}
-
-fn static_key_suffix(expr: &syn::Expr) -> Option<String> {
-    match expr {
-        syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::Str(lit),
-            ..
-        }) => Some(lit.value()),
-        syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::Int(lit),
-            ..
-        }) => lit
-            .base10_parse::<u128>()
-            .ok()
-            .map(|value| value.to_string()),
-        syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::Bool(lit),
-            ..
-        }) => Some(lit.value.to_string()),
-        syn::Expr::Lit(syn::ExprLit {
-            lit: syn::Lit::Char(lit),
-            ..
-        }) => Some(lit.value().to_string()),
-        syn::Expr::Unary(unary) if matches!(unary.op, syn::UnOp::Neg(_)) => match &*unary.expr {
-            syn::Expr::Lit(syn::ExprLit {
-                lit: syn::Lit::Int(lit),
-                ..
-            }) => lit
-                .base10_parse::<u128>()
-                .ok()
-                .map(|value| format!("-{value}")),
-            _ => None,
-        },
-        syn::Expr::Paren(expr) => static_key_suffix(&expr.expr),
-        syn::Expr::Group(expr) => static_key_suffix(&expr.expr),
-        _ => None,
-    }
+    super::key::dynamic_key(&prefix_suffix, key_expr, gpui)
 }
 
 #[cfg(test)]

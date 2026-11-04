@@ -376,6 +376,67 @@ fn load_from_dir_reloads_when_content_changes() {
 }
 
 #[test]
+fn config_cache_detects_unchanged_metadata_and_deleted_or_recreated_files() {
+    let root = std::env::temp_dir().join(format!("rsx-theme-recreate-{}", std::process::id()));
+    assert!(Theme::load_from_dir(&root).unwrap().is_none());
+    std::fs::create_dir_all(&root).unwrap();
+    let path = root.join(CONFIG_FILE);
+    std::fs::write(&path, "[colors]\nbrand = \"#123456\"\n").unwrap();
+    let metadata = std::fs::metadata(&path).unwrap();
+    let first = Theme::load_from_dir(&root).unwrap().unwrap();
+    std::fs::write(&path, "[colors]\nbrand = \"#abcdef\"\n").unwrap();
+    std::fs::File::options()
+        .write(true)
+        .open(&path)
+        .unwrap()
+        .set_times(std::fs::FileTimes::new().set_modified(metadata.modified().unwrap()))
+        .unwrap();
+    let changed_metadata = std::fs::metadata(&path).unwrap();
+    assert_eq!(metadata.len(), changed_metadata.len());
+    assert_eq!(
+        metadata.modified().unwrap(),
+        changed_metadata.modified().unwrap()
+    );
+    let second = Theme::load_from_dir(&root).unwrap().unwrap();
+    assert!(!Arc::ptr_eq(&first, &second));
+    assert_eq!(
+        second.colors().get("brand"),
+        Some(&TokenValue::Color {
+            hex: 0xabcdef,
+            alpha: false
+        })
+    );
+    std::fs::remove_file(&path).unwrap();
+    assert!(Theme::load_from_dir(&root).unwrap().is_none());
+    std::fs::write(&path, "[colors]\nbrand = \"#654321\"\n").unwrap();
+    let recreated = Theme::load_from_dir(&root).unwrap().unwrap();
+    assert!(!Arc::ptr_eq(&second, &recreated));
+    assert_eq!(
+        recreated.colors().get("brand"),
+        Some(&TokenValue::Color {
+            hex: 0x654321,
+            alpha: false
+        })
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
+#[cfg(unix)]
+fn config_cache_shares_canonical_paths_through_directory_aliases() {
+    let root = std::env::temp_dir().join(format!("rsx-theme-alias-{}", std::process::id()));
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join(CONFIG_FILE), "[colors]\nbrand = \"#123456\"\n").unwrap();
+    let alias = root.join("alias");
+    std::os::unix::fs::symlink(&root, &alias).unwrap();
+    let direct = Theme::load_from_dir(&root).unwrap().unwrap();
+    let aliased = Theme::load_from_dir(&alias).unwrap().unwrap();
+    assert!(Arc::ptr_eq(&direct, &aliased));
+    assert_eq!(direct.path, aliased.path);
+    std::fs::remove_dir_all(root).unwrap();
+}
+
+#[test]
 fn stable_theme_builder_creates_in_memory_tokens() {
     let theme = Theme::builder()
         .scale(SpacingScale::Tailwind)

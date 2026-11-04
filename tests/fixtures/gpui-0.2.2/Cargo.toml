@@ -8,8 +8,19 @@ publish = false
 gpui = { version = "=0.2.2", default-features = false, features = ["font-kit", "runtime_shaders"] }
 gpui-rsx = { path = "../../..", features = ["tailwind-scale"] }
 
+[dev-dependencies]
+gpui = { version = "=0.2.2", default-features = false, features = ["font-kit", "runtime_shaders", "test-support"] }
+
 [[test]]
 name = "feedback_regressions"
 path = "../../../demo/tests/feedback_regressions.rs"
+
+[[test]]
+name = "identity_contract"
+path = "../../../demo/tests/identity_contract.rs"
+
+[[test]]
+name = "state_updates"
+path = "../../../demo/tests/state_updates.rs"
 
 [workspace]

@@ -6,10 +6,19 @@ GPUI-RSX is a procedural macro that provides JSX-like syntax for the GPUI UI fra
 
 ### Core Philosophy
 
-- **Zero-cost abstraction**: All transformations happen at compile time
+- **Static expansion**: Literal markup and classes compile to builder calls; dynamic strings use a runtime matcher
 - **Type safety**: Generated code leverages Rust's type system
 - **GPUI-native**: Output matches handwritten GPUI code patterns
 - **Tailwind-inspired**: Familiar utility-class styling system
+
+`rsx_listener!` and `rsx_update!` expand to GPUI callbacks and explicit notification calls.
+They do not add a state container or scheduler. Generated GPUI references follow the
+project's `gpui-path`; user expressions keep their own imports. Markup generation resolves
+the path lazily once per invocation, without storing syntax spans in the global theme cache.
+
+Independent errors in sibling nodes are collected before expansion fails. Tooling retains
+each source range so repeated errors can have separate quick fixes. A failed parent can
+still prevent analysis of its descendants.
 
 ## High-Level Architecture
 
@@ -70,6 +79,8 @@ crates/
 │   ├── lib.rs                 expand / expand_macro, spacing-scale priority, public facade
 │   ├── parser.rs              RSX → AST (elements, fragments, loops, spreads)
 │   ├── component/             #[component]: function components and typestate props builders
+│   ├── listener.rs             rsx_listener!: Context::listener with optional notification
+│   ├── update.rs               rsx_update!: synchronous FnOnce update followed by notification
 │   ├── theme/                 rsx.toml design tokens: parse, cache (path + content), builder
 │   ├── style.rs               StyleOperation: one resolved class shared by codegen and previews
 │   ├── diagnostics.rs         span-aware compile errors
@@ -214,7 +225,7 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
 
 | Function | Entries | Description |
 |----------|---------|-------------|
-| `lookup_color(name)` | 242 | Full Tailwind palette (all shades + black/white) |
+| `lookup_color(name)` | Generated | Tailwind color families plus black/white |
 | `lookup_attr_method(name)` | 15 events + 30+ attrs | camelCase/snake_case → GPUI method |
 | `lookup_spacing_method(prefix)` | 17 | `"gap_"`, `"px_"`, … → GPUI method name |
 | `is_valid_text_size(size)` | 9 | `"xs"` … `"5xl"` whitelist |
@@ -499,7 +510,7 @@ pub(crate) fn lookup_color(name: &str) -> Option<u32> {
     match name {
         "red_500" => Some(0xef4444),
         "blue_500" => Some(0x3b82f6),
-        // … 242 entries …
+        // … generated palette entries …
         _ => None,
     }
 }

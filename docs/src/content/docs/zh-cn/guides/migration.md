@@ -90,7 +90,7 @@ UTF-16 位置依次应用，未修改的宏复用诊断结果。同一次 RSX �
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.2"
+gpui-rsx = "0.11.0"
 ```
 
 Kit 0.8.1 固定 `gpui-pre = 0.3.10`。从 `gpui::component` 导入带样式控件，
@@ -141,7 +141,7 @@ spacing-scale = "tailwind"
 会在整个依赖图中合并。
 
 静态 class 支持 `hover:`、`focus:`、`focus-visible:`、`active:`、`group-hover:` 和
-`group-active:`，也支持具名 group。有状态的前缀会自动注入 ID，循环内需要稳定的 key。
+`group-active:`，也支持具名 group。有状态的前缀会自动注入 ID，循环内需要稳定 key 或显式的唯一 ID。
 响应式和 `dark:` 前缀在宽松模式下警告，严格模式下报错。动态字符串不支持状态前缀和
 主题令牌。使用 `onUnknownClass={|class: &str| ...}` 可替换严格模式默认的 panic；
 `dynamic-class-report` feature 会将 debug 提示汇总到进程退出时输出。

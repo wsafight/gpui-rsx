@@ -5,7 +5,7 @@
 //!
 //! 优化：使用进程级缓存保存完整 helper 源码，避免多个动态 class 重复生成和分段解析。
 
-use super::class::{ClassMode, SpacingScale, parse_single_class_with_mode};
+use super::class::{ClassMode, ClassOutcome, SpacingScale, analyze_class};
 use super::tables::{LENGTH_CLASS_SPECS, dynamic_common_classes, supports_negative_length};
 mod color;
 use color::generate_color_fallback_code;
@@ -494,8 +494,11 @@ fn parse_dynamic_common_class(class: &str, mode: ClassMode) -> TokenStream {
         },
         _ => {
             // 只用数值刻度；主题令牌需要渲染上下文，不进入动态 helper。
-            let method_call =
-                parse_single_class_with_mode(class, ClassMode::PERMISSIVE.with_scale(mode.scale()));
+            let ClassOutcome::Supported(method_call) =
+                analyze_class(class, ClassMode::PERMISSIVE.with_scale(mode.scale())).outcome
+            else {
+                panic!("unsupported dynamic common class `{class}`");
+            };
             quote! { el #method_call }
         }
     }

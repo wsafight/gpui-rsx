@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-11-05
+
 ### Added
 
 - Support negative Tailwind spacing and sizing classes (`-m-4`, `-mt-1.5`, `-ml-[13px]`,
@@ -16,14 +18,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Negative classes expand to negated lengths (`.m(px(-4.0))`) or GPUI's `*_neg_*` preset
   methods, matching the families for which GPUI itself ships negated presets. Percentages,
   fractions, Tailwind scale and the dynamic runtime matcher all respect the sign.
+- Warn when a static class resolves to a negative size: width, height, size and maximum
+  sizes are clamped to 0 by GPUI's layout, and negative minimum sizes are ignored.
+  This includes `w-[-4px]`; zero and positive results such as `-w-[-4px]` do not warn.
+  Strict mode does not promote the warning to an error. The warning also
+  appears in `cargo rsx lint` and the language server. `demo/tests/negative_layout.rs`
+  checks every negatable family against GPUI's real layout engine.
+- Project-level `[options] gpui-path` configures generated GPUI references across markup,
+  components, IDs, listener/update helpers and the default shared runtime. A real Kit
+  fixture verifies a renamed dependency without a `gpui` alias.
+- Add `rsx_update!(view, cx, update)` to run a synchronous update closure and call
+  `cx.notify()` after normal return, preserving the result and supporting `FnOnce` captures.
+- A development build/restart prototype with failure recovery and render-marker timing;
+  it restarts the application and does not preserve state or patch code in process.
+- Optional `rsx_listener!(cx, handler)` and `rsx_listener!(cx, notify, handler)`
+  preserve GPUI's view callback signature with explicit notification responsibility.
+  Real backend tests cover click/mouse events, move captures and early returns.
+
+### Fixed
+
+- Development reload detects readiness in large output chunks and skips outdated
+  launches when source changes while the previous application is stopping.
+- Report independent semantic failures in sibling RSX nodes together, and keep
+  separate source ranges and LSP quick fixes for repeated errors such as missing loop keys.
 
 ### Changed
 
+- Index incremental analysis results by their owning macro instead of rescanning every
+  previous result for each unchanged body. Reuse class diagnostics, classifications and
+  colors within a body without retaining token streams across requests.
+- Deduplicate overlapping development watch roots and skip unrelated files before `stat`;
+  reduce intermediate allocations when escaping preview HTML.
+- Skip config-path canonicalization when `rsx.toml` is absent, while retaining content-based
+  invalidation for config edits, deletion and recreation.
 - Unknown negative classes now report a specific reason instead of suggesting the
   sign-flipped positive class (`-mx-auto` explains that `auto` cannot be negative
   rather than recommending `mx-auto`).
 - JSX/TSX conversion rescales negative spacing to keep sizes (`-mt-4` → `-mt-16`)
   instead of dropping the class as unsupported.
+- Clarify HTML tag aliases, spacing scales, dynamic class limits, preview boundaries,
+  explicit loop IDs, component construction and the scope of GPUI compatibility checks.
+- Verify renamed GPUI dependencies through a separate Kit fixture; add headless
+  regressions for explicit IDs after list reordering and focus-driven layout changes.
+- Run shared identity and state-update regression tests against official GPUI 0.2.2.
+- Add isolated VS Code extension-host tests alongside rust-analyzer, checking both
+  language services and opt-in formatting across server restarts.
 
 ## [0.10.2] - 2026-10-31
 
@@ -913,7 +952,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/wsafight/gpui-rsx/compare/v0.9.0...v0.10.0

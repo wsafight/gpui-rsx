@@ -63,6 +63,9 @@ From inside `demo/`, omit `--manifest-path demo/Cargo.toml`. These tests use Kit
 | `styled`, conditional class expressions, `when`, `whenSome`, `whenClass`, visibility | Refinement assertions plus rendered bounds in `tests/ui_syntax.rs` |
 | `rsx!`, `rsx_strict!`, `rsx_permissive!`, `rsx_tw!`, `rsx_expand!` | `tests/syntax_styles.rs` |
 | `rsx_runtime!`, default and explicit GPUI paths, both spacing scales | `tests/shared_runtime.rs`, `tests/runtime_paths.rs` |
+| View listener signatures, explicit notification, move captures and early returns | `tests/event_listeners.rs`, `tests/state_updates.rs` |
+| Explicit IDs after list reordering and native click dispatch | `tests/identity_contract.rs` |
+| Negative margin, padding, gap and sizing in the real layout engine | `tests/negative_layout.rs` |
 | Static/dynamic colors, lengths, fractions, grids, theme tokens and unknown handlers | `tests/syntax_styles.rs`, `tests/shared_runtime.rs` |
 | Function/struct props, defaults, boolean setters, `Option`, callbacks, generics, const parameters and children | `tests/syntax_components.rs`, `tests/component_props.rs` |
 | Render-time `Window`/`App` injection, fragments, spread and nested loop order | `tests/ui_syntax.rs` |
@@ -78,6 +81,10 @@ nested iterators are collected once per outer iteration so inner closures can
 safely borrow the outer loop's pattern and the caller's state. Root fragments and
 mixed loop bodies consume each loop or spread before constructing the next sibling,
 preserving source order and releasing mutable borrows between siblings.
+
+The counter uses `rsx_listener!` and `rsx_update!` for explicit view updates. The
+[development restart workflow](../docs/src/content/docs/guides/performance.md#measure-development-reload)
+can rebuild and restart it after source changes; each restart resets application state.
 
 `api_contract`, `generated_api_contract` and `semantics_contract` are compile-only
 contracts. They cover GPUI methods, every generated theme color, the Kit alias,

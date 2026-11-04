@@ -17,7 +17,8 @@ Thank you for your interest in contributing to GPUI-RSX! We welcome contribution
 
 ## Code of Conduct
 
-This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participating, you are expected to uphold this code.
+Keep discussions respectful, focus feedback on the work, and help contributors reproduce
+and resolve problems.
 
 ## Getting Started
 
@@ -74,6 +75,14 @@ Branch naming conventions:
 5. Update documentation if needed
 
 ### Testing Your Changes
+
+The [development baseline and P2 research record](docs/development-baseline.md) tracks
+validation scope, reproducible commands and the evidence required before expanding APIs.
+
+For public API changes, update the English and Chinese changelogs, API reference and
+relevant guides together. Keep released changelog entries as history. Compile examples
+against the intended GPUI backend; signature stubs alone do not verify native behavior.
+Run `bun run --cwd docs check` and `bun run --cwd docs build` to check both locales and links.
 
 ```bash
 # Run the standard validation suite
@@ -286,7 +295,7 @@ Add examples to demonstrate new features:
 
 ## 行为准则
 
-本项目遵循[行为准则](CODE_OF_CONDUCT.md)。参与项目即表示你同意遵守此准则。
+请保持尊重，针对工作本身提出反馈，并协助贡献者复现和解决问题。
 
 ## 快速开始
 
@@ -343,6 +352,13 @@ git checkout -b feature/amazing-feature
 5. 根据需要更新文档
 
 ### 测试改动
+
+[开发验收与 P2 研究记录](docs/development-baseline.md)记录验证范围、重现命令，
+以及扩大 API 范围前需要的证据。
+
+公开 API 变动需同步中英文更新日志、API 参考和相关指南，已发布的日志保留为历史记录。
+示例应使用目标 GPUI 后端编译；签名 stub 不能单独证明原生行为。
+执行 `bun run --cwd docs check` 和 `bun run --cwd docs build`，检查双语内容和站点链接。
 
 ```bash
 # 运行标准验证

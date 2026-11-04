@@ -4,12 +4,31 @@ use gpui_rsx_core::syntax::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use gpui_rsx_core::{ClassMode, StyleLength, StyleValue, resolve_style};
 
 pub fn escape(value: &str) -> String {
-    value
-        .replace('&', "&amp;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-        .replace('"', "&quot;")
-        .replace('\'', "&#39;")
+    if !value.contains('&')
+        && !value.contains('<')
+        && !value.contains('>')
+        && !value.contains('"')
+        && !value.contains('\'')
+    {
+        return value.to_owned();
+    }
+    let mut escaped = String::with_capacity(value.len());
+    let mut start = 0;
+    for (index, byte) in value.bytes().enumerate() {
+        let replacement = match byte {
+            b'&' => "&amp;",
+            b'<' => "&lt;",
+            b'>' => "&gt;",
+            b'"' => "&quot;",
+            b'\'' => "&#39;",
+            _ => continue,
+        };
+        escaped.push_str(&value[start..index]);
+        escaped.push_str(replacement);
+        start = index + 1;
+    }
+    escaped.push_str(&value[start..]);
+    escaped
 }
 
 pub fn render(source: &str, mode: ClassMode) -> Result<String, String> {

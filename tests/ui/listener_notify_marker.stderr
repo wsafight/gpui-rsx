@@ -1,0 +1,5 @@
+error: expected `notify` before the third argument
+ --> tests/ui/listener_notify_marker.rs:4:23
+  |
+4 |     rsx_listener!(cx, silent, |_, _, _, _| {});
+  |                       ^^^^^^

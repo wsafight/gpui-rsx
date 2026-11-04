@@ -47,6 +47,21 @@ pub fn document() -> Value {
         "macros": gpui_rsx_core::MACRO_NAMES,
         "component_attribute_macro": "component",
         "runtime_macro": "rsx_runtime",
+        "project_options": {
+            "gpui-path": "Absolute Rust crate or re-export path, default ::gpui; applies to markup, component, listener, update and default runtime expansions",
+        },
+        "state_update_macro": {
+            "name": "rsx_update",
+            "form": "rsx_update!(view, cx, update)",
+            "update_arguments": ["mutable view", "view context"],
+            "notification": "one explicit notify after normal synchronous FnOnce return; returns the update result; ordinary assignments are unchanged",
+        },
+        "listener_macro": {
+            "name": "rsx_listener",
+            "forms": ["rsx_listener!(cx, handler)", "rsx_listener!(cx, notify, handler)"],
+            "handler_arguments": ["view", "event", "window", "context"],
+            "notification": "plain form delegates to Context::listener; notify form notifies after normal return, including early return",
+        },
         "components": {
             "declarations": ["struct with named fields", "synchronous function with concrete prop types"],
             "required_props": "compile-time checked",

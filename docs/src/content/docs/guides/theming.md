@@ -132,3 +132,19 @@ and set `dynamic-runtime = "rsx_runtime"` in `[options]`. The option is independ
 of `spacing-scale` and does not enable theme tokens in dynamic strings.
 See [Performance](/gpui-rsx/guides/performance/#share-the-dynamic-class-runtime)
 for target placement, GPUI aliases and measurements.
+
+## Configure generated GPUI paths
+
+When the GPUI dependency is named `engine`, configure its path in the same `[options]`
+section as the spacing and runtime settings:
+
+```toml title="rsx.toml"
+[options]
+gpui-path = "::engine"
+```
+
+The default is `::gpui`; a crate-root re-export such as `crate::ui` is also accepted.
+This setting applies to generated paths, including components, IDs, listener/update
+helpers and `rsx_runtime!()`. User expressions and upstream derives retain their own
+imports. See [Compatibility](/gpui-rsx/compatibility/#existing-dependency-aliases) for
+function-component limitations and tracking config creation with `build.rs`.

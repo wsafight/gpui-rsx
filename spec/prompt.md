@@ -10,8 +10,19 @@ arbitrary color and length families. These are GPUI builder calls, not browser C
   Responsive and `dark:` variants are unsupported. Express conditions in Rust.
 - Dynamic `class={expr}` supports fewer utilities; it cannot apply state variants
   or theme tokens. Prefer literal branches such as `class={if active { "flex" } else { "hidden" }}`.
-- Events take Rust callbacks. In loops, supply a stable `key={item.id}` when an
-  element uses a stateful method or `active:`. Do not invent callback types.
+- Events take Rust callbacks. In loops, supply a stable `key={item.id}` or explicit
+  unique `id={...}` when an element uses a stateful method or `active:`. Do not invent callback types.
+- Optional `rsx_listener!(cx, handler)` delegates to `cx.listener(handler)`.
+  `rsx_listener!(cx, notify, handler)` notifies after normal handler return, including
+  early return. Handlers receive `(view, event, window, cx)` and remain synchronous `Fn`.
+- `rsx_update!(view, cx, |view, cx| { ... })` runs a synchronous `FnOnce` update and
+  calls `cx.notify()` after normal return, preserving the closure result. Each invocation
+  adds its own notification; separate calls are not batched. Use a native or plain
+  listener with it; do not add another unconditional notification.
+- `[options] gpui-path = "::engine"` in `rsx.toml` configures generated GPUI references,
+  including components, listeners, state updates and the default shared runtime.
+  Paths must start with `::` or `crate::`. User expressions and upstream derives keep
+  their own imports; the default path remains `::gpui`.
 - `img`, `svg` and `canvas` have special constructors. Custom components can use
   `base={Button::new("save")}` or `#[component]` structs/functions with required props and children.
 - Nested `<>...</>` groups add no wrapper element. Function components use concrete prop

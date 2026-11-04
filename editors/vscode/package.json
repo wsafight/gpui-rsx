@@ -2,7 +2,7 @@
   "name": "gpui-rsx",
   "displayName": "GPUI RSX",
   "description": "Class completion, diagnostics, expansion hover and formatting for GPUI RSX macros.",
-  "version": "0.10.2",
+  "version": "0.11.0",
   "publisher": "wsafight",
   "license": "MIT",
   "engines": {
@@ -18,6 +18,7 @@
   "main": "./dist/extension.cjs",
   "scripts": {
     "test": "bun test",
+    "test:integration": "bun run build && node scripts/test-integration.mjs",
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
     "check": "tsc --noEmit",
     "package": "bun run build && vsce package --no-dependencies",
@@ -86,8 +87,9 @@
     "vscode-languageclient": "^11.0.0"
   },
   "devDependencies": {
-    "@types/vscode": "~1.96.0",
     "@types/node": "^22.20.5",
+    "@types/vscode": "~1.96.0",
+    "@vscode/test-electron": "2.5.2",
     "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
     "typescript": "^7.0.2"

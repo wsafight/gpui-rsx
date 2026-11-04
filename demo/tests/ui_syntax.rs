@@ -170,6 +170,41 @@ fn keyed_loop_ids_follow_values_when_rows_reorder(cx: &mut TestAppContext) {
     assert_eq!(*ids.borrow(), reversed);
 }
 
+#[gpui::test]
+fn explicit_loop_ids_keep_click_targets_when_rows_reorder(cx: &mut TestAppContext) {
+    let rows = Rc::new(RefCell::new(vec![3u64, 1, 2]));
+    let clicked = Rc::new(Cell::new(0u64));
+    let data = rows.clone();
+    let recorded = clicked.clone();
+    let handle = mount(cx, move |_, _| {
+        let clicked = recorded.clone();
+        rsx! {
+            <div flex flex_col>
+                {for row in data.borrow().iter().copied() {
+                    <div id={("row", row)} class="w-40 h-10"
+                        onClick={{
+                            let clicked = clicked.clone();
+                            move |_, _, _| clicked.set(row)
+                        }} map={|element| element.test_support()} />
+                }}
+            </div>
+        }
+        .into_any_element()
+    });
+    frame(cx, handle, |window, cx| window.click(("row", 1u64), cx));
+    assert_eq!(clicked.get(), 1);
+
+    rows.borrow_mut().reverse();
+    frame(cx, handle, |window, cx| {
+        assert!(
+            window.find(("row", 2u64)).bounds().origin.y
+                < window.find(("row", 3u64)).bounds().origin.y
+        );
+        window.click(("row", 3u64), cx);
+    });
+    assert_eq!(clicked.get(), 3);
+}
+
 #[component]
 fn ContextProbe(
     calls: Rc<Cell<usize>>,
@@ -277,6 +312,30 @@ fn hover_class_changes_layout_through_gpui_state_dispatch(cx: &mut TestAppContex
         assert_eq!(window.find("hovered").bounds().size.width, px(40.));
         window.hover("hovered", cx);
         assert_eq!(window.find("hovered").bounds().size.width, px(60.));
+    });
+}
+
+#[gpui::test]
+fn focus_class_updates_layout_when_focus_enters_and_leaves(cx: &mut TestAppContext) {
+    let focused = cx.update(|cx| cx.focus_handle());
+    let other = cx.update(|cx| cx.focus_handle());
+    let tracked = focused.clone();
+    let handle = mount(cx, move |_, _| {
+        rsx! {
+            <div id="focus-style" class="w-40 h-20" trackFocus={&tracked}
+                focusClass="w-60" />
+        }
+        .test_support()
+        .into_any_element()
+    });
+    frame(cx, handle, |window, cx| {
+        assert_eq!(window.find("focus-style").bounds().size.width, px(40.));
+        window.focus(&focused, cx);
+        window.render_frame(cx);
+        assert_eq!(window.find("focus-style").bounds().size.width, px(60.));
+        window.focus(&other, cx);
+        window.render_frame(cx);
+        assert_eq!(window.find("focus-style").bounds().size.width, px(40.));
     });
 }
 

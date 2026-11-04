@@ -4,7 +4,22 @@
 use gpui::{
     AnyElement, Element, ElementId, InteractiveText, SharedString, StyledText, div, prelude::*,
 };
-use gpui_rsx::{component, rsx, rsx_fragment};
+use gpui_rsx::{component, rsx, rsx_fragment, rsx_listener};
+
+#[test]
+fn listener_helper_keeps_native_click_and_mouse_signatures() {
+    fn render(cx: &mut gpui::Context<()>) -> impl IntoElement {
+        rsx! {
+            <div
+                onClick={rsx_listener!(cx, |_, _, _, _| {})}
+                onMouseDown={(gpui::MouseButton::Right, rsx_listener!(cx, notify, |_, event: &gpui::MouseDownEvent, _, _| {
+                    assert_eq!(event.button, gpui::MouseButton::Right);
+                }))}
+            />
+        }
+    }
+    let _ = render;
+}
 
 #[component]
 fn Counter(

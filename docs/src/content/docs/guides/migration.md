@@ -101,7 +101,7 @@ dependencies with Kit, preserving the `gpui` crate name for generated code:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.8.1" }
-gpui-rsx = "0.10.2"
+gpui-rsx = "0.11.0"
 ```
 
 Kit 0.8.1 pins `gpui-pre = 0.3.10`. Use `gpui::component` for styled controls and
@@ -156,7 +156,7 @@ across the dependency graph.
 
 Static class literals now accept `hover:`, `focus:`, `focus-visible:`, `active:`,
 `group-hover:` and `group-active:` (including named groups). Stateful variants inject
-IDs; supply stable keys in loops. Responsive and `dark:` variants emit warnings in
+IDs; supply stable keys or explicit unique IDs in loops. Responsive and `dark:` variants emit warnings in
 permissive mode and errors in strict mode. Dynamic class strings cannot use variants
 or theme tokens. `onUnknownClass={|class: &str| ...}` handles unsupported dynamic classes
 without the strict mode's default panic; `dynamic-class-report` collects debug reports

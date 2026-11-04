@@ -6,10 +6,17 @@ GPUI-RSX 是一个为 GPUI UI 框架提供类 JSX 语法的过程宏。它在编
 
 ### 核心理念
 
-- **零成本抽象**：所有转换都在编译时完成
+- **静态展开**：字面量标记和 class 编译为 builder 调用；动态字符串使用运行时匹配器
 - **类型安全**：生成的代码充分利用 Rust 类型系统
 - **GPUI 原生**：输出与手写的 GPUI 代码模式一致
 - **Tailwind 风格**：熟悉的实用类样式系统
+
+`rsx_listener!` 和 `rsx_update!` 展开为 GPUI 回调和显式通知调用，不引入状态容器或调度器。
+生成的 GPUI 引用遵循项目的 `gpui-path`，用户表达式仍使用各自的导入。
+标记生成阶段在每次调用内部按需解析一次路径，全局主题缓存不保存语法 span。
+
+生成器在展开失败前收集兄弟节点中的独立错误，工具保留各自的源码范围，为同文错误提供
+独立快速修复。父节点失败仍可能阻止对子节点的分析。
 
 ## 高层架构
 
@@ -70,6 +77,8 @@ crates/
 │   ├── lib.rs                 expand / expand_macro、间距单位优先级、公开门面
 │   ├── parser.rs              RSX → AST（元素、Fragment、循环、展开）
 │   ├── component/             #[component]：函数组件与 typestate props builder
+│   ├── listener.rs             rsx_listener!：Context::listener 与可选通知
+│   ├── update.rs               rsx_update!：同步 FnOnce 更新后通知
 │   ├── theme/                 rsx.toml 设计令牌：解析、缓存（路径 + 内容）、builder
 │   ├── style.rs               StyleOperation：代码生成与预览共用的已解析 class
 │   ├── diagnostics.rs         带 span 的编译错误
@@ -214,7 +223,7 @@ div()
 
 | 函数 | 条目数 | 描述 |
 |------|--------|------|
-| `lookup_color(name)` | 242 | 完整 Tailwind 色板（所有色阶 + black/white） |
+| `lookup_color(name)` | 生成表 | Tailwind 色系及 black/white |
 | `lookup_attr_method(name)` | 15 事件 + 30+ 属性 | camelCase/snake_case → GPUI 方法名 |
 | `lookup_spacing_method(prefix)` | 17 | `"gap_"`、`"px_"`… → GPUI 方法名 |
 | `is_valid_text_size(size)` | 9 | `"xs"` … `"5xl"` 白名单 |
@@ -463,7 +472,7 @@ pub(crate) fn lookup_color(name: &str) -> Option<u32> {
     match name {
         "red_500" => Some(0xef4444),
         "blue_500" => Some(0x3b82f6),
-        // … 242 条 …
+        // … 生成的色板条目 …
         _ => None,
     }
 }

@@ -17958,6 +17958,20 @@
   ],
   "gpui_component_revision": "gpui-component@0.8.1",
   "gpui_revision": "gpui-pre@0.3.10",
+  "listener_macro": {
+    "forms": [
+      "rsx_listener!(cx, handler)",
+      "rsx_listener!(cx, notify, handler)"
+    ],
+    "handler_arguments": [
+      "view",
+      "event",
+      "window",
+      "context"
+    ],
+    "name": "rsx_listener",
+    "notification": "plain form delegates to Context::listener; notify form notifies after normal return, including early return"
+  },
   "macros": [
     "rsx",
     "rsx_strict",
@@ -17966,8 +17980,20 @@
     "rsx_expand",
     "rsx_fragment"
   ],
+  "project_options": {
+    "gpui-path": "Absolute Rust crate or re-export path, default ::gpui; applies to markup, component, listener, update and default runtime expansions"
+  },
   "runtime_macro": "rsx_runtime",
   "schema_version": 1,
+  "state_update_macro": {
+    "form": "rsx_update!(view, cx, update)",
+    "name": "rsx_update",
+    "notification": "one explicit notify after normal synchronous FnOnce return; returns the update result; ordinary assignments are unchanged",
+    "update_arguments": [
+      "mutable view",
+      "view context"
+    ]
+  },
   "syntax": {
     "children_spread": "{...children}",
     "fragment": "<>...</>",

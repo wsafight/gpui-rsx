@@ -1,4 +1,4 @@
-use criterion::{Criterion, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, criterion_group, criterion_main};
 use gpui_rsx_core::ClassMode;
 use gpui_rsx_tools::{analyze_rust_document, release_span_memory, update_rust_document};
 use std::hint::black_box;
@@ -84,5 +84,42 @@ fn analysis(c: &mut Criterion) {
     }
 }
 
-criterion_group!(benches, analysis);
+fn incremental_scaling(c: &mut Criterion) {
+    let mut group = c.benchmark_group("analysis/incremental_scaling");
+    for count in [80, 320, 1280] {
+        let source = (0..count).map(|index| {
+            format!("fn view_{index}(){{rsx!{{<div class=\"flex gap-4 bg-blue-500\"><span class=\"text-sm\"/></div>}};}}\n")
+        }).collect::<String>();
+        let previous = analyze_rust_document(&source, ClassMode::PERMISSIVE);
+        let edited = source.replacen("gap-4", "gap-8", 1);
+        release_span_memory();
+        group.bench_with_input(BenchmarkId::from_parameter(count), &count, |bencher, _| {
+            bencher.iter(|| {
+                black_box(update_rust_document(
+                    black_box(&edited),
+                    ClassMode::PERMISSIVE,
+                    &source,
+                    &previous,
+                ));
+                release_span_memory();
+            });
+        });
+    }
+    group.finish();
+}
+
+fn preview_escaping(c: &mut Criterion) {
+    let mut group = c.benchmark_group("preview/escape");
+    for (name, source) in [
+        ("plain", "plain text 中文😀".repeat(200)),
+        ("html", "<p class=\"text\">中文😀 & 'text'</p>".repeat(200)),
+    ] {
+        group.bench_function(name, |bencher| {
+            bencher.iter(|| black_box(gpui_rsx_tools::preview::escape(black_box(&source))));
+        });
+    }
+    group.finish();
+}
+
+criterion_group!(benches, analysis, incremental_scaling, preview_escaping);
 criterion_main!(benches);

@@ -31,6 +31,8 @@ const MULTI_DYNAMIC: &str =
     r#"<div class={outer}><div class={header}/><div class={body}/><div class={footer}/></div>"#;
 
 fn bench(c: &mut Criterion) {
+    let shared = ClassMode::PERMISSIVE
+        .with_dynamic_runtime_path(syn::parse_str("crate::rsx_runtime").unwrap());
     for (name, source, mode) in [
         ("expand/static_dashboard", DASHBOARD, ClassMode::PERMISSIVE),
         ("expand/strict_dashboard", DASHBOARD, ClassMode::STRICT),
@@ -40,6 +42,8 @@ fn bench(c: &mut Criterion) {
             MULTI_DYNAMIC,
             ClassMode::PERMISSIVE,
         ),
+        ("expand/dynamic_class_shared", DYNAMIC, shared.clone()),
+        ("expand/four_dynamic_classes_shared", MULTI_DYNAMIC, shared),
     ] {
         c.bench_function(name, |b| {
             b.iter_batched(

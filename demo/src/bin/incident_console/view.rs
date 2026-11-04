@@ -1,6 +1,6 @@
 use gpui::prelude::*;
 use gpui::*;
-use gpui_rsx::rsx;
+use gpui_rsx::{rsx, rsx_listener};
 
 use crate::details;
 use crate::model::{ConsoleStats, IncidentConsole};
@@ -38,18 +38,16 @@ impl Render for IncidentConsole {
                         <div class="flex gap-8">
                             <button
                                 class="px-12 py-8 rounded-md bg-zinc-900 text-zinc-200 border border-zinc-700 cursor-pointer"
-                                onClick={cx.listener(|view, _, _window, cx| {
+                                onClick={rsx_listener!(cx, notify, |view, _, _window, _| {
                                     view.toggle_sort();
-                                    cx.notify();
                                 })}
                             >
                                 {self.sort_mode.label()}
                             </button>
                             <button
                                 class="px-12 py-8 rounded-md bg-cyan-400 text-zinc-950 font-bold cursor-pointer"
-                                onClick={cx.listener(|view, _, _window, cx| {
+                                onClick={rsx_listener!(cx, notify, |view, _, _window, _| {
                                     view.simulate_signal();
-                                    cx.notify();
                                 })}
                             >
                                 {"Inject signal"}

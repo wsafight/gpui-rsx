@@ -26,6 +26,11 @@ Common HTML-like tags map to `div()` because GPUI does not expose browser DOM no
 | Forms | `button`, `input`, `textarea`, `select`, `form` |
 | Lists | `ul`, `ol`, `li` |
 
+These names do not supply HTML semantics: `<input />` is not an editable input,
+`<button />` does not add a component library's keyboard or focus behavior, and
+`<form>` does not submit data. `styled` adds style defaults only. Use explicit
+component constructors for controls, as shown under [Components](#components).
+
 Self-closing and paired tags are equivalent when there are no children:
 
 ```rust
@@ -67,6 +72,9 @@ rsx! {
 Use `base={expr}` when the builder needs arguments or comes from a component library:
 
 ```rust
+use gpui::component::button::Button;
+use gpui::component::Sizable as _;
+
 rsx! {
     <Button
         base={Button::new("save")}
@@ -77,6 +85,19 @@ rsx! {
 ```
 
 `base` is consumed by the macro. It does not generate a `.base(...)` method call.
+
+| Construction need | Recommended form |
+| --- | --- |
+| Builder with a zero-argument constructor | `<Card title="Inbox" />` or `<ui::Card ... />` |
+| Constructor arguments or a preconfigured builder | `<Button base={Button::new("save")} ... />` |
+| Optional props | Declare `#[prop(default)]` or `#[prop(default = expr)]`; omit the prop to use its default |
+| Heterogeneous roots or stored child collections | Use [`rsx_fragment!`](#fragments), then `{...parts}` |
+| Several roots that need concrete builder methods | Keep an ordinary `rsx!` fragment with compatible root types |
+
+`base` evaluates once and keeps the builder's own setters. Pass event callbacks
+according to that builder's API; an `onClick` prop on a component is not automatically
+a view listener. Prefer camelCase for GPUI event attributes and snake_case for direct
+native methods; both supported spellings generate the same calls.
 
 ### Function components
 
@@ -229,6 +250,8 @@ rsx! {
 }
 ```
 
+### Event listeners
+
 `InteractiveText` also accepts two arguments through `onClick` or `on_click`:
 
 ```rust
@@ -240,6 +263,59 @@ rsx! {
 
 This expands to `.on_click(ranges, listener)`. Ordinary `Div` listeners keep
 the single-argument form `onClick={listener}`.
+
+For view callbacks, the optional `rsx_listener!` macro keeps GPUI's four-argument
+`(view, event, window, cx)` handler signature:
+
+```rust
+use gpui_rsx::rsx_listener;
+
+rsx! {
+    <button onClick={rsx_listener!(cx, notify, |view, _, _, _| {
+        view.count += 1;
+    })}>{"Increment"}</button>
+}
+```
+
+`rsx_listener!(cx, handler)` delegates to `cx.listener(handler)` and leaves notification
+to the handler. The explicit `notify` form calls `cx.notify()` after normal return,
+including early return with no state change; avoid another unconditional notification
+inside that handler. Context and handler expressions each evaluate once. `move` closures
+and function expressions work; callbacks remain synchronous `Fn`, with no panic or async
+notification guarantee. For event field access, generic inference may need a type such
+as `event: &MouseDownEvent`. Mouse button tuples keep their ordinary syntax:
+`onMouseDown={(MouseButton::Right, rsx_listener!(cx, notify, handler))}`.
+
+### Explicit state updates
+
+`rsx_update!(view, cx, update)` runs a synchronous `FnOnce` with the mutable view and
+its matching `Context<View>`, calls `cx.notify()` after normal return and returns the
+updater's result. Several field changes can share one notification:
+
+```rust
+use gpui_rsx::{rsx_listener, rsx_update};
+
+rsx! {
+    <div onClick={rsx_listener!(cx, |view, _, _, cx| {
+        rsx_update!(view, cx, |view, _| {
+            view.count += 1;
+            view.label = String::from("updated");
+        });
+    })}>{"Update"}</div>
+}
+```
+
+View, context and updater expressions each evaluate once. Moved values and borrowed
+captures are supported; the updater does not need to be `'static`. Early return and
+unchanged fields still notify. Use the plain listener form above, since `rsx_update!`
+owns notification. The macro does not intercept other assignments, roll back on panic
+or notify on asynchronous completion. Use another entity update when an async result
+is ready. The entity and its lifecycle remain managed by GPUI.
+
+Each invocation calls `cx.notify()` independently; the macro does not batch separate
+calls or suppress notifications made inside the update closure.
+
+### Attribute aliases
 
 CamelCase aliases map to GPUI snake_case methods where needed:
 

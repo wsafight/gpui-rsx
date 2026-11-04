@@ -3,7 +3,9 @@
 #![doc = include_str!("docs/classes.md")]
 #![doc = include_str!("docs/events-and-children.md")]
 #![doc = include_str!("docs/attributes-and-identity.md")]
-use gpui_rsx_core::{MacroOptions, SpacingScale, expand_component, expand_macro};
+#![doc = include_str!("docs/listeners.md")]
+#![doc = include_str!("docs/state-updates.md")]
+use gpui_rsx_core::{MacroOptions, SpacingScale, Theme, expand_macro};
 use proc_macro::TokenStream;
 
 fn options(strict: bool) -> MacroOptions {
@@ -15,6 +17,40 @@ fn options(strict: bool) -> MacroOptions {
             SpacingScale::Px
         })
         .with_dynamic_report(cfg!(feature = "dynamic-class-report"))
+}
+
+/// Expands with the configured GPUI path. `item` is `Some(tokens)` for attribute macros: it is
+/// re-emitted after a configuration error so the error is not buried under cascading ones.
+fn configured_gpui(
+    item: Option<proc_macro2::TokenStream>,
+    expand: impl FnOnce(&syn::Path) -> proc_macro2::TokenStream,
+) -> TokenStream {
+    let is_item = item.is_some();
+    let theme = match std::env::var_os("CARGO_MANIFEST_DIR") {
+        Some(directory) => match Theme::load_from_dir(std::path::Path::new(&directory)) {
+            Ok(theme) => theme,
+            Err(message) => {
+                return match item {
+                    Some(item) => quote::quote!(compile_error!(#message); #item),
+                    None => quote::quote!(compile_error!(#message)),
+                }
+                .into();
+            }
+        },
+        None => None,
+    };
+    let gpui = theme
+        .as_deref()
+        .map_or_else(|| syn::parse_quote!(::gpui), Theme::gpui_syn_path);
+    let tracker = theme
+        .as_deref()
+        .and_then(gpui_rsx_core::theme::rebuild_tracker);
+    let code = expand(&gpui);
+    if is_item {
+        quote::quote!(#tracker #code).into()
+    } else {
+        quote::quote!({ #tracker #code }).into()
+    }
 }
 
 /// Generates shared dynamic class helpers once, at the crate root.
@@ -32,12 +68,43 @@ fn options(strict: bool) -> MacroOptions {
 /// `gpui_rsx::rsx_runtime!(my_gpui);`.
 #[proc_macro]
 pub fn rsx_runtime(input: TokenStream) -> TokenStream {
-    let gpui = if input.is_empty() {
-        syn::parse_quote!(::gpui)
+    if input.is_empty() {
+        configured_gpui(
+            Some(Default::default()),
+            gpui_rsx_core::generate_runtime_module,
+        )
     } else {
-        syn::parse_macro_input!(input as syn::Path)
-    };
-    gpui_rsx_core::generate_runtime_module(&gpui).into()
+        let gpui = syn::parse_macro_input!(input as syn::Path);
+        gpui_rsx_core::generate_runtime_module(&gpui).into()
+    }
+}
+
+/// Builds a GPUI view listener from a view context and a four-argument handler.
+///
+/// `rsx_listener!(cx, handler)` delegates directly to `cx.listener(handler)`.
+/// Add the explicit `notify` marker to notify the view after the handler returns:
+/// `rsx_listener!(cx, notify, handler)`. The handler still receives the view,
+/// event, window, and view context in that order.
+///
+/// `notify` is only a marker when a handler follows it; `rsx_listener!(cx, notify)` passes a
+/// handler that is itself named `notify`.
+#[proc_macro]
+pub fn rsx_listener(input: TokenStream) -> TokenStream {
+    configured_gpui(None, |gpui| {
+        gpui_rsx_core::expand_listener_with_path(input.into(), gpui)
+    })
+}
+
+/// Runs `rsx_update!(view, cx, update)` and notifies after normal return.
+///
+/// The `FnOnce` update receives the mutable view and its context. Several field
+/// changes can share one notification. The update's result is returned unchanged.
+/// Assignments made outside this macro retain GPUI's notification rules.
+#[proc_macro]
+pub fn rsx_update(input: TokenStream) -> TokenStream {
+    configured_gpui(None, |gpui| {
+        gpui_rsx_core::expand_update_with_path(input.into(), gpui)
+    })
 }
 
 /// Transforms JSX-like markup into GPUI method chains at compile time.
@@ -530,5 +597,8 @@ pub fn rsx_expand(input: TokenStream) -> TokenStream {
 /// ``missing required prop `title` on `<Card>` ``.
 #[proc_macro_attribute]
 pub fn component(attr: TokenStream, item: TokenStream) -> TokenStream {
-    expand_component(attr.into(), item.into()).into()
+    let item: proc_macro2::TokenStream = item.into();
+    configured_gpui(Some(item.clone()), |gpui| {
+        gpui_rsx_core::expand_component_with_path(attr.into(), item, gpui)
+    })
 }
