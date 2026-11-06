@@ -349,6 +349,44 @@ fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl Into
 }
 ```
 
+### `dx serve --hot-patch` Ignores RSX Edits
+
+Dioxus CLI 0.7.10 recognizes macros named `rsx!` or `render!` by the last segment
+of their path. This also matches `gpui_rsx::rsx!`. Its template parser rejects
+GPUI-RSX's HTML-like syntax, and the CLI skips that macro instead of falling back
+to Rust compilation. GPUI's Subsecond integration therefore receives no Rust patch
+for an edit confined to that macro.
+
+Use a local alias to make the edit follow the Rust compilation path:
+
+```rust
+use gpui::prelude::*;
+use gpui_rsx::rsx as gpui_view;
+
+fn content() -> impl gpui::IntoElement {
+    gpui_view! { <div>{"Edit this text"}</div> }
+}
+```
+
+Restart `dx serve` after changing the import and call sites. Keep hot reloading
+enabled: in CLI 0.7.10, `--hot-reload false` disables processing file changes,
+including automatic Rust patches. The alias preserves the selected macro's class
+handling mode. The default `rsx!` is permissive; for strict checking, import
+`gpui_rsx::rsx_strict as gpui_view` instead.
+
+The alias addresses change detection. Applying the patch also requires a GPUI
+version with Subsecond support and an application feature forwarding to
+`gpui/hot-reload`, enabled with
+`dx serve --hot-patch --hot-reload true --features hotreload`.
+Check `dx --version` and distinguish a missing rebuild from a generated patch
+that fails to update the window. These are separate stages.
+
+The standalone fixture in `tests/fixtures/hot-reload/` pins GPUI Pre 0.3.11 and
+Dioxus 0.7.10. Its README provides parser tests and native builder, original macro
+and alias comparisons. It is separate from the demo's verified dependency set.
+The existing [build/restart workflow](../performance/#measure-development-reloads)
+can also reload edits by restarting the process, which resets application state.
+
 ### Events Do Not Fire
 
 Check the handler signature expected by the GPUI method you are calling. For repeated stateful event targets, ensure the element has a `key` or explicit `id`.

@@ -1,0 +1,35 @@
+[package]
+name = "gpui-rsx-hot-reload-fixture"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[features]
+default = []
+native = ["dep:env_logger", "dep:gpui", "dep:gpui-platform", "dep:gpui-rsx"]
+hotreload = ["native", "gpui/hot-reload"]
+builder = []
+markup = []
+
+[dependencies]
+env_logger = { version = "0.11", optional = true }
+gpui = { package = "gpui-pre", version = "=0.3.11", optional = true }
+gpui-platform = { package = "gpui-pre-platform", version = "=0.3.11", features = ["font-kit"], optional = true }
+gpui-rsx = { path = "../../..", optional = true }
+
+[dev-dependencies]
+dioxus-rsx = "=0.7.10"
+dioxus-rsx-hotreload = "=0.7.10"
+syn = { version = "2", features = ["full"] }
+
+[[bin]]
+name = "hot-reload"
+path = "src/main.rs"
+required-features = ["native"]
+
+[[bin]]
+name = "live-hot-reload"
+path = "src/live.rs"
+required-features = ["native"]
+
+[workspace]

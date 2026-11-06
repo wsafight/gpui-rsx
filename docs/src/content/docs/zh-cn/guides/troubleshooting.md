@@ -349,6 +349,40 @@ fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl Into
 }
 ```
 
+### `dx serve --hot-patch` 没有响应 RSX 修改
+
+Dioxus CLI 0.7.10 根据宏路径的最后一段识别 `rsx!` 和 `render!`，因此
+`gpui_rsx::rsx!` 也会被识别为 Dioxus 模板。它的模板解析器不接受 GPUI-RSX
+的 HTML 风格语法，而 CLI 在解析失败后直接跳过，没有回退到 Rust 编译。
+如果只修改这个宏的内容，GPUI 的 Subsecond 集成就收不到 Rust 补丁。
+
+可以通过本地别名，让修改进入 Rust 编译路径：
+
+```rust
+use gpui::prelude::*;
+use gpui_rsx::rsx as gpui_view;
+
+fn content() -> impl gpui::IntoElement {
+    gpui_view! { <div>{"修改这段文字"}</div> }
+}
+```
+
+修改 import 和调用位置后，重新启动 `dx serve`。保持热更新开启：CLI 0.7.10
+的 `--hot-reload false` 会关闭文件变更处理，也就不会自动生成 Rust 补丁。
+别名保留原宏的 class 检查模式。默认 `rsx!` 使用宽松模式；需要严格检查时，
+可以改为 `use gpui_rsx::rsx_strict as gpui_view;`。
+
+别名解决的是变更检测。应用补丁还需要使用支持 Subsecond 的 GPUI 版本，
+并在应用中定义转发到 `gpui/hot-reload` 的 feature，通过
+`dx serve --hot-patch --hot-reload true --features hotreload` 启用。先检查 `dx --version`，
+再区分“没有触发编译”和“补丁已生成但窗口没有更新”，这属于两个不同阶段。
+
+独立夹具 `tests/fixtures/hot-reload/` 固定使用 GPUI Pre 0.3.11 和
+Dioxus 0.7.10，其 README 提供解析器测试以及原生 builder、原始宏和别名
+的对照步骤。它与 demo 的已验证依赖组合分开维护。
+也可以使用现有的[构建并重启流程](../performance/#测量开发重载)，
+它通过重启进程应用修改，每次重启都会重置应用状态。
+
 ### 事件没有触发
 
 检查 handler 签名是否符合对应 GPUI 方法要求。重复的有状态事件目标还需要 `key` 或显式 `id`。
