@@ -1,9 +1,9 @@
 # GPUI-RSX Demos
 
-The demos use GPUI Kit 0.8.1 and its pinned `gpui-pre 0.3.10` snapshot:
+The demos use GPUI Kit 0.9.0 and its pinned `gpui-pre 0.3.11` snapshot:
 
 ```toml
-gpui = { package = "gpui-kit", version = "=0.8.1" }
+gpui = { package = "gpui-kit", version = "=0.9.0" }
 gpui-rsx = { path = ".." }
 ```
 
@@ -58,6 +58,23 @@ widths, heights and maximum sizes to zero and ignores negative minimum sizes.
 progress, density controls and item mutations. `incident_console` combines
 filters, sorting, incident lifecycle transitions, a timeline and empty states;
 its model and UI modules live under `src/bin/incident_console/`.
+
+The console's `1k`, `10k` and `100k` controls load deterministic local datasets.
+Rows use GPUI's `uniform_list` with fixed 72px heights and stable incident IDs.
+Filtering and sorting produce a cached index snapshot; selecting a row or switching
+detail tabs does not rebuild the whole collection. To open a larger dataset directly:
+
+```sh
+RSX_DEMO_ROWS=100000 cargo run --manifest-path demo/Cargo.toml --bin incident_console --locked
+node scripts/measure-native.mjs
+```
+
+The measurement script opens and closes one real window per dataset. It enables
+the optional `native-profiler` feature, warms up 10 frames, then samples 60 frames
+of scrolling and selection. Reports and logs go to `target/native-baselines/`.
+Use `--release` for optimized builds. Keep each window visible; missing presentation
+samples fail validation. CPU draw and submission timings are not GPU completion,
+display latency, physical input latency or allocation measurements.
 
 `syntax_gallery` is an interactive reference for the RSX grammar. Toggle conditions,
 click the event example, reverse keyed rows, and inspect function/struct components,

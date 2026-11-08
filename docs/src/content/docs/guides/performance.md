@@ -409,3 +409,30 @@ showed `dynamic_class_simple` at about 16→14ns and `dynamic_class_complex` at 
 `gap-4` alone regressed from about 9→11ns and numeric fallback stayed near 13ns. These are
 small synthetic workloads, not a uniform speedup guarantee. Reproduce with
 `cargo bench --bench class_performance -- dynamic_`.
+
+## Measure the Native Queue
+
+The incident console uses the real Kit backend, a cached filtered/sorted index and
+GPUI's `uniform_list`. Its 72px rows are constructed only for the requested range.
+Stable incident IDs, not visible indices, identify interactive rows. The cache is
+invalidated by data or query changes; selection and detail tabs reuse it.
+
+```sh
+RSX_DEMO_ROWS=100000 cargo run --manifest-path demo/Cargo.toml --bin incident_console --locked
+node scripts/measure-native.mjs
+node scripts/measure-native.mjs --release
+```
+
+Run from the repository root with a visible desktop session and no other builds.
+The script enables `native-profiler`, opens one window at each of 1k/10k/100k rows,
+warms up 10 frames and samples 60 scrolling/selection frames. Reports under
+`target/native-baselines/` include CPU draw, dirty-to-present, presentation intervals,
+frame-callback intervals and row construction counts. Build mode, toolchain, CPU,
+revision and changed files are recorded. Missing presentation samples fail validation;
+failed reports and logs remain available. Debug and release results are not comparable.
+
+These timings do not measure GPU completion, display scan-out, physical input latency,
+allocations or memory. Initial data loading, filtering and sorting are outside this
+steady-state sample. These are not a before/after experiment or a cross-framework
+ranking. Native regression tests also enforce bounded row construction and retained
+selection after sorting at all three dataset sizes; CI does not run the visible probe.

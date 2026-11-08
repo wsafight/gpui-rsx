@@ -489,6 +489,21 @@ mod tests {
     }
 
     #[test]
+    fn aliased_macros_keep_completion_and_hover_while_rust_is_incomplete() {
+        let source = "use gpui_rsx::rsx_tw as gpui_view; fn render(){gpui_view!{<div class=\"gap-4 flex\"/>};}\nfn editing(";
+        let cursor = source.find("gap-4").unwrap();
+        let (hover, docs) = request_at("textDocument/hover", source, cursor + 2, json!({}));
+        assert!(hover["contents"]["value"].as_str().unwrap().contains("16"));
+        assert_eq!(
+            docs.values().next().unwrap().analysis.calls[0].name,
+            "rsx_tw"
+        );
+        let cursor = source.find("flex").unwrap();
+        let (completion, _) = request_at("textDocument/completion", source, cursor + 4, json!({}));
+        assert!(labels(&completion).contains(&"flex"));
+    }
+
+    #[test]
     fn hover_falls_back_to_the_macro_expansion_and_never_errors() {
         let source = "fn f(){rsx!{<div class=\"flex\"/>}}";
         // Between attributes, inside the macro: show the whole expansion.

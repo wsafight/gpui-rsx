@@ -51,15 +51,6 @@ impl SeverityFilter {
         }
     }
 
-    pub(crate) fn selected_class(self) -> &'static str {
-        match self {
-            Self::All => "px-10 py-6 rounded-md bg-zinc-700 text-white cursor-pointer",
-            Self::Critical => "px-10 py-6 rounded-md bg-rose-950 text-rose-300 cursor-pointer",
-            Self::High => "px-10 py-6 rounded-md bg-amber-950 text-amber-300 cursor-pointer",
-            Self::Medium => "px-10 py-6 rounded-md bg-sky-950 text-sky-300 cursor-pointer",
-        }
-    }
-
     pub(crate) fn matches(self, incident: &Incident) -> bool {
         match self {
             Self::All => true,

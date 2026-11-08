@@ -37,6 +37,19 @@ cargo rsx fmt src/main.rs --write
 
 `fmt` 只改写 RSX 宏体，保留外围 Rust；含注释的宏体保持原样。CI 使用 `--check`，应用变更使用 `--write`。
 
+开发版支持直接导入的宏别名，包括 `use gpui_rsx::{rsx as gpui_view, rsx_tw as tw};`。
+lint、格式化、预览与 LSP 补全、悬停和诊断保留原宏的严格模式和间距刻度。
+别名遵循块作用域，不会自动进入子模块。同名 `macro_rules!` 从定义处起遮蔽未限定的
+RSX 宏调用，lint、格式化与迁移不会处理这些自定义宏；显式的 `gpui_rsx::rsx!` 调用
+不受影响。暂不解析其他 crate 的重导出或
+`gpui_rsx` 本身的 crate 别名。编辑器的静态语法注入不解析任意导入别名。
+
+Rust 尚未写完时，工具仍处理完整、括号配对的 RSX 宏。lint 与 LSP 在受损位置报告
+`rsx/rust-syntax`。恢复次数有上限；未闭合的字符串或注释会遮住文件剩余部分，
+不会把其中的内容当作代码。格式化不改写外围未完成的 Rust。
+批量写入、CI 格式检查和间距迁移仍先拒绝无法分词的 Rust 源码，再写入任何文件；恢复主要用于
+编辑器请求和预览修改。
+
 开发版 JSON 诊断增加可选的 `code`，例如 `rsx/missing-loop-key`、
 `rsx/missing-required-attribute` 和 `rsx/missing-component-prop`。core 直接提供语义错误
 的位置和修复建议，修改提示文案不会改变修复行为；LSP 也保留相同代码。

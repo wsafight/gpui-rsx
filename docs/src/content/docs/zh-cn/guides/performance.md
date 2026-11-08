@@ -384,3 +384,26 @@ cargo bench -p gpui-rsx-core --bench expansion -- dynamic_class \
 16→14ns，复杂组合约 129→89ns；单独的 `gap-4` 从约 9ns 回退至 11ns，数值回退路径
 保持约 13ns。这是小型合成基准，不代表所有输入均提速。复现：
 `cargo bench --bench class_performance -- dynamic_`。
+
+## 测量原生队列
+
+事故控制台使用真实 Kit 后端、筛选排序索引缓存和 GPUI 的 `uniform_list`，
+只为请求范围构建 72px 高的行。交互身份使用事故 ID，而不是可见位置。
+数据或查询条件变化时更新缓存，选择行和切换详情页签则复用快照。
+
+```sh
+RSX_DEMO_ROWS=100000 cargo run --manifest-path demo/Cargo.toml --bin incident_console --locked
+node scripts/measure-native.mjs
+node scripts/measure-native.mjs --release
+```
+
+在仓库根目录执行，保持窗口可见，不与其他构建并行。脚本启用 `native-profiler`，
+分别打开 1千、1万、10万条数据的窗口，预热 10 帧，再采样 60 帧滚动和选择操作。
+`target/native-baselines/` 保存 CPU draw、失效到呈现、呈现间隔、帧回调间隔和行构建数量，
+同时记录构建模式、工具链、CPU、提交与变更文件。缺少呈现样本时验证失败；
+失败报告和日志也会保留。不要混用 debug 与 release 结果。
+
+这些数据不测量 GPU 完成、屏幕扫描、真实输入延迟、分配或内存。首次数据加载、筛选
+和排序也不在这段稳态采样内。它们不是优化前后对照
+或框架速度排名。原生回归还会在三个数据规模下检查行构建上限及排序后的选择状态；
+CI 只编译采样能力，不运行可见窗口采样。

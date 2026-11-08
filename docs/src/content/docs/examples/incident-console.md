@@ -9,7 +9,7 @@ The Incident Console models an operations queue: filter incidents, assign an own
 
 ## Run It
 
-The demo uses GPUI-RSX 0.11, GPUI Kit 0.8.1, and the repository's pinned Rust toolchain:
+The demo uses GPUI-RSX 0.11, GPUI Kit 0.9.0, and the repository's pinned Rust toolchain:
 
 ```bash
 cargo run --manifest-path demo/Cargo.toml --bin incident_console --locked
@@ -96,6 +96,17 @@ Repeated controls use ordinary Rust data, RSX loop syntax, and `key` for stable 
     </button>
 }}
 ```
+
+## Virtualized Queue
+
+The queue uses GPUI's `uniform_list` rather than building every result as a child.
+Its rows have a fixed 72px height. A cached snapshot stores sorted record indices,
+so selection and detail-tab changes do not repeat filtering, sorting or ID lookups.
+Use the `1k`, `10k` and `100k` controls to exercise larger local datasets, or start
+with `RSX_DEMO_ROWS=100000`. Native regression tests scroll to distant rows and
+verify that sorting preserves selection while fewer than 100 rows are constructed
+in the 1320×820 test viewport. See the [performance guide](/gpui-rsx/guides/performance/)
+for real-window measurement commands.
 
 ## State Transitions
 

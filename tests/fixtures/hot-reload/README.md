@@ -122,7 +122,8 @@ click counter retained their state. The CLI also reported `GPUI hot reload appli
 The `kit` feature adds GPUI Kit 0.9.0, which uses the same GPUI Pre 0.3.11
 snapshot as this fixture. Both binaries then initialize Kit, install its assets
 and mount its root with `gpui_kit::open_window`. This is a narrow hot-patch check;
-the generated API compatibility target remains the demo's locked Kit 0.8.1 set.
+the full generated API contract and native behavior are checked separately by the
+demo against its locked Kit 0.9.0 set.
 
 From the repository root:
 
@@ -138,12 +139,18 @@ reads this variable. The probe copies the fixture to a temporary directory, wait
 for timer state, edits only the aliased macro, checks revision/PID/timer/click
 observations, and stops its processes. It leaves the checked-in source untouched.
 Logs and `verification.json` are saved under `target/hot-reload-kit-probe/`.
-On failure it also retains the temporary reproduction source. It does not click
+The report also records source-write-to-render-log observation time and the polling
+interval. This includes compilation and transport but is not GPU presentation or
+display latency; one observation does not establish a p95 patch time.
+On failure it also retains the temporary reproduction source. A CLI build failure
+stops the probe immediately rather than waiting for the render timeout. It does not click
 the button or compare rendered pixels; use the visible test above to check those.
 
 On 2026-11-08, the Kit probe on macOS arm64 with Rust 1.99.1 and Dioxus CLI 0.7.10
-observed revision A → B at PID 79897, with timer state 3 → 3 and click state
-0 → 0. The observations come from native render callbacks. CI compiles the Kit
+observed revision A → B at PID 90488, with timer state 3 → 3 and click state
+0 → 0. Source-write-to-render-log observation took about 806 ms, including a 100 ms
+polling interval; this was one observation, not a percentile. The observations
+come from native render callbacks. CI compiles the Kit
 fixture and runs change-detection tests; it does not claim to run a desktop patch.
 
 A separate visible session that day changed the label and panel color inside

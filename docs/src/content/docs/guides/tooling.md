@@ -39,6 +39,23 @@ cargo rsx fmt src/main.rs --write
 
 `fmt` rewrites only RSX macro bodies and keeps surrounding Rust unchanged. Bodies containing comments remain unchanged. Use `--check` in CI and `--write` to apply edits.
 
+The development build recognizes direct macro imports, including grouped aliases such
+as `use gpui_rsx::{rsx as gpui_view, rsx_tw as tw};`. Lint, formatting, preview and
+LSP completion, hover and diagnostics retain the original macro's strictness and spacing scale. Aliases
+follow block scope and do not leak into child modules. A local `macro_rules!` with
+the same name shadows an unqualified RSX call from its definition onward; lint,
+formatting and migration leave those custom macro calls untouched. Explicit
+`gpui_rsx::rsx!` calls remain available. Re-exports through other
+crates and aliases of the `gpui_rsx` crate itself are not resolved. Static editor syntax
+injections do not resolve arbitrary import aliases.
+
+While Rust source is incomplete, balanced RSX macros remain available to tools.
+Lint and LSP also report `rsx/rust-syntax` at the damaged source. Recovery is bounded;
+an unfinished literal or comment hides the remainder of the file rather than exposing
+its contents as code. Formatting leaves the surrounding invalid Rust unchanged.
+Batch writes, CI formatting checks and spacing migration still reject Rust tokenization errors
+before writing any files; recovery is intended for editor requests and previewing edits.
+
 In the development build, JSON diagnostics may include an optional `code`, such as
 `rsx/missing-loop-key`, `rsx/missing-required-attribute`, or
 `rsx/missing-component-prop`. Core supplies semantic spans and fixes directly;

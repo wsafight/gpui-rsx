@@ -428,6 +428,10 @@ fn rewrite(opt: &Options, migrate: bool) -> Result<i32, String> {
     // Rewrite everything in memory first so an error never leaves the tree half-written.
     let mut rewritten = Vec::new();
     for (path, source) in sources(opt)? {
+        if opt.write || opt.check || migrate {
+            gpui_rsx_tools::format::check_rust_tokens(&source)
+                .map_err(|error| format!("{}: {error}", path.display()))?;
+        }
         if migrate && mode(opt, mode_path(&path))?.scale() == SpacingScale::Tailwind {
             return Err(format!(
                 "{} already uses Tailwind scale; refusing a second migration",

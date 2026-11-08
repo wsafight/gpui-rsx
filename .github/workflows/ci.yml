@@ -75,7 +75,7 @@ jobs:
         with:
           node-version: 22
       - run: node --test .github/scripts/*.test.cjs
-      - run: node --test scripts/dev-reload*.test.mjs scripts/test-hot-reload.test.mjs scripts/test-readme.test.mjs
+      - run: node --test scripts/dev-reload*.test.mjs scripts/test-hot-reload.test.mjs scripts/test-readme.test.mjs scripts/measure-native.test.mjs
       - run: bash -n scripts/check.sh
 
       - name: Check documentation dependency examples
@@ -201,11 +201,11 @@ jobs:
           key: ${{ runner.os }}-demo-cargo-build-target-${{ hashFiles('demo/Cargo.lock') }}
 
       - name: Check demo bins
-        run: cargo check --manifest-path demo/Cargo.toml --bins --locked
+        run: cargo check --manifest-path demo/Cargo.toml --bins --all-features --locked
 
       - name: Link and test demo targets
         run: |
-          cargo test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
+          cargo test --manifest-path demo/Cargo.toml --lib --bins --tests --all-features --locked
           cargo test --manifest-path demo/Cargo.toml --doc --locked
 
       - name: Check resolved demo backend

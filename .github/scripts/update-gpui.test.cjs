@@ -20,3 +20,12 @@ test('updates the exact Kit pin while preserving the gpui alias and other depend
   assert.throws(() => manifestVersion(source + source), /one exact/);
   assert.throws(() => manifestVersion(source.replace('=0.8.0', '0.8.0')), /one exact/);
 });
+
+test('normal and test-support dependencies upgrade together and reject mismatched pins', () => {
+  const source = '[dependencies]\ngpui = { package = "gpui-kit", version = "=0.8.1" }\n[dev-dependencies]\ngpui = { package = "gpui-kit", version = "=0.8.1", features = ["test-support"] }\n';
+  const updated = updateManifest(source, '0.9.0');
+  assert.equal(manifestVersion(updated), '0.9.0');
+  assert.equal([...updated.matchAll(/=0\.9\.0/g)].length, 2);
+  assert.match(updated, /test-support/);
+  assert.throws(() => manifestVersion(source.replace('=0.8.1', '=0.9.0')), /shared/);
+});
