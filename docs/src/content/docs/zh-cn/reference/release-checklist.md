@@ -45,6 +45,7 @@ cargo publish --dry-run --allow-dirty
 
 发布前还需要：
 
+- 对照上一版检查公开 Rust API，包括结构体字面量和穷举匹配；JSON 可选字段仍可能破坏 Rust 源码兼容。1.0 之前的这类变更应提升次版本，而不是补丁版本；
 - 用 `cargo xtask bump <version>` 统一设置版本：workspace manifest 与内部依赖要求、
   根目录、demo、Zed、fuzz 和测试 fixture 的 lockfile 中的 workspace 条目、VS Code 与 Zed
   插件 manifest、README 和文档中的安装片段，以及兼容性矩阵。CI 会运行 `cargo xtask bump --check`；

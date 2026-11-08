@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-08
+
+### Breaking Changes
+
+- Rust callers constructing tools `Diagnostic` values must supply the new `code`
+  field (`None` for uncategorized diagnostics). Existing JSON remains readable.
+  This source-level change requires a new minor version rather than 0.11.1.
+
 ### Added
 
 - Native Kit input/focus/Unicode regression coverage, 1k/10k/100k console datasets,
@@ -38,8 +46,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Select PR checks by changed paths, reuse one Playground WASM artifact for docs,
   and gate editor-analysis benchmarks alongside expansion benchmarks. Main,
   scheduled and manual runs retain the full checks.
-- Rust callers constructing tools `Diagnostic` values must supply the new `code`
-  field (`None` for uncategorized diagnostics). Existing JSON remains readable.
 
 ## [0.11.0] - 2026-11-05
 
@@ -984,7 +990,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/wsafight/gpui-rsx/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...v0.10.1
