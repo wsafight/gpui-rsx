@@ -4,6 +4,13 @@ use gpui_rsx_core::syntax::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use quote::ToTokens;
 use syn::spanned::Spanned;
 
+pub fn check_rust_tokens(source: &str) -> Result<(), String> {
+    source
+        .parse::<proc_macro2::TokenStream>()
+        .map(|_| ())
+        .map_err(|error| error.to_string())
+}
+
 /// Copies an embedded Rust expression from the source instead of re-printing its tokens,
 /// which would space out every token (`cx . listener (| this |`). Continuation lines are
 /// re-based onto `indent`, so formatting twice is a no-op.

@@ -1,6 +1,95 @@
 use crate::domain::{DetailTab, IncidentStatus, Scope, SeverityFilter};
 use crate::model::IncidentConsole;
 
+mod cache;
+mod virtualization;
+
+#[test]
+fn snapshots_are_reused_until_data_or_query_changes() {
+    use std::rc::Rc;
+    let mut console = IncidentConsole::default();
+    let initial = console.snapshot();
+    console.selected_id = 4202;
+    console.detail_tab = DetailTab::Timeline;
+    console.last_action = "Changed only the details".into();
+    assert!(Rc::ptr_eq(&initial, &console.snapshot()));
+    console.assign_selected();
+    let assigned = console.snapshot();
+    assert!(!Rc::ptr_eq(&initial, &assigned));
+    assert!(Rc::ptr_eq(&assigned, &console.snapshot()));
+    console.toggle_sort();
+    let sorted = console.snapshot();
+    assert!(!Rc::ptr_eq(&assigned, &sorted));
+    console.set_scope(Scope::All);
+    assert!(!Rc::ptr_eq(&sorted, &console.snapshot()));
+    console.simulate_signal();
+    let snapshot = console.snapshot();
+    for (id, index) in snapshot.visible_ids.iter().zip(&snapshot.visible_indices) {
+        assert_eq!(*id, console.incidents()[*index].id);
+    }
+}
+
+#[gpui::test]
+fn large_queues_render_only_visible_rows_and_keep_selection_after_sort(
+    cx: &mut gpui::TestAppContext,
+) {
+    use gpui::test::TestWindowExt;
+    use gpui::{AppContext, Bounds, ScrollStrategy, WindowBounds, WindowOptions, px, size};
+    use std::rc::Rc;
+    cx.update(gpui::init);
+    let (handle, view) = cx.update(|cx| {
+        gpui::open_window(
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(Bounds::new(
+                    Default::default(),
+                    size(px(1320.0), px(820.0)),
+                ))),
+                ..Default::default()
+            },
+            cx,
+            |_, cx| cx.new(|_| IncidentConsole::default()),
+        )
+        .unwrap()
+    });
+    for count in [1_000, 10_000, 100_000] {
+        let initial = view.update(cx, |view, cx| {
+            view.load_rows(count);
+            cx.notify();
+            view.snapshot()
+        });
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            assert_eq!(initial.visible_ids.len(), count);
+            let rendered = view.read(cx).rendered_rows.get();
+            assert!(
+                rendered > 0 && rendered < 100,
+                "{count} rows built {rendered} elements"
+            );
+            let target = count / 2;
+            let id = initial.visible_ids[target];
+            view.update(cx, |view, cx| {
+                view.queue_scroll
+                    .scroll_to_item(target, ScrollStrategy::Top);
+                cx.notify();
+            });
+            window.render_frame(cx);
+            assert!(view.read(cx).rendered_rows.get() < 100);
+            window.click(format!("incident-{id}"), cx);
+            assert_eq!(view.read(cx).selected_id, id);
+            assert!(Rc::ptr_eq(&initial, &view.read(cx).snapshot()));
+            view.update(cx, |view, cx| {
+                view.toggle_sort();
+                cx.notify();
+            });
+            window.render_frame(cx);
+            assert_eq!(view.read(cx).selected_id, id);
+            assert!(window.try_find(format!("incident-{id}")).is_some());
+            assert!(view.read(cx).rendered_rows.get() < 100);
+        })
+        .unwrap();
+    }
+}
+
 #[gpui::test]
 fn filtering_and_resolving_dispatch_through_the_console(cx: &mut gpui::TestAppContext) {
     use gpui::test::TestWindowExt;
@@ -54,9 +143,11 @@ fn filtering_and_resolving_dispatch_through_the_console(cx: &mut gpui::TestAppCo
         assert_ne!(view.selected_id, 4203);
     });
     view.update(cx, |view, cx| {
-        for incident in &mut view.incidents {
+        let mut incidents = view.incidents().to_vec();
+        for incident in &mut incidents {
             incident.status = IncidentStatus::Resolved;
         }
+        view.replace_incidents(incidents);
         view.clear_resolved();
         cx.notify();
     });
@@ -122,9 +213,11 @@ fn simulated_signals_respect_auto_triage() {
 #[test]
 fn an_empty_queue_can_recover_without_restarting() {
     let mut console = IncidentConsole::default();
-    for incident in &mut console.incidents {
+    let mut incidents = console.incidents().to_vec();
+    for incident in &mut incidents {
         incident.status = IncidentStatus::Resolved;
     }
+    console.replace_incidents(incidents);
 
     console.clear_resolved();
     let empty = console.snapshot();
@@ -166,7 +259,7 @@ fn resolving_or_assigning_an_incident_reconciles_the_selection() {
     console.reset_filters();
     console.advance_selected();
     console.advance_selected();
-    let visible = console.snapshot().visible_ids;
+    let visible = console.snapshot().visible_ids.clone();
     assert!(!visible.contains(&4201));
     assert!(visible.contains(&console.selected_id));
     assert_eq!(console.selected_incident().unwrap().id, console.selected_id);

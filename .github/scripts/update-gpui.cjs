@@ -25,7 +25,15 @@ const dependency = /^(gpui\s*=\s*\{\s*package\s*=\s*"gpui-kit",\s*version\s*=\s*
 
 function manifestVersion(source) {
   const matches = [...source.matchAll(dependency)];
-  if (matches.length !== 1) throw new Error('Expected one exact gpui-kit dependency aliased as gpui');
+  const sections = new Set();
+  for (const match of matches) {
+    const section = [...source.slice(0, match.index).matchAll(/^\[([^\]\n]+)\]\s*$/gm)].at(-1)?.[1] || '';
+    if (sections.has(section)) throw new Error('Expected one exact gpui-kit dependency per section');
+    sections.add(section);
+  }
+  if (!matches.length || new Set(matches.map(match => match[2])).size !== 1) {
+    throw new Error('Expected one exact shared gpui-kit version aliased as gpui');
+  }
   parts(matches[0][2]);
   return matches[0][2];
 }

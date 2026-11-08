@@ -437,15 +437,14 @@ fn formatter_skips_unparsable_and_multiline_literal_bodies() {
 
 #[test]
 fn document_analysis_reports_unparsable_rust_and_bodies() {
-    // A document that is not even a token stream becomes one error at the start.
     let analysis = analyze_rust_document("fn f( { rsx!{<div/>}; }", ClassMode::PERMISSIVE);
-    assert!(analysis.calls.is_empty());
+    assert_eq!(analysis.calls.len(), 1);
     assert!(analysis.literals.is_empty());
     assert_eq!(analysis.diagnostics.len(), 1);
     assert_eq!(analysis.diagnostics[0].severity, DiagnosticSeverity::Error);
     assert_eq!(
         (analysis.diagnostics[0].start, analysis.diagnostics[0].end),
-        (0, 1)
+        (4, 5)
     );
 
     // A macro whose body does not parse is located at the macro and yields no literals.

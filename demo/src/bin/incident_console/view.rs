@@ -9,15 +9,13 @@ use crate::sidebar;
 
 impl Render for IncidentConsole {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.rendered_rows.set(0);
+        #[cfg(feature = "native-profiler")]
+        crate::profile::schedule(self, _window, cx);
         let snapshot = self.snapshot();
-        let visible_incidents = snapshot
-            .visible_ids
-            .iter()
-            .filter_map(|id| self.incidents.iter().find(|incident| incident.id == *id))
-            .collect::<Vec<_>>();
         let selected = self.selected_incident();
         let sidebar = sidebar::render(self, &snapshot.stats, cx);
-        let queue = queue::render(self, &visible_incidents, cx);
+        let queue = queue::render(self, cx);
         let details = details::render(self, selected, cx);
 
         rsx! {
@@ -36,6 +34,23 @@ impl Render for IncidentConsole {
                             </span>
                         </div>
                         <div class="flex gap-8">
+                            {for count in [1_000usize, 10_000, 100_000] {
+                                <button
+                                    id={SharedString::from(format!("load-{count}"))}
+                                    test_support
+                                    key={count}
+                                    role={Role::Button}
+                                    focusable
+                                    ariaLabel={format!("Load {count} incidents")}
+                                    focusClass="border-demo-accent"
+                                    class="px-10 py-8 rounded-md bg-demo-surface text-demo-muted border border-demo-border cursor-pointer"
+                                    onClick={rsx_listener!(cx, notify, move |view, _, _, _| {
+                                        view.load_rows(count);
+                                    })}
+                                >
+                                    {format!("{}k", count / 1000)}
+                                </button>
+                            }}
                             <button
                                 class="px-12 py-8 rounded-md bg-demo-surface text-zinc-200 border border-zinc-700 cursor-pointer"
                                 onClick={rsx_listener!(cx, notify, |view, _, _window, _| {

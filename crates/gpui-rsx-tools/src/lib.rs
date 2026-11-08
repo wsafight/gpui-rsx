@@ -5,6 +5,7 @@ pub mod components;
 #[cfg(feature = "convert")]
 pub mod convert;
 mod diagnostics;
+mod discovery;
 pub mod format;
 mod incremental;
 mod reuse;
@@ -14,7 +15,7 @@ pub mod preview;
 use gpui_rsx_core::codegen::attribute::static_class_literals;
 use gpui_rsx_core::syntax::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use gpui_rsx_core::{ClassMode, SpacingScale};
-use proc_macro2::{Ident, Span, TokenStream, TokenTree};
+use proc_macro2::{Span, TokenStream};
 use serde::{Deserialize, Serialize};
 use syn::{Expr, Lit, spanned::Spanned};
 
@@ -74,10 +75,6 @@ pub struct RustAnalysis {
 
 pub const MACROS: &[&str] = gpui_rsx_core::MACRO_NAMES;
 
-fn is_macro_name(name: &Ident) -> bool {
-    MACROS.iter().any(|macro_name| name == macro_name)
-}
-
 /// Byte offset of `span` within `source`, which must be the string the span was parsed from.
 ///
 /// `Span::byte_range` resolves through proc-macro2's cached char-to-byte table, so this
@@ -94,47 +91,17 @@ pub fn byte_offset(source: &str, span: Span, end: bool) -> usize {
 /// Top-level RSX macro calls, in source order. Their ranges never overlap, so callers may
 /// rewrite each body independently.
 pub fn macro_calls(source: &str) -> Result<Vec<MacroCall>, String> {
-    scan_macro_calls(source, false)
+    discovery::calls(source, false)
 }
 
 /// Every RSX macro call, including calls nested inside another call's body (for example
 /// `rsx!` inside an `if` child). Outer calls come before the calls they contain.
 pub fn nested_macro_calls(source: &str) -> Result<Vec<MacroCall>, String> {
-    scan_macro_calls(source, true)
+    discovery::calls(source, true)
 }
 
-fn scan_macro_calls(source: &str, nested: bool) -> Result<Vec<MacroCall>, String> {
-    fn scan(tokens: TokenStream, source: &str, nested: bool, calls: &mut Vec<MacroCall>) {
-        let tokens: Vec<_> = tokens.into_iter().collect();
-        let mut i = 0;
-        while i < tokens.len() {
-            if let TokenTree::Ident(name) = &tokens[i]
-                && is_macro_name(name)
-                && let Some(TokenTree::Punct(bang)) = tokens.get(i + 1)
-                && bang.as_char() == '!'
-                && let Some(TokenTree::Group(group)) = tokens.get(i + 2)
-            {
-                calls.push(MacroCall {
-                    name: name.to_string(),
-                    start: byte_offset(source, group.span_open(), true),
-                    end: byte_offset(source, group.span_close(), false),
-                });
-                if nested {
-                    scan(group.stream(), source, nested, calls);
-                }
-                i += 3;
-                continue;
-            }
-            if let TokenTree::Group(group) = &tokens[i] {
-                scan(group.stream(), source, nested, calls);
-            }
-            i += 1;
-        }
-    }
-    let tokens = source.parse::<TokenStream>().map_err(|e| e.to_string())?;
-    let mut calls = Vec::new();
-    scan(tokens, source, nested, &mut calls);
-    Ok(calls)
+pub fn macro_invocations(source: &str) -> Result<Vec<MacroCall>, String> {
+    discovery::calls_with_spelling(source, true, true)
 }
 
 /// The innermost call whose body contains `offset`.
@@ -223,25 +190,12 @@ fn analyze_document(
     } else {
         components::collect(source)
     };
-    let calls = match cached.map_or_else(|| nested_macro_calls(source), Ok) {
-        Ok(calls) => calls,
-        Err(message) => {
-            return RustAnalysis {
-                diagnostics: vec![Diagnostic {
-                    start: 0,
-                    end: source.len().min(1),
-                    severity: DiagnosticSeverity::Error,
-                    code: None,
-                    message,
-                    suggestion: None,
-                }],
-                ..RustAnalysis::default()
-            };
-        }
-    };
+    let (calls, syntax_error) =
+        cached.map_or_else(|| discovery::scan(source, true), |calls| (calls, None));
     let mut analysis = RustAnalysis {
         calls,
         components,
+        diagnostics: syntax_error.into_iter().collect(),
         ..RustAnalysis::default()
     };
     let reusable = previous

@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { promisify } from 'node:util';
 
 export function frames(log) {
-  return [...log.matchAll(/GPUI_RSX_LIVE pid=(\d+) seconds=(\d+) clicks=(\d+) revision=([\w-]+)/g)]
+  return [...log.matchAll(/GPUI_RSX_LIVE pid=(\d+) seconds=(\d+) clicks=(\d+) revision=([\w-]+)(?=\r?\n)/g)]
     .map(([, pid, seconds, clicks, revision]) => ({ pid: Number(pid), seconds: Number(seconds), clicks: Number(clicks), revision }));
 }
 
@@ -62,6 +62,7 @@ export async function probe({
     let failure;
     child.on('error', error => { failure = error; });
     for (const stream of [child.stdout, child.stderr]) {
+      stream.setEncoding('utf8');
       stream.on('data', data => { log += data; output(data); });
     }
     const waitFor = async (predicate, timeout) => {
@@ -72,6 +73,9 @@ export async function probe({
         if (child.exitCode !== null || child.signalCode !== null) {
           throw new Error(`dx exited before verification (${child.exitCode ?? child.signalCode})`);
         }
+        if (/\bERROR\s+Build failed\b/.test(log.replace(/\u001b\[[0-9;]*m/g, ''))) {
+          throw new Error(`dx build failed before verification; logs retained in ${target}`);
+        }
         const result = frames(log).find(predicate);
         if (result) return result;
         await new Promise(resolve => setTimeout(resolve, pollInterval));
@@ -79,12 +83,16 @@ export async function probe({
       throw new Error(`No matching rendered frame within ${timeout / 1000}s; logs retained in ${target}`);
     };
     const before = await waitFor(frame => frame.revision === 'revision-a' && frame.seconds >= 3, initialTimeout);
+    const patchStarted = performance.now();
     await writeFile(sourcePath, source.replaceAll('revision-a', 'revision-b')
       .replace('REVISION A / 绿色', 'REVISION B / 补丁已应用')
       .replace('bg-emerald-600', 'bg-teal-600'));
     const after = await waitFor(frame => frame.revision === 'revision-b', patchTimeout);
     preserved(before, after);
-    const verification = { before, after, fixture: 'gpui-kit 0.9.0 / gpui-pre 0.3.11' };
+    const verification = { before, after, fixture: 'gpui-kit 0.9.0 / gpui-pre 0.3.11',
+      saveToRenderObservationMs: performance.now() - patchStarted,
+      observationPollMs: pollInterval,
+      latencyScope: 'Source write through a native render log observation, not GPU presentation or display latency' };
     await writeFile(path.join(target, 'verification.json'), JSON.stringify(verification, null, 2));
     output(`Kit patch verified: PID ${after.pid}, timer ${before.seconds} → ${after.seconds}, clicks ${before.clicks} → ${after.clicks}\n`);
     succeeded = true;

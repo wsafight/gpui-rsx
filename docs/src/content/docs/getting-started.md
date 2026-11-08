@@ -15,7 +15,7 @@ Add GPUI Kit, aliased as `gpui` for macro-generated paths, and GPUI-RSX:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.8.1" }
+gpui = { package = "gpui-kit", version = "=0.9.0" }
 gpui-rsx = "0.11.0"
 ```
 

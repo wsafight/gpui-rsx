@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Native Kit input/focus/Unicode regression coverage, 1k/10k/100k console datasets,
+  and an opt-in real-window profiler with frame histograms and bounded-row checks.
+- Tooling recognizes direct GPUI-RSX macro aliases and keeps balanced macros usable
+  in incomplete Rust, with localized `rsx/rust-syntax` diagnostics.
 - Structured core semantic diagnostics and optional diagnostic codes shared by CLI,
   LSP and WASM. Missing-loop-key fixes no longer depend on English error text.
 - `doctor --hot-reload --features FEATURES`, a Kit 0.9.0 hot-patch fixture and an
@@ -18,8 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Persistent bilingual docs/Playground browser tests, console click-through tests,
   a compiled README starter and isolated Cargo build measurements.
 
+### Fixed
+
+- Respect textual `macro_rules!` shadowing of RSX names and import aliases, so lint,
+  formatting and spacing migration leave custom macro calls untouched.
+- Decode split UTF-8 output correctly in native profiling and hot-reload probes.
+  Only accept complete render log lines when verifying hot patches.
+
 ### Changed
 
+- Upgrade the primary generated API target, demo and renamed-dependency fixture to
+  GPUI Kit 0.9.0 / GPUI Pre 0.3.11. Regenerate contracts and compatibility documentation.
+- Virtualize the incident queue, cache filtered/sorted snapshots and replace
+  per-row linear ID searches with direct record indices.
 - Select PR checks by changed paths, reuse one Playground WASM artifact for docs,
   and gate editor-analysis benchmarks alongside expansion benchmarks. Main,
   scheduled and manual runs retain the full checks.

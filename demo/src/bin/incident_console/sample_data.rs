@@ -10,6 +10,27 @@ pub(crate) struct Signal {
     pub(crate) error_rate: f32,
 }
 
+pub(crate) fn scaled_incidents(count: usize) -> Vec<Incident> {
+    let templates = incidents();
+    (0..count)
+        .map(|index| {
+            let template = &templates[index % templates.len()];
+            let mut incident = Incident::new(
+                10_000 + index as u32,
+                format!("{} · {}", template.title, index + 1),
+                template.service,
+                template.region,
+                template.severity,
+            )
+            .impact(template.customers, template.latency_ms, template.error_rate)
+            .status(template.status)
+            .age((index % 1440) as u32);
+            incident.owner = template.owner;
+            incident
+        })
+        .collect()
+}
+
 pub(crate) fn simulated_signal(round: usize) -> Signal {
     match round % 4 {
         0 => Signal {

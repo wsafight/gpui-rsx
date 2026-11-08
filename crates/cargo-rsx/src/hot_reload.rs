@@ -26,7 +26,7 @@ pub fn inspect(
     let collisions = sources
         .iter()
         .flat_map(|(path, source)| {
-            gpui_rsx_tools::macro_calls(source)
+            gpui_rsx_tools::macro_invocations(source)
                 .unwrap_or_default()
                 .into_iter()
                 .filter(|call| call.name == "rsx")
@@ -91,7 +91,7 @@ mod tests {
     fn qualified_macros_are_reported_but_aliases_are_not() {
         let sources = [(
             Path::new("src/main.rs"),
-            "fn main() { gpui_rsx::rsx! { <div/> }; gpui_view! { <div/> }; }".into(),
+            "use gpui_rsx::rsx as gpui_view; fn main() { gpui_rsx::rsx! { <div/> }; gpui_view! { <div/> }; }".into(),
         )];
         let report = inspect(&metadata(true), &sources, Some(("dx 0.7.10", true)));
         assert_eq!(
@@ -99,5 +99,18 @@ mod tests {
             1
         );
         assert_eq!(report["checks"][3]["status"], "unverified");
+    }
+
+    #[test]
+    fn a_macro_renamed_to_rsx_still_collides() {
+        let sources = [(
+            Path::new("src/main.rs"),
+            "use gpui_rsx::rsx_tw as rsx; fn render(){rsx!{<div/>};}".into(),
+        )];
+        let report = inspect(&metadata(true), &sources, Some(("dx 0.7.10", true)));
+        assert_eq!(
+            report["templateNameCollisions"].as_array().unwrap().len(),
+            1
+        );
     }
 }

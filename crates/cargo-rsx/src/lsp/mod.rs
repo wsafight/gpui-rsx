@@ -373,7 +373,7 @@ mod tests {
         let uri = "file:///tmp/codes.rs";
         // Not a token stream, so formatting cannot run; that is a null result, not an error.
         server.run(
-            json!({"method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":"fn f( { rsx!{<div/>}; }"}}}),
+            json!({"method":"textDocument/didOpen","params":{"textDocument":{"uri":uri,"version":1,"text":"fn f( {"}}}),
         );
         server.run(json!({"id":2,"method":"textDocument/formatting","params":{"textDocument":{"uri":uri}}}));
         let response = server.output();

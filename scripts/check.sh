@@ -7,7 +7,7 @@ Usage: scripts/check.sh [--proxy] [--skip-demo] [--release] [--skip-docs] [--ski
 
 Runs the standard local validation suite:
   cargo fmt --all -- --check
-  node --test .github/scripts/*.test.cjs scripts/dev-reload*.test.mjs scripts/test-hot-reload.test.mjs scripts/test-readme.test.mjs
+  node --test .github/scripts/*.test.cjs scripts/dev-reload*.test.mjs scripts/test-hot-reload.test.mjs scripts/test-readme.test.mjs scripts/measure-native.test.mjs
   cargo xtask spec --check
   cargo xtask compat-matrix --check
   cargo xtask check-gpui
@@ -17,9 +17,9 @@ Runs the standard local validation suite:
   cargo test -p gpui-rsx-tools --no-default-features
   cargo clippy -p gpui-rsx-tools --all-targets --no-default-features -- -D warnings
   cargo clippy --workspace --all-targets --all-features -- -D warnings
-  cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
-  cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings
-  cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
+  cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --all-features --locked
+  cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --all-features --locked -- -D warnings
+  cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --all-features --locked
   cargo +1.98.1 test --manifest-path demo/Cargo.toml --doc --locked
   cargo +1.98.1 test --manifest-path tests/fixtures/gpui-renamed/Cargo.toml --target-dir demo/target
 
@@ -84,7 +84,7 @@ run() {
 }
 
 run cargo fmt --all -- --check
-run node --test .github/scripts/*.test.cjs scripts/dev-reload*.test.mjs scripts/test-hot-reload.test.mjs scripts/test-readme.test.mjs
+run node --test .github/scripts/*.test.cjs scripts/dev-reload*.test.mjs scripts/test-hot-reload.test.mjs scripts/test-readme.test.mjs scripts/measure-native.test.mjs
 run cargo xtask spec --check
 run cargo xtask compat-matrix --check
 run cargo xtask line-limit
@@ -100,9 +100,9 @@ if [[ "$skip_demo" -eq 0 ]]; then
     run cargo run --quiet -p cargo-rsx -- doctor --manifest-path demo/Cargo.toml --offline
     run cargo xtask gen-tables --check
     GPUI_API_SNAPSHOT_REQUIRED=1 run cargo test -p xtask --test gpui_api_snapshot
-    run cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --locked
-    run cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --locked -- -D warnings
-    run cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --locked
+    run cargo +1.98.1 check --manifest-path demo/Cargo.toml --bins --all-features --locked
+    run cargo +1.98.1 clippy --manifest-path demo/Cargo.toml --all-targets --all-features --locked -- -D warnings
+    run cargo +1.98.1 test --manifest-path demo/Cargo.toml --lib --bins --tests --all-features --locked
     run cargo +1.98.1 test --manifest-path demo/Cargo.toml --doc --locked
     run cargo +1.98.1 test --manifest-path tests/fixtures/gpui-renamed/Cargo.toml --target-dir demo/target
 fi

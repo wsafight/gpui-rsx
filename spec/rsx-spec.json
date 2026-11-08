@@ -17956,8 +17956,8 @@
     "<div class=\"w-[280px] h-1/2 gap-[14px]\" />",
     "<div><><span>{\"One\"}</span><span>{\"Two\"}</span></></div>"
   ],
-  "gpui_component_revision": "gpui-component@0.8.1",
-  "gpui_revision": "gpui-pre@0.3.10",
+  "gpui_component_revision": "gpui-component@0.9.0",
+  "gpui_revision": "gpui-pre@0.3.11",
   "listener_macro": {
     "forms": [
       "rsx_listener!(cx, handler)",

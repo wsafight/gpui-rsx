@@ -2,6 +2,18 @@
 use crate::{MacroCall, RustAnalysis, nested_macro_calls};
 
 pub(crate) fn calls(source: &str, old: &str, previous: &RustAnalysis) -> Option<Vec<MacroCall>> {
+    if source.contains("macro_rules")
+        || (source.contains("gpui_rsx")
+            && source
+                .split(|character: char| !character.is_alphanumeric() && character != '_')
+                .any(|word| word == "as"))
+        || previous
+            .diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.code.as_deref() == Some("rsx/rust-syntax"))
+    {
+        return None;
+    }
     let mut prefix = source
         .bytes()
         .zip(old.bytes())
@@ -92,6 +104,16 @@ mod tests {
         let reused = calls(changed, old, &analysis).unwrap();
         let full = nested_macro_calls(changed).unwrap();
         assert_eq!(reused, full);
+    }
+
+    #[test]
+    fn ordinary_imports_and_class_attributes_keep_the_fast_path() {
+        let old = "use gpui_rsx::rsx; fn render(){rsx!{<div class=\"flex\"/>};}";
+        let changed = old.replace("flex", "flex-col");
+        assert_eq!(
+            calls(&changed, old, &previous(old)).unwrap(),
+            nested_macro_calls(&changed).unwrap()
+        );
     }
 
     #[test]

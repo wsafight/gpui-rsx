@@ -501,6 +501,29 @@ fn lint_columns_count_characters_not_bytes() {
 }
 
 #[test]
+fn aliased_macros_are_checked_and_formatted_in_incomplete_documents() {
+    let source = "use gpui_rsx::rsx_strict as gpui_view; fn render(){gpui_view!{<div class=\"flex-colum\"/>};}\nfn editing(";
+    let (code, stdout, stderr) = run(&["lint", "-", "--json"], source);
+    assert_eq!(code, Some(1), "{stderr}");
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    let diagnostics = report["diagnostics"].as_array().unwrap();
+    assert!(
+        diagnostics
+            .iter()
+            .any(|entry| entry["diagnostic"]["suggestion"] == "flex-col")
+    );
+    assert!(
+        diagnostics
+            .iter()
+            .any(|entry| entry["diagnostic"]["code"] == "rsx/rust-syntax")
+    );
+    let (code, stdout, stderr) = run(&["fmt", "-"], source);
+    assert_eq!(code, Some(0), "{stderr}");
+    assert!(stdout.contains("<div class=\"flex-colum\" />"));
+    assert!(stdout.ends_with("fn editing("));
+}
+
+#[test]
 fn lint_text_output_and_exit_codes_follow_severity() {
     let (code, stdout, _) = run(
         &["rsx", "lint", "-"],

@@ -11,7 +11,7 @@ The demo uses:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.8.1" }
+gpui = { package = "gpui-kit", version = "=0.9.0" }
 gpui-rsx = { path = ".." }
 ```
 
