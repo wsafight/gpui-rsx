@@ -1,0 +1,27 @@
+name: Setup pinned CI tool
+description: Cache version-checked tools installed from npm or locked crates.io sources
+inputs:
+  tool:
+    description: bun, binaryen, wasm-pack, wasm-bindgen-cli or cargo-audit
+    required: true
+  version:
+    description: Exact package version
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+    - uses: actions/cache@v4
+      with:
+        path: ${{ runner.temp }}/rsx-ci-tools/${{ inputs.tool }}
+        key: ci-tool-v1-${{ runner.os }}-${{ runner.arch }}-${{ inputs.tool }}-${{ inputs.version }}
+    - shell: bash
+      env:
+        CI_TOOL: ${{ inputs.tool }}
+        CI_TOOL_VERSION: ${{ inputs.version }}
+        CI_TOOL_ROOT: ${{ runner.temp }}/rsx-ci-tools/${{ inputs.tool }}
+      run: |
+        bash scripts/install-ci-tool.sh "$CI_TOOL" "$CI_TOOL_VERSION" "$CI_TOOL_ROOT"
+        echo "$CI_TOOL_ROOT/bin" >> "$GITHUB_PATH"
