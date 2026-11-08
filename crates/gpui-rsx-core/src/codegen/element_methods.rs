@@ -36,14 +36,18 @@ impl ElementMethods {
     }
 
     pub(crate) fn finish(self, base: TokenStream) -> TokenStream {
-        self.fragments
-            .into_iter()
-            .fold(base, |expression, method| match method {
-                ElementMethod::Chain(tokens) => quote! { #expression #tokens },
-                ElementMethod::Inline { element, body } => quote! {{
-                    let #element = #expression;
-                    #body
-                }},
-            })
+        let mut expression = base;
+        for method in self.fragments {
+            match method {
+                ElementMethod::Chain(tokens) => expression.extend(tokens),
+                ElementMethod::Inline { element, body } => {
+                    expression = quote! {{
+                        let #element = #expression;
+                        #body
+                    }};
+                }
+            }
+        }
+        expression
     }
 }
