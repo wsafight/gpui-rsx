@@ -16,6 +16,7 @@
 
 use super::attribute::{AttrHints, generate_attr_methods_with_mode, static_class_expr_needs_id};
 use super::class::{ClassMode, parse_class_string_with_mode};
+use super::element_methods::ElementMethods;
 use super::key::{make_auto_id, make_keyed_auto_id};
 use super::tables::{
     HTML_TAGS, is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
@@ -106,53 +107,6 @@ use quote::{ToTokens, quote};
 use std::cell::OnceCell;
 
 type CodegenResult = Result<TokenStream, CodegenErrors>;
-
-enum ElementMethod {
-    Chain(TokenStream),
-    Inline {
-        element: syn::Ident,
-        body: TokenStream,
-    },
-}
-
-/// Ordered method fragments. Inline blocks bind the current receiver without putting user
-/// expressions inside a generated closure, then continue the ordinary method chain.
-pub(crate) struct ElementMethods {
-    fragments: Vec<ElementMethod>,
-}
-
-impl ElementMethods {
-    fn with_capacity(capacity: usize) -> Self {
-        Self {
-            fragments: Vec::with_capacity(capacity),
-        }
-    }
-
-    pub(crate) fn push(&mut self, tokens: TokenStream) {
-        self.fragments.push(ElementMethod::Chain(tokens));
-    }
-
-    pub(crate) fn push_inline(&mut self, element: syn::Ident, body: TokenStream) {
-        self.fragments.push(ElementMethod::Inline { element, body });
-    }
-
-    pub(crate) fn extend(&mut self, tokens: impl IntoIterator<Item = TokenStream>) {
-        self.fragments
-            .extend(tokens.into_iter().map(ElementMethod::Chain));
-    }
-
-    fn finish(self, base: TokenStream) -> TokenStream {
-        self.fragments
-            .into_iter()
-            .fold(base, |expression, method| match method {
-                ElementMethod::Chain(tokens) => quote! { #expression #tokens },
-                ElementMethod::Inline { element, body } => quote! {{
-                    let #element = #expression;
-                    #body
-                }},
-            })
-    }
-}
 
 /// 生成 GPUI 代码（入口）
 ///

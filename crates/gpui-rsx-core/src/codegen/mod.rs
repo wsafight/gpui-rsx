@@ -19,6 +19,7 @@ pub mod attribute;
 mod auto_id;
 pub mod class;
 pub mod element;
+mod element_methods;
 mod format_class;
 mod key;
 pub mod runtime;

@@ -24,7 +24,7 @@ cd editors/vscode
 bun install --frozen-lockfile
 bun run check
 bun run package
-code --install-extension gpui-rsx-0.12.0.vsix
+code --install-extension gpui-rsx-0.12.1.vsix
 ```
 
 VSIX packaging requires Node.js 22 or newer. The extension still supports VS Code

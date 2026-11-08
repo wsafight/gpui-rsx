@@ -9,6 +9,23 @@
 
 ## [未发布]
 
+## [0.12.1] - 2026-11-08
+
+### 修复
+
+- 让 `class` 和 `visible` 表达式保持外层函数的控制流，保留 `?`、`return` 和 `.await`
+  语义、单次且按源码顺序求值以及条件分支惰性。文档所述 `onUnknownClass` 例外仍在对应
+  动态 `class` 前立即求值；生成标识符现在保留宏卫生性。
+- 避免组件 builder 的 typestate 泛型和内部 state 字段与用户的类型 / const 泛型及 props
+  冲突，包括归一化为相同 PascalCase 的名称。
+- 仅通过规范导入或完整 `gpui_rsx` 路径识别 RSX 宏，其他 crate 的同名导入和限定调用
+  保持不变；涉及绑定解析的编辑会触发完整增量扫描，不再复用错误的宏边界。
+- preview watch 通过 RAII 在成功渲染、解析失败和缓存命中提前返回后释放 span 内存。
+- 静态与动态 class 一致支持 0 到 100 的有限小数 opacity 百分比，并一致拒绝负数、
+  越界值、NaN 和无穷值。
+- 同步架构、属性、class、children 和宏文档，使其符合当前代码生成及静态 / 动态行为。
+- CI 固定工具改从 npm 或 crates.io 锁定包安装并校验缓存版本，避免下载 GitHub release 资产。
+
 ## [0.12.0] - 2026-11-08
 
 ### 破坏性变更
@@ -882,7 +899,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.12.0...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/wsafight/gpui-rsx/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/wsafight/gpui-rsx/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...v0.10.2

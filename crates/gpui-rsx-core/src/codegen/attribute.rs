@@ -12,7 +12,7 @@
 //! - 直接 push 到调用方 Vec，避免中间 Vec 分配
 
 use super::class::{ClassMode, parse_class_string_with_mode};
-use super::element::ElementMethods;
+use super::element_methods::ElementMethods;
 use super::runtime::generate_dynamic_class_code_with_mode;
 use super::tables::{is_stateful_class, lookup_attr_flag_method, lookup_attr_method_info};
 use crate::parser::RsxAttribute;

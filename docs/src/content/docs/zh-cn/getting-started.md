@@ -16,7 +16,7 @@ description: 安装 GPUI-RSX 并渲染第一个 GPUI 视图。
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.9.0" }
-gpui-rsx = "0.12.0"
+gpui-rsx = "0.12.1"
 ```
 
 Kit 固定配套的 `gpui-pre` 快照，并导出 GPUI、组件和资源。应用应提交 `Cargo.lock`，固定完整依赖图。

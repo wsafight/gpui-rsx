@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-08
+
+### Fixed
+
+- Keep `class` and `visible` expressions in the outer function's control flow, preserving
+  `?`, `return` and `.await`, single/source-ordered evaluation and lazy conditional branches.
+  The documented `onUnknownClass` exception still evaluates immediately before its dynamic
+  `class`; generated identifiers now retain macro hygiene.
+- Avoid component builder typestate generic and internal state-field collisions with user
+  type/const generics and props, including names that normalize to the same PascalCase form.
+- Recognize RSX macros only through canonical imports or exact `gpui_rsx` paths. Foreign
+  imports and qualified calls remain untouched, and binding-sensitive edits force full
+  incremental scans instead of reusing incorrect macro boundaries.
+- Release preview watch span memory through RAII after successful renders, parse failures
+  and cache-hit early returns.
+- Accept finite decimal opacity percentages from 0 through 100 in both static and dynamic
+  classes, consistently rejecting negative, out-of-range, NaN and infinite values.
+- Synchronize architecture, attribute, class, children and macro documentation with the
+  current code generation and static/dynamic behavior.
+- Install pinned CI tools from npm or locked crates.io packages with cached version checks,
+  avoiding GitHub release-asset downloads.
+
 ## [0.12.0] - 2026-11-08
 
 ### Breaking Changes
@@ -990,7 +1012,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/wsafight/gpui-rsx/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/wsafight/gpui-rsx/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/wsafight/gpui-rsx/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...v0.10.2
