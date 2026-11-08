@@ -65,3 +65,16 @@ node scripts/measure-builds.mjs
 重复构建并修改视图后重建。registry 依赖需事先缓存。每次运行创建独立目录，保留
 三个 timing HTML、日志和 JSON；不会删除用户的构建缓存。比较结果时应保持环境一致，
 也不要与其他构建并行运行。
+
+2026-11-08，在本机 macOS arm64、Rust 1.98.1 上运行一次，Kit 0.8.1 的 starter 得到：
+
+| 场景 | 耗时 |
+| --- | --- |
+| 空 target 首次构建 | 69.882 秒 |
+| 无改动再次构建 | 0.767 秒 |
+| 视图文字 Count 改为 Total 后重建 | 1.335 秒 |
+
+运行时没有其他 Cargo 构建，热更新演示窗口保持运行。依赖源码已缓存；这里的首次构建
+不含下载。测量使用本分支提交前的工作区，只运行一轮，没有与 main 做对照，不能据此
+声称构建提速。原始结果保存在本地 `target/build-baselines/measurement-DpMOEs/`，
+包含每阶段的 Cargo timing HTML、日志与 `results.json`；这些产物不提交到仓库。

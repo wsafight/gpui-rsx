@@ -25,7 +25,7 @@ const run = promisify(execFile);
 const results = await Promise.allSettled([
   run('rustc', ['--version'], { cwd: project }),
   run('git', ['rev-parse', 'HEAD'], { cwd: root }),
-  run('git', ['diff', '--name-only'], { cwd: root }),
+  run('git', ['status', '--porcelain', '--untracked-files=all'], { cwd: root }),
 ]);
 if (results.some(result => result.status !== 'fulfilled')) throw new Error('Cannot record build environment');
 const report = {
@@ -33,7 +33,7 @@ const report = {
   platform: `${process.platform}/${process.arch}`,
   rustc: results[0].value.stdout.trim(),
   revision: results[1].value.stdout.trim(),
-  modifiedFiles: results[2].value.stdout.trim().split('\n').filter(Boolean),
+  workingTree: results[2].value.stdout.split('\n').filter(Boolean),
   fixture: 'demo/src/bin/starter.rs, demo/Cargo.toml and demo/Cargo.lock; no project rsx.toml',
   command: 'cargo build --locked --offline --timings',
   target,
