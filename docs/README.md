@@ -14,6 +14,8 @@ The site uses the `/gpui-rsx/` base path. Open the URL reported by Astro with th
 
 The playground build needs Rust 1.98.1, the `wasm32-unknown-unknown` target, and `wasm-pack`. Generated files in `public/playground/pkg/` are ignored by Git. Rebuild them after changing the Rust parser, tools, or WASM crate.
 
+CI pins and caches Bun 1.4.4, wasm-pack 0.15.1, wasm-bindgen-cli 0.2.130 and Binaryen 130.0.0. Bun and the Binaryen JavaScript CLI come from npm; Rust tools are built from locked crates.io packages. This avoids GitHub release-asset downloads while keeping `wasm-opt` enabled. Cached tools are version-checked before use. The same installer pins cargo-audit 0.22.2 for security checks.
+
 Before submitting changes:
 
 ```sh

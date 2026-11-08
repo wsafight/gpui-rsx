@@ -325,9 +325,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: taiki-e/install-action@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: ./.github/actions/setup-ci-tool
         with:
           tool: cargo-audit
+          version: 0.22.2
 
       - name: Audit Rust lockfiles
         run: |
@@ -336,9 +338,10 @@ jobs:
           cargo audit --file editors/zed/Cargo.lock
           cargo audit --file fuzz/Cargo.lock
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: ./.github/actions/setup-ci-tool
         with:
-          bun-version: 1.4.4
+          tool: bun
+          version: 1.4.4
 
       - name: Audit documentation and VS Code dependencies
         run: |
@@ -491,9 +494,10 @@ jobs:
           components: rustfmt
           targets: wasm32-wasip1
       - uses: Swatinem/rust-cache@v2
-      - uses: oven-sh/setup-bun@v2
+      - uses: ./.github/actions/setup-ci-tool
         with:
-          bun-version: 1.4.4
+          tool: bun
+          version: 1.4.4
       - name: Build VS Code extension
         run: |
           bun install --cwd editors/vscode --frozen-lockfile
@@ -527,12 +531,18 @@ jobs:
           toolchain: 1.98.1
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
+      - uses: ./.github/actions/setup-ci-tool
         with:
           tool: wasm-pack
-      - uses: actions/setup-node@v4
+          version: 0.15.1
+      - uses: ./.github/actions/setup-ci-tool
         with:
-          node-version: 22
+          tool: wasm-bindgen-cli
+          version: 0.2.130
+      - uses: ./.github/actions/setup-ci-tool
+        with:
+          tool: binaryen
+          version: 130.0.0
       - run: scripts/build-playground.sh
       - run: node scripts/test-playground.mjs
       - uses: actions/upload-artifact@v4
