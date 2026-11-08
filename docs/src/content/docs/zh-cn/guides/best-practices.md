@@ -1,11 +1,13 @@
 ---
 title: 最佳实践
-description: 编写可维护、类型安全且高效的 GPUI-RSX 视图的实用模式。
+description: 组织视图、明确状态更新，并为 class 和元素身份选择合适的写法。
 ---
+
+当视图变长时，可以从下面几种写法开始整理。[事故响应控制台](/gpui-rsx/zh-cn/examples/incident-console/)展示了这些做法如何用于一个可运行的应用。
 
 ## 按工作流组织视图
 
-当一个 render block 不再容易扫读时，把可复用 UI 提取到方法或小 builder 中：
+当 render 方法不再容易读懂时，把可复用的界面提取到方法或小型 builder 中：
 
 ```rust
 impl MyView {

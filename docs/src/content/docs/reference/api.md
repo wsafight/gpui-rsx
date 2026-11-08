@@ -3,6 +3,8 @@ title: API Reference
 description: Compact reference for GPUI-RSX macros, tags, attributes, and generated mappings.
 ---
 
+Use this page to look up macro behavior and attribute mappings. For complete examples, see the [syntax reference](/gpui-rsx/usage/syntax/) and [runnable demos](/gpui-rsx/examples/demos/).
+
 ## Macros
 
 ```rust

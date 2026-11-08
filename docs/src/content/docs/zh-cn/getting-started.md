@@ -3,7 +3,7 @@ title: 快速开始
 description: 安装 GPUI-RSX 并渲染第一个 GPUI 视图。
 ---
 
-GPUI-RSX 是一个用于编写 GPUI 视图的过程宏。静态标记会在编译期展开为普通 GPUI builder 调用，因此最终 UI 仍是常规 Rust 代码。
+用 RSX 标签和 Rust 表达式编写 GPUI 视图，宏会在编译期将静态标记展开为 GPUI builder 调用。本页从依赖配置开始，带你打开第一个窗口。
 
 :::note[GPUI 元素与 HTML-like 名称]
 `button`、`input` 等名称是 GPUI `div()` 的别名，不提供 HTML 输入和表单行为。使用组件库控件时，请显式指定构造方式，例如 `<Button base={Button::new("save")} label={"Save"} />`；导入和构造规则见[组件](/gpui-rsx/zh-cn/usage/syntax/#组件)。
@@ -37,7 +37,7 @@ struct HelloView;
 impl Render for HelloView {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
-            <div class="flex flex-col gap-3 p-4">
+            <div class="size-full flex flex-col gap-[12px] p-[24px]">
                 <h1 class="text-xl font-bold">{"Hello GPUI-RSX"}</h1>
                 <p class="text-gray-600">{"This markup expands to GPUI builder calls."}</p>
             </div>
@@ -65,6 +65,8 @@ cargo run
 ```
 
 GPUI 需要对应平台的原生构建依赖。请参考[兼容性矩阵](/gpui-rsx/zh-cn/compatibility/)对齐 GPUI Kit、Rust 和组件版本。
+
+想先试用现成应用，可以从[可运行示例](/gpui-rsx/zh-cn/examples/demos/)选择：`counter` 适合了解事件，`component` 适合查看原生控件。
 
 ## 第一个元素
 

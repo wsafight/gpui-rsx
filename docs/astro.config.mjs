@@ -122,6 +122,11 @@ export default defineConfig({
           },
           items: [
             {
+              label: 'Runnable Demos',
+              translations: { 'zh-CN': '可运行示例' },
+              slug: 'examples/demos',
+            },
+            {
               label: 'Incident Console',
               translations: {
                 'zh-CN': '事故响应控制台',

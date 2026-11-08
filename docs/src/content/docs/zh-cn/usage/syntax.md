@@ -3,7 +3,7 @@ title: 语法参考
 description: 元素、属性、子节点、Fragment、条件渲染和特殊 GPUI 标签。
 ---
 
-本页说明 RSX 语法。Class 工具类范围见 [Class 处理](/gpui-rsx/zh-cn/usage/class/)，生成 ID 的规则见 [ID 与 Key](/gpui-rsx/zh-cn/usage/ids/)。
+本页可查阅元素、属性、Rust 表达式、循环和组件的写法。想直接试用，可以运行[示例索引](/gpui-rsx/zh-cn/examples/demos/)中的 `syntax_gallery`。工具类支持范围见 [Class 处理](/gpui-rsx/zh-cn/usage/class/)，元素身份规则见 [ID 与 Key](/gpui-rsx/zh-cn/usage/ids/)。
 
 ## 元素
 

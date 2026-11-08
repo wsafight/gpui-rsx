@@ -1,7 +1,7 @@
 mod common;
 
-use gpui::component::Sizable as _;
 use gpui::component::ActiveTheme as _;
+use gpui::component::Sizable as _;
 use gpui::component::StyledExt as _;
 use gpui::component::button::{Button, ButtonVariants as _};
 use gpui::component::input::{Input, InputState};
@@ -13,11 +13,15 @@ use gpui::*;
 use gpui_rsx::{component, rsx};
 
 #[component]
-fn StatusBadge(label: SharedString, #[prop(default)] highlighted: bool) -> impl IntoElement {
+fn StatusBadge(
+    label: SharedString,
+    #[prop(default)] highlighted: bool,
+    #[context] cx: &mut App,
+) -> impl IntoElement {
     rsx! {
         <span
-            class="px-3 py-1 rounded-full text-sm bg-zinc-800 text-zinc-300"
-            whenClass={(highlighted, "bg-blue-600 text-white")}
+            class="px-[10px] py-[5px] rounded-md text-sm bg-muted text-muted-foreground"
+            whenClass={(highlighted, "bg-primary text-primary-foreground")}
         >
             {label}
         </span>
@@ -31,14 +35,17 @@ fn StatusCard(
     #[context] cx: &mut App,
 ) -> impl IntoElement {
     rsx! {
-        <section class="flex flex-col gap-3 p-4 rounded-lg border border-zinc-700" textColor={cx.theme().foreground}>
+        <section class="flex flex-col gap-[16px] p-[20px] rounded-lg border border-border" textColor={cx.theme().foreground}>
             <h2 class="text-lg font-semibold">{title}</h2>
-            <div class="flex gap-2">{...children}</div>
+            <div class="flex flex-wrap gap-[8px]">{...children}</div>
         </section>
     }
 }
 
-struct ComponentView;
+#[derive(Default)]
+struct ComponentView {
+    input: Option<Entity<InputState>>,
+}
 
 #[allow(dead_code)]
 fn stateful_input_contract(window: &mut Window, cx: &mut App) -> impl IntoElement {
@@ -53,15 +60,18 @@ fn facade_reexport_contract() -> impl IntoElement {
 }
 
 impl Render for ComponentView {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let input = self
+            .input
+            .get_or_insert_with(|| cx.new(|cx| InputState::new(window, cx)));
         rsx! {
-            <div class="size-full flex flex-col gap-4 p-6 bg-zinc-950">
-                <header class="flex flex-col gap-2">
-                    <h1 class="text-3xl font-bold text-white">
+            <div class="size-full flex flex-col gap-[24px] p-[32px] bg-background text-foreground overflow-scroll">
+                <header class="flex flex-col gap-[8px]">
+                    <h1 class="text-2xl font-semibold">
                         {"gpui-component"}
                     </h1>
-                    <p class="text-sm text-zinc-400">
-                        {"External component builders composed through RSX base constructors."}
+                    <p class="text-sm text-muted-foreground">
+                        {"Native controls composed with RSX. Type in the input or open the popover."}
                     </p>
                 </header>
 
@@ -72,13 +82,15 @@ impl Render for ComponentView {
                     </>
                 </StatusCard>
 
-                <section class="flex flex-col gap-3 p-4 rounded-lg bg-zinc-900 border border-zinc-700">
+                <section class="flex flex-col gap-[20px] p-[20px] rounded-lg border border-border">
                     <Label
                         base={Label::new("Component label").secondary("rendered by gpui-component")}
                         class="text-sm"
                     />
 
-                    <div class="flex gap-3">
+                    <Input base={Input::new(&*input)} />
+
+                    <div class="flex flex-wrap gap-[12px]">
                         <Button
                             base={Button::new("component-primary")}
                             label={"Primary"}
@@ -118,5 +130,8 @@ impl Render for ComponentView {
 }
 
 fn main() {
-    common::run(|_| WindowOptions::default(), |_| ComponentView);
+    common::run(
+        |cx| common::window(cx, "Components · GPUI-RSX", 800.0, 680.0),
+        |_| ComponentView::default(),
+    );
 }

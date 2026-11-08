@@ -4,6 +4,21 @@ description: 从手写 GPUI builder 链迁移，升级工具 API，并对齐 GPU
 ---
 
 
+先查看当前版本对应的升级说明。后文另有从 Zed Git 切换依赖、将 builder 链改写为 RSX 的步骤。
+
+## 从 0.10 升级到 0.11
+
+已有标记可以继续使用。主要新增负间距、自定义 GPUI 路径和可选的状态更新辅助宏。
+
+- `-mt-4`、`-ml-[8px]` 等负值 class 现在支持静态和动态写法。默认数值间距仍按像素解释。GPUI 会将负宽高与负最大尺寸限制为零，并忽略负最小尺寸；静态使用这些尺寸 class 时会给出警告。
+- 如果 GPUI 依赖使用其他 crate 名称，在 `rsx.toml` 中设置 `[options] gpui-path = "your_alias"`。组件、ID、listener/update 宏和默认共享 runtime 都会使用这个路径。demo 仍将 Kit 命名为 `gpui`。
+- `rsx_listener!(cx, handler)` 保留原生回调签名，由 handler 负责通知；`rsx_listener!(cx, notify, handler)` 则在 handler 正常返回后通知。使用 `notify` 时，删除对应的手动 `cx.notify()`。
+- `rsx_update!(view, cx, update)` 执行同步更新，并在正常返回后通知。与 listener 搭配时，选择由 handler 负责通知的形式，避免重复通知。
+
+[计数器示例](/gpui-rsx/zh-cn/examples/demos/)展示了两种通知写法。[开发重载流程](/gpui-rsx/zh-cn/guides/performance/#测量开发重载)会重新构建并重启应用，每次重启都会重置状态。
+
+工具集成方还需独立处理相邻节点的诊断。静态负尺寸警告在严格模式下仍是警告。
+
 ## 从 0.9 升级到 0.10
 
 根 Fragment 中包含 `for` 循环或 `{...spread}` 时，现在

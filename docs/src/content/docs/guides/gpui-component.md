@@ -3,7 +3,7 @@ title: gpui-component
 description: Use GPUI-RSX with gpui-component builders without duplicate GPUI crate instances.
 ---
 
-`gpui-component` works with GPUI-RSX when its component builders and the application's GPUI dependencies resolve to the same GPUI source.
+Use Kit's native controls through `gpui::component`. The controls and your application must resolve to the same GPUI source. The `component` binary in the [demo index](/gpui-rsx/examples/demos/) includes a Button, Input, and Popover you can try.
 
 ## Dependency Shape
 

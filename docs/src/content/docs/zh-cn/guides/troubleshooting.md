@@ -3,6 +3,8 @@ title: 问题排查
 description: 使用 GPUI-RSX 时常见的解析、类型、运行时、样式和依赖问题。
 ---
 
+先查看 Rust 或 `cargo rsx lint` 报告的错误，再按下面的分类排查。遇到依赖问题时，先核对[已验证的依赖组合](/gpui-rsx/zh-cn/compatibility/)，再决定是否修改 lockfile。
+
 ## 解析错误
 
 ### 闭合标签不匹配

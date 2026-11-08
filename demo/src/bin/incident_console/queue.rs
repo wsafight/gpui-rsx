@@ -2,7 +2,7 @@ use gpui::prelude::*;
 use gpui::*;
 use gpui_rsx::{rsx, rsx_listener};
 
-use crate::domain::{DetailTab, Incident, SeverityFilter};
+use crate::domain::{DetailTab, Incident, Scope, SeverityFilter};
 use crate::model::IncidentConsole;
 
 pub(crate) fn render(
@@ -17,15 +17,16 @@ pub(crate) fn render(
                     {for filter in SeverityFilter::OPTIONS.iter() {
                         <button
                             key={filter.label()}
+                            hoverClass="bg-demo-raised"
                             class={if view.severity_filter == *filter {
                                 filter.selected_class()
                             } else {
-                                "px-10 py-6 rounded-md text-zinc-500 cursor-pointer"
+                                "px-10 py-6 rounded-md text-demo-muted cursor-pointer"
                             }}
                             onClick={rsx_listener!(cx, notify, {
                                 let filter = *filter;
                                 move |view, _, _window, _| {
-                                    view.severity_filter = filter;
+                                    view.set_severity_filter(filter);
                                 }
                             })}
                         >
@@ -33,17 +34,33 @@ pub(crate) fn render(
                         </button>
                     }}
                 </div>
-                <span class="text-xs text-zinc-500">
+                <span class="text-xs text-demo-muted">
                     {format!("{} results", incidents.len())}
                 </span>
             </div>
 
-            <div class="flex flex-col overflow-scroll">
+            <div class="flex-1 min-h-0 flex flex-col overflow-scroll">
                 {if incidents.is_empty() {
                     rsx! {
-                        <div class="flex-1 flex flex-col items-center justify-center gap-6 p-20 border border-zinc-800">
+                        <div class="flex-1 flex flex-col items-center justify-center gap-6 p-20 border border-demo-border">
                             <span class="text-base text-zinc-300">{"No matching incidents"}</span>
-                            <span class="text-sm text-zinc-600">{"Change the scope or severity filter."}</span>
+                            <span class="text-sm text-demo-muted">{"Change the scope or severity filter."}</span>
+                            <button
+                                class="px-12 py-8 rounded-md bg-demo-accent text-zinc-950 cursor-pointer"
+                                onClick={rsx_listener!(cx, notify, |view, _, _window, _| {
+                                    if view.scope != Scope::Active || view.severity_filter != SeverityFilter::All {
+                                        view.reset_filters();
+                                    } else {
+                                        view.simulate_signal();
+                                    }
+                                })}
+                            >
+                                {if view.scope != Scope::Active || view.severity_filter != SeverityFilter::All {
+                                    "Reset filters"
+                                } else {
+                                    "Simulate incident"
+                                }}
+                            </button>
                         </div>
                     }
                 } else {
@@ -52,10 +69,14 @@ pub(crate) fn render(
                             {for incident in incidents.iter() {
                                 <button
                                     key={incident.id}
+                                    role={Role::Button}
+                                    ariaLabel={incident.title.clone()}
+                                    ariaSelected={incident.id == view.selected_id}
+                                    hoverClass="bg-demo-surface"
                                     class={if incident.id == view.selected_id {
-                                        "w-full flex items-center gap-12 px-12 py-10 bg-zinc-800 border-l-2 border-cyan-400 cursor-pointer"
+                                        "w-full flex items-center gap-12 px-12 py-10 bg-demo-raised border-l-2 border-demo-accent cursor-pointer"
                                     } else {
-                                        "w-full flex items-center gap-12 px-12 py-10 border-b border-zinc-800 cursor-pointer"
+                                        "w-full flex items-center gap-12 px-12 py-10 border-b border-demo-border cursor-pointer"
                                     }}
                                     onClick={rsx_listener!(cx, notify, {
                                         let incident_id = incident.id;
@@ -68,10 +89,10 @@ pub(crate) fn render(
                                 >
                                     <div class={incident.severity.dot_class()} />
                                     <div class="flex-1 min-w-0 flex flex-col gap-4">
-                                        <span class="text-sm text-zinc-100 truncate">
+                                        <span class="text-sm text-demo-text truncate">
                                             {incident.title.clone()}
                                         </span>
-                                        <span class="text-xs text-zinc-500">
+                                        <span class="text-xs text-demo-muted">
                                             {format!("#{}  {}  {}", incident.id, incident.service, incident.region)}
                                         </span>
                                     </div>
@@ -79,7 +100,7 @@ pub(crate) fn render(
                                         <span class={incident.status.text_class()}>
                                             {incident.status.label()}
                                         </span>
-                                        <span class="text-xs text-zinc-500">{incident.age_label()}</span>
+                                        <span class="text-xs text-demo-muted">{incident.age_label()}</span>
                                     </div>
                                 </button>
                             }}

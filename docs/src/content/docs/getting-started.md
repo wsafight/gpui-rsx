@@ -3,7 +3,7 @@ title: Getting Started
 description: Install GPUI-RSX and render a first GPUI view.
 ---
 
-GPUI-RSX is a procedural macro for writing GPUI views with JSX-like syntax. Static markup expands to normal GPUI builder calls during compilation, so the generated UI remains ordinary Rust code.
+Write a GPUI view with RSX tags and Rust expressions. The macro expands static markup into GPUI builder calls at compile time. This guide sets up the dependencies and opens a first window.
 
 :::note[GPUI elements and HTML-like names]
 Names such as `button` and `input` are aliases for GPUI `div()`, with no HTML input or form behavior. For a component library's controls, use explicit constructors such as `<Button base={Button::new("save")} label={"Save"} />`; see [Components](/gpui-rsx/usage/syntax/#components) for imports and construction rules.
@@ -37,7 +37,7 @@ struct HelloView;
 impl Render for HelloView {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
-            <div class="flex flex-col gap-3 p-4">
+            <div class="size-full flex flex-col gap-[12px] p-[24px]">
                 <h1 class="text-xl font-bold">{"Hello GPUI-RSX"}</h1>
                 <p class="text-gray-600">{"This markup expands to GPUI builder calls."}</p>
             </div>
@@ -65,6 +65,8 @@ cargo run
 ```
 
 GPUI needs the native build dependencies for your platform. Use the [compatibility matrix](/gpui-rsx/compatibility/) to align GPUI Kit, Rust, and component versions.
+
+To try an existing application first, choose one from the [runnable demos](/gpui-rsx/examples/demos/). Start with `counter` for events or `component` for native controls.
 
 ## First Element
 

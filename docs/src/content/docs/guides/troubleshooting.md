@@ -3,6 +3,8 @@ title: Troubleshooting
 description: Common parser, type, runtime, styling, and dependency issues when using GPUI-RSX.
 ---
 
+Start with the error reported by Rust or `cargo rsx lint`, then find the matching section below. For dependency failures, check the [verified dependency set](/gpui-rsx/compatibility/) before changing the lockfile.
+
 ## Parser Errors
 
 ### Closing Tag Mismatch

@@ -3,6 +3,8 @@ title: API 参考
 description: GPUI-RSX 宏、标签、属性和生成映射的速查。
 ---
 
+本页用于查找宏的行为和属性映射。需要完整写法时，可查看[语法参考](/gpui-rsx/zh-cn/usage/syntax/)和[可运行示例](/gpui-rsx/zh-cn/examples/demos/)。
+
 ## 宏
 
 ```rust

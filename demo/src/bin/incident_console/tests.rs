@@ -1,4 +1,4 @@
-use crate::domain::{IncidentStatus, Scope};
+use crate::domain::{DetailTab, IncidentStatus, Scope, SeverityFilter};
 use crate::model::IncidentConsole;
 
 #[test]
@@ -11,11 +11,7 @@ fn snapshot_derives_metrics_filters_and_impact_order() {
     assert_eq!(snapshot.stats.critical, 1);
     assert_eq!(snapshot.stats.unassigned, 1);
     assert_eq!(snapshot.stats.affected_customers, 3060);
-    assert_eq!(
-        snapshot
-            .visible_ids,
-        [4201, 4202, 4204, 4203]
-    );
+    assert_eq!(snapshot.visible_ids, [4201, 4202, 4204, 4203]);
 
     console.scope = Scope::Unassigned;
     assert_eq!(console.snapshot().visible_ids[0], 4203);
@@ -73,4 +69,39 @@ fn an_empty_queue_can_recover_without_restarting() {
     let recovered = console.snapshot();
     assert_eq!(recovered.stats.active, 1);
     assert_eq!(console.selected_incident().unwrap().id, 4205);
+}
+
+#[test]
+fn filters_keep_the_selected_incident_in_the_visible_queue() {
+    let mut console = IncidentConsole::default();
+    console.detail_tab = DetailTab::Timeline;
+    console.set_scope(Scope::Unassigned);
+    assert_eq!(console.selected_id, 4203);
+    assert!(console.detail_tab == DetailTab::Overview);
+    assert_eq!(console.selected_incident().unwrap().id, 4203);
+
+    console.set_severity_filter(SeverityFilter::Critical);
+    assert!(console.snapshot().visible_ids.is_empty());
+    assert!(console.selected_incident().is_none());
+
+    console.reset_filters();
+    assert_eq!(console.selected_id, 4201);
+    assert_eq!(console.selected_incident().unwrap().id, 4201);
+}
+
+#[test]
+fn resolving_or_assigning_an_incident_reconciles_the_selection() {
+    let mut console = IncidentConsole::default();
+    console.set_scope(Scope::Unassigned);
+    console.assign_selected();
+    assert!(console.snapshot().visible_ids.is_empty());
+    assert!(console.selected_incident().is_none());
+
+    console.reset_filters();
+    console.advance_selected();
+    console.advance_selected();
+    let visible = console.snapshot().visible_ids;
+    assert!(!visible.contains(&4201));
+    assert!(visible.contains(&console.selected_id));
+    assert_eq!(console.selected_incident().unwrap().id, console.selected_id);
 }

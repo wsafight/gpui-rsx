@@ -3,7 +3,7 @@ title: Class 处理
 description: 静态和动态 class 处理、支持的工具类范围，以及性能建议。
 ---
 
-`class` 属性会把 Tailwind-like 工具类子集映射为 GPUI builder 方法。
+`class` 属性把一部分 Tailwind 风格的工具类映射为 GPUI builder 方法。固定样式优先写成静态字符串；依赖应用状态的样式再使用动态表达式。
 
 ```rust
 rsx! {

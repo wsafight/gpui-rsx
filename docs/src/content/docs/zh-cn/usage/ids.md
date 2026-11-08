@@ -3,7 +3,7 @@ title: ID 与 Key
 description: GPUI-RSX 如何生成 ID，以及循环中如何使用 key。
 ---
 
-GPUI-RSX 会在 GPUI API 需要元素身份时生成稳定 ID。
+GPUI API 需要元素身份时，GPUI-RSX 会根据源码位置生成 ID。循环中的有状态元素需要 `key`；如果身份要在源码编辑前后保持不变，请显式指定 `id`。
 
 大多数布局和样式调用不需要 ID。只有使用有状态 GPUI 方法时，宏才会注入 ID。
 
