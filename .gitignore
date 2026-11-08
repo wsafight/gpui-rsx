@@ -30,6 +30,8 @@ Thumbs.db
 
 # Generated distributable artifacts
 /docs/public/playground/pkg/
+/docs/test-results/
+/docs/playwright-report/
 /editors/vscode/node_modules/
 /editors/vscode/dist/
 /editors/vscode/*.vsix

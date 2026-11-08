@@ -290,6 +290,27 @@ For full compiler validation, use `cargo check`.
 
 ## Verify Performance-Sensitive Changes
 
+CI compares both expansion and editor-analysis benchmarks with the base revision
+on the same runner, using the same harness. Expansion retains a 10% regression
+limit; analysis starts at 20% to allow for runner noise. A failed check is repeated
+with fresh base and candidate measurements before failing the job. Reports are
+retained as artifacts. These are checks on sampled microbenchmarks, not promises
+about application build or rendering time.
+
+For a real native build, run this from the repository root with the demo's native
+dependencies installed and cached:
+
+```sh
+node scripts/measure-builds.mjs
+```
+
+It copies the compiled README starter and demo's locked dependency set to a fresh
+project under `target/build-baselines/`, then measures an empty-target build, an
+unchanged build and a text edit inside the view. Each phase retains a Cargo timing
+report and log beside `results.json`. It never cleans an existing build directory.
+Cold here means an empty target directory; registry sources stay cached. Run it on
+an idle machine and keep toolchain, profile and dependencies fixed when comparing.
+
 ### 0.9 development measurements
 
 On macOS ARM64 with Rust 1.99.1, short Criterion runs (10 samples, 1 second warmup

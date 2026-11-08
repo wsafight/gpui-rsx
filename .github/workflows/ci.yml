@@ -29,6 +29,9 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * 1'
 
 # A newer commit supersedes older work on the same branch. This keeps the
 # matrix from consuming runners after a fix has already been pushed.
@@ -41,6 +44,28 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  changes:
+    name: Select checks
+    runs-on: ubuntu-latest
+    outputs:
+      core: ${{ steps.paths.outputs.core }}
+      tooling: ${{ steps.paths.outputs.tooling }}
+      demo: ${{ steps.paths.outputs.demo }}
+      docs: ${{ steps.paths.outputs.docs }}
+      editor: ${{ steps.paths.outputs.editor }}
+      security: ${{ steps.paths.outputs.security }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - id: paths
+        env:
+          BASE_REV: ${{ github.event.pull_request.base.sha }}
+        run: node .github/scripts/ci-changes.cjs
+
   automation:
     name: Compatibility Automation
     runs-on: ubuntu-latest
@@ -50,7 +75,7 @@ jobs:
         with:
           node-version: 22
       - run: node --test .github/scripts/*.test.cjs
-      - run: node --test scripts/dev-reload*.test.mjs
+      - run: node --test scripts/dev-reload*.test.mjs scripts/test-hot-reload.test.mjs scripts/test-readme.test.mjs
       - run: bash -n scripts/check.sh
 
       - name: Check documentation dependency examples
@@ -61,6 +86,8 @@ jobs:
           fi
 
   msrv:
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
     name: Root MSRV
     runs-on: ubuntu-latest
     steps:
@@ -75,6 +102,8 @@ jobs:
         run: cargo check --lib
 
   tooling-msrv:
+    needs: changes
+    if: needs.changes.outputs.tooling == 'true'
     name: Tooling MSRV
     runs-on: ubuntu-latest
     steps:
@@ -89,6 +118,8 @@ jobs:
         run: cargo check --locked -p gpui-rsx-tools -p cargo-rsx
 
   test:
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tooling == 'true'
     name: Test Suite
     runs-on: ${{ matrix.os }}
     strategy:
@@ -130,6 +161,8 @@ jobs:
           cargo clippy -p gpui-rsx-tools --all-targets --no-default-features -- -D warnings
 
   demo:
+    needs: changes
+    if: needs.changes.outputs.demo == 'true'
     name: Demo GPUI Check
     runs-on: ${{ matrix.os }}
     strategy:
@@ -178,10 +211,17 @@ jobs:
       - name: Check resolved demo backend
         run: cargo run --quiet -p cargo-rsx -- doctor --manifest-path demo/Cargo.toml
 
+      - name: Check Kit hot-reload fixture
+        run: |
+          cargo test --manifest-path tests/fixtures/hot-reload/Cargo.toml --test change_detection --target-dir demo/target
+          cargo check --manifest-path tests/fixtures/hot-reload/Cargo.toml --features hotreload,kit --bins --target-dir demo/target
+
       - name: Test renamed GPUI dependency
         run: cargo test --manifest-path tests/fixtures/gpui-renamed/Cargo.toml --target-dir demo/target
 
   gpui-022:
+    needs: changes
+    if: needs.changes.outputs.core == 'true'
     name: GPUI 0.2.2 Feedback Regressions
     runs-on: macos-latest
     steps:
@@ -194,6 +234,8 @@ jobs:
         run: cargo test --manifest-path tests/fixtures/gpui-0.2.2/Cargo.toml
 
   fmt:
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tooling == 'true' || needs.changes.outputs.demo == 'true' || needs.changes.outputs.editor == 'true'
     name: Rustfmt
     runs-on: ubuntu-latest
     steps:
@@ -208,6 +250,8 @@ jobs:
         run: cargo fmt --all -- --check
 
   clippy:
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tooling == 'true'
     name: Clippy
     runs-on: ubuntu-latest
     steps:
@@ -240,6 +284,8 @@ jobs:
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   docs:
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tooling == 'true'
     name: Documentation
     runs-on: ubuntu-latest
     steps:
@@ -272,6 +318,8 @@ jobs:
           RUSTDOCFLAGS: -D warnings
 
   security_audit:
+    needs: changes
+    if: needs.changes.outputs.security == 'true'
     name: Security Audit
     runs-on: ubuntu-latest
     steps:
@@ -298,6 +346,8 @@ jobs:
           bun audit --cwd editors/vscode
 
   coverage:
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tooling == 'true'
     name: Code Coverage
     runs-on: ubuntu-latest
     steps:
@@ -340,6 +390,8 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
 
   gpui-api:
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.demo == 'true'
     name: Generated Outputs and GPUI API
     runs-on: ubuntu-latest
     env:
@@ -367,7 +419,20 @@ jobs:
         run: cargo xtask bump --check
 
   benchmarks:
-    name: Expansion Performance
+    needs: changes
+    if: needs.changes.outputs.core == 'true' || needs.changes.outputs.tooling == 'true'
+    name: ${{ matrix.name }}
+    strategy:
+      matrix:
+        include:
+          - name: Expansion Performance
+            crate: gpui-rsx-core
+            bench: expansion
+            threshold: '0.10'
+          - name: Analysis Performance
+            crate: gpui-rsx-tools
+            bench: analysis
+            threshold: '0.20'
     runs-on: ubuntu-latest
     env:
       CARGO_TARGET_DIR: ${{ github.workspace }}/target
@@ -383,37 +448,39 @@ jobs:
         id: baseline
         shell: bash
         run: |
-          if test -n "$BASE_REV" && git cat-file -e "$BASE_REV:crates/gpui-rsx-core/benches/expansion.rs" 2>/dev/null; then
+          if test -n "$BASE_REV" && git cat-file -e "$BASE_REV:crates/${{ matrix.crate }}/benches/${{ matrix.bench }}.rs" 2>/dev/null; then
             git worktree add --detach "$RUNNER_TEMP/rsx-bench-base" "$BASE_REV"
             # Compare product code with the same harness, including span cleanup.
-            cp crates/gpui-rsx-core/benches/expansion.rs "$RUNNER_TEMP/rsx-bench-base/crates/gpui-rsx-core/benches/expansion.rs"
-            cargo bench --locked --manifest-path "$RUNNER_TEMP/rsx-bench-base/Cargo.toml" -p gpui-rsx-core --bench expansion -- --save-baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+            cp crates/${{ matrix.crate }}/benches/${{ matrix.bench }}.rs "$RUNNER_TEMP/rsx-bench-base/crates/${{ matrix.crate }}/benches/${{ matrix.bench }}.rs"
+            cargo bench --locked --manifest-path "$RUNNER_TEMP/rsx-bench-base/Cargo.toml" -p ${{ matrix.crate }} --bench ${{ matrix.bench }} -- --save-baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
             echo 'comparable=true' >> "$GITHUB_OUTPUT"
           else
-            echo 'No expansion benchmark in the base revision; recording the initial baseline.'
+            echo 'No matching benchmark in the base revision; recording the initial baseline.'
             echo 'comparable=false' >> "$GITHUB_OUTPUT"
           fi
-      - name: Compare expansion costs
+      - name: Compare benchmark costs
         if: steps.baseline.outputs.comparable == 'true'
         run: |
-          cargo bench --locked -p gpui-rsx-core --bench expansion -- --baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
-          if ! cargo xtask bench-check --threshold 0.10; then
+          cargo bench --locked -p ${{ matrix.crate }} --bench ${{ matrix.bench }} -- --baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+          if ! cargo xtask bench-check --threshold ${{ matrix.threshold }}; then
             echo 'Confirming the regression with a fresh baseline and candidate measurement.'
-            cargo bench --locked --manifest-path "$RUNNER_TEMP/rsx-bench-base/Cargo.toml" -p gpui-rsx-core --bench expansion -- --save-baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
-            cargo bench --locked -p gpui-rsx-core --bench expansion -- --baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
-            cargo xtask bench-check --threshold 0.10
+            cargo bench --locked --manifest-path "$RUNNER_TEMP/rsx-bench-base/Cargo.toml" -p ${{ matrix.crate }} --bench ${{ matrix.bench }} -- --save-baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+            cargo bench --locked -p ${{ matrix.crate }} --bench ${{ matrix.bench }} -- --baseline base --sample-size 30 --warm-up-time 1 --measurement-time 2
+            cargo xtask bench-check --threshold ${{ matrix.threshold }}
           fi
       - name: Record initial baseline
         if: steps.baseline.outputs.comparable != 'true'
-        run: cargo bench --locked -p gpui-rsx-core --bench expansion -- --save-baseline initial --sample-size 30 --warm-up-time 1 --measurement-time 2
+        run: cargo bench --locked -p ${{ matrix.crate }} --bench ${{ matrix.bench }} -- --save-baseline initial --sample-size 30 --warm-up-time 1 --measurement-time 2
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: expansion-benchmarks
+          name: ${{ matrix.bench }}-benchmarks
           path: ${{ env.CRITERION_HOME }}
           retention-days: 7
 
   tooling:
+    needs: changes
+    if: needs.changes.outputs.editor == 'true' || needs.changes.outputs.tooling == 'true'
     name: Playground and Editor Packages
     runs-on: ubuntu-latest
     steps:
@@ -422,18 +489,11 @@ jobs:
         with:
           toolchain: 1.98.1
           components: rustfmt
-          targets: wasm32-unknown-unknown,wasm32-wasip1
+          targets: wasm32-wasip1
       - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.4
-      - name: Build the WASM playground
-        run: scripts/build-playground.sh
-      - name: Test browser WASM and worker protocol
-        run: node scripts/test-playground.mjs
       - name: Build VS Code extension
         run: |
           bun install --cwd editors/vscode --frozen-lockfile
@@ -454,3 +514,52 @@ jobs:
           path: |
             editors/vscode/*.vsix
             editors/zed/target/wasm32-wasip1/release/*.wasm
+
+  wasm:
+    name: Playground WASM
+    needs: changes
+    if: needs.changes.outputs.docs == 'true' || needs.changes.outputs.tooling == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: wasm-pack
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: scripts/build-playground.sh
+      - run: node scripts/test-playground.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: playground-wasm
+          path: docs/public/playground/pkg
+          retention-days: 7
+
+  site:
+    name: Docs
+    needs: [changes, wasm]
+    if: needs.changes.outputs.docs == 'true'
+    uses: ./.github/workflows/docs.yml
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    with:
+      deploy: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+
+  required:
+    name: Required Checks
+    if: always()
+    needs: [changes, automation, msrv, tooling-msrv, test, demo, gpui-022, fmt, clippy, docs, security_audit, coverage, gpui-api, benchmarks, wasm, site, tooling]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: node .github/scripts/ci-gate.cjs

@@ -26,6 +26,7 @@ mod listener;
 #[doc(hidden)]
 pub mod parser;
 mod runtime_config;
+mod semantic;
 pub mod style;
 pub mod theme;
 mod update;
@@ -36,14 +37,15 @@ pub use codegen::class::{
     suggest_class,
 };
 pub use codegen::element::{
-    generate_body_expansion_preview, generate_body_with_mode, generate_body_without_runtime,
-    generate_fragment_with_mode, generate_fragment_without_runtime,
+    generate_body_expansion_preview, generate_body_with_diagnostics, generate_body_with_mode,
+    generate_body_without_runtime, generate_fragment_with_mode, generate_fragment_without_runtime,
 };
 pub use codegen::runtime::generate_runtime_module;
 pub use codegen::tables::{GPUI_COMPONENT_REV, GPUI_SOURCE_REV};
 pub use component::{expand_component, expand_component_with_path};
 pub use listener::{expand_listener, expand_listener_with_path};
 pub use parser::{RsxAttribute, RsxBody, RsxElement, RsxElementName, RsxNode};
+pub use semantic::{BodyExpansion, SemanticDiagnostic, SemanticDiagnosticCode};
 pub use style::{StyleLength, StyleOperation, StyleValue};
 pub use theme::{Theme, ThemeBuilder, ThemeExplanation, ThemeToken, ThemeTokenKind, TokenValue};
 pub use update::expand_update_with_path;

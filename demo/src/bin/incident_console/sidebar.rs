@@ -29,6 +29,8 @@ pub(crate) fn render(
                     <span class="text-xs text-demo-muted">{"Incidents"}</span>
                     {for (scope, count) in scope_options.iter() {
                         <button
+                            id={SharedString::from(format!("scope-{}", scope.label()))}
+                            test_support
                             key={scope.label()}
                             class={if view.scope == *scope {
                                 "flex items-center justify-between px-10 py-8 rounded-md bg-zinc-700 text-white cursor-pointer"

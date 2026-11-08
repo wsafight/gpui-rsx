@@ -14,6 +14,18 @@ cargo rsx doctor --manifest-path demo/Cargo.toml
 
 The `demo/Cargo.toml` examples below run from the repository root. For your own app, use its manifest path. `doctor` checks the resolved Cargo graph, including aliases, Git dependencies, and published snapshots.
 
+The repository CLI also checks hot-patch readiness. Run the development build with
+the same Cargo features as the application:
+
+```sh
+cargo run -p cargo-rsx -- doctor --manifest-path tests/fixtures/hot-reload/Cargo.toml --features hotreload,kit --hot-reload --json
+```
+
+It checks the selected backend's `hot-reload` feature, whether `dx serve` supports
+`--hot-patch`, and macros named `rsx` that Dioxus CLI 0.7.10 may intercept. Set
+`RSX_DX` to select a separate CLI binary. The patch stage stays `unverified` until
+you observe a running application; see [hot-reload troubleshooting](/gpui-rsx/guides/troubleshooting/).
+
 ## Check and format
 
 ```sh
@@ -26,6 +38,12 @@ cargo rsx fmt src/main.rs --write
 `lint` follows workspace members and reads each package's `rsx.toml`. The spacing scale follows the macro: `rsx.toml` first, then the `tailwind-scale` feature of `gpui-rsx`; `--tailwind` forces the Tailwind scale. Dynamic class values are checked at runtime; the CLI reports that limitation as information.
 
 `fmt` rewrites only RSX macro bodies and keeps surrounding Rust unchanged. Bodies containing comments remain unchanged. Use `--check` in CI and `--write` to apply edits.
+
+In the development build, JSON diagnostics may include an optional `code`, such as
+`rsx/missing-loop-key`, `rsx/missing-required-attribute`, or
+`rsx/missing-component-prop`. Core supplies semantic spans and fixes directly;
+messages can change without changing the fix. LSP diagnostics carry the same codes.
+Existing `start`, `end`, `severity`, `message`, and `suggestion` fields are retained.
 
 ## Inspect a theme
 

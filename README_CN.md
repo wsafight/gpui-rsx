@@ -8,22 +8,14 @@
 [![Documentation](https://docs.rs/gpui-rsx/badge.svg)](https://docs.rs/gpui-rsx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-一个为 GPUI 提供 JSX-like 语法的 Rust 过程宏，让 UI 开发更加简洁和直观。
+用 JSX-like 标记和 Rust 表达式编写 GPUI 视图。静态 RSX 展开为原生 GPUI builder 调用，由 Rust 检查生成代码的类型。
 
-## ✨ 特性
+## 支持的写法
 
-- 🎨 **HTML-like 语法** - 类似 React JSX 的开发体验
-- 🚀 **静态标记无运行时解析** - 静态 RSX 编译为原生 GPUI builder 调用
-- 📦 **轻量级** - 仅依赖 `syn`, `quote`, `proc-macro2`
-- 🔧 **灵活** - 支持表达式、条件渲染、组件组合
-- 💡 **类型安全** - 完全的编译时检查
-- 🧩 **Fragment 支持** - 使用 `<>...</>` 返回多个根元素
-- 🔁 **For 循环语法糖** - 使用 `{for item in iter { ... }}` 迭代
-- 🔑 **循环安全 ID** - 循环中的有状态元素需提供 `key={expr}` 或显式 `id={expr}`
-- 🎨 **完整 Tailwind 色板** - 22 个色系 × 11 个色阶 + black/white + 任意 hex/RGB/RGBA 值
-- 📐 **桌面布局工具类** - 支持任意长度、百分比和分数尺寸，适合面板和分栏布局
-- ⚡ **动态 Class** - 支持运行时 class 切换：颜色、尺寸、间距和数值前缀回退
-- 🔍 **诊断与预览** - strict/permissive 宏、可读错误和 `rsx_expand!`
+- 元素、Fragment、条件、循环和函数组件。
+- 用于颜色和桌面布局的静态工具类，以及处理动态字符串的运行时 matcher。
+- 交互列表的稳定 ID、可配置的 GPUI 路径和共享运行时代码。
+- 提供诊断、格式化和展开预览的 CLI、语言服务及 Playground。
 
 ### 语义与默认行为
 
@@ -95,124 +87,60 @@ gpui-rsx = "0.11.0"
 ```
 <!-- gpui-rsx:compat:end -->
 
-## 🚀 快速开始
+## 运行最小示例
 
-### 5 分钟上手
+在仓库根目录运行下面的命令，启动的就是这段代码：
+
+```sh
+cargo run --manifest-path demo/Cargo.toml --bin starter --locked
+```
+
+[示例源码](./demo/src/bin/starter.rs)会在 CI 中编译。它使用 Kit 原生 Button 和 0.11 的监听辅助宏。新建应用时，采用安装章节的依赖配置，再将此文件复制为 `src/main.rs`。构建前请先安装对应平台的[原生依赖](./demo/README.md)。
 
 ```rust
-use gpui::*;
+use gpui::component::{
+    ActiveTheme as _,
+    button::{Button, ButtonVariants as _},
+};
 use gpui::prelude::*;
-use gpui_rsx::rsx;
+use gpui::*;
+use gpui_rsx::{rsx, rsx_listener};
 
+#[derive(Default)]
 struct CounterView {
-    count: i32,
+    count: usize,
 }
 
 impl Render for CounterView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
-            <div class="flex flex-col gap-4 p-4">
+            <div class="size-full flex flex-col gap-[16px] p-[24px]"
+                bg={cx.theme().background} text_color={cx.theme().foreground}>
                 <h1>{format!("Count: {}", self.count)}</h1>
-                <div class="flex gap-2">
-                    <button
-                        bg={rgb(0x3b82f6)}
-                        text_color={rgb(0xffffff)}
-                        px_4
-                        py_2
-                        rounded_md
-                        onClick={cx.listener(|view, _, _window, cx| {
-                            view.count += 1;
-                            cx.notify();
-                        })}
-                    >
-                        {"Increment"}
-                    </button>
-                    <button
-                        bg={rgb(0xef4444)}
-                        text_color={rgb(0xffffff)}
-                        px_4
-                        py_2
-                        rounded_md
-                        onClick={cx.listener(|view, _, _window, cx| {
-                            view.count -= 1;
-                            cx.notify();
-                        })}
-                    >
-                        {"Decrement"}
-                    </button>
-                </div>
+                <Button base={Button::new("increment")} label="Increment" primary
+                    onClick={rsx_listener!(cx, notify, |view, _, _, _| {
+                        view.count += 1;
+                    })} />
             </div>
         }
     }
 }
 
 fn main() {
-    application().with_assets(assets::Assets).run(|cx: &mut App| {
-        gpui::init(cx);
-        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
-            cx.new(|_cx| CounterView { count: 0 })
-        }).unwrap();
-        cx.activate(true);
-    });
+    application()
+        .with_assets(assets::Assets)
+        .run(|cx: &mut App| {
+            gpui::init(cx);
+            gpui::open_window(WindowOptions::default(), cx, |_, cx| {
+                cx.new(|_| CounterView::default())
+            })
+            .expect("failed to open counter");
+            cx.activate(true);
+        });
 }
 ```
 
-### 前后对比
-
-#### ❌ 传统 GPUI 写法（繁琐）
-
-```rust
-fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-    div()
-        .flex()
-        .flex_col()
-        .gap_4()
-        .p_4()
-        .child(
-            div()
-                .text_xl()
-                .font_weight(FontWeight::BOLD)
-                .child(format!("Count: {}", self.count))
-        )
-        .child(
-            div()
-                .flex()
-                .gap_2()
-                .child(
-                    div()
-                        .bg(rgb(0x3b82f6))
-                        .text_color(rgb(0xffffff))
-                        .px_4()
-                        .py_2()
-                        .rounded_md()
-                        .on_click(cx.listener(|view, _, _window, cx| {
-                            view.count += 1;
-                            cx.notify();
-                        }))
-                        .child("Increment")
-                )
-                .child(
-                    div()
-                        .bg(rgb(0xef4444))
-                        .text_color(rgb(0xffffff))
-                        .px_4()
-                        .py_2()
-                        .rounded_md()
-                        .on_click(cx.listener(|view, _, _window, cx| {
-                            view.count -= 1;
-                            cx.notify();
-                        }))
-                        .child("Decrement")
-                )
-        )
-}
-```
-
-#### ✅ 使用 GPUI-RSX（简洁）
-
-见上方快速开始示例。
-
-**代码减少：~50%** ✨
+输入框、列表、布局和多面板应用见[可运行示例](https://wsafight.github.io/gpui-rsx/zh-cn/examples/demos/)。
 
 ## 📖 语法指南
 

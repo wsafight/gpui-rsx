@@ -25,3 +25,10 @@ paths remain available as hidden implementation details.
 Its values preserve colors, lengths, opacity and opaque Rust expressions; inspecting a
 style never evaluates application code. `Theme::builder().try_build()` validates token
 types and expressions for in-memory configurations.
+
+`generate_body_with_diagnostics` returns helper-free tokens, the inline-runtime
+requirement and typed semantic diagnostics. Each diagnostic carries a stable
+`SemanticDiagnosticCode`, source span, message and optional replacement text.
+Macro expansion renders these as `compile_error!`; editor tooling consumes the
+structured fields without inspecting generated tokens or matching error prose.
+Class analysis and syntax errors keep their existing APIs.

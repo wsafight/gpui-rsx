@@ -73,16 +73,23 @@ fn main() {
         .target(env_logger::Target::Stdout)
         .init();
 
-    gpui_platform::application().run(|cx: &mut App| {
+    #[cfg(feature = "kit")]
+    let application = gpui_kit::application().with_assets(gpui_kit::assets::Assets);
+    #[cfg(not(feature = "kit"))]
+    let application = gpui_platform::application();
+    application.run(|cx: &mut App| {
+        #[cfg(feature = "kit")]
+        gpui_kit::init(cx);
         let bounds = Bounds::centered(None, size(px(760.0), px(470.0)), cx);
-        cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(bounds)),
-                ..Default::default()
-            },
-            |_, cx| cx.new(LiveView::new),
-        )
-        .expect("failed to open live hot-reload demo");
+        let options = WindowOptions {
+            window_bounds: Some(WindowBounds::Windowed(bounds)),
+            ..Default::default()
+        };
+        #[cfg(feature = "kit")]
+        let window = gpui_kit::open_window(options, cx, |_, cx| cx.new(LiveView::new));
+        #[cfg(not(feature = "kit"))]
+        let window = cx.open_window(options, |_, cx| cx.new(LiveView::new));
+        window.expect("failed to open live hot-reload demo");
         cx.activate(true);
     });
 }

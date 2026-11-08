@@ -34,6 +34,7 @@ cargo run --manifest-path demo/Cargo.toml --bin counter --locked
 
 | Binary | Interaction | Main APIs |
 | --- | --- | --- |
+| `starter` | Run the README's counter. | Complete minimal app with a native Button. |
 | `hello` | Open a minimal view. | Static RSX and semantic colors. |
 | `counter` | Increase, decrease, reset. | `rsx_listener!`, `rsx_update!`, native Button and disabled state. |
 | `palette` | Compare color swatches. | Dynamic class expressions. |

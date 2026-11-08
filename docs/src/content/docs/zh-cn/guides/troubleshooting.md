@@ -382,6 +382,10 @@ fn content() -> impl gpui::IntoElement {
 独立夹具 `tests/fixtures/hot-reload/` 固定使用 GPUI Pre 0.3.11 和
 Dioxus 0.7.10，其 README 提供解析器测试以及原生 builder、原始宏和别名
 的对照步骤。它与 demo 的已验证依赖组合分开维护。
+夹具的 `kit` feature 单独验证 Kit 0.9.0 的初始化和根窗口路径。仓库根目录的
+`node scripts/test-hot-reload.mjs` 会用 Dioxus CLI 0.7.10 自动修改临时副本，检查
+原生 render 回调中的版本、PID 和计时状态。它不会点击控件或比较屏幕像素。
+开发版 `doctor --hot-reload --features hotreload,kit` 可先检查环境；通过检查不表示补丁已经生效。
 也可以使用现有的[构建并重启流程](../performance/#测量开发重载)，
 它通过重启进程应用修改，每次重启都会重置应用状态。
 

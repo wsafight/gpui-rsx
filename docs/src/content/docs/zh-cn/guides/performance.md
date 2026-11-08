@@ -279,6 +279,22 @@ let preview = gpui_rsx::rsx_expand! {
 
 ## 验证性能敏感改动
 
+CI 使用同一个 runner 和相同的 benchmark，比较基准分支与当前改动的宏展开和编辑器
+分析耗时。宏展开保留 10% 回退阈值；分析暂用 20%，容纳 runner 噪声。首次超出阈值时，
+会重新测量两端再判断，并保留报告。这些检查针对抽样微基准，不代表应用构建或渲染耗时。
+
+需要测量真实原生应用构建时，在安装并缓存 demo 所需依赖后，从仓库根目录运行：
+
+```sh
+node scripts/measure-builds.mjs
+```
+
+脚本将 README 的可编译最小示例和 demo 锁定的依赖复制到 `target/build-baselines/`
+下的新项目，依次测量空 target 构建、源码不变的构建，以及修改视图文字后的构建。
+每一步保留 Cargo timing 报告、日志和 `results.json`，不会清理已有构建目录。
+这里的冷构建指 target 为空，registry 源码仍有缓存。比较时请保持工具链、profile
+和依赖一致，并在机器空闲时运行。
+
 ### 0.9 开发测量
 
 macOS ARM64、Rust 1.99.1 下的短时 Criterion 测量（10 个样本、预热和测量各 1 秒）

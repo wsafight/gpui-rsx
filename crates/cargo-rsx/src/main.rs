@@ -1,6 +1,7 @@
 mod config;
 mod doctor;
 mod help;
+mod hot_reload;
 mod lint;
 mod lsp;
 mod preview;
@@ -30,6 +31,8 @@ struct Options {
     write: bool,
     watch: bool,
     offline: bool,
+    hot_reload: bool,
+    features: Option<String>,
     index: usize,
     port: u16,
 }
@@ -80,6 +83,7 @@ fn run() -> Result<i32, String> {
 Options: --manifest-path PATH --json --strict --tailwind --deny-warnings\n\
          --check --write --output PATH --watch --port N --index N --offline\n\
          lint: --min-severity error|warning|information --quiet\n\
+         doctor: --hot-reload --features FEATURES\n\
 Migration: enable tailwind-scale or set spacing-scale=\"tailwind\" after migrating.\n\
 Formatting preserves surrounding Rust and leaves commented macro bodies unchanged."
         );
@@ -145,6 +149,8 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
             "--write" => opt.write = true,
             "--watch" => opt.watch = true,
             "--offline" => opt.offline = true,
+            "--hot-reload" => opt.hot_reload = true,
+            "--features" => opt.features = Some(value()?),
             "-" => opt.path = Some(PathBuf::from("-")),
             flag if flag.starts_with('-') => return Err(format!("unknown option {flag}")),
             _ if opt.path.is_none() => opt.path = Some(arg.into()),
@@ -162,7 +168,34 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
     }
     match command.as_str() {
         "doctor" => {
-            let report = doctor::inspect(&metadata(&opt, false)?);
+            let metadata = metadata(&opt, false)?;
+            let mut report = doctor::inspect(&metadata);
+            if opt.hot_reload {
+                let dx_binary = std::env::var_os("RSX_DX").unwrap_or_else(|| "dx".into());
+                let dx = Command::new(&dx_binary)
+                    .arg("--version")
+                    .output()
+                    .ok()
+                    .filter(|output| output.status.success())
+                    .map(|output| String::from_utf8_lossy(&output.stdout).trim().to_owned());
+                let hot_patch = Command::new(&dx_binary)
+                    .args(["serve", "--help"])
+                    .output()
+                    .ok()
+                    .is_some_and(|output| {
+                        output.status.success()
+                            && String::from_utf8_lossy(&output.stdout).contains("--hot-patch")
+                    });
+                let hot_reload = hot_reload::inspect(
+                    &metadata,
+                    &sources(&opt)?,
+                    dx.as_deref().map(|version| (version, hot_patch)),
+                );
+                if hot_reload["ok"] != true {
+                    report["ok"] = Value::Bool(false);
+                }
+                report["hotReload"] = hot_reload;
+            }
             if opt.json {
                 println!("{report}");
             } else {
@@ -178,6 +211,16 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
                 for key in ["warnings", "errors"] {
                     for message in report[key].as_array().unwrap() {
                         println!("{key}: {}", message.as_str().unwrap());
+                    }
+                }
+                if let Some(checks) = report["hotReload"]["checks"].as_array() {
+                    for check in checks {
+                        println!(
+                            "{} [{}]: {}",
+                            check["code"].as_str().unwrap(),
+                            check["status"].as_str().unwrap(),
+                            check["message"].as_str().unwrap()
+                        );
                     }
                 }
                 println!(
@@ -222,7 +265,13 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
 /// Options each command reads; anything else would be silently ignored, so it is rejected.
 fn allowed_options(command: &str) -> Option<&'static [&'static str]> {
     Some(match command {
-        "doctor" => &["--manifest-path", "--json", "--offline"],
+        "doctor" => &[
+            "--manifest-path",
+            "--json",
+            "--offline",
+            "--hot-reload",
+            "--features",
+        ],
         "lint" => &[
             "--manifest-path",
             "--json",
@@ -271,6 +320,9 @@ fn metadata(opt: &Options, no_deps: bool) -> Result<Value, String> {
     }
     if opt.offline {
         cmd.arg("--offline");
+    }
+    if let Some(features) = &opt.features {
+        cmd.args(["--features", features]);
     }
     if let Some(path) = &opt.manifest {
         cmd.arg("--manifest-path").arg(path);

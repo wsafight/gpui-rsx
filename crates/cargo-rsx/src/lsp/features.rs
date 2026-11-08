@@ -217,7 +217,7 @@ pub(super) fn request(
                     );
                     actions.push(json!({
                         "title":format!("Replace with {suggestion}"),"kind":"quickfix","isPreferred":true,
-                        "diagnostics":[{"range":fix_range,"source":"gpui-rsx","message":d.message}],
+                        "diagnostics":[super::document::diagnostic(document, d)],
                         "edit":{"changes":changes}
                     }));
                 }
@@ -663,6 +663,12 @@ mod tests {
             assert_eq!(edit["range"]["start"], position(source, start));
             assert_eq!(edit["range"]["end"], position(source, start + 3));
             assert!(edit["newText"].as_str().unwrap().contains("key="));
+            assert_eq!(actions[0]["diagnostics"][0]["code"], "rsx/missing-loop-key");
+            let document = Document::new("file:///tmp/rsx-lsp-test.rs", source);
+            assert!(diagnostics(&document).iter().any(|diagnostic| {
+                diagnostic["code"] == "rsx/missing-loop-key"
+                    && diagnostic["range"]["start"] == position(source, start)
+            }));
         }
     }
 

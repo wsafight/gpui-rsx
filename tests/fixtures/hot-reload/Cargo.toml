@@ -8,6 +8,7 @@ publish = false
 default = []
 native = ["dep:env_logger", "dep:gpui", "dep:gpui-platform", "dep:gpui-rsx"]
 hotreload = ["native", "gpui/hot-reload"]
+kit = ["native", "dep:gpui-kit"]
 builder = []
 markup = []
 
@@ -16,6 +17,7 @@ env_logger = { version = "0.11", optional = true }
 gpui = { package = "gpui-pre", version = "=0.3.11", optional = true }
 gpui-platform = { package = "gpui-pre-platform", version = "=0.3.11", features = ["font-kit"], optional = true }
 gpui-rsx = { path = "../../..", optional = true }
+gpui-kit = { version = "=0.9.0", optional = true }
 
 [dev-dependencies]
 dioxus-rsx = "=0.7.10"

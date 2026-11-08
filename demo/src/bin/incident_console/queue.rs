@@ -16,6 +16,8 @@ pub(crate) fn render(
                 <div class="flex gap-6">
                     {for filter in SeverityFilter::OPTIONS.iter() {
                         <button
+                            id={SharedString::from(format!("severity-{}", filter.label()))}
+                            test_support
                             key={filter.label()}
                             hoverClass="bg-demo-raised"
                             class={if view.severity_filter == *filter {
@@ -46,6 +48,8 @@ pub(crate) fn render(
                             <span class="text-base text-zinc-300">{"No matching incidents"}</span>
                             <span class="text-sm text-demo-muted">{"Change the scope or severity filter."}</span>
                             <button
+                                id="recover-queue"
+                                test_support
                                 class="px-12 py-8 rounded-md bg-demo-accent text-zinc-950 cursor-pointer"
                                 onClick={rsx_listener!(cx, notify, |view, _, _window, _| {
                                     if view.scope != Scope::Active || view.severity_filter != SeverityFilter::All {
@@ -68,6 +72,8 @@ pub(crate) fn render(
                         <div class="flex flex-col">
                             {for incident in incidents.iter() {
                                 <button
+                                    id={SharedString::from(format!("incident-{}", incident.id))}
+                                    test_support
                                     key={incident.id}
                                     role={Role::Button}
                                     ariaLabel={incident.title.clone()}
