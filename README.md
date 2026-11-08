@@ -8,22 +8,14 @@ English | [简体中文](./README_CN.md)
 [![Documentation](https://docs.rs/gpui-rsx/badge.svg)](https://docs.rs/gpui-rsx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-A Rust procedural macro that provides JSX-like syntax for GPUI, making UI development more concise and intuitive.
+Write GPUI views with JSX-like markup and Rust expressions. Static RSX expands to native GPUI builder calls; GPUI checks the resulting types.
 
-## ✨ Features
+## What it supports
 
-- 🎨 **HTML-like Syntax** - React JSX-like development experience
-- 🚀 **Static RSX Has No Runtime Parser** - Expands static markup to native GPUI builder calls
-- 📦 **Lightweight** - Only depends on `syn`, `quote`, `proc-macro2`
-- 🔧 **Flexible** - Supports expressions, conditional rendering, component composition
-- 💡 **Type Safe** - Full compile-time type checking
-- 🧩 **Fragment Support** - Return multiple root elements with `<>...</>`
-- 🔁 **For-loop Sugar** - Iterate with `{for item in iter { ... }}`
-- 🔑 **Loop-safe IDs** - Stateful elements in loops require `key={expr}` or an explicit `id={expr}`
-- 🎨 **Full Tailwind Colors** - Built-in color families + black/white + arbitrary hex/RGB/RGBA values
-- 📐 **Desktop Layout Utilities** - Arbitrary lengths, percentages, and fraction sizing for panels and split views
-- ⚡ **Dynamic Class** - Runtime class switching with colors, sizing, spacing, and numeric prefix fallback
-- 🔍 **Diagnostics & Preview** - Strict/permissive macros, readable errors, and `rsx_expand!`
+- Elements, fragments, conditions, loops and function components.
+- Static utility classes for colors and desktop layouts, plus a runtime matcher for dynamic strings.
+- Stable IDs for interactive lists, explicit GPUI paths and shared runtime generation.
+- A CLI, language server and Playground for diagnostics, formatting and expansion previews.
 
 ### Semantics and Defaults
 
@@ -98,124 +90,60 @@ gpui-rsx = "0.11.0"
 ```
 <!-- gpui-rsx:compat:end -->
 
-## 🚀 Quick Start
+## Run the starter
 
-### Get Started in 5 Minutes
+From a checkout of this repository, run the same minimal app shown below:
+
+```sh
+cargo run --manifest-path demo/Cargo.toml --bin starter --locked
+```
+
+The [starter source](./demo/src/bin/starter.rs) is compiled in CI. It uses Kit's native Button and the 0.11 listener helper. For a new app, use the dependency block in Installation and copy this file to `src/main.rs`. Install your platform's [native dependencies](./demo/README.md) first.
 
 ```rust
-use gpui::*;
+use gpui::component::{
+    ActiveTheme as _,
+    button::{Button, ButtonVariants as _},
+};
 use gpui::prelude::*;
-use gpui_rsx::rsx;
+use gpui::*;
+use gpui_rsx::{rsx, rsx_listener};
 
+#[derive(Default)]
 struct CounterView {
-    count: i32,
+    count: usize,
 }
 
 impl Render for CounterView {
-    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
-            <div class="flex flex-col gap-4 p-4">
+            <div class="size-full flex flex-col gap-[16px] p-[24px]"
+                bg={cx.theme().background} text_color={cx.theme().foreground}>
                 <h1>{format!("Count: {}", self.count)}</h1>
-                <div class="flex gap-2">
-                    <button
-                        bg={rgb(0x3b82f6)}
-                        text_color={rgb(0xffffff)}
-                        px_4
-                        py_2
-                        rounded_md
-                        onClick={cx.listener(|view, _, _window, cx| {
-                            view.count += 1;
-                            cx.notify();
-                        })}
-                    >
-                        {"Increment"}
-                    </button>
-                    <button
-                        bg={rgb(0xef4444)}
-                        text_color={rgb(0xffffff)}
-                        px_4
-                        py_2
-                        rounded_md
-                        onClick={cx.listener(|view, _, _window, cx| {
-                            view.count -= 1;
-                            cx.notify();
-                        })}
-                    >
-                        {"Decrement"}
-                    </button>
-                </div>
+                <Button base={Button::new("increment")} label="Increment" primary
+                    onClick={rsx_listener!(cx, notify, |view, _, _, _| {
+                        view.count += 1;
+                    })} />
             </div>
         }
     }
 }
 
 fn main() {
-    application().with_assets(assets::Assets).run(|cx: &mut App| {
-        gpui::init(cx);
-        gpui::open_window(WindowOptions::default(), cx, |_, cx| {
-            cx.new(|_cx| CounterView { count: 0 })
-        }).unwrap();
-        cx.activate(true);
-    });
+    application()
+        .with_assets(assets::Assets)
+        .run(|cx: &mut App| {
+            gpui::init(cx);
+            gpui::open_window(WindowOptions::default(), cx, |_, cx| {
+                cx.new(|_| CounterView::default())
+            })
+            .expect("failed to open counter");
+            cx.activate(true);
+        });
 }
 ```
 
-### Before & After
-
-#### ❌ Traditional GPUI (Verbose)
-
-```rust
-fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-    div()
-        .flex()
-        .flex_col()
-        .gap_4()
-        .p_4()
-        .child(
-            div()
-                .text_xl()
-                .font_weight(FontWeight::BOLD)
-                .child(format!("Count: {}", self.count))
-        )
-        .child(
-            div()
-                .flex()
-                .gap_2()
-                .child(
-                    div()
-                        .bg(rgb(0x3b82f6))
-                        .text_color(rgb(0xffffff))
-                        .px_4()
-                        .py_2()
-                        .rounded_md()
-                        .on_click(cx.listener(|view, _, _window, cx| {
-                            view.count += 1;
-                            cx.notify();
-                        }))
-                        .child("Increment")
-                )
-                .child(
-                    div()
-                        .bg(rgb(0xef4444))
-                        .text_color(rgb(0xffffff))
-                        .px_4()
-                        .py_2()
-                        .rounded_md()
-                        .on_click(cx.listener(|view, _, _window, cx| {
-                            view.count -= 1;
-                            cx.notify();
-                        }))
-                        .child("Decrement")
-                )
-        )
-}
-```
-
-#### ✅ With GPUI-RSX (Concise)
-
-See the Quick Start example above.
-
-**Code Reduction: ~50%** ✨
+See [runnable demos](https://wsafight.github.io/gpui-rsx/examples/demos/) for inputs, lists, layouts and multi-panel applications.
 
 ## 📖 Syntax Guide
 

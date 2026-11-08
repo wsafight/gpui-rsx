@@ -7,7 +7,7 @@ Usage: scripts/check.sh [--proxy] [--skip-demo] [--release] [--skip-docs] [--ski
 
 Runs the standard local validation suite:
   cargo fmt --all -- --check
-  node --test scripts/dev-reload*.test.mjs
+  node --test .github/scripts/*.test.cjs scripts/dev-reload*.test.mjs scripts/test-hot-reload.test.mjs scripts/test-readme.test.mjs
   cargo xtask spec --check
   cargo xtask compat-matrix --check
   cargo xtask check-gpui
@@ -84,7 +84,7 @@ run() {
 }
 
 run cargo fmt --all -- --check
-run node --test scripts/dev-reload*.test.mjs
+run node --test .github/scripts/*.test.cjs scripts/dev-reload*.test.mjs scripts/test-hot-reload.test.mjs scripts/test-readme.test.mjs
 run cargo xtask spec --check
 run cargo xtask compat-matrix --check
 run cargo xtask line-limit

@@ -4,6 +4,9 @@ import { readFile } from 'node:fs/promises';
 import { initSync, analyze, analyze_with_theme, format, convert, convert_with_options } from '../docs/public/playground/pkg/gpui_rsx_wasm.js';
 
 initSync({ module: await readFile(new URL('../docs/public/playground/pkg/gpui_rsx_wasm_bg.wasm',import.meta.url)) });
+const loop = JSON.parse(analyze('<div>{for item in items {<button onClick={handler}/>}}</div>', true, false));
+assert.equal(loop.diagnostics[0].code, 'rsx/missing-loop-key');
+assert.match(loop.diagnostics[0].suggestion, /key=/);
 let result = JSON.parse(analyze('<div class="gap-4"/>',true,true));
 assert.match(result.expansion.Ok,/16f32/);
 result = JSON.parse(analyze('<div class="flex-colum"/>',true,false));

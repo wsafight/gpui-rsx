@@ -16,11 +16,12 @@
 
 use super::attribute::{AttrHints, generate_attr_methods_with_mode, static_class_expr_needs_id};
 use super::class::{ClassMode, parse_class_string_with_mode};
-use super::key::static_key_suffix;
+use super::key::{make_auto_id, make_keyed_auto_id};
 use super::tables::{
     HTML_TAGS, is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
 };
-use crate::diagnostics::{for_loop_missing_key_error, missing_required_attribute_error};
+use crate::SemanticDiagnostic;
+use crate::semantic::{BodyExpansion, CodegenErrors};
 
 #[derive(Default)]
 struct AttrAnalysis {
@@ -104,7 +105,7 @@ use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use std::cell::OnceCell;
 
-type CodegenResult = Result<TokenStream, TokenStream>;
+type CodegenResult = Result<TokenStream, CodegenErrors>;
 
 /// 生成 GPUI 代码（入口）
 ///
@@ -128,7 +129,7 @@ fn generate_body_with_erased_roots(
 ) -> TokenStream {
     let mut dynamic_used = false;
     let code = generate_body_checked(body, mode.clone(), &mut dynamic_used, erase_roots)
-        .unwrap_or_else(|err| err);
+        .unwrap_or_else(|err| err.tokens);
     if dynamic_used && mode.dynamic_runtime_path().is_none() {
         let helper = super::runtime::get_cached_dynamic_class_helper(mode);
         quote! { { #helper #code } }
@@ -141,7 +142,22 @@ fn generate_body_with_erased_roots(
 /// 1,400 lines; tools that only analyze or display the call site use this. The flag reports
 /// whether the omitted helper (`__rsx_apply_class`) is referenced.
 pub fn generate_body_without_runtime(body: &RsxBody, mode: ClassMode) -> (TokenStream, bool) {
-    generate_body_without_runtime_with_erased_roots(body, mode, false)
+    let expansion = generate_body_with_diagnostics(body, mode);
+    (expansion.tokens, expansion.uses_inline_runtime)
+}
+
+pub fn generate_body_with_diagnostics(body: &RsxBody, mode: ClassMode) -> BodyExpansion {
+    let inline_runtime = mode.dynamic_runtime_path().is_none();
+    let mut dynamic_used = false;
+    let (tokens, diagnostics) = match generate_body_checked(body, mode, &mut dynamic_used, false) {
+        Ok(tokens) => (tokens, Vec::new()),
+        Err(error) => (error.tokens, error.diagnostics),
+    };
+    BodyExpansion {
+        tokens,
+        uses_inline_runtime: dynamic_used && inline_runtime,
+        diagnostics,
+    }
 }
 
 pub fn generate_fragment_without_runtime(body: &RsxBody, mode: ClassMode) -> (TokenStream, bool) {
@@ -155,8 +171,8 @@ fn generate_body_without_runtime_with_erased_roots(
 ) -> (TokenStream, bool) {
     let inline_runtime = mode.dynamic_runtime_path().is_none();
     let mut dynamic_used = false;
-    let code =
-        generate_body_checked(body, mode, &mut dynamic_used, erase_roots).unwrap_or_else(|err| err);
+    let code = generate_body_checked(body, mode, &mut dynamic_used, erase_roots)
+        .unwrap_or_else(|err| err.tokens);
     (code, dynamic_used && inline_runtime)
 }
 
@@ -287,22 +303,29 @@ fn generate_flattened_nodes(
     mode: ClassMode,
     dynamic_used: &mut bool,
     gpui: &OnceCell<syn::Path>,
-) -> Result<Vec<(TokenStream, bool)>, TokenStream> {
+) -> Result<Vec<(TokenStream, bool)>, CodegenErrors> {
     let mut expressions = Vec::new();
     let mut errors = TokenStream::new();
+    let mut diagnostics = Vec::new();
     for node in flattened_nodes(nodes) {
         match generate_node_checked(node, require_loop_key, mode.clone(), dynamic_used, gpui) {
             Ok(expression) => expressions.push((
                 expression,
                 matches!(node, RsxNode::For { .. } | RsxNode::Spread(_)),
             )),
-            Err(error) => errors.extend(error),
+            Err(error) => {
+                errors.extend(error.tokens);
+                diagnostics.extend(error.diagnostics);
+            }
         }
     }
     if errors.is_empty() {
         Ok(expressions)
     } else {
-        Err(quote! {{ #errors }})
+        Err(CodegenErrors {
+            tokens: quote! {{ #errors }},
+            diagnostics,
+        })
     }
 }
 
@@ -434,7 +457,7 @@ fn generate_element_checked(
     }
 
     if require_loop_key && needs_id && user_id.is_none() && user_key.is_none() {
-        return Err(for_loop_missing_key_error(&element.name.path, &tag_str).to_compile_error());
+        return Err(SemanticDiagnostic::missing_loop_key(&element.name.path, &tag_str).into());
     }
 
     // 生成基础元素和 id：
@@ -505,7 +528,7 @@ fn generate_children_methods(
     mode: ClassMode,
     dynamic_used: &mut bool,
     gpui: &OnceCell<syn::Path>,
-) -> Result<(), TokenStream> {
+) -> Result<(), CodegenErrors> {
     for (expr, yields_many) in
         generate_flattened_nodes(children, require_loop_key, mode, dynamic_used, gpui)?
     {
@@ -539,34 +562,34 @@ fn generate_tag(
         "svg" => quote! { svg() },
         "img" => {
             let Some(source) = img_source else {
-                return Err(missing_required_attribute_error(
+                return Err(SemanticDiagnostic::missing_required_attribute(
                     &name.path,
                     "img",
                     "src",
                     r#"<img src={"path/to/image.png"} />"#,
                 )
-                .to_compile_error());
+                .into());
             };
             quote! { img(#source) }
         }
         "canvas" => {
             let Some(prepaint) = canvas_prepaint else {
-                return Err(missing_required_attribute_error(
+                return Err(SemanticDiagnostic::missing_required_attribute(
                     &name.path,
                     "canvas",
                     "prepaint",
                     r#"<canvas prepaint={|bounds, window, cx| state} paint={|bounds, state, window, cx| { ... }} />"#,
                 )
-                .to_compile_error());
+                .into());
             };
             let Some(paint) = canvas_paint else {
-                return Err(missing_required_attribute_error(
+                return Err(SemanticDiagnostic::missing_required_attribute(
                     &name.path,
                     "canvas",
                     "paint",
                     r#"<canvas prepaint={|bounds, window, cx| state} paint={|bounds, state, window, cx| { ... }} />"#,
                 )
-                .to_compile_error());
+                .into());
             };
             quote! { canvas(#prepaint, #paint) }
         }
@@ -576,47 +599,10 @@ fn generate_tag(
     })
 }
 
-/// 生成基于源码位置的稳定自动 ID（无 key）
-///
-/// 格式：`concat!(file!(), "::", "__rsx_{tag}_L{line}C{col}")`
-///
-/// **稳定性**：只要元素源码位置不变，ID 不变（增量编译安全）。
-/// **唯一性**：`file!()` 在用户侧展开，包含完整路径，跨文件全局唯一。
-///
-/// 若需要跨重构完全稳定的 ID，请使用 `id` 属性；
-/// 若在循环内使用，请改用 `key` 属性。
-fn make_auto_id(tag_name: &RsxElementName) -> TokenStream {
-    let span = tag_name.span();
-    let loc = span.start(); // 需要 proc-macro2 的 span-locations 特性
-    let id_suffix = format!("__rsx_{}_L{}C{}", tag_name, loc.line, loc.column);
-    quote! { concat!(file!(), "::", #id_suffix) }
-}
-
-/// 生成带 `key` 的复合自动 ID（用于循环场景）
-///
-/// 字面量 key 使用 concat!；具体整数值使用命名整数 ID（无字符串分配）。
-/// 其他 Display 值保留格式化路径，表达式借用求值一次。
-fn make_keyed_auto_id(
-    tag_name: &RsxElementName,
-    key_expr: &syn::Expr,
-    gpui: &syn::Path,
-) -> TokenStream {
-    let span = tag_name.span();
-    let loc = span.start();
-    // 编译期常量前缀，包含文件路径 + 源码位置，格式如：
-    //   "src/views/list.rs::__rsx_li_L42C8_"
-    let prefix_suffix = format!("::__rsx_{}_L{}C{}_", tag_name, loc.line, loc.column);
-    if let Some(static_suffix) = static_key_suffix(key_expr) {
-        return quote! { concat!(file!(), #prefix_suffix, #static_suffix) };
-    }
-    // 运行时将 key 追加到前缀后，生成如：
-    //   "src/views/list.rs::__rsx_li_L42C8_item_42"
-    super::key::dynamic_key(&prefix_suffix, key_expr, gpui)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::codegen::key::static_key_suffix;
 
     fn element_name(name: &str) -> RsxElementName {
         RsxElementName {
@@ -628,6 +614,7 @@ mod tests {
     fn img_requires_source() {
         let error = generate_tag("img", &element_name("img"), None, None, None)
             .expect_err("img without src must fail")
+            .tokens
             .to_string();
 
         assert!(error.contains("Element `<img>` requires `src`"));
@@ -640,11 +627,13 @@ mod tests {
 
         let missing_prepaint = generate_tag("canvas", &name, None, None, Some(&callback))
             .expect_err("canvas without prepaint must fail")
+            .tokens
             .to_string();
         assert!(missing_prepaint.contains("Element `<canvas>` requires `prepaint`"));
 
         let missing_paint = generate_tag("canvas", &name, None, Some(&callback), None)
             .expect_err("canvas without paint must fail")
+            .tokens
             .to_string();
         assert!(missing_paint.contains("Element `<canvas>` requires `paint`"));
     }

@@ -1,6 +1,72 @@
 use crate::domain::{DetailTab, IncidentStatus, Scope, SeverityFilter};
 use crate::model::IncidentConsole;
 
+#[gpui::test]
+fn filtering_and_resolving_dispatch_through_the_console(cx: &mut gpui::TestAppContext) {
+    use gpui::test::TestWindowExt;
+    use gpui::{AppContext, Bounds, WindowBounds, WindowOptions, px, size};
+
+    cx.update(gpui::init);
+    let (handle, view) = cx.update(|cx| {
+        gpui::open_window(
+            WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(Bounds::new(
+                    Default::default(),
+                    size(px(1320.0), px(820.0)),
+                ))),
+                ..Default::default()
+            },
+            cx,
+            |_, cx| cx.new(|_| IncidentConsole::default()),
+        )
+        .unwrap()
+    });
+    let click = |cx: &mut gpui::TestAppContext, target: &str| {
+        cx.update_window(handle, |_, window, cx| {
+            window.render_frame(cx);
+            window.click(target.to_owned(), cx);
+        })
+        .unwrap();
+    };
+
+    click(cx, "scope-Unassigned");
+    view.read_with(cx, |view, _| assert_eq!(view.selected_id, 4203));
+    click(cx, "detail-timeline");
+    view.read_with(cx, |view, _| {
+        assert!(view.detail_tab == DetailTab::Timeline)
+    });
+    click(cx, "severity-Critical");
+    view.read_with(cx, |view, _| {
+        assert!(view.snapshot().visible_ids.is_empty());
+        assert!(view.selected_incident().is_none());
+    });
+    click(cx, "recover-queue");
+    view.read_with(cx, |view, _| {
+        assert!(view.scope == Scope::Active);
+        assert!(view.severity_filter == SeverityFilter::All);
+    });
+    click(cx, "incident-4203");
+    click(cx, "advance-incident");
+    click(cx, "advance-incident");
+    click(cx, "advance-incident");
+    view.read_with(cx, |view, _| {
+        assert!(!view.snapshot().visible_ids.contains(&4203));
+        assert_ne!(view.selected_id, 4203);
+    });
+    view.update(cx, |view, cx| {
+        for incident in &mut view.incidents {
+            incident.status = IncidentStatus::Resolved;
+        }
+        view.clear_resolved();
+        cx.notify();
+    });
+    click(cx, "recover-queue");
+    view.read_with(cx, |view, _| {
+        assert_eq!(view.snapshot().stats.active, 1);
+        assert!(view.selected_incident().is_some());
+    });
+}
+
 #[test]
 fn snapshot_derives_metrics_filters_and_impact_order() {
     let mut console = IncidentConsole::default();

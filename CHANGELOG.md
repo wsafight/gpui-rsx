@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Structured core semantic diagnostics and optional diagnostic codes shared by CLI,
+  LSP and WASM. Missing-loop-key fixes no longer depend on English error text.
+- `doctor --hot-reload --features FEATURES`, a Kit 0.9.0 hot-patch fixture and an
+  isolated native probe with revision, process and state observations.
+- Persistent bilingual docs/Playground browser tests, console click-through tests,
+  a compiled README starter and isolated Cargo build measurements.
+
+### Changed
+
+- Select PR checks by changed paths, reuse one Playground WASM artifact for docs,
+  and gate editor-analysis benchmarks alongside expansion benchmarks. Main,
+  scheduled and manual runs retain the full checks.
+- Rust callers constructing tools `Diagnostic` values must supply the new `code`
+  field (`None` for uncategorized diagnostics). Existing JSON remains readable.
+
 ## [0.11.0] - 2026-11-05
 
 ### Added

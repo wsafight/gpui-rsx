@@ -3,7 +3,7 @@ title: Runnable Demos
 description: Choose a native GPUI example, run it, and find the APIs it demonstrates.
 ---
 
-The `demo/` crate contains nine desktop examples. They use the local GPUI-RSX 0.11 source and the locked GPUI Kit dependency set. Start with a small view to learn one API, or open a console to follow state across several panels.
+The `demo/` crate contains ten desktop examples. They use the local GPUI-RSX 0.11 source and the locked GPUI Kit dependency set. Start with a small view to learn one API, or open a console to follow state across several panels.
 
 ## Choose an example
 
@@ -17,6 +17,7 @@ The crate pins Rust 1.98.1. Install the native dependencies for your platform be
 
 | Binary | What to try | Source / API focus |
 | --- | --- | --- |
+| `starter` | Run the README's counter. | Minimal complete app, native Button, `rsx_listener!`. |
 | `hello` | Open a minimal view. | Static RSX, semantic theme colors, explicit pixel spacing. |
 | `counter` | Increase, decrease, then reset the count. | `rsx_listener!`, `rsx_update!`, conditional classes, disabled native Button. |
 | `palette` | Compare swatches and their class names. | Dynamic class expressions and color values. |

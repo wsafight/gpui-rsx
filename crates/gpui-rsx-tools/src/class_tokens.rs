@@ -84,6 +84,7 @@ impl ClassAnalyzer {
                     } else {
                         DiagnosticSeverity::Warning
                     },
+                    code: None,
                     message: diagnostic.message.clone(),
                     suggestion: content.and(diagnostic.suggestion.clone()),
                 });

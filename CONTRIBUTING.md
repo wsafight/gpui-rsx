@@ -196,6 +196,9 @@ fn parse_element(input: ParseStream) -> Result<Element> {
 
 ## Testing Guidelines
 
+See [developer workflow checks](./docs/developer-workflow.md) for change-aware CI,
+docs browser tests, the native Kit patch probe and isolated build measurements.
+
 ### Test Types
 
 1. **Unit Tests** - Test individual functions
@@ -471,6 +474,9 @@ fn parse_element(input: ParseStream) -> Result<Element> {
 ```
 
 ## 测试指南
+
+改动范围对应的 CI、文档浏览器回归、原生 Kit 补丁验证和隔离构建测量，见
+[开发流程检查](./docs/developer-workflow.md)。
 
 ### 测试类型
 

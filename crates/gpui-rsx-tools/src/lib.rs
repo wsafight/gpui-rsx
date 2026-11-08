@@ -49,6 +49,8 @@ pub struct Diagnostic {
     pub start: usize,
     pub end: usize,
     pub severity: DiagnosticSeverity,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub code: Option<String>,
     pub message: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub suggestion: Option<String>,
@@ -170,6 +172,7 @@ fn error(source: &str, e: syn::Error) -> Diagnostic {
         start: byte_offset(source, e.span(), false),
         end: byte_offset(source, e.span(), true),
         severity: DiagnosticSeverity::Error,
+        code: None,
         message: e.to_string(),
         suggestion,
     }
@@ -228,6 +231,7 @@ fn analyze_document(
                     start: 0,
                     end: source.len().min(1),
                     severity: DiagnosticSeverity::Error,
+                    code: None,
                     message,
                     suggestion: None,
                 }],
@@ -368,6 +372,7 @@ fn analyze_parsed_body(
                             start: byte_offset(source, value.span(), false),
                             end: byte_offset(source, value.span(), true),
                             severity: DiagnosticSeverity::Information,
+                            code: None,
                             message,
                             suggestion: None,
                         });
@@ -382,11 +387,9 @@ fn analyze_parsed_body(
             }
         }
     });
-    // Include semantic errors (required constructors, loop keys, unsupported state classes).
-    // The dynamic class helper holds no diagnostics and would dominate the walk below.
-    let (expanded, dynamic) = gpui_rsx_core::generate_body_without_runtime(body, mode);
-    diagnostics::semantic_errors(expanded.clone(), source, &mut analysis.diagnostics);
-    (analysis, (expanded, dynamic))
+    let expansion = gpui_rsx_core::generate_body_with_diagnostics(body, mode);
+    diagnostics::semantic_errors(expansion.diagnostics, source, &mut analysis.diagnostics);
+    (analysis, (expansion.tokens, expansion.uses_inline_runtime))
 }
 
 pub(crate) fn class_literals(attr: &RsxAttribute) -> Option<Vec<&syn::LitStr>> {

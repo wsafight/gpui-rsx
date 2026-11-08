@@ -2,6 +2,30 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use crate::parser::RsxElementName;
+
+pub(super) fn make_auto_id(tag_name: &RsxElementName) -> TokenStream {
+    let location = tag_name.span().start();
+    let id_suffix = format!("__rsx_{}_L{}C{}", tag_name, location.line, location.column);
+    quote! { concat!(file!(), "::", #id_suffix) }
+}
+
+pub(super) fn make_keyed_auto_id(
+    tag_name: &RsxElementName,
+    key_expr: &syn::Expr,
+    gpui: &syn::Path,
+) -> TokenStream {
+    let location = tag_name.span().start();
+    let prefix_suffix = format!(
+        "::__rsx_{}_L{}C{}_",
+        tag_name, location.line, location.column
+    );
+    if let Some(static_suffix) = static_key_suffix(key_expr) {
+        return quote! { concat!(file!(), #prefix_suffix, #static_suffix) };
+    }
+    dynamic_key(&prefix_suffix, key_expr, gpui)
+}
+
 pub(super) fn static_key_suffix(expr: &syn::Expr) -> Option<String> {
     match expr {
         syn::Expr::Lit(syn::ExprLit {

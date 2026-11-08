@@ -32,6 +32,7 @@ fn indexed_ownership_matches_innermost_containment_for_every_range() {
                 severity: DiagnosticSeverity::Warning,
                 message: "range".to_owned(),
                 suggestion: None,
+                code: None,
             })
         })
         .collect();

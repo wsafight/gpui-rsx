@@ -1,31 +1,14 @@
 name: Docs
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
-      - 'crates/gpui-rsx-core/**'
-      - 'crates/gpui-rsx-tools/**'
-      - 'crates/gpui-rsx-wasm/**'
-      - 'scripts/build-playground.sh'
-  pull_request:
-    branches: [main]
-    paths:
-      - 'docs/**'
-      - '.github/workflows/docs.yml'
-      - 'crates/gpui-rsx-core/**'
-      - 'crates/gpui-rsx-tools/**'
-      - 'crates/gpui-rsx-wasm/**'
-      - 'scripts/build-playground.sh'
+  workflow_call:
+    inputs:
+      deploy:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
-
-concurrency:
-  group: docs-${{ github.event_name }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -35,14 +18,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/download-artifact@v4
         with:
-          toolchain: 1.98.1
-          targets: wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v2
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: wasm-pack
+          name: playground-wasm
+          path: docs/public/playground/pkg
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -59,10 +38,27 @@ jobs:
 
       - name: Build docs
         working-directory: docs
-        run: bun run build
+        run: bun run build:site
+
+      - name: Install browser
+        working-directory: docs
+        run: bunx playwright install --with-deps chromium
+
+      - name: Test docs in Chromium
+        working-directory: docs
+        run: bun run test:browser
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: docs-browser-results
+          path: |
+            docs/test-results
+            docs/playwright-report
+          retention-days: 7
 
       - name: Upload Pages artifact
-        if: github.event_name == 'push'
+        if: inputs.deploy
         uses: actions/upload-pages-artifact@v3
         with:
           path: docs/dist
@@ -70,7 +66,7 @@ jobs:
   deploy:
     name: Deploy to GitHub Pages
     needs: build
-    if: github.event_name == 'push'
+    if: inputs.deploy
     runs-on: ubuntu-latest
     permissions:
       pages: write

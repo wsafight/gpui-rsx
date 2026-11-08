@@ -3,7 +3,7 @@ title: 可运行示例
 description: 选择原生 GPUI 示例，运行交互，并查找对应 API。
 ---
 
-`demo/` crate 提供九个桌面示例，使用本地 GPUI-RSX 0.11 源码和锁定的 GPUI Kit 依赖。可以先用小示例了解单项 API，再用控制台观察多个面板之间的状态变化。
+`demo/` crate 提供十个桌面示例，使用本地 GPUI-RSX 0.11 源码和锁定的 GPUI Kit 依赖。可以先用小示例了解单项 API，再用控制台观察多个面板之间的状态变化。
 
 ## 选择示例
 
@@ -17,6 +17,7 @@ cargo run --manifest-path demo/Cargo.toml --bin counter --locked
 
 | 二进制名称 | 可以尝试的操作 | 对应写法 |
 | --- | --- | --- |
+| `starter` | 运行 README 中的计数器。 | 完整最小应用、原生 Button、`rsx_listener!`。 |
 | `hello` | 打开最小视图。 | 静态 RSX、语义主题色、显式像素间距。 |
 | `counter` | 增加、减少，再重置数值。 | `rsx_listener!`、`rsx_update!`、条件 class、原生 Button 禁用状态。 |
 | `palette` | 对照色块、class 名称和颜色值。 | 动态 class 表达式。 |

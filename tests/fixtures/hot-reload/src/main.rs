@@ -57,11 +57,22 @@ fn main() {
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .target(env_logger::Target::Stdout)
         .init();
-    gpui_platform::application().run(|cx: &mut App| {
-        cx.open_window(WindowOptions::default(), |_, cx| {
+    #[cfg(feature = "kit")]
+    let application = gpui_kit::application().with_assets(gpui_kit::assets::Assets);
+    #[cfg(not(feature = "kit"))]
+    let application = gpui_platform::application();
+    application.run(|cx: &mut App| {
+        #[cfg(feature = "kit")]
+        gpui_kit::init(cx);
+        #[cfg(feature = "kit")]
+        let window = gpui_kit::open_window(WindowOptions::default(), cx, |_, cx| {
             cx.new(|_| HotReloadView { renders: 0 })
-        })
-        .expect("failed to open hot-reload fixture");
+        });
+        #[cfg(not(feature = "kit"))]
+        let window = cx.open_window(WindowOptions::default(), |_, cx| {
+            cx.new(|_| HotReloadView { renders: 0 })
+        });
+        window.expect("failed to open hot-reload fixture");
         cx.activate(true);
     });
 }

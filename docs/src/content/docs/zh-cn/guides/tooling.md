@@ -14,6 +14,16 @@ cargo rsx doctor --manifest-path demo/Cargo.toml
 
 本页使用 `demo/Cargo.toml` 的命令在仓库根目录执行。接入自己的应用时，请换成应用的 manifest 路径。`doctor` 检查实际解析的 Cargo 依赖图，支持别名、Git 依赖和发布快照。
 
+仓库开发版 CLI 还可检查热补丁环境。请传入应用实际使用的 Cargo feature：
+
+```sh
+cargo run -p cargo-rsx -- doctor --manifest-path tests/fixtures/hot-reload/Cargo.toml --features hotreload,kit --hot-reload --json
+```
+
+检查包括选中后端的 `hot-reload` feature、`dx serve` 是否支持 `--hot-patch`，以及可能
+被 Dioxus CLI 0.7.10 拦截的 `rsx` 宏。可用 `RSX_DX` 指定独立的 CLI 安装路径。
+补丁阶段仍标为 `unverified`，需要在运行中的应用里确认，步骤见[热更新排查](/gpui-rsx/zh-cn/guides/troubleshooting/)。
+
 ## 检查与格式化
 
 ```sh
@@ -26,6 +36,11 @@ cargo rsx fmt src/main.rs --write
 `lint` 扫描工作区成员，并读取各包的 `rsx.toml`。间距刻度与宏保持一致：先看 `rsx.toml`，再看 `gpui-rsx` 的 `tailwind-scale` feature；`--tailwind` 可强制使用 Tailwind 刻度。动态 class 的值在运行时检查，CLI 会将这一限制作为提示信息报告。
 
 `fmt` 只改写 RSX 宏体，保留外围 Rust；含注释的宏体保持原样。CI 使用 `--check`，应用变更使用 `--write`。
+
+开发版 JSON 诊断增加可选的 `code`，例如 `rsx/missing-loop-key`、
+`rsx/missing-required-attribute` 和 `rsx/missing-component-prop`。core 直接提供语义错误
+的位置和修复建议，修改提示文案不会改变修复行为；LSP 也保留相同代码。
+原有的 `start`、`end`、`severity`、`message` 和 `suggestion` 字段继续保留。
 
 ## 检查主题
 

@@ -160,6 +160,7 @@ pub(crate) fn diagnostics(
             start: byte_offset(source, el.name.span(), false),
             end: byte_offset(source, el.name.span(), true),
             severity: DiagnosticSeverity::Error,
+            code: Some("rsx/missing-component-prop".into()),
             message: format!(
                 "Missing required prop(s) {} on `<{name}>`",
                 missing

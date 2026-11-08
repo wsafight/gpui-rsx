@@ -33,6 +33,8 @@ pub(crate) fn render(
 
                         <div class="flex px-18 pt-12 border-b border-demo-border">
                             <button
+                                id="detail-overview"
+                                test_support
                                 class={if view.detail_tab == DetailTab::Overview {
                                     "flex-1 px-10 py-8 text-sm text-white border-b-2 border-demo-accent cursor-pointer"
                                 } else {
@@ -46,6 +48,8 @@ pub(crate) fn render(
                                 {"Overview"}
                             </button>
                             <button
+                                id="detail-timeline"
+                                test_support
                                 class={if view.detail_tab == DetailTab::Timeline {
                                     "flex-1 px-10 py-8 text-sm text-white border-b-2 border-demo-accent cursor-pointer"
                                 } else {
@@ -147,6 +151,8 @@ pub(crate) fn render(
                                             </button>
                                         </div>
                                         <button
+                                            id="advance-incident"
+                                            test_support
                                             class={if selected.status == IncidentStatus::Resolved {
                                                 "w-full px-12 py-10 rounded-md bg-demo-raised text-zinc-200 border border-zinc-700 cursor-pointer"
                                             } else {

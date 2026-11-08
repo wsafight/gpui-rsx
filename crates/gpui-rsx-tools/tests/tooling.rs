@@ -272,7 +272,7 @@ fn repeated_semantic_errors_keep_each_source_location_and_fix() {
     let diagnostics = analyze_body(source, ClassMode::PERMISSIVE);
     let missing_keys: Vec<_> = diagnostics
         .iter()
-        .filter(|diagnostic| diagnostic.message.contains("has no `id` or `key`"))
+        .filter(|diagnostic| diagnostic.code.as_deref() == Some("rsx/missing-loop-key"))
         .collect();
     assert_eq!(missing_keys.len(), 2, "{diagnostics:?}");
     assert_ne!(missing_keys[0].start, missing_keys[1].start);

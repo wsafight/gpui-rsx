@@ -37,6 +37,8 @@ pub(super) fn print(command: &str, operation: Option<&str>) -> Result<(), String
             "--port" => "N  Preview HTTP port (default: 9230)",
             "--index" => "N  Select the macro to preview (default: 0)",
             "--offline" => "Run Cargo metadata without network access",
+            "--hot-reload" => "Check GPUI hot-reload features, dx availability and macro names",
+            "--features" => "FEATURES  Resolve application Cargo features for doctor",
             _ => "",
         };
         println!("  {option} {help}");

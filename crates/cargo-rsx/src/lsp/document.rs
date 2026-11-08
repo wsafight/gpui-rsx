@@ -78,10 +78,12 @@ pub(super) fn mode_at(document: Option<&Document>, cursor: usize, uri: &str) -> 
 }
 
 pub(super) fn diagnostics(document: &Document) -> Vec<Value> {
-    let mut diagnostics = document.analysis.diagnostics.iter().map(|d| json!({
-        "range":document.range(d.start,d.end),"severity": match d.severity {DiagnosticSeverity::Error=>1,DiagnosticSeverity::Warning=>2,_=>3},
-        "source":"gpui-rsx","message":d.message,"data":{"suggestion":d.suggestion}
-    })).collect::<Vec<_>>();
+    let mut diagnostics = document
+        .analysis
+        .diagnostics
+        .iter()
+        .map(|item| diagnostic(document, item))
+        .collect::<Vec<_>>();
     if let Some(error) = &document.config_error {
         diagnostics.push(json!({
             "range": document.range(0, 0),
@@ -91,6 +93,18 @@ pub(super) fn diagnostics(document: &Document) -> Vec<Value> {
         }));
     }
     diagnostics
+}
+
+pub(super) fn diagnostic(document: &Document, item: &gpui_rsx_tools::Diagnostic) -> Value {
+    let mut result = json!({
+        "range": document.range(item.start, item.end),
+        "severity": match item.severity { DiagnosticSeverity::Error => 1, DiagnosticSeverity::Warning => 2, _ => 3 },
+        "source": "gpui-rsx", "message": item.message, "data": {"suggestion": item.suggestion}
+    });
+    if let Some(code) = &item.code {
+        result["code"] = json!(code);
+    }
+    result
 }
 
 /// A class token under the cursor; refuses text outside an RSX macro or class literal.

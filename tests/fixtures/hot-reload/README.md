@@ -94,7 +94,8 @@ that GPUI-RSX expansion can be compiled and patched. The lost macro-only edit
 occurs in the CLI's change-classification path. The alias works in this controlled
 configuration; this does not establish why it failed in a different installation.
 The render counters are fixture state; these checks do not cover every possible
-application state or Rust type change. This fixture does not include `gpui-kit`.
+application state or Rust type change. Those observations used the direct platform
+entry point. The optional Kit integration is checked separately below.
 
 ## Visible state-preserving demo
 
@@ -115,6 +116,45 @@ of source hot-reloading.
 On 2026-11-07 (Asia/Shanghai), a live source edit changed the panel from blue A to
 green B. The window visibly changed, the PID stayed the same, and the timer and
 click counter retained their state. The CLI also reported `GPUI hot reload applied`.
+
+## Kit integration and automated probe
+
+The `kit` feature adds GPUI Kit 0.9.0, which uses the same GPUI Pre 0.3.11
+snapshot as this fixture. Both binaries then initialize Kit, install its assets
+and mount its root with `gpui_kit::open_window`. This is a narrow hot-patch check;
+the generated API compatibility target remains the demo's locked Kit 0.8.1 set.
+
+From the repository root:
+
+```sh
+cargo check --manifest-path tests/fixtures/hot-reload/Cargo.toml --features hotreload,kit --bins
+cargo run -p cargo-rsx -- doctor --manifest-path tests/fixtures/hot-reload/Cargo.toml --features hotreload,kit --hot-reload --json
+node scripts/test-hot-reload.mjs
+```
+
+The automated probe requires Dioxus CLI 0.7.10 and a working native desktop session.
+Set `RSX_DX=/absolute/path/to/dx` to use a separate CLI installation; doctor also
+reads this variable. The probe copies the fixture to a temporary directory, waits
+for timer state, edits only the aliased macro, checks revision/PID/timer/click
+observations, and stops its processes. It leaves the checked-in source untouched.
+Logs and `verification.json` are saved under `target/hot-reload-kit-probe/`.
+On failure it also retains the temporary reproduction source. It does not click
+the button or compare rendered pixels; use the visible test above to check those.
+
+On 2026-11-08, the Kit probe on macOS arm64 with Rust 1.99.1 and Dioxus CLI 0.7.10
+observed revision A → B at PID 79897, with timer state 3 → 3 and click state
+0 → 0. The observations come from native render callbacks. CI compiles the Kit
+fixture and runs change-detection tests; it does not claim to run a desktop patch.
+
+A separate visible session that day changed the label and panel color inside
+`gpui_view!`: revision A → B kept PID 15615, timer state 27 → 35 and a nonzero
+click count of 26 → 26. The user clicked the window before and after the patch.
+These observations verify state preservation with actual input; no automated
+pixel comparison was performed.
+
+Doctor reports runtime-feature and CLI readiness, macro-name collision hints,
+and a separate `unverified` patch stage. A successful readiness check is not proof
+that a patch reached a running application.
 
 ## Upstream fallback
 
