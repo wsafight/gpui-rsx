@@ -16,6 +16,7 @@
 
 use super::attribute::{AttrHints, generate_attr_methods_with_mode, static_class_expr_needs_id};
 use super::class::{ClassMode, parse_class_string_with_mode};
+use super::element_methods::ElementMethods;
 use super::key::{make_auto_id, make_keyed_auto_id};
 use super::tables::{
     HTML_TAGS, is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
@@ -333,11 +334,12 @@ fn generate_flattened_nodes(
 /// and releasing mutable borrows between siblings. The result uses one shared collection.
 fn collect_any_elements(exprs: &[(TokenStream, bool)], element_type: TokenStream) -> TokenStream {
     let children = syn::Ident::new("__rsx_children", Span::mixed_site());
+    let child = syn::Ident::new("__rsx_child", Span::mixed_site());
     let append = exprs.iter().map(|(expr, yields_many)| {
         if *yields_many {
             quote! {
                 #children.extend(::core::iter::IntoIterator::into_iter(#expr)
-                    .map(|__rsx_child| __rsx_child.into_any_element()));
+                    .map(|#child| #child.into_any_element()));
             }
         } else {
             quote! { #children.push((#expr).into_any_element()); }
@@ -408,8 +410,8 @@ fn generate_element_checked(
     // 预分配方法链容量：
     // - 每个属性乘以 2（class 属性平均展开 3-4 个方法，其余属性 1 个）
     // - 加上子节点数
-    let mut methods: Vec<TokenStream> =
-        Vec::with_capacity(element.attributes.len() * 2 + element.children.len());
+    let mut methods =
+        ElementMethods::with_capacity(element.attributes.len() * 2 + element.children.len());
 
     for attr in &element.attributes {
         match attr {
@@ -517,14 +519,14 @@ fn generate_element_checked(
         gpui,
     )?;
 
-    Ok(quote! { #base #(#default_methods)* #(#methods)* })
+    Ok(methods.finish(quote! { #base #(#default_methods)* }))
 }
 
 /// 生成子节点的方法链片段
 fn generate_children_methods(
     children: &[RsxNode],
     require_loop_key: bool,
-    methods: &mut Vec<TokenStream>,
+    methods: &mut ElementMethods,
     mode: ClassMode,
     dynamic_used: &mut bool,
     gpui: &OnceCell<syn::Path>,

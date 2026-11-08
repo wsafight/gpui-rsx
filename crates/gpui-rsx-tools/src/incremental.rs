@@ -1,12 +1,9 @@
 //! Reuse macro boundaries when an edit is confined to one previously balanced body.
-use crate::{MacroCall, RustAnalysis, nested_macro_calls};
+use crate::{MacroCall, RustAnalysis, discovery, nested_macro_calls};
 
 pub(crate) fn calls(source: &str, old: &str, previous: &RustAnalysis) -> Option<Vec<MacroCall>> {
     if source.contains("macro_rules")
-        || (source.contains("gpui_rsx")
-            && source
-                .split(|character: char| !character.is_alphanumeric() && character != '_')
-                .any(|word| word == "as"))
+        || discovery::imports_require_full_scan(source)
         || previous
             .diagnostics
             .iter()

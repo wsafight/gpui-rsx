@@ -59,6 +59,33 @@ fn length_number_rejects_empty_and_non_finite_values() {
 }
 
 #[test]
+fn opacity_accepts_finite_decimal_percentages() {
+    for (suffix, expected) in [("0", 0.0), ("33.5", 0.335), ("100", 1.0), ("1e2", 1.0)] {
+        let class = format!("opacity-{suffix}");
+        let operation = resolve_style(&class, ClassMode::STRICT).unwrap().unwrap();
+
+        assert_eq!(operation.method(), "opacity");
+        assert_eq!(
+            operation.value(),
+            Some(&crate::StyleValue::Number(expected)),
+            "{class}"
+        );
+    }
+}
+
+#[test]
+fn opacity_rejects_out_of_range_and_non_finite_percentages() {
+    for suffix in ["", "-0.1", "100.1", "NaN", "inf", "-inf"] {
+        let class = format!("opacity-{suffix}");
+        let error = resolve_style(&class, ClassMode::STRICT)
+            .unwrap()
+            .unwrap_err();
+
+        assert!(error.contains("Invalid opacity class"), "{class}: {error}");
+    }
+}
+
+#[test]
 fn variants_group_into_style_refinement_closures() {
     let tokens = expand(
         "bg-blue-500 hover:bg-blue-600 hover:text-white active:opacity-75 group-hover/menu:underline",

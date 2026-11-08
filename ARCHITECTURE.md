@@ -423,37 +423,26 @@ structures, giving O(1) worst-case performance without any runtime initialisatio
    `{for ...}` loop without `id` or `key`, because all iterations would share the same
    auto-generated ID, causing GPUI state conflicts.
 
-7. **Child Aggregation** — 2+ consecutive `Expr` children are batched into a single
-   `.children([...])` call backed by a stack-allocated array, reducing method dispatch
-   count compared to individual `.child()` chains. The threshold was lowered from 3 to 2
-   because arrays have no heap-allocation cost:
+7. **Child Emission** — Ordinary element and expression children are emitted individually
+   as `.child(expr)` in source order. Only nodes that yield multiple elements (a `for` loop or
+   spread) use `.children(iterator)`:
 
    ```rust
-   // 2+ consecutive expressions → single .children([...]) with stack array
-   .children([expr1, expr2])
-
-   // 1 expression → individual .child() call
    .child(expr1)
+   .child(expr2)
+   .children(iter)
    ```
 
-   Implementation in `generate_children_methods`:
-   ```rust
-   // Before: threshold was 3
-   if consecutive_exprs.len() >= 3 {
+   `generate_children_methods` preserves this order directly; there is no consecutive-expression
+   batching threshold.
 
-   // After: threshold is 2 — arrays are stack-allocated, so 2 is free
-   if consecutive_exprs.len() >= 2 {
-       methods.push(quote! { .children([#(#consecutive_exprs),*]) });
-   } else {
-       for expr in &consecutive_exprs {
-           methods.push(quote! { .child(#expr) });
-       }
-   }
-   ```
-
-8. **For-loop Code Generation** — A single child maps directly over the iterator.
-   Multiple children flatten `once`/`chain` iterators of `AnyElement`, avoiding a per-iteration
-   fragment vector. Root fragments collect their final children into `Vec<AnyElement>`.
+8. **For-loop Code Generation** — A single ordinary child maps directly over the iterator.
+   Multiple ordinary children use `.flat_map()` with an array of `AnyElement` values. A single
+   nested `for` / spread body is consumed using `.flat_map()` plus `collect::<Vec<_>>()`. With
+   multiple flattened body nodes, if any contains a nested iterator or spread,
+   `collect_any_elements` builds one shared `Vec`, using `push` / `extend` in source order.
+   Ordinary root fragments retain `vec![exprs...]`; root fragments containing multi-element
+   nodes, and all `rsx_fragment!` roots, collect into `Vec<AnyElement>`.
 
 **Auto ID Generation** (span-based, stable across incremental builds):
 ```rust
@@ -476,7 +465,8 @@ parameters and borrowed integers) may use the borrowed formatting fallback. See
 
 #### runtime.rs — Dynamic Class Code Generation
 
-**Purpose**: Generate runtime code for `class={expression}` attributes.
+**Purpose**: Generate runtime code for `class={expression}` attributes that cannot be
+statically expanded.
 
 Dynamic classes support the common generated GPUI methods, numeric lengths, arbitrary
 colors, the Tailwind palette and opacity modifiers. Negated spacing and sizing values
@@ -604,7 +594,7 @@ thread_local! {
 - Attributes (45): Flags, values, camelCase/snake_case
 - Events (18): All 15 event handlers + auto ID
 - Styling (32): Classes, colors, spacing, border
-- Children (24): Expr, spread, for loops, aggregation
+- Children (24): Expr, spread, for loops, source-order emission
 - Conditional (12): when, whenSome
 - Edge cases (43): Auto IDs, styled tags, fragments, invisible
 
@@ -789,22 +779,21 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
 
 ### Runtime (Generated Code Quality)
 
-**Child aggregation threshold** (`element.rs`):
+**Child emission** (`element.rs`):
 
-Consecutive `Expr` children are batched into `.children([...])` (stack-allocated array)
-when there are 2 or more, instead of emitting individual `.child()` calls:
+Ordinary children use individual `.child()` calls in source order. `for` loops and spreads
+use `.children(iterator)` because they yield multiple elements. There is no aggregation
+threshold for consecutive expressions.
 
 ```rust
-// 1 expression — individual call
 .child(expr1)
-
-// 2+ expressions — array batch; no heap allocation; fewer method dispatches
-.children([expr1, expr2])
-.children([expr1, expr2, expr3])
+.child(expr2)
+.children(iter)
 ```
 
-The threshold was lowered from 3 → 2 because `[T; N]` arrays are stack-allocated and
-have no additional overhead over a single `.child()` call.
+Loop bodies with several ordinary children use a stack-allocated `AnyElement` array with
+`.flat_map()`; multi-node bodies containing nested iterators or spreads use an ordered shared
+`Vec` instead.
 
 **Zero cost** — the generated GPUI code is identical to hand-written code:
 ```rust
@@ -817,8 +806,9 @@ div().id("__rsx_div_0").flex().gap(px(4.0)).on_click(handler)
 
 No reflection, no string parsing, no dynamic dispatch at runtime.
 
-**Dynamic class exception** — `class={expression}` generates a runtime `fold` + `match`.
-Use static string literals for zero-overhead styling.
+**Dynamic class exception** — A `class={expression}` that cannot be statically expanded
+generates a runtime `fold` + `match`. Use static strings or inline conditional/match literals
+for zero-overhead styling.
 
 ### Binary Size (proc-macro)
 

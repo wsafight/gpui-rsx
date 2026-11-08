@@ -54,7 +54,7 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.9.0" }
-gpui-rsx = "0.12.0"
+gpui-rsx = "0.12.1"
 ```
 
 ### GPUI Version Target
@@ -79,14 +79,14 @@ application lockfile; update Kit and its matching snapshot together. See the
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.12.0` | `0.9.0` | `gpui-pre@0.3.11` | `gpui-component@0.9.0` |
+| `0.12.1` | `0.9.0` | `gpui-pre@0.3.11` | `gpui-component@0.9.0` |
 
 This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.9.0" }
-gpui-rsx = "0.12.0"
+gpui-rsx = "0.12.1"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -512,7 +512,7 @@ rsx! {
 > palette, arbitrary colors (e.g. `bg-[#ff0000]`, `text-[#f00]`, `bg-[rgba(15,23,42,0.8)]`),
 > arbitrary spacing and sizing lengths (`w-[280px]`, `h-[50%]`, `gap-[14px]`, `mx-[1.25rem]`),
 > negative spacing and sizing values (`-mt-2`, `-gap-4`, `-w-1/2`),
-> fraction sizing (`w-6/24`), and numeric prefix fallback (e.g. `gap-7`, `p-5`, `opacity-33`).
+> fraction sizing (`w-6/24`), and numeric prefix fallback (e.g. `gap-7`, `p-5`, `opacity-33.5`).
 > Truly unsupported classes (e.g. Tailwind variants or unknown utilities) are **silently ignored**
 > in release builds and print each warning once per call site in debug builds. Enable
 > `dynamic-class-report` for an exit summary, or supply `onUnknownClass` for explicit handling.
@@ -528,8 +528,9 @@ rsx! {
 **Common Patterns:**
 
 ```rust
-// ✅ Conditional literal (compile-time, documented subset)
+// Conditional assigned to a variable (runtime parser; initializers are not tracked)
 let button_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 text-black" };
+rsx! { <div class={button_class} /> }
 
 // ✅ when attribute (compile-time, fully flexible)
 rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }
@@ -1151,7 +1152,7 @@ Inspired by:
 
 ## Development tools
 
-Install `cargo-rsx` 0.12.0 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
+Install `cargo-rsx` 0.12.1 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
 `preview --watch`, and the `lsp` server. See the [tooling guide](https://wsafight.github.io/gpui-rsx/guides/tooling/)
 and [WASM Playground](https://wsafight.github.io/gpui-rsx/playground/). VS Code and Zed adapters
 live in `editors/`; release assets include an installable VSIX.

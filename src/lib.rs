@@ -426,7 +426,10 @@ pub fn rsx_update(input: TokenStream) -> TokenStream {
 /// # Notes
 ///
 /// - **Static `class`**: parsed entirely at compile time, supports the documented Tailwind-like subset.
-/// - **Dynamic `class={expr}`**: runtime matcher; full Tailwind color palette,
+///   Directly inline `if` / `match` expressions with string-literal leaves are also expanded
+///   statically; assigning the condition to a local variable selects the dynamic path instead.
+/// - **Dynamic `class={expr}`**: runtime matcher for expressions that cannot be statically expanded;
+///   full Tailwind color palette,
 ///   arbitrary colors, common layout/spacing/typography utilities, arbitrary
 ///   lengths, fraction sizing, and numeric values via prefix fallback. Unsupported classes
 ///   are reported in debug builds (or through `onUnknownClass`). Prefer `when` or static

@@ -54,7 +54,7 @@ bun run dev
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.9.0" }
-gpui-rsx = "0.12.0"
+gpui-rsx = "0.12.1"
 ```
 
 ### GPUI 版本目标
@@ -76,14 +76,14 @@ demo 使用 GPUI Kit 0.9.0 及其固定的 `gpui-pre 0.3.11` 快照。Cargo 中�
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.12.0` | `0.9.0` | `gpui-pre@0.3.11` | `gpui-component@0.9.0` |
+| `0.12.1` | `0.9.0` | `gpui-pre@0.3.11` | `gpui-component@0.9.0` |
 
 此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.9.0" }
-gpui-rsx = "0.12.0"
+gpui-rsx = "0.12.1"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -497,7 +497,7 @@ rsx! {
 > 任意颜色（如 `bg-[#ff0000]`、`text-[#f00]`、`bg-[rgba(15,23,42,0.8)]`）、
 > 任意间距和尺寸长度（如 `w-[280px]`、`h-[50%]`、`gap-[14px]`、`mx-[1.25rem]`）、
 > 负值间距与尺寸（如 `-mt-2`、`-gap-4`、`-w-1/2`）、
-> 分数尺寸（如 `w-6/24`），以及数值前缀回退（如 `gap-7`、`p-5`、`opacity-33`）。
+> 分数尺寸（如 `w-6/24`），以及数值前缀回退（如 `gap-7`、`p-5`、`opacity-33.5`）。
 > 真正不受支持的 class（如 Tailwind variants 或未知工具类）在 release 构建中**静默忽略**，
 > 在 debug 构建中按调用点去重警告；`dynamic-class-report` 可在退出时汇总，
 > 也可通过 `onUnknownClass` 显式处理。
@@ -513,8 +513,9 @@ rsx! {
 **常见模式：**
 
 ```rust
-// ✅ 条件字面量（编译期，支持文档列出的子集）
+// 条件结果赋给变量（运行时解析；宏不会追踪变量初始化表达式）
 let btn_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 text-black" };
+rsx! { <div class={btn_class} /> }
 
 // ✅ when 属性（编译期，完全灵活）
 rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }
@@ -1148,7 +1149,7 @@ MIT License
 
 ## 开发工具
 
-安装 `cargo-rsx` 0.12.0（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
+安装 `cargo-rsx` 0.12.1（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
 `convert`、`preview --watch` 和 `lsp`。参见[工具指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/tooling/)
 与 [WASM Playground](https://wsafight.github.io/gpui-rsx/zh-cn/playground/)。
 编辑器适配位于 `editors/`，发布附件包含可安装的 VSIX，市场上架状态另行记录。

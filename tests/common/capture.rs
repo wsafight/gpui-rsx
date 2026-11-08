@@ -19,6 +19,7 @@ thread_local! {
     pub static BORDER_CALLS: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
     pub static FONT_WEIGHT_CALLS: RefCell<Vec<f32>> = const { RefCell::new(Vec::new()) };
     pub static LENGTH_CALLS: RefCell<Vec<(&'static str, f32)>> = const { RefCell::new(Vec::new()) };
+    pub static OPACITY_CALLS: RefCell<Vec<f32>> = const { RefCell::new(Vec::new()) };
     pub static INTEGER_CALLS: RefCell<Vec<(&'static str, i32)>> = const { RefCell::new(Vec::new()) };
 }
 
@@ -49,6 +50,11 @@ pub fn take_font_weight_calls() -> Vec<f32> {
 /// 返回测试期间捕获的长度 helper 入参，并清空缓存。
 pub fn take_length_calls() -> Vec<(&'static str, f32)> {
     LENGTH_CALLS.with(|c| c.borrow_mut().drain(..).collect())
+}
+
+/// Returns opacity arguments captured from static or dynamic class expansion.
+pub fn take_opacity_calls() -> Vec<f32> {
+    OPACITY_CALLS.with(|c| c.borrow_mut().drain(..).collect())
 }
 
 /// 返回测试期间捕获的整数 helper 入参，并清空缓存。

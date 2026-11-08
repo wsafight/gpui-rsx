@@ -9,6 +9,7 @@ type Aliases = HashMap<String, &'static str>;
 struct Bindings {
     aliases: Aliases,
     shadowed: HashSet<String>,
+    foreign_imports: HashSet<String>,
 }
 
 fn canonical(name: &str) -> Option<&'static str> {
@@ -23,20 +24,20 @@ fn identifier(ident: &proc_macro2::Ident) -> String {
     name
 }
 
-fn imports(tree: &syn::UseTree, prefix: &mut Vec<String>, aliases: &mut Aliases) {
+fn imports(tree: &syn::UseTree, prefix: &mut Vec<String>, bindings: &mut Bindings) {
     match tree {
         syn::UseTree::Path(path) => {
             prefix.push(identifier(&path.ident));
-            imports(&path.tree, prefix, aliases);
+            imports(&path.tree, prefix, bindings);
             prefix.pop();
         }
         syn::UseTree::Group(group) => {
             for item in &group.items {
-                imports(item, prefix, aliases);
+                imports(item, prefix, bindings);
             }
         }
-        syn::UseTree::Name(name) => bind(&name.ident, &name.ident, prefix, aliases),
-        syn::UseTree::Rename(rename) => bind(&rename.ident, &rename.rename, prefix, aliases),
+        syn::UseTree::Name(name) => bind(&name.ident, &name.ident, prefix, bindings),
+        syn::UseTree::Rename(rename) => bind(&rename.ident, &rename.rename, prefix, bindings),
         syn::UseTree::Glob(_) => {}
     }
 }
@@ -45,16 +46,52 @@ fn bind(
     original: &proc_macro2::Ident,
     local: &proc_macro2::Ident,
     prefix: &[String],
-    aliases: &mut Aliases,
+    bindings: &mut Bindings,
 ) {
     let local = identifier(local);
-    aliases.remove(&local);
-    if local != "_"
-        && prefix == ["gpui_rsx"]
+    bindings.aliases.remove(&local);
+    bindings.foreign_imports.remove(&local);
+    if local == "_" {
+        return;
+    }
+    if prefix == ["gpui_rsx"]
         && let Some(name) = canonical(&identifier(original))
     {
-        aliases.insert(local, name);
+        bindings.aliases.insert(local, name);
+    } else {
+        // An explicit foreign binding must not fall back to a same-named GPUI-RSX macro.
+        bindings.foreign_imports.insert(local);
     }
+}
+
+fn double_colon_before(tokens: &[TokenTree], index: usize) -> bool {
+    index >= 2
+        && tokens[index - 2..index]
+            .iter()
+            .all(|token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == ':'))
+}
+
+/// Returns whether a macro path is absolute and its identifier segments, including the macro.
+fn invocation_path(tokens: &[TokenTree], index: usize) -> (bool, Vec<String>) {
+    let TokenTree::Ident(name) = &tokens[index] else {
+        unreachable!("macro names are identifiers")
+    };
+    let mut segments = vec![identifier(name)];
+    let mut start = index;
+    let mut absolute = false;
+    while double_colon_before(tokens, start) {
+        if start >= 3
+            && let TokenTree::Ident(segment) = &tokens[start - 3]
+        {
+            segments.push(identifier(segment));
+            start -= 3;
+        } else {
+            absolute = true;
+            break;
+        }
+    }
+    segments.reverse();
+    (absolute, segments)
 }
 
 fn scan_scope(
@@ -74,7 +111,7 @@ fn scan_scope(
         {
             let item: TokenStream = tokens[index..=index + end].iter().cloned().collect();
             if let Ok(item) = syn::parse2::<syn::ItemUse>(item) {
-                imports(&item.tree, &mut Vec::new(), &mut bindings.aliases);
+                imports(&item.tree, &mut Vec::new(), &mut bindings);
             }
         }
     }
@@ -93,14 +130,19 @@ fn scan_scope(
                 && bang.as_char() == '!'
                 && let Some(TokenTree::Group(group)) = tokens.get(index + 2)
             {
-                let qualified = index >= 2
-                    && tokens[index - 2..index].iter().all(
-                        |token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == ':'),
-                    );
                 let local = identifier(name);
-                let canonical = if qualified {
-                    canonical(&local)
-                } else if bindings.shadowed.contains(&local) {
+                let (absolute, segments) = invocation_path(&tokens, index);
+                let canonical = if absolute || segments.len() > 1 {
+                    // Qualified calls are GPUI-RSX only at exactly `gpui_rsx::<macro>` or
+                    // `::gpui_rsx::<macro>`, never merely because their last segment matches.
+                    if segments.len() == 2 && segments[0] == "gpui_rsx" {
+                        canonical(&local)
+                    } else {
+                        None
+                    }
+                } else if bindings.shadowed.contains(&local)
+                    || bindings.foreign_imports.contains(&local)
+                {
                     None
                 } else {
                     bindings
@@ -141,6 +183,7 @@ fn scan_scope(
                 Bindings {
                     aliases: Aliases::new(),
                     shadowed: bindings.shadowed.clone(),
+                    foreign_imports: HashSet::new(),
                 }
             } else {
                 bindings.clone()
@@ -149,6 +192,59 @@ fn scan_scope(
         }
         index += 1;
     }
+}
+
+fn nondefault_import(tree: &syn::UseTree, prefix: &mut Vec<String>) -> bool {
+    match tree {
+        syn::UseTree::Path(path) => {
+            prefix.push(identifier(&path.ident));
+            let nondefault = nondefault_import(&path.tree, prefix);
+            prefix.pop();
+            nondefault
+        }
+        syn::UseTree::Group(group) => group
+            .items
+            .iter()
+            .any(|item| nondefault_import(item, prefix)),
+        syn::UseTree::Name(name) => {
+            canonical(&identifier(&name.ident)).is_some() && prefix.as_slice() != ["gpui_rsx"]
+        }
+        // A body-only rescan cannot reproduce either a positive or negative renamed binding.
+        syn::UseTree::Rename(_) => true,
+        syn::UseTree::Glob(_) => false,
+    }
+}
+
+/// Body-only incremental rescans start with empty bindings. Imports that change bare macro
+/// resolution therefore require a full scan; plain canonical GPUI-RSX imports do not.
+pub(crate) fn imports_require_full_scan(source: &str) -> bool {
+    if !source.contains("use") {
+        return false;
+    }
+    fn scan(tokens: TokenStream) -> bool {
+        let tokens: Vec<_> = tokens.into_iter().collect();
+        for (index, token) in tokens.iter().enumerate() {
+            if matches!(token, TokenTree::Ident(name) if name == "use")
+                && let Some(end) = tokens[index..].iter().position(
+                    |token| matches!(token, TokenTree::Punct(punct) if punct.as_char() == ';'),
+                )
+            {
+                let item: TokenStream = tokens[index..=index + end].iter().cloned().collect();
+                if syn::parse2::<syn::ItemUse>(item)
+                    .is_ok_and(|item| nondefault_import(&item.tree, &mut Vec::new()))
+                {
+                    return true;
+                }
+            }
+            if let TokenTree::Group(group) = token
+                && scan(group.stream())
+            {
+                return true;
+            }
+        }
+        false
+    }
+    source.parse::<TokenStream>().map_or(true, scan)
 }
 
 pub(crate) fn scan(source: &str, nested: bool) -> (Vec<MacroCall>, Option<Diagnostic>) {

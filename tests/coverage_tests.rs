@@ -172,7 +172,7 @@ fn test_user_id_prevents_auto_id() {
 }
 
 // ===========================================================================
-// 子节点聚合边界
+// 子节点顺序与数量边界
 // ===========================================================================
 
 #[test]
@@ -187,7 +187,7 @@ fn test_children_single_expr() {
 
 #[test]
 fn test_children_exactly_two_exprs() {
-    // 恰好 2 个表达式（聚合阈值下界）
+    // 恰好 2 个表达式，均按源码顺序生成 .child()
     let _el = rsx! {
         <div>
             {"first"}
@@ -198,7 +198,7 @@ fn test_children_exactly_two_exprs() {
 
 #[test]
 fn test_children_exactly_three_exprs() {
-    // 恰好 3 个表达式（聚合阈值上界，应触发 .children()）
+    // 恰好 3 个表达式，仍分别生成 .child()
     let _el = rsx! {
         <div>
             {"first"}
@@ -210,7 +210,7 @@ fn test_children_exactly_three_exprs() {
 
 #[test]
 fn test_children_four_exprs() {
-    // 4 个表达式（应触发 .children()）
+    // 4 个表达式，仍分别生成 .child()
     let _el = rsx! {
         <div>
             {"first"}

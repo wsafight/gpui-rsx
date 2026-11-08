@@ -3,3 +3,27 @@ error: Invalid opacity class `opacity-250`. Expected `opacity-0` through `opacit
   |
 8 |     let _el = rsx! { <div class="opacity-250" /> };
   |                                 ^^^^^^^^^^^^^
+
+error: Invalid opacity class `opacity-100.1`. Expected `opacity-0` through `opacity-100`.
+ --> tests/ui/invalid_opacity.rs:9:38
+  |
+9 |     let _decimal = rsx! { <div class="opacity-100.1" /> };
+  |                                      ^^^^^^^^^^^^^^^
+
+error: Invalid opacity class `opacity-NaN`. Expected `opacity-0` through `opacity-100`.
+  --> tests/ui/invalid_opacity.rs:10:34
+   |
+10 |     let _nan = rsx! { <div class="opacity-NaN" /> };
+   |                                  ^^^^^^^^^^^^^
+
+error: Invalid opacity class `opacity-inf`. Expected `opacity-0` through `opacity-100`.
+  --> tests/ui/invalid_opacity.rs:11:39
+   |
+11 |     let _infinite = rsx! { <div class="opacity-inf" /> };
+   |                                       ^^^^^^^^^^^^^
+
+error: Invalid opacity class `opacity--0.1`. Expected `opacity-0` through `opacity-100`.
+  --> tests/ui/invalid_opacity.rs:12:39
+   |
+12 |     let _negative = rsx! { <div class="opacity--0.1" /> };
+   |                                       ^^^^^^^^^^^^^^

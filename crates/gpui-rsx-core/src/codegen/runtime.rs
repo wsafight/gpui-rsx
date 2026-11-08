@@ -61,7 +61,15 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
     class_expr: &syn::Expr,
     mode: ClassMode,
     unknown_class_handler: Option<&syn::Expr>,
+    el: &syn::Ident,
 ) -> TokenStream {
+    let style = syn::Ident::new("__style", Span::mixed_site());
+    let class = syn::Ident::new("__class", Span::mixed_site());
+    let class_str = syn::Ident::new("__class_str", Span::mixed_site());
+    let class_value = syn::Ident::new("__class_expr", Span::mixed_site());
+    let on_unknown = syn::Ident::new("__on_unknown", Span::mixed_site());
+    let unknown_handler = syn::Ident::new("__rsx_unknown_class_handler", Span::mixed_site());
+    let handler_arg = syn::Ident::new("__handler", Span::mixed_site());
     let handler = match unknown_class_handler {
         Some(handler) => quote! { #handler },
         None => default_unknown_handler(mode.clone()),
@@ -73,20 +81,20 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
             SpacingScale::Tailwind => quote! { tailwind },
         };
         quote! {
-            let mut __el = __el;
-            let __style = Styled::style(&mut __el);
-            *__style = #path::#helper(std::mem::take(__style), __class_str, &mut __on_unknown);
-            __el
+            let mut #el = #el;
+            let #style = Styled::style(&mut #el);
+            *#style = #path::#helper(std::mem::take(#style), #class_str, &mut #on_unknown);
+            #el
         }
     } else {
         quote! {
-            __class_str
+            #class_str
                 .split_ascii_whitespace()
-                .fold(__el, |__el, __class| __rsx_apply_class(__el, __class, &mut __on_unknown))
+                .fold(#el, |#el, #class| __rsx_apply_class(#el, #class, &mut #on_unknown))
         }
     };
 
-    let result = quote! { if __class_str.is_empty() { __el } else { #apply } };
+    let result = quote! { if #class_str.is_empty() { #el } else { #apply } };
     let result = if let Some(edges) = super::format_class::static_edges(class_expr, mode.clone()) {
         let prefix = super::class::parse_class_string_with_mode(
             &edges.prefix,
@@ -103,14 +111,14 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
         quote! {
             // An unqualified format! can be shadowed by a user macro. Verify its
             // actual output before assuming literal edges or slicing byte offsets.
-            if __class_str.len() >= #min_len
-                && __class_str.starts_with(#prefix_text)
-                && __class_str.ends_with(#suffix_text)
+            if #class_str.len() >= #min_len
+                && #class_str.starts_with(#prefix_text)
+                && #class_str.ends_with(#suffix_text)
             {
-                let __class_str = &__class_str[#prefix_len..__class_str.len() - #suffix_len];
-                let __el = __el #(#prefix)*;
-                let __el = #result;
-                __el #(#suffix)*
+                let #class_str = &#class_str[#prefix_len..#class_str.len() - #suffix_len];
+                let #el = #el #(#prefix)*;
+                let #el = #result;
+                #el #(#suffix)*
             } else {
                 #result
             }
@@ -121,28 +129,29 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
 
     quote! {
         {
-            fn __rsx_unknown_class_handler<F: FnMut(&str)>(handler: F) -> F {
-                handler
+            fn #unknown_handler<F: FnMut(&str)>(#handler_arg: F) -> F {
+                #handler_arg
             }
             #[allow(unused_mut)]
-            let mut __on_unknown = __rsx_unknown_class_handler(#handler);
+            let mut #on_unknown = #unknown_handler(#handler);
+            let #class_value = #class_expr;
             // AsRef<str>：&str、String、Cow<str> 均零拷贝通过
-            let __class_expr = #class_expr;
-            let __class_str: &str = __class_expr.as_ref();
+            let #class_str: &str = #class_value.as_ref();
             #result
         }
     }
 }
 
 fn default_unknown_handler(mode: ClassMode) -> TokenStream {
+    let class = syn::Ident::new("__class", Span::mixed_site());
     if mode.is_strict() {
         return quote! {
-            |__class: &str| {
+            |#class: &str| {
                 panic!(
                     "[gpui-rsx] unsupported dynamic class {:?} in strict mode. \
                      Pass onUnknownClass={{|class| ...}} to handle it without panicking, \
                      or use rsx! / rsx_permissive! to ignore unsupported dynamic classes.",
-                    __class
+                    #class
                 );
             }
         };
@@ -179,7 +188,7 @@ fn default_unknown_handler(mode: ClassMode) -> TokenStream {
                 }
             });
             if let Ok(mut ignored) = __RSX_IGNORED.lock() {
-                ignored.insert(__class.to_owned());
+                ignored.insert(#class.to_owned());
             }
         }
     } else {
@@ -188,13 +197,13 @@ fn default_unknown_handler(mode: ClassMode) -> TokenStream {
             static __RSX_WARNED: std::sync::LazyLock<std::sync::Mutex<std::collections::HashSet<String>>> =
                 std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
             if let Ok(mut warned) = __RSX_WARNED.lock() {
-                if warned.insert(__class.to_owned()) {
+                if warned.insert(#class.to_owned()) {
                     eprintln!(
                         "[gpui-rsx] warning: dynamic class {:?} ignored at {} (unsupported class)\n  \
                          hint: static literals such as class=\"{}\" are checked at compile time",
-                        __class,
+                        #class,
                         concat!(file!(), ":", line!()),
-                        __class
+                        #class
                     );
                 }
             }
@@ -202,13 +211,13 @@ fn default_unknown_handler(mode: ClassMode) -> TokenStream {
     };
 
     quote! {
-        |__class: &str| {
+        |#class: &str| {
             // 仅在 debug 构建中提示，避免 release 中每帧触发 syscall 污染日志。
             #[cfg(debug_assertions)]
             {
                 #report
             }
-            let _ = __class;
+            let _ = #class;
         }
     }
 }

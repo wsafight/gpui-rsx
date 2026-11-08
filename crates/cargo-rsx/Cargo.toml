@@ -12,3 +12,6 @@ readme = "README.md"
 gpui-rsx-core.workspace = true
 gpui-rsx-tools = { workspace = true, features = ["convert"] }
 serde_json = "1"
+
+[dev-dependencies]
+proc-macro2 = { version = "1.0.107", features = ["span-locations"] }
