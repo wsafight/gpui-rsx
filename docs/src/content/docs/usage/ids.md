@@ -3,7 +3,7 @@ title: IDs and Keys
 description: How GPUI-RSX generates IDs and how to use keys in loops.
 ---
 
-GPUI-RSX generates stable IDs when GPUI APIs require an element identity.
+GPUI-RSX generates an ID from the source location when a GPUI API needs element identity. Use `key` for repeated stateful elements, and an explicit `id` when identity must survive source edits.
 
 Most layout and styling calls do not need an ID. The macro only injects one when a stateful GPUI method is used.
 

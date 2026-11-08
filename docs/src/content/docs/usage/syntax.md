@@ -3,7 +3,7 @@ title: Syntax Reference
 description: Elements, attributes, children, fragments, conditionals, and special GPUI tags.
 ---
 
-This page covers RSX syntax. For class utility details, see [Class Handling](/gpui-rsx/usage/class/). For generated identity rules, see [IDs and Keys](/gpui-rsx/usage/ids/).
+Look up elements, attributes, Rust expressions, loops, and components here. Open `syntax_gallery` from the [runnable demos](/gpui-rsx/examples/demos/) to try them. Utility support is covered in [Class Handling](/gpui-rsx/usage/class/); element identity is covered in [IDs and Keys](/gpui-rsx/usage/ids/).
 
 ## Elements
 

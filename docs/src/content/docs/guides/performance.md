@@ -3,7 +3,7 @@ title: Performance
 description: How GPUI-RSX code expands, where runtime work can appear, and how to keep renders cheap.
 ---
 
-GPUI-RSX is designed so the common path is ordinary GPUI code generated at compile time. Most performance work is therefore about keeping markup static where possible and avoiding unnecessary allocation or state churn in render methods.
+Static markup becomes GPUI builder calls at compile time. Runtime work comes from the expressions, collections, dynamic classes, and state updates around it. Measure those paths before changing a view for performance.
 
 ## Measure development reloads
 

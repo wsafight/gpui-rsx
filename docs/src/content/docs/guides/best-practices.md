@@ -1,7 +1,9 @@
 ---
 title: Best Practices
-description: Practical patterns for maintainable, type-safe, and fast GPUI-RSX views.
+description: Organize views, keep state updates explicit, and choose IDs and classes that survive refactoring.
 ---
+
+Use these patterns when a view grows beyond a short render method. The [Incident Console](/gpui-rsx/examples/incident-console/) shows how the pieces fit together in a runnable application.
 
 ## Structure Views by Workflow
 

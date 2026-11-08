@@ -67,6 +67,14 @@ Also run `node scripts/test-playground.mjs` after building WASM; build the VSIX 
 `editors/zed` for `wasm32-wasip1`. Attach both editor packages to the GitHub release.
 Track Marketplace authentication and Zed registry review separately from crate publication.
 
+## 0.11 behavior checks
+
+Run the real GPUI tests in `demo/tests/negative_layout.rs`, `event_listeners.rs`, and `state_updates.rs`. Check negative margins and GPUI's size clamping, move captures, early returns, and exactly-once notification. Verify the renamed-dependency fixture with the configured `gpui-path`.
+
+Check the build/restart prototype's failure recovery and ready marker. It must retain the running application after a failed build and reset application state on a successful restart. Also verify separate diagnostics and quick fixes for repeated errors in sibling nodes.
+
+Run the runnable binaries' model tests, including filter/selection reconciliation and empty-state recovery in `incident_console` and `project_dashboard`.
+
 ## 0.10 behavior checks
 
 Verify numeric key identity, shared runtime styles, generic components/callbacks, and format

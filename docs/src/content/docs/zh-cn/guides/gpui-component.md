@@ -3,7 +3,7 @@ title: gpui-component
 description: 配合 gpui-component builder 使用 GPUI-RSX，并避免重复 GPUI crate 实例。
 ---
 
-只要组件 builder 和应用的 GPUI 依赖解析到同一个 GPUI source，`gpui-component` 就可以与 GPUI-RSX 一起使用。
+通过 `gpui::component` 使用 Kit 提供的原生控件。控件与应用必须解析到同一个 GPUI 来源。[示例索引](/gpui-rsx/zh-cn/examples/demos/)中的 `component` 包含可操作的 Button、Input 和 Popover。
 
 ## 依赖形态
 

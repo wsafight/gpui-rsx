@@ -95,8 +95,9 @@ impl IncidentConsole {
             })
             .collect::<Vec<_>>();
         match self.sort_mode {
-            SortMode::Impact => visible_incidents
-                .sort_by_key(|(_, severity, customers, _)| (*severity, *customers)),
+            SortMode::Impact => {
+                visible_incidents.sort_by_key(|(_, severity, customers, _)| (*severity, *customers))
+            }
             SortMode::Newest => visible_incidents.sort_by_key(|(_, _, _, age)| *age),
         }
         let visible_ids = visible_incidents
@@ -119,10 +120,38 @@ impl IncidentConsole {
     }
 
     pub(crate) fn selected_incident(&self) -> Option<&Incident> {
-        self.incidents
-            .iter()
-            .find(|incident| incident.id == self.selected_id)
-            .or_else(|| self.incidents.first())
+        self.incidents.iter().find(|incident| {
+            incident.id == self.selected_id
+                && self.scope.matches(incident)
+                && self.severity_filter.matches(incident)
+        })
+    }
+
+    fn reconcile_selection(&mut self) {
+        let snapshot = self.snapshot();
+        if !snapshot.visible_ids.contains(&self.selected_id) {
+            self.selected_id = snapshot.visible_ids.first().copied().unwrap_or(0);
+            self.detail_tab = DetailTab::Overview;
+        }
+    }
+
+    pub(crate) fn set_scope(&mut self, scope: Scope) {
+        self.scope = scope;
+        self.last_action = scope.action().into();
+        self.reconcile_selection();
+    }
+
+    pub(crate) fn set_severity_filter(&mut self, filter: SeverityFilter) {
+        self.severity_filter = filter;
+        self.last_action = format!("Severity filter: {}", filter.label());
+        self.reconcile_selection();
+    }
+
+    pub(crate) fn reset_filters(&mut self) {
+        self.scope = Scope::Active;
+        self.severity_filter = SeverityFilter::All;
+        self.last_action = "Showing all active incidents".into();
+        self.reconcile_selection();
     }
 
     fn record_event(
@@ -160,6 +189,7 @@ impl IncidentConsole {
             EventTone::Note,
         );
         self.last_action = format!("Assigned incident #{incident_id} to you");
+        self.reconcile_selection();
     }
 
     pub(crate) fn advance_selected(&mut self) {
@@ -187,6 +217,7 @@ impl IncidentConsole {
             tone,
         );
         self.last_action = format!("Incident #{incident_id} is now {}", status.label());
+        self.reconcile_selection();
     }
 
     pub(crate) fn escalate_selected(&mut self) {
@@ -210,6 +241,7 @@ impl IncidentConsole {
         };
         self.record_event(incident_id, "You", message, EventTone::Alert);
         self.last_action = format!("Reviewed severity for incident #{incident_id}");
+        self.reconcile_selection();
     }
 
     pub(crate) fn toggle_sort(&mut self) {
@@ -268,13 +300,7 @@ impl IncidentConsole {
         let previous_len = self.incidents.len();
         self.incidents.retain(Incident::is_active);
         let removed = previous_len - self.incidents.len();
-        if !self
-            .incidents
-            .iter()
-            .any(|incident| incident.id == self.selected_id)
-        {
-            self.selected_id = self.incidents.first().map_or(0, |incident| incident.id);
-        }
+        self.reconcile_selection();
         self.last_action = format!("Cleared {removed} resolved incidents");
     }
 }

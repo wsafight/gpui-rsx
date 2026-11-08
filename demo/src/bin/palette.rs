@@ -1,5 +1,6 @@
 mod common;
 
+use gpui::component::ActiveTheme as _;
 use gpui::prelude::*;
 use gpui::*;
 use gpui_rsx::rsx;
@@ -44,26 +45,27 @@ impl Default for PaletteView {
 }
 
 impl Render for PaletteView {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
-            <div class="size-full flex flex-col gap-4 p-6 bg-zinc-950">
-                <header class="flex flex-col gap-2">
-                    <h1 class="text-3xl font-bold text-white">
+            <div class="size-full overflow-y-scroll flex flex-col gap-[24px] p-[32px] bg-background text-foreground">
+                <header class="flex flex-col gap-[8px]">
+                    <h1 class="text-2xl font-semibold">
                         {"Palette"}
                     </h1>
-                    <p class="text-sm text-zinc-400">
-                        {"Static and dynamic class paths can live in the same view."}
+                    <p class="text-sm text-muted-foreground">
+                        {"Each swatch uses a dynamic background class. The layout uses static classes."}
                     </p>
                 </header>
 
-                <section class="flex flex-col gap-3">
+                <section class="flex flex-col">
                     {for swatch in self.swatches.iter() {
-                        <div class="flex items-center gap-4 p-4 rounded-lg bg-zinc-900 border border-zinc-700">
-                            <div class={format!("size-8 rounded-md {}", swatch.class_name)} />
-                            <div class="flex flex-col gap-1">
-                                <span class="text-base text-white">{swatch.name}</span>
-                                <span class="text-sm text-zinc-400">{swatch.value}</span>
+                        <div class="flex items-center gap-[16px] py-[16px] border-b border-border">
+                            <div class={format!("size-[48px] rounded-md {}", swatch.class_name)} />
+                            <div class="flex-1 flex flex-col gap-[4px]">
+                                <span class="text-base font-medium">{swatch.name}</span>
+                                <span class="text-sm text-muted-foreground">{swatch.class_name}</span>
                             </div>
+                            <span class="text-sm text-muted-foreground">{swatch.value}</span>
                         </div>
                     }}
                 </section>
@@ -73,5 +75,8 @@ impl Render for PaletteView {
 }
 
 fn main() {
-    common::run(|_| WindowOptions::default(), |_| PaletteView::default());
+    common::run(
+        |cx| common::window(cx, "Palette · GPUI-RSX", 720.0, 600.0),
+        |_| PaletteView::default(),
+    );
 }

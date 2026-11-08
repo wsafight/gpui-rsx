@@ -17,43 +17,42 @@ pub(crate) fn render(
     ];
 
     rsx! {
-        <aside class="w-[212px] min-w-[212px] flex flex-col justify-between p-16 bg-zinc-900 border-r border-zinc-800">
+        <aside class="w-[212px] min-w-[212px] flex flex-col justify-between p-16 bg-demo-surface border-r border-demo-border">
             <div class="flex flex-col gap-20">
                 <header class="flex flex-col gap-4">
-                    <span class="text-xs font-bold text-cyan-400">{"RELAY"}</span>
+                    <span class="text-xs font-bold text-demo-accent">{"GPUI-RSX demo"}</span>
                     <h1 class="text-xl font-bold text-white">{"Operations"}</h1>
-                    <span class="text-xs text-zinc-500">{"Production workspace"}</span>
+                    <span class="text-xs text-demo-muted">{"Production workspace"}</span>
                 </header>
 
                 <nav class="flex flex-col gap-6">
-                    <span class="text-xs text-zinc-500">{"INCIDENTS"}</span>
+                    <span class="text-xs text-demo-muted">{"Incidents"}</span>
                     {for (scope, count) in scope_options.iter() {
                         <button
                             key={scope.label()}
                             class={if view.scope == *scope {
                                 "flex items-center justify-between px-10 py-8 rounded-md bg-zinc-700 text-white cursor-pointer"
                             } else {
-                                "flex items-center justify-between px-10 py-8 rounded-md text-zinc-400 cursor-pointer"
+                                "flex items-center justify-between px-10 py-8 rounded-md text-demo-muted cursor-pointer"
                             }}
                             onClick={cx.listener({
                                 let scope = *scope;
                                 move |view, _, _window, cx| {
-                                    view.scope = scope;
-                                    view.last_action = scope.action().into();
+                                    view.set_scope(scope);
                                     cx.notify();
                                 }
                             })}
                         >
                             <span>{scope.label()}</span>
-                            <span class="text-xs text-zinc-500">{count.to_string()}</span>
+                            <span class="text-xs text-demo-muted">{count.to_string()}</span>
                         </button>
                     }}
                 </nav>
 
-                <div class="flex flex-col gap-8 pt-12 border-t border-zinc-800">
-                    <span class="text-xs text-zinc-500">{"AUTOMATION"}</span>
+                <div class="flex flex-col gap-8 pt-12 border-t border-demo-border">
+                    <span class="text-xs text-demo-muted">{"Automation"}</span>
                     <button
-                        class="flex items-center justify-between px-10 py-8 rounded-md bg-zinc-950 border border-zinc-800 cursor-pointer"
+                        class="flex items-center justify-between px-10 py-8 rounded-md bg-demo-canvas border border-demo-border cursor-pointer"
                         onClick={cx.listener(|view, _, _window, cx| {
                             view.auto_triage = !view.auto_triage;
                             view.last_action = if view.auto_triage {
@@ -76,13 +75,13 @@ pub(crate) fn render(
                 </div>
             </div>
 
-            <div class="flex flex-col gap-10 pt-12 border-t border-zinc-800">
+            <div class="flex flex-col gap-10 pt-12 border-t border-demo-border">
                 <div class="flex flex-col gap-4">
-                    <span class="text-xs text-zinc-500">{"LAST ACTION"}</span>
+                    <span class="text-xs text-demo-muted">{"Last action"}</span>
                     <span class="text-sm text-zinc-300">{view.last_action.clone()}</span>
                 </div>
                 <button
-                    class="px-10 py-8 rounded-md text-sm text-zinc-400 border border-zinc-700 cursor-pointer"
+                    class="px-10 py-8 rounded-md text-sm text-demo-muted border border-zinc-700 cursor-pointer"
                     onClick={cx.listener(|view, _, _window, cx| {
                         view.clear_resolved();
                         cx.notify();

@@ -1,5 +1,9 @@
 mod common;
 
+use gpui::component::{
+    ActiveTheme as _, Disableable as _,
+    button::{Button, ButtonVariants as _},
+};
 use gpui::prelude::*;
 use gpui::*;
 use gpui_rsx::{rsx, rsx_listener, rsx_update};
@@ -19,52 +23,51 @@ impl Render for CounterView {
         let is_negative = self.count < 0;
 
         rsx! {
-            <div class="size-full flex flex-col gap-5 p-6 bg-neutral-950">
-                <header class="flex flex-col gap-2">
-                    <h1 class="text-3xl font-bold text-white">
+            <div class="size-full overflow-y-scroll flex flex-col gap-[28px] p-[32px] bg-background text-foreground">
+                <header class="flex flex-col gap-[8px]">
+                    <h1 class="text-2xl font-semibold">
                         {"Counter"}
                     </h1>
-                    <p class="text-sm text-neutral-400">
-                        {"This demo uses GPUI listeners generated from RSX attributes."}
+                    <p class="text-sm text-muted-foreground">
+                        {"Change the value with the buttons. Reset returns it to zero."}
                     </p>
                 </header>
 
-                <section class="flex flex-col gap-4 p-5 rounded-lg bg-neutral-900 border border-neutral-700">
+                <section class="flex flex-col gap-[24px] p-[24px] rounded-lg bg-muted border border-border">
                     <div
-                        class={if is_positive { "text-emerald-400" } else if is_negative { "text-red-400" } else { "text-neutral-200" }}
+                        class="text-[64px] font-semibold"
+                        whenClass={(is_positive, "text-emerald-500")}
+                        whenClass={(is_negative, "text-rose-500")}
                     >
-                        {format!("Count: {}", self.count)}
+                        {self.count.to_string()}
                     </div>
 
-                    <div class="flex gap-3">
-                        <button
-                            class="px-4 py-2 rounded-md bg-blue-500 text-white cursor-pointer"
-                            onClick={cx.listener(|view, _, _window, cx| {
+                    <div class="flex flex-wrap gap-[12px]">
+                        <Button
+                            base={Button::new("counter-increment")}
+                            label="Increase"
+                            primary
+                            onClick={rsx_listener!(cx, notify, |view, _, _window, _cx| {
                                 view.count += 1;
-                                cx.notify();
                             })}
-                        >
-                            {"Increment"}
-                        </button>
+                        />
 
-                        <button
-                            class="px-4 py-2 rounded-md bg-red-500 text-white cursor-pointer"
-                            onClick={cx.listener(|view, _, _window, cx| {
+                        <Button
+                            base={Button::new("counter-decrement")}
+                            label="Decrease"
+                            onClick={rsx_listener!(cx, notify, |view, _, _window, _cx| {
                                 view.count -= 1;
-                                cx.notify();
                             })}
-                        >
-                            {"Decrement"}
-                        </button>
+                        />
 
-                        <button
-                            class="px-4 py-2 rounded-md bg-neutral-700 text-white cursor-pointer"
+                        <Button
+                            base={Button::new("counter-reset")}
+                            label="Reset"
+                            disabled={self.count == 0}
                             onClick={rsx_listener!(cx, |view, _, _window, cx| {
                                 rsx_update!(view, cx, |view, _| view.count = 0);
                             })}
-                        >
-                            {"Reset"}
-                        </button>
+                        />
                     </div>
                 </section>
             </div>
@@ -73,5 +76,8 @@ impl Render for CounterView {
 }
 
 fn main() {
-    common::run(|_| WindowOptions::default(), |_| CounterView::default());
+    common::run(
+        |cx| common::window(cx, "Counter · GPUI-RSX", 720.0, 520.0),
+        |_| CounterView::default(),
+    );
 }

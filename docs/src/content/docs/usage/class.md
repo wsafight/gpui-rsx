@@ -3,7 +3,7 @@ title: Class Handling
 description: Static and dynamic class handling, supported utility patterns, and performance guidance.
 ---
 
-The `class` attribute maps a Tailwind-like utility subset to GPUI builder methods.
+The `class` attribute maps a subset of Tailwind-like utilities to GPUI builder methods. Start with a static string; use a dynamic expression only for styles that depend on application state.
 
 ```rust
 rsx! {

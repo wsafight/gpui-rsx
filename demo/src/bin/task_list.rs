@@ -1,8 +1,9 @@
 mod common;
 
+use gpui::component::{ActiveTheme as _, button::Button};
 use gpui::prelude::*;
 use gpui::*;
-use gpui_rsx::rsx;
+use gpui_rsx::{rsx, rsx_listener};
 
 #[derive(Clone)]
 struct Task {
@@ -34,7 +35,7 @@ impl Default for TaskListView {
                 },
                 Task {
                     id: 3,
-                    title: "Add demos for 0.9",
+                    title: "Review the interactive examples",
                     owner: "Docs",
                     done: false,
                 },
@@ -43,44 +44,54 @@ impl Default for TaskListView {
     }
 }
 
+impl TaskListView {
+    fn completed_count(&self) -> usize {
+        self.tasks.iter().filter(|task| task.done).count()
+    }
+
+    fn toggle_task(&mut self, task_id: usize) {
+        if let Some(task) = self.tasks.iter_mut().find(|task| task.id == task_id) {
+            task.done = !task.done;
+        }
+    }
+}
+
 impl Render for TaskListView {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
-            <div class="size-full flex flex-col gap-4 p-6 bg-stone-950">
-                <header class="flex flex-col gap-2">
-                    <h1 class="text-3xl font-bold text-white">
-                        {"Task List"}
+            <div class="size-full overflow-y-scroll flex flex-col gap-[24px] p-[32px] bg-background text-foreground">
+                <header class="flex flex-col gap-[8px]">
+                    <h1 class="text-2xl font-semibold">
+                        {"Task list"}
                     </h1>
-                    <p class="text-sm text-stone-400">
-                        {"Loop rendering with key and conditional literal classes."}
+                    <p class="text-sm text-muted-foreground">
+                        {format!("{} of {} tasks complete. Each row keeps its task ID.", self.completed_count(), self.tasks.len())}
                     </p>
                 </header>
 
-                <section class="flex flex-col gap-3">
+                <section class="flex flex-col">
                     {for task in self.tasks.iter() {
                         <div
                             key={task.id}
-                            class={if task.done {
-                                "flex items-center justify-between gap-4 p-4 rounded-lg bg-emerald-950 border border-emerald-700"
-                            } else {
-                                "flex items-center justify-between gap-4 p-4 rounded-lg bg-stone-900 border border-stone-700"
-                            }}
+                            class="flex items-center justify-between gap-[20px] py-[18px] border-b border-border"
                         >
-                            <div class="flex flex-col gap-1">
-                                <span class="text-base text-white">{task.title}</span>
-                                <span class="text-sm text-stone-400">
-                                    {format!("#{} - Owner: {}", task.id, task.owner)}
+                            <div class="flex-1 min-w-0 flex flex-col gap-[6px]">
+                                <span class="text-base" whenClass={(task.done, "text-muted-foreground line-through")}>{task.title}</span>
+                                <span class="text-sm text-muted-foreground">
+                                    {format!("#{} assigned to {}", task.id, task.owner)}
                                 </span>
                             </div>
-                            <span
-                                class={if task.done {
-                                    "px-3 py-1 rounded-md bg-emerald-500 text-white"
-                                } else {
-                                    "px-3 py-1 rounded-md bg-amber-400 text-stone-950"
-                                }}
-                            >
-                                {if task.done { "Done" } else { "Open" }}
-                            </span>
+                            <Button
+                                key={task.id}
+                                base={Button::new(SharedString::from(format!("task-toggle-{}", task.id)))}
+                                label={if task.done { "Reopen" } else { "Complete" }}
+                                onClick={rsx_listener!(cx, notify, {
+                                    let task_id = task.id;
+                                    move |view, _, _window, _cx| {
+                                        view.toggle_task(task_id);
+                                    }
+                                })}
+                            />
                         </div>
                     }}
                 </section>
@@ -90,5 +101,32 @@ impl Render for TaskListView {
 }
 
 fn main() {
-    common::run(|_| WindowOptions::default(), |_| TaskListView::default());
+    common::run(
+        |cx| common::window(cx, "Task list · GPUI-RSX", 800.0, 560.0),
+        |_| TaskListView::default(),
+    );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TaskListView;
+
+    #[test]
+    fn completion_tracks_task_identity_after_reordering() {
+        let mut view = TaskListView::default();
+        view.tasks.reverse();
+        view.toggle_task(3);
+        assert_eq!(view.completed_count(), 3);
+        assert!(view.tasks.iter().find(|task| task.id == 3).unwrap().done);
+        view.toggle_task(3);
+        assert_eq!(view.completed_count(), 2);
+    }
+
+    #[test]
+    fn unknown_tasks_leave_completion_unchanged() {
+        let mut view = TaskListView::default();
+        view.toggle_task(99);
+        assert_eq!(view.completed_count(), 2);
+        assert_eq!(view.tasks.len(), 3);
+    }
 }

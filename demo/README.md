@@ -24,18 +24,34 @@ sudo apt-get install -y libfontconfig1-dev libwayland-dev libx11-dev libxcb1-dev
   libxkbcommon-dev libxkbcommon-x11-dev
 ```
 
+## Run an example
+
+From the repository root, replace `counter` with an example from the table:
+
 ```bash
-cd demo
-cargo run --bin hello --locked
-cargo run --bin counter --locked
-cargo run --bin palette --locked
-cargo run --bin task_list --locked
-cargo run --bin project_dashboard --locked
-cargo run --bin incident_console --locked
-cargo run --bin api_surface --locked
-cargo run --bin component --locked
-cargo run --bin syntax_gallery --locked
+cargo run --manifest-path demo/Cargo.toml --bin counter --locked
 ```
+
+| Binary | Interaction | Main APIs |
+| --- | --- | --- |
+| `hello` | Open a minimal view. | Static RSX and semantic colors. |
+| `counter` | Increase, decrease, reset. | `rsx_listener!`, `rsx_update!`, native Button and disabled state. |
+| `palette` | Compare color swatches. | Dynamic class expressions. |
+| `task_list` | Complete and reopen tasks. | Keys on stateful controls, ID captures, derived counts. |
+| `component` | Type in the input and open the popover. | Native controls, `#[component]`, context injection, children. |
+| `syntax_gallery` | Toggle conditions, reverse rows, scroll through syntax examples. | `rsx_fragment!`, spread, state variants, negative spacing, special tags. |
+| `api_surface` | Toggle styles and hover the group. | Flex aliases, accessibility, tooltips and group states. |
+| `project_dashboard` | Filter work, change density, complete and add items. | Shared tokens, selection, conditional fragments and empty states. |
+| `incident_console` | Filter, assign, advance status, inject a signal. | Shared runtime, modular views, timeline and state transitions. |
+
+Small examples use Kit's semantic theme colors. The two consoles share green project
+tokens in `rsx.toml`. Numeric spacing defaults to pixels; arbitrary pixel values make
+the intended spacing explicit in the small examples.
+
+The examples use the local GPUI-RSX 0.11 source. The counter demonstrates both new
+listener notification styles and `rsx_update!`; each action notifies once. The syntax
+gallery demonstrates negative margins with overlapping avatars. GPUI clamps negative
+widths, heights and maximum sizes to zero and ignores negative minimum sizes.
 
 `project_dashboard` demonstrates keyed lists, selection, conditional classes,
 progress, density controls and item mutations. `incident_console` combines
@@ -46,6 +62,8 @@ its model and UI modules live under `src/bin/incident_console/`.
 click the event example, reverse keyed rows, and inspect function/struct components,
 fragments, spread children, nested loops, state classes, themes, SVG, images and canvas.
 Its view lives in `src/syntax/` and is also rendered by the automated tests.
+
+## Validate the examples
 
 Run the demo tests without opening a desktop window:
 

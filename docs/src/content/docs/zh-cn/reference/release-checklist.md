@@ -65,6 +65,14 @@ CI 会审计四个活跃 Rust 项目与两个 Bun 项目的 lockfile。更新依
 构建 `editors/zed`，把两个编辑器插件包附加到 GitHub Release。Marketplace 认证和 Zed
 registry 审核与 crate 发布分开跟进。
 
+## 0.11 行为检查
+
+运行 `demo/tests/negative_layout.rs`、`event_listeners.rs` 和 `state_updates.rs` 中的真实 GPUI 测试，核对负边距、GPUI 尺寸限制、move 捕获、提前返回以及每次更新只通知一次的行为。用重命名依赖夹具验证 `gpui-path` 配置。
+
+检查构建/重启原型的失败恢复和就绪标记：构建失败时应保留正在运行的应用，成功重启后应用状态会重置。相邻节点中的重复错误还需分别产生诊断和可应用的修复。
+
+运行各示例的模型测试，覆盖 `incident_console` 和 `project_dashboard` 的筛选、选择同步与空状态恢复。
+
 ## 0.10 行为检查
 
 使用 `demo/tests` 在真实 GPUI 上验证整数 key 身份、共享 runtime 样式、泛型组件 / 回调、

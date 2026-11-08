@@ -1,8 +1,23 @@
 ---
 title: Migration Guide
-description: Adopt RSX and migrate existing Zed Git applications to GPUI Kit.
+description: Upgrade GPUI-RSX, adopt RSX in existing views, and align GPUI dependencies.
 ---
 
+
+Start with the section for your current version. Dependency migration from Zed Git and builder-to-RSX examples follow the version notes.
+
+## From 0.10 to 0.11
+
+Existing markup can keep its current syntax. The main changes are negative spacing, configurable GPUI paths, and optional state-update helpers.
+
+- Negative classes such as `-mt-4` and `-ml-[8px]` now resolve in static and dynamic classes. Numeric spacing still defaults to pixels. GPUI clamps negative widths, heights, and maximum sizes to zero and ignores negative minimum sizes; static uses of these size classes produce a warning.
+- Set `[options] gpui-path = "your_alias"` in `rsx.toml` if your GPUI dependency has a different crate name. The setting also applies to components, IDs, listener/update helpers, and the default shared runtime. The demo keeps the `gpui` alias for Kit.
+- `rsx_listener!(cx, handler)` preserves the native callback signature and leaves notification to the handler. `rsx_listener!(cx, notify, handler)` notifies after the handler returns normally. Remove the matching manual `cx.notify()` when using `notify`.
+- `rsx_update!(view, cx, update)` runs a synchronous update and notifies after normal return. Use it with the listener form that leaves notification to the handler to avoid notifying twice.
+
+The [counter demo](/gpui-rsx/examples/demos/) shows both notification styles. The [development reload workflow](/gpui-rsx/guides/performance/#measure-development-reloads) rebuilds and restarts the application; each restart resets state.
+
+Tool integrations should also check that sibling diagnostics are handled independently. Static negative-size warnings remain warnings in strict mode.
 
 ## From 0.9 to 0.10
 

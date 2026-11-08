@@ -3,7 +3,7 @@ title: 事故响应控制台
 description: 一个包含筛选、状态转换和事件时间线的模块化 GPUI-RSX 多面板应用。
 ---
 
-事故响应控制台是仓库中的完整应用示例。它没有把语法拆成孤立片段，而是模拟实际运维流程：可以筛选、选择、认领、升级事故，推进响应状态，并通过时间线查看处置过程。
+事故响应控制台模拟运维队列：筛选事故、认领负责人、推进响应状态，再查看事件时间线。各面板共用一份状态模型，使用本地示例数据，无需外部服务。
 
 ![事故响应控制台，包含事故队列、运维指标和所选事故详情](/gpui-rsx/incident-console.png)
 
@@ -50,16 +50,19 @@ demo/src/bin/incident_console/
 
 ## 派生视图状态
 
-计数、排序、筛选和选择回退统一在 snapshot 中计算。各面板拿到的是可以直接渲染的数据，不会重复业务规则：
+snapshot 保存统计值和排序后的事故 ID，渲染时再从模型查找对应记录。状态转换会同步当前选择与筛选条件，详情面板只展示可见队列中的事故：
 
 ```rust
 let snapshot = self.snapshot();
+let visible_incidents = snapshot.visible_ids.iter()
+    .filter_map(|id| self.incidents.iter().find(|incident| incident.id == *id))
+    .collect::<Vec<_>>();
 let sidebar = sidebar::render(self, &snapshot.stats, cx);
-let queue = queue::render(self, &snapshot.visible_incidents, cx);
-let details = details::render(self, snapshot.selected.as_ref(), cx);
+let queue = queue::render(self, &visible_incidents, cx);
+let details = details::render(self, self.selected_incident(), cx);
 
 rsx! {
-    <div class="size-full flex bg-neutral-950">
+    <div class="size-full flex bg-demo-canvas">
         {sidebar}
         <main class="flex-1 min-w-0">
             {queue}
@@ -80,13 +83,12 @@ rsx! {
         class={if view.severity_filter == *filter {
             filter.selected_class()
         } else {
-            "px-10 py-6 rounded-md text-zinc-500 cursor-pointer"
+            "px-10 py-6 rounded-md text-demo-muted cursor-pointer"
         }}
-        onClick={cx.listener({
+        onClick={rsx_listener!(cx, notify, {
             let filter = *filter;
-            move |view, _, _window, cx| {
-                view.severity_filter = filter;
-                cx.notify();
+            move |view, _, _window, _cx| {
+                view.set_severity_filter(filter);
             }
         })}
     >
@@ -97,17 +99,16 @@ rsx! {
 
 ## 状态转换
 
-Listener 会把非简单修改交给命名方法。每次转换都会更新事故、记录时间线事件、更新最近操作，并且只发送一次通知：
+Listener 将事故状态修改交给命名方法。`rsx_listener!(cx, notify, ...)` 在方法返回后发送通知，模型本身不负责通知：
 
 ```rust
-onClick={cx.listener(|view, _, _window, cx| {
+onClick={rsx_listener!(cx, notify, |view, _, _window, _cx| {
     view.advance_selected();
-    cx.notify();
 })}
 ```
 
-模型还处理了清理全部已解决事故后的空队列。再次注入信号即可恢复正常流程，不需要重启应用。
+筛选没有结果时，队列提供 **Reset filters**；当前活跃队列为空时，可以用 **Simulate incident** 添加信号。认领或解决事故后，如果记录不再符合当前筛选，选择也会随之更新。
 
-使用 `cargo test --manifest-path demo/Cargo.toml --bin incident_console --locked` 可以运行 4 个状态单元测试。
+共享配色集中在 `demo/rsx.toml`，各面板通过 `bg-demo-surface`、`text-demo-muted` 等 token 使用。运行 `cargo test --manifest-path demo/Cargo.toml --bin incident_console --locked` 可检查状态行为；较小的 API 示例见[示例索引](/gpui-rsx/zh-cn/examples/demos/)。
 
 可以浏览[完整源码](https://github.com/wsafight/gpui-rsx/tree/main/demo/src/bin/incident_console)，也可以把这个持续接受编译检查的示例作为 GPUI 桌面应用起点。

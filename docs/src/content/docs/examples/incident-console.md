@@ -3,13 +3,13 @@ title: Incident Console
 description: A modular, multi-pane GPUI-RSX application with filters, state transitions, and an event timeline.
 ---
 
-The Incident Console is the repository's complete application example. It models an operations workflow instead of presenting isolated syntax samples: incidents can be filtered, selected, assigned, escalated, advanced through a response lifecycle, and inspected through an event timeline.
+The Incident Console models an operations queue: filter incidents, assign an owner, advance the response status, and inspect the event timeline. Its panels share one state model, with local sample data and no external services.
 
 ![Incident Console showing the incident queue, operational metrics, and selected incident details](/gpui-rsx/incident-console.png)
 
 ## Run It
 
-The demo uses the repository's pinned GPUI revision and Rust toolchain:
+The demo uses GPUI-RSX 0.11, GPUI Kit 0.8.1, and the repository's pinned Rust toolchain:
 
 ```bash
 cargo run --manifest-path demo/Cargo.toml --bin incident_console --locked
@@ -50,16 +50,19 @@ This is the same boundary recommended in [Best Practices](/gpui-rsx/guides/best-
 
 ## Derived View State
 
-Counts, sorting, filtering, and selection fallback are computed in one snapshot. Panel renderers receive ready-to-render data and do not duplicate business rules:
+The snapshot contains counts and sorted incident IDs. Rendering looks up those IDs in the model. State transitions reconcile selection with the current filters, so the detail panel always refers to a visible incident:
 
 ```rust
 let snapshot = self.snapshot();
+let visible_incidents = snapshot.visible_ids.iter()
+    .filter_map(|id| self.incidents.iter().find(|incident| incident.id == *id))
+    .collect::<Vec<_>>();
 let sidebar = sidebar::render(self, &snapshot.stats, cx);
-let queue = queue::render(self, &snapshot.visible_incidents, cx);
-let details = details::render(self, snapshot.selected.as_ref(), cx);
+let queue = queue::render(self, &visible_incidents, cx);
+let details = details::render(self, self.selected_incident(), cx);
 
 rsx! {
-    <div class="size-full flex bg-neutral-950">
+    <div class="size-full flex bg-demo-canvas">
         {sidebar}
         <main class="flex-1 min-w-0">
             {queue}
@@ -80,13 +83,12 @@ Repeated controls use ordinary Rust data, RSX loop syntax, and `key` for stable 
         class={if view.severity_filter == *filter {
             filter.selected_class()
         } else {
-            "px-10 py-6 rounded-md text-zinc-500 cursor-pointer"
+            "px-10 py-6 rounded-md text-demo-muted cursor-pointer"
         }}
-        onClick={cx.listener({
+        onClick={rsx_listener!(cx, notify, {
             let filter = *filter;
-            move |view, _, _window, cx| {
-                view.severity_filter = filter;
-                cx.notify();
+            move |view, _, _window, _cx| {
+                view.set_severity_filter(filter);
             }
         })}
     >
@@ -97,17 +99,16 @@ Repeated controls use ordinary Rust data, RSX loop syntax, and `key` for stable 
 
 ## State Transitions
 
-Listeners delegate non-trivial mutations to named methods. Each transition updates the incident, records a timeline event, updates the activity message, and emits one notification:
+Listeners delegate incident changes to named methods. `rsx_listener!(cx, notify, ...)` sends the notification after the method returns; the model itself does not notify:
 
 ```rust
-onClick={cx.listener(|view, _, _window, cx| {
+onClick={rsx_listener!(cx, notify, |view, _, _window, _cx| {
     view.advance_selected();
-    cx.notify();
 })}
 ```
 
-The model also handles an empty queue after resolved incidents are cleared. Injecting another signal restores the normal workflow without restarting the application.
+When a filter has no results, the queue offers **Reset filters**. If the active queue itself is empty, **Simulate incident** adds a signal. Resolving or assigning an incident also updates selection if it leaves the current queue.
 
-Run its four state-focused unit tests with `cargo test --manifest-path demo/Cargo.toml --bin incident_console --locked`.
+The shared colors live in `demo/rsx.toml`; the panels use `bg-demo-surface`, `text-demo-muted`, and related tokens instead of repeating color values. Run the state tests with `cargo test --manifest-path demo/Cargo.toml --bin incident_console --locked`. For smaller examples of the same APIs, see the [demo index](/gpui-rsx/examples/demos/).
 
 Browse the [complete source](https://github.com/wsafight/gpui-rsx/tree/main/demo/src/bin/incident_console) or use this example as a compile-checked starting point for a GPUI desktop application.
