@@ -6,6 +6,16 @@ description: Upgrade GPUI-RSX, adopt RSX in existing views, and align GPUI depen
 
 Start with the section for your current version. Dependency migration from Zed Git and builder-to-RSX examples follow the version notes.
 
+## From 0.11 to 0.12
+
+Existing RSX markup and pixel/Tailwind spacing modes are unchanged. Macro/core still require Rust 1.88; CLI/tooling require Rust 1.98.
+
+`gpui-rsx-tools::Diagnostic` adds `code: Option<String>`. Add `code: None` to existing struct literals, and use `..` when destructuring if the code is not needed. Old JSON without `code` still deserializes; uncategorized diagnostics omit it when serialized. JSON compatibility does not make this Rust source change patch-compatible, so this release is 0.12.0 rather than 0.11.1.
+
+Direct macro imports such as `use gpui_rsx::rsx as view` retain their original spacing mode in tooling. Balanced macros can still be analyzed while surrounding Rust is incomplete, but formatting and migration refuse to write lexically damaged files. Local `macro_rules!` definitions shadow unqualified calls; crate aliases and re-exports are not full Rust name resolution.
+
+The demo targets Kit 0.9.0 / GPUI Pre 0.3.11. Its large incident queue is virtualized, and native profiling is opt-in. New hot-reload diagnostics and probes do not establish that every Dioxus/Kit hot-patch configuration works; see the [development reload workflow](/gpui-rsx/guides/performance/#measure-development-reloads) for the tested configuration and limits.
+
 ## From 0.10 to 0.11
 
 Existing markup can keep its current syntax. The main changes are negative spacing, configurable GPUI paths, and optional state-update helpers.
@@ -116,7 +126,7 @@ dependencies with Kit, preserving the `gpui` crate name for generated code:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.9.0" }
-gpui-rsx = "0.11.0"
+gpui-rsx = "0.12.0"
 ```
 
 Kit 0.9.0 pins `gpui-pre = 0.3.11`. Use `gpui::component` for styled controls and

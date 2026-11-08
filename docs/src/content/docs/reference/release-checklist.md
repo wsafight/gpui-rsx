@@ -46,6 +46,7 @@ cargo publish --dry-run --allow-dirty
 
 Before publishing:
 
+- compare public Rust APIs with the previous release, including struct literals and exhaustive matches; an optional JSON field can still break Rust source compatibility. Before 1.0, ship such changes in a new minor version rather than a patch,
 - set the version everywhere with `cargo xtask bump <version>`: workspace manifests and
   internal requirements, workspace entries in the root, demo, Zed, fuzz and test fixture
   lockfiles, the VS Code and Zed extension manifests, install snippets in the

@@ -8,7 +8,7 @@ The CLI and editor language server share the macro's parser and class configurat
 ## Install and diagnose
 
 ```sh
-cargo install cargo-rsx --version 0.11.0 --locked
+cargo install cargo-rsx --version 0.12.0 --locked
 cargo rsx doctor --manifest-path demo/Cargo.toml
 ```
 
@@ -121,7 +121,7 @@ with failure recovery and timing reports.
 
 | Editor | Setup |
 | --- | --- |
-| VS Code | Download the `.vsix` from the [0.11.0 release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.11.0), then run **Extensions: Install from VSIX**. |
+| VS Code | Download the `.vsix` from the [0.12.0 release](https://github.com/wsafight/gpui-rsx/releases/tag/v0.12.0), then run **Extensions: Install from VSIX**. |
 | Zed | Install `editors/zed` from the repository as a development extension. If you customize Rust language servers, add `"gpui-rsx"` alongside `"rust-analyzer"`. |
 
 Both integrations use `cargo rsx lsp` and provide:

@@ -9,6 +9,13 @@
 
 ## [未发布]
 
+## [0.12.0] - 2026-11-08
+
+### 破坏性变更
+
+- Rust 调用方手动构造工具库 `Diagnostic` 时需补充 `code` 字段；无分类时使用 `None`。
+  原有 JSON 仍可读取。这属于 Rust 源码层面的变更，因此发布为新次版本，而不是 0.11.1。
+
 ### 新增
 
 - Kit 输入、焦点和 Unicode 原生回归，控制台 1千/1万/10万条数据，以及按需启用的
@@ -36,8 +43,6 @@
 - 事故队列改用虚拟列表，缓存筛选与排序快照，以记录索引替代逐行线性 ID 查找。
 - PR 根据改动路径选择检查，文档复用一次 Playground WASM 构建产物。
   编辑器分析基准与宏展开基准一同检查回退；main、定期和手动运行仍执行完整检查。
-- Rust 调用方手动构造工具库 `Diagnostic` 时需补充 `code` 字段；无分类时使用 `None`。
-  原有 JSON 仍可读取。
 
 ## [0.11.0] - 2026-11-05
 
@@ -877,7 +882,8 @@
 
 ---
 
-[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.11.0...HEAD
+[未发布]: https://github.com/wsafight/gpui-rsx/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/wsafight/gpui-rsx/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/wsafight/gpui-rsx/compare/v0.10.2...v0.11.0
 [0.10.2]: https://github.com/wsafight/gpui-rsx/compare/v0.10.1...v0.10.2
 [0.10.1]: https://github.com/wsafight/gpui-rsx/compare/v0.10.0...v0.10.1

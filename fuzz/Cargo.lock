@@ -45,7 +45,7 @@ dependencies = [
 
 [[package]]
 name = "gpui-rsx-core"
-version = "0.11.0"
+version = "0.12.0"
 dependencies = [
  "proc-macro2",
  "quote",
