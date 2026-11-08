@@ -188,9 +188,12 @@ Tokens are compile-time only: they are not available in dynamic `class={expr}` s
 
 ### The `class` Attribute — Dynamic (Runtime)
 
-When `class` receives an expression, a runtime matcher is generated.
-To share it across the crate, call [`rsx_runtime!`] once at the crate root and set
-`[options] dynamic-runtime = "rsx_runtime"` in `rsx.toml`. This optional setting reduces
+When a `class` expression cannot be statically expanded—for example, when it reads a local
+variable—a runtime matcher is generated. Directly inline `if` / `match` expressions whose
+leaves are all string literals are expanded at compile time instead; the macro does not track
+local variable initializers.
+To share the runtime matcher across the crate, call [`rsx_runtime!`] once at the crate root
+and set `[options] dynamic-runtime = "rsx_runtime"` in `rsx.toml`. This optional setting reduces
 compilation work while retaining the same dynamic class support and callbacks.
 Supported classes: common layout/spacing/typography utilities, the full Tailwind
 color palette, arbitrary colors (`bg-[#ff0000]`, `text-[#f00]`,
@@ -245,7 +248,8 @@ let _el = rsx_strict! {
 # let handler = |_: &ClickEvent, _: &mut Window, _: &mut App| {};
 # let _doc = {
 let active = true;
-rsx! { <div class={if active { "flex gap-4" } else { "block" }} /> };
+let classes = if active { "flex gap-4" } else { "block" };
+rsx! { <div class={classes} /> };
 # };
 # div()
 # }
@@ -256,7 +260,7 @@ rsx! { <div class={if active { "flex gap-4" } else { "block" }} /> };
 # }
 ```
 
-Prefer static strings or the `when` attribute instead:
+Prefer static strings, inline conditional/match literals, or the `when` attribute instead:
 
 ```
 # #![allow(unused)]
@@ -293,7 +297,10 @@ Prefer static strings or the `when` attribute instead:
 // static literal — compile-time, documented subset
 rsx! { <div class="flex gap-4" /> };
 
-// ✅ conditional literal — still static
+// ✅ inline conditional literal — static branch expansion
+rsx! { <div class={if active { "flex gap-4" } else { "block" }} /> };
+
+// Conditional assigned to a variable — dynamic; initializers are not tracked
 let cls = if active { "flex gap-4" } else { "block" };
 rsx! { <div class={cls} /> };
 

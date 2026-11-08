@@ -267,8 +267,8 @@ rsx! {
 # }
 ```
 
-Two or more consecutive expressions are batched into a single `.children([...])`
-call (stack-allocated array, zero heap allocation):
+Ordinary expressions are emitted as individual `.child(...)` calls in source order.
+Only spreads and `for` loops, which yield multiple elements, use `.children(iterator)`:
 
 ```
 # #![allow(unused)]
@@ -303,7 +303,7 @@ call (stack-allocated array, zero heap allocation):
 # let handler = |_: &ClickEvent, _: &mut Window, _: &mut App| {};
 # let _doc = {
 rsx! { <div>{"a"}{"b"}{"c"}</div> }
-// → div().children(["a", "b", "c"])
+// → div().child("a").child("b").child("c")
 # };
 # div()
 # }

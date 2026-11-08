@@ -12,10 +12,11 @@
 //! - 直接 push 到调用方 Vec，避免中间 Vec 分配
 
 use super::class::{ClassMode, parse_class_string_with_mode};
+use super::element::ElementMethods;
 use super::runtime::generate_dynamic_class_code_with_mode;
 use super::tables::{is_stateful_class, lookup_attr_flag_method, lookup_attr_method_info};
 use crate::parser::RsxAttribute;
-use proc_macro2::TokenStream;
+use proc_macro2::{Span, TokenStream};
 use quote::quote;
 use syn::spanned::Spanned;
 
@@ -48,7 +49,7 @@ pub(crate) fn static_class_expr_needs_id(expr: &syn::Expr, mode: ClassMode) -> b
 pub(crate) fn generate_attr_methods_with_mode(
     attr: &RsxAttribute,
     hints: AttrHints<'_>,
-    out: &mut Vec<TokenStream>,
+    out: &mut ElementMethods,
     mode: ClassMode,
     dynamic_used: &mut bool,
 ) {
@@ -93,30 +94,39 @@ pub(crate) fn generate_attr_methods_with_mode(
                 // 情况 2：条件表达式的每个分支都是字符串字面量 → 分支内静态展开。
                 // 这是常见写法，避免为 `if active { "..." } else { "..." }`
                 // 生成完整动态 class matcher。
-                if let Some(static_expr) = generate_static_class_expr_code(value, mode.clone()) {
-                    out.push(quote! { .map(|__el| #static_expr) });
+                let el = syn::Ident::new("__el", Span::mixed_site());
+                if let Some(static_expr) = generate_static_class_expr_code(value, mode.clone(), &el)
+                {
+                    out.push_inline(el, static_expr);
                     return;
                 }
 
                 // 情况 3：动态表达式 → 生成运行时解析代码
                 *dynamic_used = true;
-                let dynamic_code =
-                    generate_dynamic_class_code_with_mode(value, mode, hints.unknown_class_handler);
-                out.push(quote! { .map(|__el| #dynamic_code) });
+                let dynamic_code = generate_dynamic_class_code_with_mode(
+                    value,
+                    mode,
+                    hints.unknown_class_handler,
+                    &el,
+                );
+                out.push_inline(el, dynamic_code);
                 return;
             }
 
             if name == "visible" {
-                out.push(quote! {
-                    .map(|__el| {
-                        let __visible = #value;
-                        if __visible {
-                            __el.visible()
+                let el = syn::Ident::new("__el", Span::mixed_site());
+                let visible = syn::Ident::new("__visible", Span::mixed_site());
+                out.push_inline(
+                    el.clone(),
+                    quote! {
+                        let #visible = #value;
+                        if #visible {
+                            #el.visible()
                         } else {
-                            __el.invisible()
+                            #el.invisible()
                         }
-                    })
-                });
+                    },
+                );
                 return;
             }
 
@@ -163,7 +173,8 @@ pub(crate) fn generate_attr_methods_with_mode(
         } => {
             let class_str = class_lit.value();
             let class_methods = parse_class_string_with_mode(&class_str, mode, class_lit.span());
-            out.push(quote! { .when(#condition, |__el| __el #(#class_methods)* ) });
+            let el = syn::Ident::new("__el", Span::mixed_site());
+            out.push(quote! { .when(#condition, |#el| #el #(#class_methods)* ) });
         }
 
         // GPUI state-style helpers. These methods receive StyleRefinement, which implements
@@ -171,7 +182,8 @@ pub(crate) fn generate_attr_methods_with_mode(
         RsxAttribute::StateClass { method, class_lit } => {
             let class_str = class_lit.value();
             let class_methods = parse_class_string_with_mode(&class_str, mode, class_lit.span());
-            out.push(quote! { .#method(|__style| __style #(#class_methods)* ) });
+            let style = syn::Ident::new("__style", Span::mixed_site());
+            out.push(quote! { .#method(|#style| #style #(#class_methods)* ) });
         }
     }
 }
@@ -206,13 +218,18 @@ pub fn static_class_literals(expr: &syn::Expr) -> Option<Vec<&syn::LitStr>> {
     }
 }
 
-fn generate_static_class_expr_code(expr: &syn::Expr, mode: ClassMode) -> Option<TokenStream> {
+fn generate_static_class_expr_code(
+    expr: &syn::Expr,
+    mode: ClassMode,
+    el: &syn::Ident,
+) -> Option<TokenStream> {
     match expr {
         syn::Expr::If(expr_if) => {
             let condition = &expr_if.cond;
-            let then_code = generate_static_class_block_code(&expr_if.then_branch, mode.clone())?;
+            let then_code =
+                generate_static_class_block_code(&expr_if.then_branch, mode.clone(), el)?;
             let (_, else_expr) = expr_if.else_branch.as_ref()?;
-            let else_code = generate_static_class_expr_code(else_expr, mode)?;
+            let else_code = generate_static_class_expr_code(else_expr, mode, el)?;
             Some(quote! {
                 if #condition {
                     #then_code
@@ -234,7 +251,7 @@ fn generate_static_class_expr_code(expr: &syn::Expr, mode: ClassMode) -> Option<
                     } else {
                         quote! {}
                     };
-                    let body = generate_static_class_expr_code(&arm.body, mode.clone())?;
+                    let body = generate_static_class_expr_code(&arm.body, mode.clone(), el)?;
                     Some(quote! {
                         #(#attrs)*
                         #pat #guard => #body,
@@ -253,18 +270,22 @@ fn generate_static_class_expr_code(expr: &syn::Expr, mode: ClassMode) -> Option<
         }) => {
             let class_str = lit_str.value();
             let methods = parse_class_string_with_mode(&class_str, mode, lit_str.span());
-            Some(quote! { __el #(#methods)* })
+            Some(quote! { #el #(#methods)* })
         }
-        syn::Expr::Paren(expr) => generate_static_class_expr_code(&expr.expr, mode),
-        syn::Expr::Group(expr) => generate_static_class_expr_code(&expr.expr, mode),
-        syn::Expr::Block(expr) => generate_static_class_block_code(&expr.block, mode),
+        syn::Expr::Paren(expr) => generate_static_class_expr_code(&expr.expr, mode, el),
+        syn::Expr::Group(expr) => generate_static_class_expr_code(&expr.expr, mode, el),
+        syn::Expr::Block(expr) => generate_static_class_block_code(&expr.block, mode, el),
         _ => None,
     }
 }
 
-fn generate_static_class_block_code(block: &syn::Block, mode: ClassMode) -> Option<TokenStream> {
+fn generate_static_class_block_code(
+    block: &syn::Block,
+    mode: ClassMode,
+    el: &syn::Ident,
+) -> Option<TokenStream> {
     let expr = block_tail_expr(block)?;
-    generate_static_class_expr_code(expr, mode)
+    generate_static_class_expr_code(expr, mode, el)
 }
 
 fn block_tail_expr(block: &syn::Block) -> Option<&syn::Expr> {
@@ -341,9 +362,10 @@ mod tests {
 
     #[test]
     fn static_class_branches_expand_each_arm_at_compile_time() {
-        // `if` / `else` branches become one `.map` with a static expansion per branch.
+        // Branches use a sequential receiver block, not a closure around user expressions.
         let conditional = expand(r#"<div class={if active {"flex"} else {"grid"}} />"#);
-        assert!(conditional.contains(". map ("), "{conditional}");
+        assert!(conditional.contains("let __el"), "{conditional}");
+        assert!(!conditional.contains(". map ("), "{conditional}");
         assert!(conditional.contains(". flex ()"), "{conditional}");
         assert!(conditional.contains(". grid ()"), "{conditional}");
         assert!(!conditional.contains("__rsx_apply_class"), "{conditional}");

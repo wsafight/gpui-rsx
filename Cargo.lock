@@ -116,6 +116,7 @@ version = "0.12.0"
 dependencies = [
  "gpui-rsx-core",
  "gpui-rsx-tools",
+ "proc-macro2",
  "serde_json",
 ]
 

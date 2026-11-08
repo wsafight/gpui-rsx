@@ -209,8 +209,12 @@ impl Styled for StyleRefinement {
         bg,
         text_color,
         border_color,
-        opacity,
     );
+
+    fn opacity<T: Into<f32>>(self, value: T) -> Self {
+        OPACITY_CALLS.with(|c| c.borrow_mut().push(value.into()));
+        self
+    }
 
     fn line_clamp(self, _: usize) -> Self {
         self
@@ -464,8 +468,12 @@ impl Styled for MockElement {
         bg,
         text_color,
         border_color,
-        opacity,
     );
+
+    fn opacity<T: Into<f32>>(self, value: T) -> Self {
+        OPACITY_CALLS.with(|c| c.borrow_mut().push(value.into()));
+        self
+    }
 
     fn line_clamp(self, lines: usize) -> Self {
         INTEGER_CALLS.with(|c| c.borrow_mut().push(("line_clamp", lines as i32)));

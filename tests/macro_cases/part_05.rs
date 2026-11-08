@@ -181,12 +181,12 @@ fn test_on_mouse_up_out_snake() {
 }
 
 // ===========================================================================
-// 36. Children 聚合优化
+// 36. Children 按源码顺序生成
 // ===========================================================================
 
 #[test]
-fn test_children_aggregation_3_or_more() {
-    // 3 个连续 Expr → .children(vec![...]) 而非 3 个 .child()
+fn test_children_three_exprs_in_source_order() {
+    // 3 个连续 Expr 仍分别生成 .child()
     let _el = rsx! {
         <div>
             {"first"}
@@ -197,8 +197,8 @@ fn test_children_aggregation_3_or_more() {
 }
 
 #[test]
-fn test_children_aggregation_mixed() {
-    // 混合节点不影响聚合逻辑
+fn test_children_mixed_nodes_in_source_order() {
+    // 表达式与元素子节点保持源码顺序
     let _el = rsx! {
         <div>
             {"a"}
@@ -212,8 +212,8 @@ fn test_children_aggregation_mixed() {
 }
 
 #[test]
-fn test_children_aggregation_under_3() {
-    // 2 个 Expr 不触发聚合，仍用 .child()
+fn test_children_two_exprs_in_source_order() {
+    // 2 个 Expr 分别生成 .child()
     let _el = rsx! {
         <div>
             {"first"}

@@ -45,6 +45,14 @@ fn watch_key(source: Result<String, String>, mode: Result<ClassMode, String>) ->
     (source, mode_key(&mode))
 }
 
+struct SpanMemoryGuard;
+
+impl Drop for SpanMemoryGuard {
+    fn drop(&mut self) {
+        gpui_rsx_tools::release_span_memory();
+    }
+}
+
 /// The refreshed `(key, body)` for an edit, or `None` when nothing changed.
 ///
 /// Rendering errors become escaped HTML, so one broken edit keeps the preview server
@@ -55,6 +63,9 @@ fn refreshed(
     current_mode: Result<ClassMode, String>,
     cached: &WatchKey,
 ) -> Option<(WatchKey, String)> {
+    // Every result is owned, and no spans escape this request. Drop covers successful renders,
+    // parse failures, and cache-hit early returns.
+    let _span_memory = SpanMemoryGuard;
     let key = (source, mode_key(&current_mode));
     if &key == cached {
         return None;
@@ -160,6 +171,43 @@ mod tests {
         }
     }
 
+    fn next_parsed_span_start() -> usize {
+        let tokens = "1".parse::<proc_macro2::TokenStream>().unwrap();
+        let proc_macro2::TokenTree::Literal(literal) = tokens.into_iter().next().unwrap() else {
+            unreachable!()
+        };
+        let span = literal.span();
+        assert_eq!(span.source_text().as_deref(), Some("1"));
+        span.byte_range().start
+    }
+
+    fn seeded_span_start() -> usize {
+        gpui_rsx_tools::release_span_memory();
+        next_parsed_span_start()
+    }
+
+    #[test]
+    fn foreign_macro_calls_are_not_previewed() {
+        for source in [
+            r#"fn view(){other_crate::rsx!{<div class="flex"/>};}"#,
+            r#"use other_crate::rsx; fn view(){rsx!{<div class="flex"/>};}"#,
+            r#"use other_crate::widget as rsx; fn view(){rsx!{<div class="flex"/>};}"#,
+        ] {
+            assert!(
+                content(&options(0), source, ClassMode::PERMISSIVE).is_err(),
+                "{source}"
+            );
+        }
+
+        let source = r#"fn view(){
+            other_crate::rsx!{<div>{"foreign"}</div>};
+            ::gpui_rsx::rsx!{<span>{"local"}</span>};
+        }"#;
+        let rendered = content(&options(0), source, ClassMode::PERMISSIVE).unwrap();
+        assert!(rendered.contains("local"), "{rendered}");
+        assert!(!rendered.contains("foreign"), "{rendered}");
+    }
+
     #[test]
     fn bare_bodies_render_without_macro_selection() {
         let rendered =
@@ -233,6 +281,59 @@ mod tests {
             assert_eq!(status, "404 Not Found", "{route}");
             assert_eq!(body.as_ref(), "Not found", "{route}");
         }
+    }
+
+    #[test]
+    fn refreshed_releases_span_memory_after_success_and_cache_hits() {
+        let opt = options(0);
+        let origin = seeded_span_start();
+        let source = "fn view(){rsx!{<div/>};}".to_owned();
+        let cached = watch_key(Ok(source), Ok(ClassMode::PERMISSIVE));
+        let changed = "fn view(){rsx!{<span/>};}".to_owned();
+        let (key, body) = refreshed(
+            &opt,
+            Ok(changed.clone()),
+            Ok(ClassMode::PERMISSIVE),
+            &cached,
+        )
+        .unwrap();
+        assert!(body.contains("data-rsx-tag=\"span\""), "{body}");
+        assert_eq!(
+            next_parsed_span_start(),
+            origin,
+            "successful rendering must reset the thread's source map"
+        );
+
+        assert!(refreshed(&opt, Ok(changed), Ok(ClassMode::PERMISSIVE), &key).is_none());
+        assert_eq!(
+            next_parsed_span_start(),
+            origin,
+            "cache hits must also reset the thread's source map"
+        );
+    }
+
+    #[test]
+    fn refreshed_releases_span_memory_after_parse_failures() {
+        let opt = options(0);
+        let cached = watch_key(
+            Ok("fn view(){rsx!{<div/>};}".into()),
+            Ok(ClassMode::PERMISSIVE),
+        );
+        // Seed the map so cleanup is observable even before the failed render adds more spans.
+        let origin = seeded_span_start();
+        let (_, body) = refreshed(
+            &opt,
+            Ok("fn view(){rsx!{<div>".into()),
+            Ok(ClassMode::PERMISSIVE),
+            &cached,
+        )
+        .unwrap();
+        assert!(body.starts_with("<pre>"), "{body}");
+        assert_eq!(
+            next_parsed_span_start(),
+            origin,
+            "failed parsing must reset the thread's source map"
+        );
     }
 
     #[test]

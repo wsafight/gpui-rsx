@@ -216,6 +216,42 @@ fn build_script_tracks_config_creation_removal_and_recreation_for_every_macro() 
 }
 
 #[test]
+fn conditional_and_dynamic_theme_classes_preserve_context_borrows() {
+    let project = Project::new("theme-context-borrows");
+    fs::write(
+        project.root.join("rsx.toml"),
+        "[colors]\nsurface = { expr = \"cx.theme().background\" }\n",
+    )
+    .unwrap();
+    fs::write(
+        project.root.join("src/lib.rs"),
+        "extern crate engine as gpui;
+         use engine::{prelude::*, *};
+         struct Theme { background: u32 }
+         struct Context;
+         impl Context {
+             fn theme(&self) -> Theme { Theme { background: 0 } }
+         }
+         pub fn render(cx: &mut Context, active: bool) -> impl IntoElement {
+             let element = gpui_rsx::rsx! {
+                 <div class={if active { \"bg-surface\" } else { \"bg-surface\" }} />
+             };
+             let dynamic = if active { \"flex\" } else { \"grid\" };
+             let dynamic_element = gpui_rsx::rsx! {
+                 <div class={format!(\"bg-surface {}\", dynamic)} />
+             };
+             let _ = cx.theme().background;
+             let _ = dynamic_element;
+             element
+         }",
+    )
+    .unwrap();
+
+    let (success, errors) = project.run();
+    assert!(success, "theme expressions must not move `cx`: {errors}");
+}
+
+#[test]
 fn component_keeps_its_item_when_the_config_is_invalid() {
     let project = Project::new("component-config-error");
     fs::write(

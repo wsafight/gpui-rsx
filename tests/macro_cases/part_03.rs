@@ -308,7 +308,7 @@ fn test_group_hover_does_not_generate_auto_id() {
 #[test]
 fn test_group_active_generates_auto_id() {
     let _el = rsx! {
-        <button groupActive={("menu", |style| style.opacity(0.85))}>
+        <button groupActive={("menu", |style| style.opacity(0.85_f32))}>
             {"Active"}
         </button>
     };

@@ -512,7 +512,7 @@ rsx! {
 > palette, arbitrary colors (e.g. `bg-[#ff0000]`, `text-[#f00]`, `bg-[rgba(15,23,42,0.8)]`),
 > arbitrary spacing and sizing lengths (`w-[280px]`, `h-[50%]`, `gap-[14px]`, `mx-[1.25rem]`),
 > negative spacing and sizing values (`-mt-2`, `-gap-4`, `-w-1/2`),
-> fraction sizing (`w-6/24`), and numeric prefix fallback (e.g. `gap-7`, `p-5`, `opacity-33`).
+> fraction sizing (`w-6/24`), and numeric prefix fallback (e.g. `gap-7`, `p-5`, `opacity-33.5`).
 > Truly unsupported classes (e.g. Tailwind variants or unknown utilities) are **silently ignored**
 > in release builds and print each warning once per call site in debug builds. Enable
 > `dynamic-class-report` for an exit summary, or supply `onUnknownClass` for explicit handling.
@@ -528,8 +528,9 @@ rsx! {
 **Common Patterns:**
 
 ```rust
-// ✅ Conditional literal (compile-time, documented subset)
+// Conditional assigned to a variable (runtime parser; initializers are not tracked)
 let button_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 text-black" };
+rsx! { <div class={button_class} /> }
 
 // ✅ when attribute (compile-time, fully flexible)
 rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }

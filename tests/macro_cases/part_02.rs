@@ -254,7 +254,7 @@ fn test_nested_conditional_elements() {
 #[test]
 fn test_opacity_attribute() {
     let _el = rsx! {
-        <div opacity={0.5}>{"半透明内容"}</div>
+        <div opacity={0.5_f32}>{"半透明内容"}</div>
     };
 }
 
@@ -324,7 +324,7 @@ fn test_combined_common_attributes() {
     let _el = rsx! {
         <div
             class="flex items-center"
-            opacity={0.8}
+            opacity={0.8_f32}
             visible={is_visible}
             absolute
             top={px(0.0)}
@@ -346,7 +346,7 @@ fn test_modal_overlay_example() {
             width={px(100.0)}
             height={px(100.0)}
             bg={rgb(0x000000)}
-            opacity={0.5}
+            opacity={0.5_f32}
             visible={is_open}
         >
             {"模态框遮罩"}

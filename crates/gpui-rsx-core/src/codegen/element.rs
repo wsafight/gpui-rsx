@@ -107,6 +107,53 @@ use std::cell::OnceCell;
 
 type CodegenResult = Result<TokenStream, CodegenErrors>;
 
+enum ElementMethod {
+    Chain(TokenStream),
+    Inline {
+        element: syn::Ident,
+        body: TokenStream,
+    },
+}
+
+/// Ordered method fragments. Inline blocks bind the current receiver without putting user
+/// expressions inside a generated closure, then continue the ordinary method chain.
+pub(crate) struct ElementMethods {
+    fragments: Vec<ElementMethod>,
+}
+
+impl ElementMethods {
+    fn with_capacity(capacity: usize) -> Self {
+        Self {
+            fragments: Vec::with_capacity(capacity),
+        }
+    }
+
+    pub(crate) fn push(&mut self, tokens: TokenStream) {
+        self.fragments.push(ElementMethod::Chain(tokens));
+    }
+
+    pub(crate) fn push_inline(&mut self, element: syn::Ident, body: TokenStream) {
+        self.fragments.push(ElementMethod::Inline { element, body });
+    }
+
+    pub(crate) fn extend(&mut self, tokens: impl IntoIterator<Item = TokenStream>) {
+        self.fragments
+            .extend(tokens.into_iter().map(ElementMethod::Chain));
+    }
+
+    fn finish(self, base: TokenStream) -> TokenStream {
+        self.fragments
+            .into_iter()
+            .fold(base, |expression, method| match method {
+                ElementMethod::Chain(tokens) => quote! { #expression #tokens },
+                ElementMethod::Inline { element, body } => quote! {{
+                    let #element = #expression;
+                    #body
+                }},
+            })
+    }
+}
+
 /// 生成 GPUI 代码（入口）
 ///
 /// 将解析后的 RSX AST 转换为 GPUI 的类型安全代码。
@@ -333,11 +380,12 @@ fn generate_flattened_nodes(
 /// and releasing mutable borrows between siblings. The result uses one shared collection.
 fn collect_any_elements(exprs: &[(TokenStream, bool)], element_type: TokenStream) -> TokenStream {
     let children = syn::Ident::new("__rsx_children", Span::mixed_site());
+    let child = syn::Ident::new("__rsx_child", Span::mixed_site());
     let append = exprs.iter().map(|(expr, yields_many)| {
         if *yields_many {
             quote! {
                 #children.extend(::core::iter::IntoIterator::into_iter(#expr)
-                    .map(|__rsx_child| __rsx_child.into_any_element()));
+                    .map(|#child| #child.into_any_element()));
             }
         } else {
             quote! { #children.push((#expr).into_any_element()); }
@@ -408,8 +456,8 @@ fn generate_element_checked(
     // 预分配方法链容量：
     // - 每个属性乘以 2（class 属性平均展开 3-4 个方法，其余属性 1 个）
     // - 加上子节点数
-    let mut methods: Vec<TokenStream> =
-        Vec::with_capacity(element.attributes.len() * 2 + element.children.len());
+    let mut methods =
+        ElementMethods::with_capacity(element.attributes.len() * 2 + element.children.len());
 
     for attr in &element.attributes {
         match attr {
@@ -517,14 +565,14 @@ fn generate_element_checked(
         gpui,
     )?;
 
-    Ok(quote! { #base #(#default_methods)* #(#methods)* })
+    Ok(methods.finish(quote! { #base #(#default_methods)* }))
 }
 
 /// 生成子节点的方法链片段
 fn generate_children_methods(
     children: &[RsxNode],
     require_loop_key: bool,
-    methods: &mut Vec<TokenStream>,
+    methods: &mut ElementMethods,
     mode: ClassMode,
     dynamic_used: &mut bool,
     gpui: &OnceCell<syn::Path>,

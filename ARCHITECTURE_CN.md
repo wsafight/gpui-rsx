@@ -392,35 +392,23 @@ div()
    **循环安全**：for 循环内的 stateful 元素若缺少 `id` 或 `key`，会报编译错误。
    原因是所有迭代会共享相同的自动 ID，导致 GPUI 状态冲突。
 
-7. **子节点聚合** — 2+ 个连续 `Expr` 子节点批量合并为单次 `.children([...])` 调用，
-   数组是栈分配，比多次 `.child()` 方法分派更高效。阈值由 3 降为 2：
+7. **子节点生成** — 普通元素和表达式子节点按源码顺序逐一生成 `.child(expr)`。
+   只有一次产生多个元素的节点（`for` 循环或展开）使用 `.children(iterator)`：
 
    ```rust
-   // 2+ 个连续表达式 → 单次 .children([...])，栈分配数组
-   .children([expr1, expr2])
-
-   // 1 个 → 独立 .child() 调用
    .child(expr1)
+   .child(expr2)
+   .children(iter)
    ```
 
-   `generate_children_methods` 中的改动：
-   ```rust
-   // 之前：阈值为 3
-   if consecutive_exprs.len() >= 3 {
+   `generate_children_methods` 直接保持这一顺序，不存在连续表达式批处理阈值。
 
-   // 之后：阈值为 2（数组栈分配，无额外开销）
-   if consecutive_exprs.len() >= 2 {
-       methods.push(quote! { .children([#(#consecutive_exprs),*]) });
-   } else {
-       for expr in &consecutive_exprs {
-           methods.push(quote! { .child(#expr) });
-       }
-   }
-   ```
-
-8. **For 循环代码生成** — 单个子节点直接映射迭代器；多个子节点使用 `once` / `chain`
-   将 `AnyElement` 迭代器展平，避免每次迭代分配 Fragment 向量。根 Fragment 最终收集为
-   `Vec<AnyElement>`。
+8. **For 循环代码生成** — 单个普通子节点直接通过 `.map()` 映射迭代器；多个普通子节点
+   使用 `.flat_map()` 和 `AnyElement` 数组。唯一的循环体节点是嵌套 `for` / 展开时，使用
+   `.flat_map()` 和 `collect::<Vec<_>>()` 消费；展开后有多个循环体节点且其中包含嵌套
+   迭代器或展开时，`collect_any_elements` 使用同一个 `Vec`，按源码顺序执行
+   `push` / `extend`。普通根 Fragment 保留 `vec![exprs...]`；包含多元素节点的根
+   Fragment 以及所有 `rsx_fragment!` 根节点才收集为 `Vec<AnyElement>`。
 
 **自动 ID 生成**（基于 span，在增量编译中保持稳定）：
 ```rust
@@ -442,7 +430,7 @@ fn make_auto_id(tag_ident: &syn::Ident) -> TokenStream {
 
 #### runtime.rs — 动态 class 代码生成
 
-**用途**：为 `class={expression}` 属性生成运行时代码。
+**用途**：为无法静态展开的 `class={expression}` 属性生成运行时代码。
 
 动态 class 支持常用生成方法、数值长度、任意颜色、Tailwind 色板与透明度修饰符，负值间距/尺寸（`-mt-2`、`-gap-4`）通过同一数值回退解析并保留符号。
 变体和主题 token 需静态字符串；未知 class 交给调用点的回调，默认 debug 警告、严格模式
@@ -562,7 +550,7 @@ thread_local! {
 - 属性（45）：Flag、值、camelCase/snake_case
 - 事件（18）：所有 15 个事件处理器 + 自动 ID
 - 样式（32）：class、颜色、间距、边框
-- 子节点（24）：表达式、展开、for 循环、聚合
+- 子节点（24）：表达式、展开、for 循环、按源码顺序生成
 - 条件（12）：when、whenSome
 - 边界情况（43）：自动 ID、styled 标签、fragments、invisible
 
@@ -747,21 +735,19 @@ pub(crate) fn parse_single_class(class: &str) -> TokenStream {
 
 ### 运行时（生成代码质量）
 
-**子节点聚合阈值** (`element.rs`)：
+**子节点生成** (`element.rs`)：
 
-连续 2+ 个 `Expr` 子节点合并为 `.children([...])` 调用（栈分配数组），
-而非逐一 `.child()` 调用，减少方法分派次数：
+普通子节点按源码顺序使用独立的 `.child()` 调用；`for` 循环和展开会产生多个元素，
+因此使用 `.children(iterator)`。连续表达式没有聚合阈值。
 
 ```rust
-// 1 个表达式 → 独立调用
 .child(expr1)
-
-// 2+ 个表达式 → 数组批量，无堆分配，方法分派次数更少
-.children([expr1, expr2])
-.children([expr1, expr2, expr3])
+.child(expr2)
+.children(iter)
 ```
 
-阈值由 3 降为 2，因为 `[T; N]` 数组是栈分配，无额外开销。
+包含多个普通子节点的循环体使用栈分配的 `AnyElement` 数组和 `.flat_map()`；包含嵌套
+迭代器或展开的多节点循环体改用有序共享 `Vec`。
 
 **零成本** — 生成的 GPUI 代码与手写代码完全相同：
 ```rust
@@ -774,8 +760,8 @@ div().id("__rsx_div_0").flex().gap(px(4.0)).on_click(handler)
 
 无反射、无字符串解析、无动态分发。
 
-**动态 class 例外** — `class={expression}` 生成运行时 `fold` + `match`。
-如需零开销样式，使用静态字符串字面量。
+**动态 class 例外** — 无法静态展开的 `class={expression}` 生成运行时 `fold` + `match`。
+如需零开销样式，使用静态字符串或直接内联的条件 / match 字面量。
 
 ### 二进制体积（proc-macro）
 

@@ -280,7 +280,7 @@ pub trait Styled: Sized {
     fn bg<T>(self, v: T) -> Self;
     fn text_color<T>(self, v: T) -> Self;
     fn border_color<T>(self, v: T) -> Self;
-    fn opacity<T>(self, v: T) -> Self;
+    fn opacity<T: Into<f32>>(self, v: T) -> Self;
     // --- grid ---
     fn grid_cols(self, v: u16) -> Self;
     fn grid_rows(self, v: u16) -> Self;

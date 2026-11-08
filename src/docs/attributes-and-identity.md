@@ -214,6 +214,13 @@ table are passed through unchanged (e.g., `bg={color}` → `.bg(color)`).
 | `boxShadow` | `.shadow()` |
 | `inset` | `.inset()` |
 
+`class` and `visible` expressions are evaluated once, in source order relative to other
+attributes and children. For a dynamic `class`, the associated `onUnknownClass` expression is
+an exception: it is evaluated immediately before the `class` expression, regardless of where
+the handler attribute appears in the source. The macro does not wrap these user expressions in
+an additional non-async closure, so `?`, `return`, and `.await` keep the surrounding function's
+semantics. Conditional class branches remain lazy, and only the selected branch is evaluated.
+
 ## Auto ID Injection
 
 Elements that require a stateful identity (`onClick`, `onHover`, `onDrag`, `tooltip`,

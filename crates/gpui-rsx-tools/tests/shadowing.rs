@@ -30,6 +30,76 @@ fn assert_untouched(source: &str) {
 }
 
 #[test]
+fn qualified_calls_require_the_complete_gpui_rsx_path() {
+    for macro_name in MACROS {
+        for prefix in ["gpui_rsx", "::gpui_rsx"] {
+            let source =
+                format!("fn render(){{{prefix}::{macro_name}!{{<div class=\"gap-8\"/>}};}}");
+            let calls = macro_calls(&source).unwrap();
+            assert_eq!(calls.len(), 1, "{source}");
+            assert_eq!(calls[0].name, *macro_name);
+            assert_eq!(
+                &source[calls[0].start..calls[0].end],
+                "<div class=\"gap-8\"/>"
+            );
+        }
+        for path in [
+            format!("other_crate::{macro_name}"),
+            format!("::other_crate::{macro_name}"),
+            format!("other_crate::gpui_rsx::{macro_name}"),
+            format!("gpui_rsx::nested::{macro_name}"),
+            format!("::{macro_name}"),
+        ] {
+            let source = format!("fn render(){{{path}!{{<div class=\"gap-8 flex-colum\"/>}};}}");
+            assert_untouched(&source);
+        }
+    }
+}
+
+#[test]
+fn foreign_imports_block_every_bare_canonical_fallback() {
+    for local in MACROS {
+        for original in [*local, "widget"] {
+            let source = format!(
+                "use other_crate::{original} as {local}; fn render(){{{local}!{{<div class=\"gap-8 flex-colum\"/>}};}}"
+            );
+            assert_untouched(&source);
+        }
+        for prefix in ["other_crate", "::other_crate"] {
+            let source = format!(
+                "use {prefix}::{local}; fn render(){{{local}!{{<div class=\"gap-8 flex-colum\"/>}};}}"
+            );
+            assert_untouched(&source);
+        }
+    }
+}
+
+#[test]
+fn foreign_imports_do_not_remove_legal_gpui_rsx_bindings() {
+    let source = r#"use gpui_rsx::{rsx as view, rsx_tw};
+use other_crate::rsx;
+fn render(){
+    view!{<div/>};
+    rsx_tw!{<span/>};
+    rsx!{<foreign/>};
+    gpui_rsx::rsx!{<label/>};
+    ::gpui_rsx::rsx_strict!{<section/>};
+}"#;
+    let calls = nested_macro_calls(source).unwrap();
+    assert_eq!(
+        calls
+            .iter()
+            .map(|call| call.name.as_str())
+            .collect::<Vec<_>>(),
+        ["rsx", "rsx_tw", "rsx", "rsx_strict"]
+    );
+    assert_eq!(
+        bodies(source),
+        ["<div/>", "<span/>", "<label/>", "<section/>"]
+    );
+}
+
+#[test]
 fn local_macros_shadow_every_exported_name_and_import_alias() {
     for original in MACROS {
         for local in [*original, "view"] {
@@ -188,5 +258,28 @@ fn incremental_nested_calls_keep_shadowing_from_outside_the_edited_body() {
         assert_eq!(updated.components, full.components);
         source = changed;
         previous = updated;
+    }
+}
+
+#[test]
+fn incremental_body_edits_cannot_bypass_foreign_imports() {
+    for import in [
+        "use other_crate::rsx;",
+        "use ::other_crate::rsx;",
+        "use other_crate::widget as rsx;",
+    ] {
+        let source = format!(
+            "{import} fn render(){{rsx_tw!{{<div>{{rsx!{{<span class=\"gap-4\"/>}}}}</div>}};}}"
+        );
+        let previous = analyze_rust_document(&source, ClassMode::STRICT);
+        assert_eq!(previous.calls.len(), 1, "{source}");
+        let changed = source.replace("gap-4", "gap-8");
+        let updated = update_rust_document(&changed, ClassMode::STRICT, &source, &previous);
+        let full = analyze_rust_document(&changed, ClassMode::STRICT);
+        assert_eq!(updated.calls, full.calls, "{changed}");
+        assert_eq!(updated.calls.len(), 1, "{changed}");
+        assert_eq!(updated.diagnostics, full.diagnostics, "{changed}");
+        assert_eq!(updated.class_tokens, full.class_tokens, "{changed}");
+        assert_eq!(updated.literals, full.literals, "{changed}");
     }
 }

@@ -2,8 +2,8 @@
 source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
 expression: tail
 ---
-                fn __rsx_unknown_class_handler<F: FnMut(&str)>(handler: F) -> F {
-                    handler
+                fn __rsx_unknown_class_handler<F: FnMut(&str)>(__handler: F) -> F {
+                    __handler
                 }
                 #[allow(unused_mut)]
                 let mut __on_unknown = __rsx_unknown_class_handler(|__class: &str| {
@@ -30,6 +30,7 @@ expression: tail
                             ),
                         )
                 }
-            })
+            }
+        }
     };
 }

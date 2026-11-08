@@ -328,14 +328,13 @@ fn parse_direct_color_class(class: &str) -> Option<Result<StyleOperation, String
 
 fn parse_direct_opacity_class(class: &str) -> Option<Result<StyleOperation, String>> {
     let rest = class.strip_prefix("opacity-")?;
-    let n = match rest.parse::<u8>() {
-        Ok(n) if n <= 100 => n,
+    let n = match parse_length_number(rest) {
+        Some(n) if (0.0..=100.0).contains(&n) => n,
         _ => return Some(Err(invalid_opacity_value_message(class))),
     };
-    let val = n as f32 / 100.0;
     Some(Ok(StyleOperation::new(
         "opacity",
-        Some(StyleValue::Number(val)),
+        Some(StyleValue::Number(n / 100.0)),
     )))
 }
 

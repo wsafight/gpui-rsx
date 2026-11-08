@@ -497,7 +497,7 @@ rsx! {
 > 任意颜色（如 `bg-[#ff0000]`、`text-[#f00]`、`bg-[rgba(15,23,42,0.8)]`）、
 > 任意间距和尺寸长度（如 `w-[280px]`、`h-[50%]`、`gap-[14px]`、`mx-[1.25rem]`）、
 > 负值间距与尺寸（如 `-mt-2`、`-gap-4`、`-w-1/2`）、
-> 分数尺寸（如 `w-6/24`），以及数值前缀回退（如 `gap-7`、`p-5`、`opacity-33`）。
+> 分数尺寸（如 `w-6/24`），以及数值前缀回退（如 `gap-7`、`p-5`、`opacity-33.5`）。
 > 真正不受支持的 class（如 Tailwind variants 或未知工具类）在 release 构建中**静默忽略**，
 > 在 debug 构建中按调用点去重警告；`dynamic-class-report` 可在退出时汇总，
 > 也可通过 `onUnknownClass` 显式处理。
@@ -513,8 +513,9 @@ rsx! {
 **常见模式：**
 
 ```rust
-// ✅ 条件字面量（编译期，支持文档列出的子集）
+// 条件结果赋给变量（运行时解析；宏不会追踪变量初始化表达式）
 let btn_class = if primary { "bg-blue-500 text-white" } else { "bg-gray-200 text-black" };
+rsx! { <div class={btn_class} /> }
 
 // ✅ when 属性（编译期，完全灵活）
 rsx! { <div when={(primary, |el| el.bg(rgb(0x3b82f6)).text_color(rgb(0xffffff)))} /> }

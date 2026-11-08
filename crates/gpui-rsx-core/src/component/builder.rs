@@ -150,25 +150,37 @@ pub(super) fn expand_struct(
         .filter(|p| matches!(p.kind, PropKind::Required))
         .collect();
     // `a_b` and `a__b` both PascalCase to `AB`; suffix a counter on a clash so the
-    // generated generics stay distinct.
-    let mut seen: std::collections::HashSet<String> =
-        original_arguments.iter().map(ToString::to_string).collect();
+    // generated generics stay distinct. Check the final prefixed names against user generics.
+    let mut seen: std::collections::HashSet<String> = original_parameters
+        .iter()
+        .filter_map(|param| match param {
+            syn::GenericParam::Type(param) => Some(param.ident.unraw().to_string()),
+            syn::GenericParam::Const(param) => Some(param.ident.unraw().to_string()),
+            syn::GenericParam::Lifetime(_) => None,
+        })
+        .collect();
     let type_params: Vec<syn::Ident> = required
         .iter()
         .map(|p| {
             let pascal = to_pascal(&p.ident.unraw().to_string());
-            let mut name = pascal.clone();
+            let mut name = format!("__{pascal}");
             let mut n = 1;
             while !seen.insert(name.clone()) {
-                name = format!("{pascal}{n}");
+                name = format!("__{pascal}{n}");
                 n += 1;
             }
-            format_ident!("__{}", name)
+            format_ident!("{}", name)
         })
         .collect();
     // rustc reports a missing prop as "`MissingRequiredProp: title` was not satisfied",
     // so the marker trait is named exactly like the prop.
     let has_traits: Vec<syn::Ident> = required.iter().map(|p| p.ident.clone()).collect();
+
+    // Keep the internal field out of the user's namespace, including generated phantom props.
+    let mut state_field = format_ident!("__rsx_state");
+    while props.iter().any(|prop| prop.ident == state_field) {
+        state_field = format_ident!("{}_", state_field);
+    }
 
     // Builder fields.
     let builder_fields = props.iter().map(|p| {
@@ -242,7 +254,7 @@ pub(super) fn expand_struct(
                         pub fn #ident(self, value: #value_type) -> #builder<#(#original_arguments,)* #(#output_params),*> {
                             #builder {
                                 #(#moved,)*
-                                __rsx_state: ::core::marker::PhantomData,
+                                #state_field: ::core::marker::PhantomData,
                             }
                         }
                     }
@@ -373,7 +385,7 @@ pub(super) fn expand_struct(
         #[allow(deprecated)]
         #vis struct #builder<#(#original_parameters,)* #(#defaults),*> #where_clause {
             #(#builder_fields,)*
-            __rsx_state: ::core::marker::PhantomData<(fn() -> #name<#(#original_arguments),*>, #(#type_params,)*)>,
+            #state_field: ::core::marker::PhantomData<(fn() -> #name<#(#original_arguments),*>, #(#type_params,)*)>,
         }
 
         #(#gates)*
@@ -383,7 +395,7 @@ pub(super) fn expand_struct(
         #vis fn #name #constructor_generics () -> #builder<#(#original_arguments,)* #(#missing),*> #where_clause {
             #builder::<#(#original_arguments,)* #(#missing2),*> {
                 #(#initial_fields,)*
-                __rsx_state: ::core::marker::PhantomData,
+                #state_field: ::core::marker::PhantomData,
             }
         }
 
