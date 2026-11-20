@@ -281,3 +281,73 @@ fn function_docs_and_deprecation_move_to_the_constructor() {
         "{out}"
     );
 }
+
+#[test]
+fn component_slots_styles_track_caller_and_option_children_expand_and_validate() {
+    let out = expand(
+        TokenStream::new(),
+        quote! {
+            fn Modal(
+                title: String,
+                #[style] style: StyleRefinement,
+                #[slot] header: Option<AnyElement>,
+                #[slot] actions: Vec<AnyElement>,
+                #[children] body: Option<AnyElement>,
+            ) -> impl IntoElement {
+                div()
+            }
+        },
+    )
+    .unwrap()
+    .to_string();
+    assert!(out.contains("# [track_caller]"), "{out}");
+    assert!(out.contains("Styled for ModalBuilder"), "{out}");
+    assert!(out.contains("fn actions_children"), "{out}");
+
+    for (invalid, expected) in [
+        (
+            quote! {
+                struct Bad {
+                    #[style] a: StyleRefinement,
+                    #[style] b: StyleRefinement,
+                }
+            },
+            "at most one #[style]",
+        ),
+        (
+            quote! {
+                struct Bad {
+                    #[slot(extra)] header: Option<AnyElement>,
+                }
+            },
+            "#[slot] takes no arguments",
+        ),
+        (
+            quote! {
+                struct Bad {
+                    #[style(extra)] style: StyleRefinement,
+                }
+            },
+            "#[style] takes no arguments",
+        ),
+        (
+            quote! {
+                struct Bad {
+                    #[slot] #[prop(default)] header: Option<AnyElement>,
+                }
+            },
+            "only one",
+        ),
+        (
+            quote! {
+                struct Bad {
+                    #[prop(callback)] #[slot] header: Rc<dyn Fn()>,
+                }
+            },
+            "cannot be combined",
+        ),
+    ] {
+        let error = expand(TokenStream::new(), invalid).unwrap_err().to_string();
+        assert!(error.contains(expected), "{error}");
+    }
+}

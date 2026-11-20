@@ -14,15 +14,18 @@
 //! - 每个子节点独立生成 `.child()` 调用，避免数组类型统一约束
 //! - 自动 ID 基于源码 span 位置（行号 + 列号），增量编译下保持稳定
 
+mod tag;
+
 use super::attribute::{AttrHints, generate_attr_methods_with_mode, static_class_expr_needs_id};
 use super::class::{ClassMode, parse_class_string_with_mode};
 use super::element_methods::ElementMethods;
 use super::key::{make_auto_id, make_keyed_auto_id};
 use super::tables::{
-    HTML_TAGS, is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
+    is_stateful_attr, is_stateful_class, lookup_attr_flag_method, lookup_tag_default,
 };
 use crate::SemanticDiagnostic;
 use crate::semantic::{BodyExpansion, CodegenErrors};
+use tag::{TagInputs, extract_child_slot_ident, generate_tag, is_native_tag};
 
 #[derive(Default)]
 struct AttrAnalysis {
@@ -101,7 +104,7 @@ fn analyze_attr(attr: &RsxAttribute, mode: ClassMode) -> AttrAnalysis {
     }
 }
 
-use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxElementName, RsxNode};
+use crate::parser::{RsxAttribute, RsxBody, RsxElement, RsxNode};
 use proc_macro2::{Span, TokenStream};
 use quote::{ToTokens, quote};
 use std::cell::OnceCell;
@@ -410,17 +413,7 @@ fn generate_element_inner(
 
     // 快速路径：无构造参数、无属性且无子节点时，跳过所有扫描直接返回基础标签
     if element.args.is_none() && element.attributes.is_empty() && element.children.is_empty() {
-        return generate_tag(
-            &tag_str,
-            &element.name,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        );
+        return generate_tag(&tag_str, &element.name, TagInputs::default());
     }
 
     let is_uniform_list = tag_str == "uniform_list" && element.name.as_single_ident().is_some();
@@ -519,9 +512,7 @@ fn generate_element_inner(
         None
     };
 
-    let native_tag = element.name.as_single_ident().is_some()
-        && (HTML_TAGS.contains(&tag_str.as_str())
-            || matches!(tag_str.as_str(), "svg" | "img" | "canvas" | "uniform_list"));
+    let native_tag = is_native_tag(&element.name, &tag_str);
 
     // 生成基础元素和 id：
     //  1. 显式 id              → 直接使用，优先级最高
@@ -534,13 +525,15 @@ fn generate_element_inner(
         generate_tag(
             &tag_str,
             &element.name,
-            element.args.as_deref(),
-            img_source,
-            canvas_prepaint,
-            canvas_paint,
-            list_id_tokens,
-            list_count,
-            list_render,
+            TagInputs {
+                args: element.args.as_deref(),
+                img_source,
+                canvas_prepaint,
+                canvas_paint,
+                list_id: list_id_tokens,
+                list_count,
+                list_render,
+            },
         )?
     };
     let base = if is_uniform_list && base_expr.is_none() {
@@ -585,38 +578,6 @@ fn generate_element_inner(
     )?;
 
     Ok(methods.finish(quote! { #base #(#default_methods)* }))
-}
-
-fn extract_child_slot_ident(element: &RsxElement) -> Option<syn::Ident> {
-    let slot_lit = element.attributes.iter().find_map(|attr| match attr {
-        RsxAttribute::Value {
-            name,
-            value:
-                syn::Expr::Lit(syn::ExprLit {
-                    lit: syn::Lit::Str(lit),
-                    ..
-                }),
-        } if name == "slot" => Some(lit),
-        _ => None,
-    })?;
-    let raw = slot_lit.value();
-    let mut snake = String::with_capacity(raw.len() + 2);
-    for (idx, ch) in raw.chars().enumerate() {
-        if ch == '-' {
-            snake.push('_');
-        } else if ch.is_ascii_uppercase() {
-            if idx > 0 {
-                snake.push('_');
-            }
-            snake.push(ch.to_ascii_lowercase());
-        } else {
-            snake.push(ch);
-        }
-    }
-    syn::parse_str::<syn::Ident>(&snake).ok().map(|mut ident| {
-        ident.set_span(slot_lit.span());
-        ident
-    })
 }
 
 /// 生成子节点的方法链片段
@@ -675,122 +636,12 @@ fn generate_children_methods(
     }
 }
 
-/// HTML 标签 → `div()`，特殊标签 → 同名函数，自定义组件 → 同名函数调用或 `Type::new(args...)`
-///
-/// 接受预缓存的 `tag_str` 避免重复 `to_string()`
-#[allow(clippy::too_many_arguments)]
-fn generate_tag(
-    tag_str: &str,
-    name: &RsxElementName,
-    args: Option<&[syn::Expr]>,
-    img_source: Option<&syn::Expr>,
-    canvas_prepaint: Option<&syn::Expr>,
-    canvas_paint: Option<&syn::Expr>,
-    list_id: Option<TokenStream>,
-    list_count: Option<&syn::Expr>,
-    list_render: Option<&syn::Expr>,
-) -> CodegenResult {
-    if let Some(args) = args {
-        if name.as_single_ident().is_some()
-            && (HTML_TAGS.contains(&tag_str)
-                || matches!(tag_str, "svg" | "img" | "canvas" | "uniform_list"))
-        {
-            let err =
-                crate::diagnostics::unsupported_native_constructor_args_error(&name.path, tag_str);
-            return Err(CodegenErrors {
-                tokens: err.to_compile_error(),
-                diagnostics: Vec::new(),
-            });
-        }
-        let path = &name.path;
-        let is_type_ctor = path.segments.last().is_some_and(|seg| {
-            use syn::ext::IdentExt;
-            seg.ident
-                .unraw()
-                .to_string()
-                .starts_with(|c: char| c.is_ascii_uppercase())
-        });
-        return Ok(if is_type_ctor {
-            quote! { #path::new(#(#args),*) }
-        } else {
-            quote! { #path(#(#args),*) }
-        });
-    }
-
-    if name.as_single_ident().is_none() {
-        let path = &name.path;
-        return Ok(quote! { #path() });
-    }
-
-    let path = &name.path;
-    Ok(match tag_str {
-        // 特殊标签：保留为同名函数调用
-        "svg" => quote! { svg() },
-        "img" => {
-            let Some(source) = img_source else {
-                return Err(SemanticDiagnostic::missing_required_attribute(
-                    &name.path,
-                    "img",
-                    "src",
-                    r#"<img src={"path/to/image.png"} />"#,
-                )
-                .into());
-            };
-            quote! { img(#source) }
-        }
-        "canvas" => {
-            let Some(prepaint) = canvas_prepaint else {
-                return Err(SemanticDiagnostic::missing_required_attribute(
-                    &name.path,
-                    "canvas",
-                    "prepaint",
-                    r#"<canvas prepaint={|bounds, window, cx| state} paint={|bounds, state, window, cx| { ... }} />"#,
-                )
-                .into());
-            };
-            let Some(paint) = canvas_paint else {
-                return Err(SemanticDiagnostic::missing_required_attribute(
-                    &name.path,
-                    "canvas",
-                    "paint",
-                    r#"<canvas prepaint={|bounds, window, cx| state} paint={|bounds, state, window, cx| { ... }} />"#,
-                )
-                .into());
-            };
-            quote! { canvas(#prepaint, #paint) }
-        }
-        "uniform_list" => {
-            let Some(count) = list_count else {
-                return Err(SemanticDiagnostic::missing_required_attribute(
-                    &name.path,
-                    "uniform_list",
-                    "count",
-                    r#"<uniform_list count={items.len()} render={|range, window, cx| { ... }} />"#,
-                )
-                .into());
-            };
-            let Some(render) = list_render else {
-                return Err(SemanticDiagnostic::missing_required_attribute(
-                    &name.path,
-                    "uniform_list",
-                    "render",
-                    r#"<uniform_list count={items.len()} render={|range, window, cx| { ... }} />"#,
-                )
-                .into());
-            };
-            let id = list_id.unwrap_or_else(|| make_auto_id(name));
-            quote! { uniform_list(#id, #count, #render) }
-        }
-        // HTML 标签：统一映射为 div()（与 spec/工具共用同一份 HTML_TAGS 列表）
-        tag if HTML_TAGS.contains(&tag) => quote! { div() },
-        _ => quote! { #path() },
-    })
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::codegen::key::static_key_suffix;
+    use crate::codegen::tables::HTML_TAGS;
+    use crate::parser::RsxElementName;
 
     fn element_name(name: &str) -> RsxElementName {
         RsxElementName {
@@ -800,20 +651,10 @@ mod tests {
 
     #[test]
     fn img_requires_source() {
-        let error = generate_tag(
-            "img",
-            &element_name("img"),
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-        )
-        .expect_err("img without src must fail")
-        .tokens
-        .to_string();
+        let error = generate_tag("img", &element_name("img"), TagInputs::default())
+            .expect_err("img without src must fail")
+            .tokens
+            .to_string();
 
         assert!(error.contains("Element `<img>` requires `src`"));
     }
@@ -826,13 +667,10 @@ mod tests {
         let missing_prepaint = generate_tag(
             "canvas",
             &name,
-            None,
-            None,
-            None,
-            Some(&callback),
-            None,
-            None,
-            None,
+            TagInputs {
+                canvas_paint: Some(&callback),
+                ..TagInputs::default()
+            },
         )
         .expect_err("canvas without prepaint must fail")
         .tokens
@@ -842,13 +680,10 @@ mod tests {
         let missing_paint = generate_tag(
             "canvas",
             &name,
-            None,
-            None,
-            Some(&callback),
-            None,
-            None,
-            None,
-            None,
+            TagInputs {
+                canvas_prepaint: Some(&callback),
+                ..TagInputs::default()
+            },
         )
         .expect_err("canvas without paint must fail")
         .tokens
@@ -865,13 +700,10 @@ mod tests {
         let missing_count = generate_tag(
             "uniform_list",
             &name,
-            None,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(&render),
+            TagInputs {
+                list_render: Some(&render),
+                ..TagInputs::default()
+            },
         )
         .expect_err("uniform_list without count must fail")
         .tokens
@@ -881,13 +713,10 @@ mod tests {
         let missing_render = generate_tag(
             "uniform_list",
             &name,
-            None,
-            None,
-            None,
-            None,
-            None,
-            Some(&count),
-            None,
+            TagInputs {
+                list_count: Some(&count),
+                ..TagInputs::default()
+            },
         )
         .expect_err("uniform_list without render must fail")
         .tokens
@@ -964,19 +793,9 @@ mod tests {
     #[test]
     fn every_html_tag_maps_to_div() {
         for tag in HTML_TAGS {
-            let tokens = generate_tag(
-                tag,
-                &element_name(tag),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-            )
-            .expect("HTML tags need no attributes")
-            .to_string();
+            let tokens = generate_tag(tag, &element_name(tag), TagInputs::default())
+                .expect("HTML tags need no attributes")
+                .to_string();
             assert_eq!(tokens, "div ()", "<{tag}> should map to div()");
         }
     }
@@ -989,19 +808,9 @@ mod tests {
             ("ui::Card", "ui :: Card ()"),
         ];
         for (tag, expected) in cases {
-            let tokens = generate_tag(
-                tag,
-                &element_name(tag),
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-                None,
-            )
-            .expect("custom tags need no attributes")
-            .to_string();
+            let tokens = generate_tag(tag, &element_name(tag), TagInputs::default())
+                .expect("custom tags need no attributes")
+                .to_string();
             assert_eq!(tokens, expected, "<{tag}>");
         }
     }

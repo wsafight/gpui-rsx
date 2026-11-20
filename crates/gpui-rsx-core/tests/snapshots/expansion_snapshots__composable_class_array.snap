@@ -1,0 +1,17 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<div class={[\"flex items-center\", active.then_some(\"bg-blue-500\"), disabled && \"opacity-50\", (selected, \"border-1\"), if open { \"p-4\" }]} />"
+---
+fn expanded() {
+    let _ = {
+        let __el = div();
+        {
+            let __el = __el.flex().items_center();
+            let __el = if active { __el.bg(rgb(3900150u32)) } else { __el };
+            let __el = if disabled { __el.opacity(0.5f32) } else { __el };
+            let __el = if selected { __el.border_1() } else { __el };
+            let __el = if open { __el.p(px(4f32)) } else { __el };
+            __el
+        }
+    };
+}

@@ -1,0 +1,10 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<><Button(\"save\") label={\"Save\"} small /><Tab() underline /><widget(\"row\", 1) compact /></>"
+---
+fn expanded() {
+    let _ = vec![
+        Button::new("save").label("Save").small(), Tab::new().underline(), widget("row",
+        1).compact()
+    ];
+}

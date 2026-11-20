@@ -1066,3 +1066,65 @@ fn doctor_reports_a_healthy_project_without_gpui() {
     assert!(stdout.contains("doctor: passed"), "{stdout}");
     std::fs::remove_dir_all(root).unwrap();
 }
+
+#[test]
+fn dev_check_auto_detects_hotreload_feature_and_emits_structured_preflight() {
+    let root = std::env::temp_dir().join(format!("rsx-dev-check-{}", std::process::id()));
+    std::fs::create_dir_all(root.join("src")).unwrap();
+    std::fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"dev-check-test\"\nversion = \"0.1.0\"\nedition = \"2024\"\n\n[features]\nhotreload = []\n",
+    )
+    .unwrap();
+    std::fs::write(
+        root.join("src/main.rs"),
+        "fn main() { gpui_rsx::rsx! { <div /> }; }\n",
+    )
+    .unwrap();
+
+    let manifest = root.join("Cargo.toml");
+    let (code, stdout, _) = run(
+        &[
+            "rsx",
+            "dev",
+            "dev-check-test",
+            "--manifest-path",
+            manifest.to_str().unwrap(),
+            "--check",
+            "--json",
+        ],
+        "",
+    );
+    // Without a GPUI hot-reload engine or dx installed, preflight reports ok=false with exit 1.
+    assert_eq!(code, Some(1));
+    let report: Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(report["ok"], false);
+    assert_eq!(report["features"], "hotreload");
+    let args: Vec<_> = report["args"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(Value::as_str)
+        .collect();
+    assert_eq!(
+        args,
+        [
+            "serve",
+            "--hot-patch",
+            "--hot-reload",
+            "true",
+            "--bin",
+            "dev-check-test",
+            "--features",
+            "hotreload",
+        ]
+    );
+    assert_eq!(
+        report["hotReload"]["templateNameCollisions"]
+            .as_array()
+            .unwrap()
+            .len(),
+        1
+    );
+    std::fs::remove_dir_all(root).unwrap();
+}
