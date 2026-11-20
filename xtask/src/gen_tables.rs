@@ -345,7 +345,7 @@ fn stub(methods: &BTreeMap<String, Merged>, revs: &Revisions) -> String {
     s.push_str("use crate::*;\n\n");
 
     let groups: [(&str, u8, &str); 3] = [
-        ("GeneratedStyled", T_STYLED, "Sized"),
+        ("GeneratedStyled", T_STYLED, "Styled"),
         ("GeneratedInteractive", T_INTERACTIVE, "Sized"),
         ("GeneratedStateful", T_STATEFUL, "Sized"),
     ];
@@ -381,8 +381,8 @@ fn stub(methods: &BTreeMap<String, Merged>, revs: &Revisions) -> String {
         }
         s.push_str("}\n\n");
     }
-    s.push_str("impl GeneratedStyled for Div {}\nimpl<E: Styled> GeneratedStyled for Stateful<E> {}\nimpl GeneratedStyled for StyleRefinement {}\nimpl GeneratedStyled for Svg {}\nimpl GeneratedStyled for Img {}\nimpl<T> GeneratedStyled for Canvas<T> {}\n");
-    s.push_str("impl GeneratedInteractive for Div {}\nimpl<E: InteractiveElement> GeneratedInteractive for Stateful<E> {}\nimpl GeneratedInteractive for Svg {}\nimpl GeneratedInteractive for Img {}\n");
+    s.push_str("impl<T: Styled> GeneratedStyled for T {}\n");
+    s.push_str("impl GeneratedInteractive for Div {}\nimpl<E: InteractiveElement> GeneratedInteractive for Stateful<E> {}\nimpl GeneratedInteractive for Svg {}\nimpl GeneratedInteractive for Img {}\nimpl GeneratedInteractive for UniformList {}\n");
     s.push_str("impl<E: Element> GeneratedStateful for Stateful<E> {}\n");
     s
 }
