@@ -89,3 +89,21 @@ fn generated_module_is_valid_rust_with_concrete_style_helpers() {
         );
     }
 }
+
+#[test]
+fn runtime_module_with_theme_includes_static_tokens() {
+    let theme = Theme::parse(
+        "[colors]\nbrand = \"#2563eb\"\nsurface = { expr = \"cx.theme().background\" }\n[radius]\ncard = \"12px\"\n[spacing]\ngutter = \"18px\"\n[opacity]\nmuted = \"60%\"\n",
+    )
+    .unwrap();
+    let path = syn::parse_quote!(::gpui);
+    let code = gpui_rsx_core::generate_runtime_module_with_theme(&path, Some(&theme)).to_string();
+    assert!(code.contains("\"bg-brand\""), "{code}");
+    assert!(code.contains("\"rounded-card\""), "{code}");
+    assert!(code.contains("\"p-gutter\""), "{code}");
+    assert!(code.contains("\"opacity-muted\""), "{code}");
+    assert!(
+        !code.contains("\"bg-surface\""),
+        "runtime cx expressions stay out of static matcher"
+    );
+}

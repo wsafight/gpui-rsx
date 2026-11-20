@@ -68,15 +68,28 @@ fn configured_gpui(
 /// `gpui_rsx::rsx_runtime!(my_gpui);`.
 #[proc_macro]
 pub fn rsx_runtime(input: TokenStream) -> TokenStream {
-    if input.is_empty() {
-        configured_gpui(
-            Some(Default::default()),
-            gpui_rsx_core::generate_runtime_module,
-        )
+    let explicit_gpui = if input.is_empty() {
+        None
     } else {
-        let gpui = syn::parse_macro_input!(input as syn::Path);
-        gpui_rsx_core::generate_runtime_module(&gpui).into()
-    }
+        Some(syn::parse_macro_input!(input as syn::Path))
+    };
+    let theme = match std::env::var_os("CARGO_MANIFEST_DIR") {
+        Some(directory) => match Theme::load_from_dir(std::path::Path::new(&directory)) {
+            Ok(theme) => theme,
+            Err(message) => return quote::quote!(compile_error!(#message);).into(),
+        },
+        None => None,
+    };
+    let gpui = explicit_gpui.unwrap_or_else(|| {
+        theme
+            .as_deref()
+            .map_or_else(|| syn::parse_quote!(::gpui), Theme::gpui_syn_path)
+    });
+    let tracker = theme
+        .as_deref()
+        .and_then(gpui_rsx_core::theme::rebuild_tracker);
+    let code = gpui_rsx_core::generate_runtime_module_with_theme(&gpui, theme.as_deref());
+    quote::quote!(#tracker #code).into()
 }
 
 /// Builds a GPUI view listener from a view context and a four-argument handler.

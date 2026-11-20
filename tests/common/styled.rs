@@ -111,12 +111,6 @@ impl Styled for StyleRefinement {
         border_1,
         border_2,
         border_dashed,
-        border_t_1,
-        border_b_1,
-        border_l_1,
-        border_r_1,
-        border_x_1,
-        border_y_1,
         border_t_2,
         border_b_2,
         border_l_2,
@@ -216,62 +210,90 @@ impl Styled for StyleRefinement {
         self
     }
 
-    fn line_clamp(self, _: usize) -> Self {
+    fn line_clamp(self, lines: usize) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("line_clamp", lines as i32)));
         self
     }
 
-    fn font_weight<T>(self, _: T) -> Self
+    fn font_weight<T>(self, weight: T) -> Self
     where
         T: Into<FontWeight>,
     {
+        FONT_WEIGHT_CALLS.with(|c| c.borrow_mut().push(weight.into().0));
         self
     }
 
-    fn grid_cols(self, _: u16) -> Self {
+    fn border_t_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_t_1"));
+        self
+    }
+    fn border_b_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_b_1"));
+        self
+    }
+    fn border_l_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_l_1"));
+        self
+    }
+    fn border_r_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_r_1"));
+        self
+    }
+    fn border_x_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_x_1"));
+        self
+    }
+    fn border_y_1(self) -> Self {
+        BORDER_CALLS.with(|c| c.borrow_mut().push("border_y_1"));
         self
     }
 
-    fn grid_rows(self, _: u16) -> Self {
+    fn grid_cols(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_cols", v as i32)));
         self
     }
-
-    fn grid_cols_min_content(self, _: u16) -> Self {
+    fn grid_rows(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_rows", v as i32)));
         self
     }
-
-    fn grid_cols_max_content(self, _: u16) -> Self {
+    fn grid_cols_min_content(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_cols_min_content", v as i32)));
         self
     }
-
-    fn grid_rows_min_content(self, _: u16) -> Self {
+    fn grid_cols_max_content(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_cols_max_content", v as i32)));
         self
     }
-
-    fn grid_rows_max_content(self, _: u16) -> Self {
+    fn grid_rows_min_content(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_rows_min_content", v as i32)));
         self
     }
-
-    fn col_span(self, _: u16) -> Self {
+    fn grid_rows_max_content(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("grid_rows_max_content", v as i32)));
         self
     }
-
-    fn col_start(self, _: i16) -> Self {
+    fn col_span(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("col_span", v as i32)));
         self
     }
-
-    fn col_end(self, _: i16) -> Self {
+    fn col_start(self, v: i16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("col_start", v as i32)));
         self
     }
-
-    fn row_span(self, _: u16) -> Self {
+    fn col_end(self, v: i16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("col_end", v as i32)));
         self
     }
-
-    fn row_start(self, _: i16) -> Self {
+    fn row_span(self, v: u16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_span", v as i32)));
         self
     }
-
-    fn row_end(self, _: i16) -> Self {
+    fn row_start(self, v: i16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_start", v as i32)));
+        self
+    }
+    fn row_end(self, v: i16) -> Self {
+        INTEGER_CALLS.with(|c| c.borrow_mut().push(("row_end", v as i32)));
         self
     }
 }

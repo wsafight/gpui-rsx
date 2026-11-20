@@ -29,6 +29,12 @@ static TAILWIND_HELPER_STR: OnceLock<String> = OnceLock::new();
 ///
 /// 缓存字符串而非 `TokenStream`，避免跨 proc-macro bridge 保存失效的 token handle。
 pub(crate) fn get_cached_dynamic_class_helper(mode: ClassMode) -> TokenStream {
+    if mode
+        .theme()
+        .is_some_and(|theme| !theme.static_class_expansions().is_empty())
+    {
+        return generate_dynamic_class_helper(mode);
+    }
     let cell = match mode.scale() {
         SpacingScale::Px => &PX_HELPER_STR,
         SpacingScale::Tailwind => &TAILWIND_HELPER_STR,
@@ -88,9 +94,14 @@ pub(crate) fn generate_dynamic_class_code_with_mode(
         }
     } else {
         quote! {
-            #class_str
+            let mut #el = #el;
+            let #style = Styled::style(&mut #el);
+            *#style = #class_str
                 .split_ascii_whitespace()
-                .fold(#el, |#el, #class| __rsx_apply_class(#el, #class, &mut #on_unknown))
+                .fold(::core::mem::take(#style), |#style, #class| {
+                    __rsx_apply_class(#style, #class, &mut #on_unknown)
+                });
+            #el
         }
     };
 
@@ -231,11 +242,23 @@ fn generate_dynamic_class_helper(mode: ClassMode) -> TokenStream {
 
 /// Generates the optional crate-wide runtime without depending on a particular GPUI crate.
 pub fn generate_runtime_module(gpui: &syn::Path) -> TokenStream {
+    generate_runtime_module_with_theme(gpui, None)
+}
+
+/// Generates the crate-wide runtime module, including static tokens from `rsx.toml` when present.
+pub fn generate_runtime_module_with_theme(
+    gpui: &syn::Path,
+    theme: Option<&crate::theme::Theme>,
+) -> TokenStream {
+    let theme_arc = theme.cloned().map(std::sync::Arc::new);
     let helpers = [("px", SpacingScale::Px), ("tailwind", SpacingScale::Tailwind)]
         .into_iter()
         .map(|(name, scale)| {
             let name = syn::Ident::new(name, Span::call_site());
-            let matcher = dynamic_class_helper(ClassMode::PERMISSIVE.with_scale(scale), quote! {
+            let mode = ClassMode::PERMISSIVE
+                .with_scale(scale)
+                .with_theme(theme_arc.clone());
+            let matcher = dynamic_class_helper(mode, quote! {
                 fn __rsx_apply_class(el: StyleRefinement, class: &str, on_unknown: &mut dyn FnMut(&str)) -> StyleRefinement
             });
             quote! {
@@ -469,13 +492,26 @@ fn generate_integer_fallback(prefix: &'static str, method: &'static str, ty: &st
 /// 通过 thread_local 缓存，整个编译过程只调用一次。
 ///
 fn generate_common_class_matches(mode: ClassMode) -> Vec<TokenStream> {
-    let mut groups = std::collections::BTreeMap::<u8, Vec<TokenStream>>::new();
+    let mut table = std::collections::BTreeMap::<String, TokenStream>::new();
     for class in dynamic_common_classes() {
-        let method = parse_dynamic_common_class(class, mode.clone());
-        groups
-            .entry(class.as_bytes()[0])
-            .or_default()
-            .push(quote! { #class => return #method, });
+        table.insert(
+            (*class).to_owned(),
+            parse_dynamic_common_class(class, mode.clone()),
+        );
+    }
+    if let Some(theme) = mode.theme() {
+        for (class, tokens) in theme.static_class_expansions() {
+            table.insert(class, quote! { el #tokens });
+        }
+    }
+    let mut groups = std::collections::BTreeMap::<u8, Vec<TokenStream>>::new();
+    for (class, method) in table {
+        if let Some(&first) = class.as_bytes().first() {
+            groups
+                .entry(first)
+                .or_default()
+                .push(quote! { #class => return #method, });
+        }
     }
     groups
         .into_iter()

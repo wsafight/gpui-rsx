@@ -40,7 +40,7 @@ pub use codegen::element::{
     generate_body_expansion_preview, generate_body_with_diagnostics, generate_body_with_mode,
     generate_body_without_runtime, generate_fragment_with_mode, generate_fragment_without_runtime,
 };
-pub use codegen::runtime::generate_runtime_module;
+pub use codegen::runtime::{generate_runtime_module, generate_runtime_module_with_theme};
 pub use codegen::tables::{GPUI_COMPONENT_REV, GPUI_SOURCE_REV};
 pub use component::{expand_component, expand_component_with_path};
 pub use listener::{expand_listener, expand_listener_with_path};

@@ -8,6 +8,7 @@ use std::hint::black_box;
 #[derive(Debug, Default)]
 pub(crate) struct MockElement {
     pub(crate) checksum: u64,
+    pub(crate) style: StyleRefinement,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -47,6 +48,7 @@ pub(crate) enum AlignContent {
 #[allow(dead_code)]
 #[derive(Default, Debug)]
 pub(crate) struct StyleRefinement {
+    pub(crate) checksum: u64,
     pub(crate) align_items: Option<AlignItems>,
     pub(crate) align_self: Option<AlignItems>,
     pub(crate) justify_content: Option<JustifyContent>,
@@ -58,6 +60,7 @@ pub(crate) struct StyleRefinement {
 pub(crate) fn div() -> MockElement {
     MockElement {
         checksum: black_box(0),
+        style: StyleRefinement::default(),
     }
 }
 
