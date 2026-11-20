@@ -52,7 +52,7 @@ already names that dependency `engine`, expose the expected crate name at its ro
 
 ```toml
 [dependencies]
-engine = { package = "gpui-kit", version = "=0.9.0" }
+engine = { package = "gpui-kit", version = "=0.10.0" }
 ```
 
 ```rust

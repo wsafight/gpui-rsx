@@ -42,7 +42,10 @@ for supported paths, target placement and derive limitations.
 | `svg` | `svg()` |
 | `img src={source}` or `img source={source}` | `img(source)` |
 | `canvas prepaint={a} paint={b}` | `canvas(a, b)` |
+| `uniform_list count={n} render={f}` | `uniform_list(id_or_auto, n, f)` |
 | `MyComponent` | `MyComponent()` |
+| `Button("id")` / `Tab()` | `Button::new("id")` / `Tab::new()` |
+| `widget("a", 1)` | `widget("a", 1)` |
 | `ui::TaskCard` | `ui::TaskCard()` |
 | any tag with `base={expr}` | `expr` |
 
@@ -53,10 +56,12 @@ for supported paths, target placement and derive limitations.
 | `<div flex />` | `.flex()` |
 | `<div gap={px(4.0)} />` | `.gap(px(4.0))` |
 | `<div class="flex gap-4" />` | compile-time class method expansion |
-| `<div class={classes} />` | generated runtime class matcher |
+| `<div class={["flex", cond && "gap-4"]} />` | compile-time conditional method chain |
+| `<div class={classes} />` | generated runtime class matcher (`StyleRefinement`) |
 | `<div visible={cond} />` | `.visible()` or `.invisible()` |
-| `<img grayscale />` | `.grayscale(true)` |
-| `<Button base={Button::new("id")} />` | starts method chain from `Button::new("id")` |
+| `<img grayscale />` / `<uniform_list yFlipped ... />` | `.grayscale(true)` / `.y_flipped(true)` |
+| `<Button("id") />` / `<Button base={Button::new("id")} />` | starts method chain from `Button::new("id")` |
+| `<div slot="header">...</div>` (inside component) | calls `.header(div()...)` on parent component builder |
 | `<button key={id} onClick={h} />` | generated composite `.id(...)` plus `.on_click(h)` |
 
 `id`, `key`, and `base` are macro-level attributes. `id` generates `.id(...)`; `key` and `base` are consumed by the macro.

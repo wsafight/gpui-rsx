@@ -9,7 +9,8 @@ arbitrary color and length families. These are GPUI builder calls, not browser C
 - `hover:`, `focus:`, `active:` and group variants work in static class literals.
   Responsive and `dark:` variants are unsupported. Express conditions in Rust.
 - Dynamic `class={expr}` supports fewer utilities; it cannot apply state variants
-  or theme tokens. Prefer literal branches such as `class={if active { "flex" } else { "hidden" }}`.
+  or render-time `cx` expression tokens from `rsx.toml` (static `rsx.toml` tokens work).
+  Prefer literal branches or composable arrays such as `class={["flex", active.then_some("bg-blue-500")]}`.
 - Events take Rust callbacks. In loops, supply a stable `key={item.id}` or explicit
   unique `id={...}` when an element uses a stateful method or `active:`. Do not invent callback types.
 - Optional `rsx_listener!(cx, handler)` delegates to `cx.listener(handler)`.
@@ -23,11 +24,12 @@ arbitrary color and length families. These are GPUI builder calls, not browser C
   including components, listeners, state updates and the default shared runtime.
   Paths must start with `::` or `crate::`. User expressions and upstream derives keep
   their own imports; the default path remains `::gpui`.
-- `img`, `svg` and `canvas` have special constructors. Custom components can use
-  `base={Button::new("save")}` or `#[component]` structs/functions with required props and children.
+- `img`, `svg`, `canvas` and `uniform_list` have special constructors. Custom components can use
+  `<Button("save") ... />` (`Button::new("save")`), `base={Button::new("save")}`, or `#[component]` structs/functions.
 - Nested `<>...</>` groups add no wrapper element. Function components use concrete prop
   types, `#[prop(default)]` / `#[prop(default = expr)]`, `#[prop(callback)]` for
-  `Rc<dyn TraitAlias>`, and `#[children] Vec<AnyElement>`.
+  `Rc<dyn TraitAlias>`, `#[children]` (`Vec<AnyElement>` or `Option<AnyElement>`),
+  `#[slot]` (supplied via prop or `<child slot="name">`), and `#[style] StyleRefinement`.
   Use `#[context]` only for `&mut Window` / `&mut App`; contexts are supplied during rendering.
 - Use `rsx_fragment!` for mixed root types; it always returns `Vec<gpui::AnyElement>`.
   Ordinary `rsx!` fragments without loops or spreads retain their concrete element types.

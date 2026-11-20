@@ -45,11 +45,14 @@ Some tags use GPUI constructors directly:
 | RSX | Generated constructor |
 | --- | --- |
 | `<svg src={path} />` | `svg().path(path)` |
+| `<svg src={path} timedTransformation={(anim, transform)} />` | `svg().path(path).with_timed_transformation(anim, transform)` |
 | `<img src={source} />` | `img(source)` |
 | `<img source={source} />` | `img(source)` |
 | `<canvas prepaint={prepaint} paint={paint} />` | `canvas(prepaint, paint)` |
+| `<uniform_list count={n} render={render} />` | `uniform_list(auto_id, n, render)` |
+| `<uniform_list id="rows" count={n} render={render} />` | `uniform_list("rows", n, render)` |
 
-`img` requires `src` or `source`. `canvas` requires both `prepaint` and `paint`.
+`img` requires `src` or `source`. `canvas` requires both `prepaint` and `paint`. `uniform_list` requires `count` (`itemCount` / `item_count`) and `render`; inside `{for ...}` it requires `id` or `key`.
 
 ## Components
 
@@ -69,28 +72,29 @@ rsx! {
 }
 ```
 
-Use `base={expr}` when the builder needs arguments or comes from a component library:
+Pass constructor arguments in parentheses for types constructed with `Type::new(...)` (or lowercase factory functions), or use `base={expr}` when passing a preconfigured builder:
 
 ```rust
 use gpui::component::button::Button;
 use gpui::component::Sizable as _;
 
 rsx! {
-    <Button
-        base={Button::new("save")}
+    <Button("save")
         label={"Save"}
         small
     />
 }
 ```
 
-`base` is consumed by the macro. It does not generate a `.base(...)` method call.
+`base` is consumed by the macro. It does not generate a `.base(...)` method call, and cannot be combined with `<Tag(...)>` on the same element.
 
 | Construction need | Recommended form |
 | --- | --- |
-| Builder with a zero-argument constructor | `<Card title="Inbox" />` or `<ui::Card ... />` |
-| Constructor arguments or a preconfigured builder | `<Button base={Button::new("save")} ... />` |
+| Builder with a zero-argument constructor (`#[component]`) | `<Card title="Inbox" />` or `<ui::Card ... />` |
+| `Type::new(...)` or factory function arguments | `<Button("save") ... />`, `<Tab() ... />`, or `<widget("a") ... />` |
+| Preconfigured builder expression | `<Button base={Button::new("save")} ... />` |
 | Optional props | Declare `#[prop(default)]` or `#[prop(default = expr)]`; omit the prop to use its default |
+| Named slots and style forwarding | Declare `#[slot]` (`<div slot="header">`) and `#[style] style: StyleRefinement` |
 | Heterogeneous roots or stored child collections | Use [`rsx_fragment!`](#fragments), then `{...parts}` |
 | Several roots that need concrete builder methods | Keep an ordinary `rsx!` fragment with compatible root types |
 
@@ -135,7 +139,9 @@ let badge = rsx! {
 Plain parameters are required props. `#[prop(default)]` uses `Default::default()`;
 `#[prop(default = expr)]` supplies an explicit default. Defaulted booleans use flag setters
 (`highlighted`) or conditional setters (`highlightedIf={active}`). `#[children]` collects
-children into `Vec<AnyElement>`. Module-qualified tags such as `<ui::Badge ...>` work too.
+children into `Vec<AnyElement>`, `SmallVec<[AnyElement; N]>`, or `Option<AnyElement>` (single-child without heap allocation).
+`#[slot]` declares optional named slots (`Option<AnyElement>` or `Vec<AnyElement>`), populated either by a prop (`header={rsx! { ... }}`) or by a direct child element carrying `slot="header"`.
+`#[style] style: StyleRefinement` implements `gpui::Styled` on the generated builder so `<Badge class="mt-4 w-full" />` forwards static and dynamic classes. Module-qualified tags such as `<ui::Badge ...>` work too.
 
 Unsuffixed numeric literals and pure numeric expressions infer the declared primitive
 field type, such as `#[prop(default = 7)] value: u32` or `#[prop(default = 7.0)] ratio: f32`.

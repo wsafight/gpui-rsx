@@ -40,7 +40,7 @@ rsx_strict! {
 
 ## Compile-Time Conditional Classes
 
-`if` and `match` expressions whose branches are string literals can also be optimized by the macro:
+`if`, `match`, and composable array expressions whose leaves are string literals are expanded at compile time:
 
 ```rust
 rsx! {
@@ -53,6 +53,16 @@ rsx! {
         State::Error => "border-red-500",
         _ => "border-gray-300",
     }} />
+}
+
+rsx! {
+    <div class={[
+        "flex items-center p-2",
+        active.then_some("bg-blue-500 text-white"),
+        disabled && "opacity-50",
+        (selected, "border-1"),
+        if open { "gap-4" },
+    ]} />
 }
 ```
 
@@ -99,6 +109,8 @@ Unknown dynamic classes are ignored in permissive mode. In debug builds, each un
 | Percent and fraction sizing | Supported | Supported |
 | Full Tailwind color palette | Supported | Supported |
 | Arbitrary hex / RGB / RGBA colors | Supported | Supported |
+| Static `rsx.toml` tokens (`[colors]` hex, `[radius]`, `[spacing]`, `[opacity]`, etc.) | Supported | Supported |
+| Render-time `rsx.toml` `{ expr = "cx..." }` tokens | Supported | Not supported |
 | Static stateful scroll classes | Supported with auto ID | Not supported |
 | State variants (`hover:`, `focus:`, `active:`, group variants) | Supported | Not supported |
 | Responsive / `dark:` variants | Warning or strict error | Debug report or strict panic / custom handler |

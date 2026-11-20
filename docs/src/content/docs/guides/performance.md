@@ -150,7 +150,9 @@ The generated public module contains `px` and `tailwind` helpers. Both operate o
 GPUI's `StyleRefinement`, so different element types share the same compiled code.
 `rsx!` and `rsx_tw!` choose the appropriate helper. Existing styles and per-element
 `onUnknownClass` callbacks are preserved, and strict mode still rejects unknown
-dynamic classes at runtime. Variants and theme tokens still require static strings.
+dynamic classes at runtime. Static `rsx.toml` tokens (`[colors]` hex values, `[radius]`,
+`[spacing]`, `[text-size]`, `[line-height]`, `[opacity]`) are included in the shared
+matcher; state variants and render-time `cx` expression tokens still require static strings.
 This setting reduces compilation work; dynamic strings are still parsed during rendering.
 
 Library code uses `crate::rsx_runtime`; integration tests, examples and binaries in

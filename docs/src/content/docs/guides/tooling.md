@@ -19,7 +19,11 @@ the same Cargo features as the application:
 
 ```sh
 cargo run -p cargo-rsx -- doctor --manifest-path tests/fixtures/hot-reload/Cargo.toml --features hotreload,kit --hot-reload --json
+cargo rsx dev --check --manifest-path tests/fixtures/hot-reload/Cargo.toml --features hotreload,kit
+cargo rsx dev my-bin
 ```
+
+`cargo rsx dev` runs hot-reload preflight checks automatically (auto-detecting a package's `hotreload` or `hot-reload` feature when `--features` is omitted) and launches `dx serve --hot-patch --hot-reload true`. Pass `--check` (optionally with `--json`) to inspect readiness and the resolved `dx` invocation without launching it.
 
 It checks the selected backend's `hot-reload` feature, whether `dx serve` supports
 `--hot-patch`, and macros named `rsx` that Dioxus CLI 0.7.10 may intercept. Set

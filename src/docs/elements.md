@@ -198,10 +198,9 @@ rsx! { <div gap={px(16.0)} bg={rgb(0x3b82f6)} opacity={0.8} /> }
 # }
 ```
 
-### Custom Constructor with `base`
+### Custom Constructors: `<Tag(...)>` Shorthand and `base`
 
-`base={expr}` replaces the constructor inferred from the tag name, then the remaining
-attributes continue as a normal method chain:
+For component types built with `Type::new(args...)` (or lowercase factory functions `fn_name(args...)`), pass constructor arguments directly after the tag name, or use `base={expr}` to supply a preconfigured builder:
 
 ```
 # #![allow(unused)]
@@ -235,6 +234,8 @@ attributes continue as a normal method chain:
 # let task = Task { id: 7, title: "Write docs".into() };
 # let handler = |_: &ClickEvent, _: &mut Window, _: &mut App| {};
 # let _doc = {
+rsx! { <Button("save") label={"Save"} small /> };
+// → Button::new("save").label("Save").small()
 rsx! { <Button base={Button::new("save")} label={"Save"} small /> }
 // → Button::new("save").label("Save").small()
 # };

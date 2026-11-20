@@ -14,7 +14,7 @@ Existing RSX markup and pixel/Tailwind spacing modes are unchanged. Macro/core s
 
 Direct macro imports such as `use gpui_rsx::rsx as view` retain their original spacing mode in tooling. Balanced macros can still be analyzed while surrounding Rust is incomplete, but formatting and migration refuse to write lexically damaged files. Local `macro_rules!` definitions shadow unqualified calls; crate aliases and re-exports are not full Rust name resolution.
 
-The demo targets Kit 0.9.0 / GPUI Pre 0.3.11. Its large incident queue is virtualized, and native profiling is opt-in. New hot-reload diagnostics and probes do not establish that every Dioxus/Kit hot-patch configuration works; see the [development reload workflow](/gpui-rsx/guides/performance/#measure-development-reloads) for the tested configuration and limits.
+The demo targets Kit 0.10.0 / GPUI Pre 0.3.12. Its large incident queue is virtualized, and native profiling is opt-in. New hot-reload diagnostics and probes do not establish that every Dioxus/Kit hot-patch configuration works; see the [development reload workflow](/gpui-rsx/guides/performance/#measure-development-reloads) for the tested configuration and limits.
 
 ## From 0.10 to 0.11
 
@@ -125,11 +125,11 @@ dependencies with Kit, preserving the `gpui` crate name for generated code:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = "0.12.1"
 ```
 
-Kit 0.9.0 pins `gpui-pre = 0.3.11`. Use `gpui::component` for styled controls and
+Kit 0.10.0 pins `gpui-pre = 0.3.12`. Use `gpui::component` for styled controls and
 `gpui::base` for unstyled behavior. Replace `gpui_platform::application()` with
 `gpui::application()`, initialize Kit before opening a window, and mount its root:
 

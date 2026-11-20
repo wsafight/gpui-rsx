@@ -383,14 +383,14 @@ version with Subsecond support and an application feature forwarding to
 Check `dx --version` and distinguish a missing rebuild from a generated patch
 that fails to update the window. These are separate stages.
 
-The standalone fixture in `tests/fixtures/hot-reload/` pins GPUI Pre 0.3.11 and
+The standalone fixture in `tests/fixtures/hot-reload/` pins GPUI Pre 0.3.12 and
 Dioxus 0.7.10. Its README provides parser tests and native builder, original macro
 and alias comparisons. It is separate from the demo's verified dependency set.
-Its `kit` feature checks Kit 0.9.0 initialization and root-window mounting. From
+Its `kit` feature checks Kit 0.10.0 initialization and root-window mounting. From
 the repository root, `node scripts/test-hot-reload.mjs` uses Dioxus CLI 0.7.10 to
 edit a temporary copy and check revision, PID and timer state in native render
 callbacks. It does not click controls or compare pixels. The development CLI's
-`doctor --hot-reload --features hotreload,kit` checks readiness separately;
+`cargo rsx dev --check` or `doctor --hot-reload --features hotreload,kit` checks readiness separately;
 passing that check does not mean a patch was applied.
 The existing [build/restart workflow](../performance/#measure-development-reloads)
 can also reload edits by restarting the process, which resets application state.

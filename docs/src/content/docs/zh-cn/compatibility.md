@@ -48,7 +48,7 @@ manifest、lockfile、最小失败 RSX 和编译器输出。
 
 ```toml
 [dependencies]
-engine = { package = "gpui-kit", version = "=0.9.0" }
+engine = { package = "gpui-kit", version = "=0.10.0" }
 ```
 
 ```rust

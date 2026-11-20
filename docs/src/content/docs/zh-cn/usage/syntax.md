@@ -44,11 +44,14 @@ rsx! { <div flex></div> }
 | RSX | 生成的构造器 |
 | --- | --- |
 | `<svg src={path} />` | `svg().path(path)` |
+| `<svg src={path} timedTransformation={(anim, transform)} />` | `svg().path(path).with_timed_transformation(anim, transform)` |
 | `<img src={source} />` | `img(source)` |
 | `<img source={source} />` | `img(source)` |
 | `<canvas prepaint={prepaint} paint={paint} />` | `canvas(prepaint, paint)` |
+| `<uniform_list count={n} render={render} />` | `uniform_list(auto_id, n, render)` |
+| `<uniform_list id="rows" count={n} render={render} />` | `uniform_list("rows", n, render)` |
 
-`img` 必须提供 `src` 或 `source`。`canvas` 必须同时提供 `prepaint` 和 `paint`。
+`img` 必须提供 `src` 或 `source`。`canvas` 必须同时提供 `prepaint` 和 `paint`。`uniform_list` 必须提供 `count`（或 `itemCount` / `item_count`）与 `render`；在 `{for ...}` 循环内使用时须提供 `id` 或 `key`。
 
 ## 组件
 
@@ -68,28 +71,29 @@ rsx! {
 }
 ```
 
-当 builder 需要参数，或来自组件库时，使用 `base={expr}`：
+通过 `Type::new(...)` 构造的类型（或小写工厂函数）可以直接在标签名后使用括号传参；复用预先配置的 builder 时则使用 `base={expr}`：
 
 ```rust
 use gpui::component::button::Button;
 use gpui::component::Sizable as _;
 
 rsx! {
-    <Button
-        base={Button::new("save")}
+    <Button("save")
         label={"Save"}
         small
     />
 }
 ```
 
-`base` 会被宏消费，不会生成 `.base(...)` 方法调用。
+`base` 会被宏消费，不会生成 `.base(...)` 方法调用，也不能与 `<Tag(...)>` 同时出现在同一元素上。
 
 | 构造需求 | 推荐写法 |
 | --- | --- |
-| 有无参构造函数的 builder | `<Card title="Inbox" />` 或 `<ui::Card ... />` |
-| 构造函数需要参数，或复用已配置的 builder | `<Button base={Button::new("save")} ... />` |
+| 有无参构造函数的 builder（`#[component]`） | `<Card title="Inbox" />` 或 `<ui::Card ... />` |
+| `Type::new(...)` 或工厂函数参数 | `<Button("save") ... />`、`<Tab() ... />` 或 `<widget("a") ... />` |
+| 复用已配置的 builder 表达式 | `<Button base={Button::new("save")} ... />` |
 | 可省略的属性 | 声明 `#[prop(default)]` 或 `#[prop(default = expr)]`；省略属性时使用默认值 |
+| 具名插槽与样式透传 | 声明 `#[slot]`（配合 `<div slot="header">`）与 `#[style] style: StyleRefinement` |
 | 不同类型的根节点，或需要保存的子节点集合 | 使用 [`rsx_fragment!`](#fragment)，再用 `{...parts}` 展开 |
 | 多个根节点还需调用具体 builder 方法 | 保留普通 `rsx!` Fragment，并使用兼容的根节点类型 |
 
@@ -133,7 +137,9 @@ let badge = rsx! {
 普通参数为必填属性。`#[prop(default)]` 使用 `Default::default()`，
 `#[prop(default = expr)]` 提供显式默认值。带默认值的布尔属性使用 flag setter
 （`highlighted`）或条件 setter（`highlightedIf={active}`）。`#[children]` 将子节点
-收集到 `Vec<AnyElement>`。也支持 `<ui::Badge ...>` 这样的模块路径标签。
+收集到 `Vec<AnyElement>`、`SmallVec<[AnyElement; N]>` 或 `Option<AnyElement>`（单子节点零堆分配）。
+`#[slot]` 声明可选具名插槽（`Option<AnyElement>` 或 `Vec<AnyElement>`），既可通过属性（`header={rsx! { ... }}`）传入，也可在直接子元素上标记 `slot="header"`。
+`#[style] style: StyleRefinement` 会为生成的 builder 实现 `gpui::Styled`，使 `<Badge class="mt-4 w-full" />` 支持静态与动态 class 透传。也支持 `<ui::Badge ...>` 这样的模块路径标签。
 
 无后缀数值字面量与纯数值表达式按声明的基础数值类型推断，例如
 `#[prop(default = 7)] value: u32`、`#[prop(default = 7.0)] ratio: f32`。

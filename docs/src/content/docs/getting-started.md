@@ -6,7 +6,7 @@ description: Install GPUI-RSX and render a first GPUI view.
 Write a GPUI view with RSX tags and Rust expressions. The macro expands static markup into GPUI builder calls at compile time. This guide sets up the dependencies and opens a first window.
 
 :::note[GPUI elements and HTML-like names]
-Names such as `button` and `input` are aliases for GPUI `div()`, with no HTML input or form behavior. For a component library's controls, use explicit constructors such as `<Button base={Button::new("save")} label={"Save"} />`; see [Components](/gpui-rsx/usage/syntax/#components) for imports and construction rules.
+Names such as `button` and `input` are aliases for GPUI `div()`, with no HTML input or form behavior. For a component library's controls, use explicit constructors such as `<Button("save") label={"Save"} />` or `<Button base={Button::new("save")} label={"Save"} />`; see [Components](/gpui-rsx/usage/syntax/#components) for imports and construction rules.
 :::
 
 ## Install
@@ -15,7 +15,7 @@ Add GPUI Kit, aliased as `gpui` for macro-generated paths, and GPUI-RSX:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = "0.12.1"
 ```
 

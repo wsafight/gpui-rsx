@@ -144,7 +144,8 @@ dynamic-runtime = "rsx_runtime"
 生成的公开模块包含 `px` 与 `tailwind` 两个 helper，均作用于 GPUI 的
 `StyleRefinement`，不同元素类型也复用同一份编译结果。`rsx!` 和 `rsx_tw!`
 按间距刻度选择 helper。已有样式、每个元素的 `onUnknownClass` 回调和严格模式
-行为保持一致；状态变体与主题 token 仍需使用静态字符串。
+行为保持一致；`rsx.toml` 中的静态 token（颜色 hex、圆角、间距、字号、行高、透明度）
+也会编入共享 matcher，而状态变体与依赖渲染期 `cx` 的表达式 token 仍需使用静态字符串。
 此设置减少编译工作，动态字符串在渲染时仍需解析。
 
 库内部使用 `crate::rsx_runtime`；同一包的 integration test、example 和 bin

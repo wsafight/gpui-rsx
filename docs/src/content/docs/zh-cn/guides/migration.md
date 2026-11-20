@@ -14,7 +14,7 @@ description: 从手写 GPUI builder 链迁移，升级工具 API，并对齐 GPU
 
 工具链现在识别 `use gpui_rsx::rsx as view` 等直接宏导入，并保留原宏的间距模式。外围 Rust 尚未写完时，完整宏仍可分析；词法受损的文件则禁止格式化和迁移写回。本地 `macro_rules!` 会遮蔽无路径调用，但 crate 别名和重导出不属于完整 Rust 名称解析支持。
 
-Demo 改用 Kit 0.9.0 / GPUI Pre 0.3.11，大数据事故队列使用虚拟列表，原生性能采样按需启用。新增热更新诊断和探针不代表所有 Dioxus/Kit 热补丁组合都已验证；具体配置和限制见[开发重载流程](/gpui-rsx/zh-cn/guides/performance/#测量开发重载)。
+Demo 改用 Kit 0.10.0 / GPUI Pre 0.3.12，大数据事故队列使用虚拟列表，原生性能采样按需启用。新增热更新诊断和探针不代表所有 Dioxus/Kit 热补丁组合都已验证；具体配置和限制见[开发重载流程](/gpui-rsx/zh-cn/guides/performance/#测量开发重载)。
 
 ## 从 0.10 升级到 0.11
 
@@ -114,11 +114,11 @@ UTF-16 位置依次应用，未修改的宏复用诊断结果。同一次 RSX �
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = "0.12.1"
 ```
 
-Kit 0.9.0 固定 `gpui-pre = 0.3.11`。从 `gpui::component` 导入带样式控件，
+Kit 0.10.0 固定 `gpui-pre = 0.3.12`。从 `gpui::component` 导入带样式控件，
 从 `gpui::base` 导入基础行为。将 `gpui_platform::application()` 改为
 `gpui::application()`；打开窗口前初始化 Kit，并挂载其根视图：
 
