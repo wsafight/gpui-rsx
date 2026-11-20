@@ -20,7 +20,7 @@
     "@astrojs/starlight": "^0.42.8",
     "@playwright/test": "1.65.0",
     "@types/bun": "1.4.4",
-    "astro": "^7.4.4",
+    "astro": "^7.4.13",
     "sharp": "^0.35.5",
     "typescript": "^6.0.3"
   },
