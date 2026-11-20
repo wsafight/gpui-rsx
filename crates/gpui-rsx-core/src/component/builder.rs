@@ -8,6 +8,8 @@ enum PropKind {
     Required,
     Default(Option<Box<syn::Expr>>),
     Children,
+    Slot,
+    Style,
 }
 
 struct Prop {
@@ -46,6 +48,16 @@ pub(super) fn expand_struct(
                     ));
                 }
                 PropKind::Children
+            } else if attr.path().is_ident("slot") {
+                if !matches!(attr.meta, syn::Meta::Path(_)) {
+                    return Err(syn::Error::new_spanned(attr, "#[slot] takes no arguments"));
+                }
+                PropKind::Slot
+            } else if attr.path().is_ident("style") {
+                if !matches!(attr.meta, syn::Meta::Path(_)) {
+                    return Err(syn::Error::new_spanned(attr, "#[style] takes no arguments"));
+                }
+                PropKind::Style
             } else if attr.path().is_ident("prop") {
                 let (parsed, is_callback) = parse_prop_attr(&attr)?;
                 callback |= is_callback;
@@ -60,14 +72,19 @@ pub(super) fn expand_struct(
             if kind.replace(parsed).is_some() {
                 return Err(syn::Error::new_spanned(
                     &field.ident,
-                    "use only one #[prop(...)] or #[children] annotation per prop",
+                    "use only one #[prop(...)], #[children], #[slot] or #[style] annotation per prop",
                 ));
             }
         }
-        if callback && matches!(kind, Some(PropKind::Children)) {
+        if callback
+            && matches!(
+                kind,
+                Some(PropKind::Children | PropKind::Slot | PropKind::Style)
+            )
+        {
             return Err(syn::Error::new_spanned(
                 &field.ident,
-                "#[prop(callback)] cannot be combined with #[children]",
+                "#[prop(callback)] cannot be combined with #[children], #[slot] or #[style]",
             ));
         }
         let docs = kept
@@ -93,6 +110,17 @@ pub(super) fn expand_struct(
         return Err(syn::Error::new(
             input.ident.span(),
             "#[component] supports at most one #[children] field",
+        ));
+    }
+    if props
+        .iter()
+        .filter(|p| matches!(p.kind, PropKind::Style))
+        .count()
+        > 1
+    {
+        return Err(syn::Error::new(
+            input.ident.span(),
+            "#[component] supports at most one #[style] field",
         ));
     }
 
@@ -199,7 +227,7 @@ pub(super) fn expand_struct(
                 let value = super::callback::default_value(&p.ty, expr, p.callback);
                 quote! { #ident: #value }
             }
-            PropKind::Default(None) | PropKind::Children => {
+            PropKind::Default(None) | PropKind::Children | PropKind::Slot | PropKind::Style => {
                 quote! { #ident: ::core::default::Default::default() }
             }
         }
@@ -219,6 +247,7 @@ pub(super) fn expand_struct(
 
     // Setters.
     let mut setters = Vec::new();
+    let mut styled_impl = None;
     for prop in &props {
         let ident = &prop.ident;
         let ty = &prop.ty;
@@ -293,24 +322,107 @@ pub(super) fn expand_struct(
                 });
             }
             PropKind::Children => {
+                if is_option_type(ty) {
+                    setters.push(quote! {
+                        impl<#(#impl_parameters,)* #(#type_params),*> #builder<#(#original_arguments,)* #(#type_params),*> #where_clause {
+                            /// Sets the single child element without heap-allocating a `Vec`.
+                            #[must_use]
+                            pub fn child(mut self, child: impl #gpui::IntoElement) -> Self {
+                                self.#ident = ::core::option::Option::Some(#gpui::IntoElement::into_any_element(child));
+                                self
+                            }
+
+                            /// Sets the child element from an iterator.
+                            #[must_use]
+                            pub fn children(
+                                mut self,
+                                children: impl ::core::iter::IntoIterator<Item = impl #gpui::IntoElement>,
+                            ) -> Self {
+                                for child in children {
+                                    self.#ident = ::core::option::Option::Some(#gpui::IntoElement::into_any_element(child));
+                                }
+                                self
+                            }
+                        }
+                    });
+                } else {
+                    setters.push(quote! {
+                        impl<#(#impl_parameters,)* #(#type_params),*> #builder<#(#original_arguments,)* #(#type_params),*> #where_clause {
+                            /// Appends one child element.
+                            #[must_use]
+                            pub fn child(mut self, child: impl #gpui::IntoElement) -> Self {
+                                self.#ident.push(#gpui::IntoElement::into_any_element(child));
+                                self
+                            }
+
+                            /// Appends several child elements.
+                            #[must_use]
+                            pub fn children(
+                                mut self,
+                                children: impl ::core::iter::IntoIterator<Item = impl #gpui::IntoElement>,
+                            ) -> Self {
+                                self.#ident
+                                    .extend(children.into_iter().map(#gpui::IntoElement::into_any_element));
+                                self
+                            }
+                        }
+                    });
+                }
+            }
+            PropKind::Slot => {
+                if is_option_type(ty) {
+                    setters.push(quote! {
+                        impl<#(#impl_parameters,)* #(#type_params),*> #builder<#(#original_arguments,)* #(#type_params),*> #where_clause {
+                            #(#docs)*
+                            #[must_use]
+                            pub fn #ident(mut self, value: impl #gpui::IntoElement) -> Self {
+                                self.#ident = ::core::option::Option::Some(#gpui::IntoElement::into_any_element(value));
+                                self
+                            }
+                        }
+                    });
+                } else {
+                    let plural = format_ident!("{}_children", ident.unraw());
+                    setters.push(quote! {
+                        impl<#(#impl_parameters,)* #(#type_params),*> #builder<#(#original_arguments,)* #(#type_params),*> #where_clause {
+                            #(#docs)*
+                            #[must_use]
+                            pub fn #ident(mut self, value: impl #gpui::IntoElement) -> Self {
+                                self.#ident.push(#gpui::IntoElement::into_any_element(value));
+                                self
+                            }
+
+                            #[doc = concat!("Appends multiple elements to the `", stringify!(#ident), "` slot.")]
+                            #[must_use]
+                            pub fn #plural(
+                                mut self,
+                                values: impl ::core::iter::IntoIterator<Item = impl #gpui::IntoElement>,
+                            ) -> Self {
+                                self.#ident
+                                    .extend(values.into_iter().map(#gpui::IntoElement::into_any_element));
+                                self
+                            }
+                        }
+                    });
+                }
+            }
+            PropKind::Style => {
                 setters.push(quote! {
                     impl<#(#impl_parameters,)* #(#type_params),*> #builder<#(#original_arguments,)* #(#type_params),*> #where_clause {
-                        /// Appends one child element.
+                        #(#docs)*
                         #[must_use]
-                        pub fn child(mut self, child: impl #gpui::IntoElement) -> Self {
-                            self.#ident.push(#gpui::IntoElement::into_any_element(child));
+                        pub fn #ident(mut self, value: #value_type) -> Self {
+                            self.#ident = #converted;
                             self
                         }
-
-                        /// Appends several child elements.
-                        #[must_use]
-                        pub fn children(
-                            mut self,
-                            children: impl ::core::iter::IntoIterator<Item = impl #gpui::IntoElement>,
-                        ) -> Self {
-                            self.#ident
-                                .extend(children.into_iter().map(#gpui::IntoElement::into_any_element));
-                            self
+                    }
+                });
+                styled_impl = Some(quote! {
+                    #(#gates)*
+                    #[allow(deprecated)]
+                    impl<#(#impl_parameters,)* #(#type_params),*> #gpui::Styled for #builder<#(#original_arguments,)* #(#type_params),*> #where_clause {
+                        fn style(&mut self) -> &mut #gpui::StyleRefinement {
+                            &mut self.#ident
                         }
                     }
                 });
@@ -391,6 +503,7 @@ pub(super) fn expand_struct(
         #(#gates)*
         #[doc = #ctor_doc]
         #(#deprecated)*
+        #[track_caller]
         #[allow(non_snake_case, deprecated)]
         #vis fn #name #constructor_generics () -> #builder<#(#original_arguments,)* #(#missing),*> #where_clause {
             #builder::<#(#original_arguments,)* #(#missing2),*> {
@@ -401,10 +514,13 @@ pub(super) fn expand_struct(
 
         #(#setters)*
 
+        #styled_impl
+
         #(#gates)*
         #[allow(deprecated)]
         impl<#(#impl_parameters,)* #(#bounds),*> #builder<#(#original_arguments,)* #(#type_params),*> #where_clause {
             /// Finishes the builder. Only available once every required prop is set.
+            #[track_caller]
             pub fn build(self) -> #name<#(#original_arguments),*> {
                 #name {
                     #(#build_fields,)*
@@ -417,6 +533,7 @@ pub(super) fn expand_struct(
         impl #element_impl #gpui::IntoElement for #builder #element_args #element_where {
             type Element = <#name<#(#original_arguments),*> as #gpui::IntoElement>::Element;
 
+            #[track_caller]
             fn into_element(self) -> Self::Element {
                 #gpui::IntoElement::into_element(self.build())
             }
@@ -457,6 +574,24 @@ fn parse_prop_attr(attr: &syn::Attribute) -> syn::Result<(Option<PropKind>, bool
 
 fn is_bool(ty: &syn::Type) -> bool {
     matches!(ty, syn::Type::Path(p) if p.qself.is_none() && p.path.is_ident("bool"))
+}
+
+fn is_option_type(ty: &syn::Type) -> bool {
+    let syn::Type::Path(path) = ty else {
+        return false;
+    };
+    if path.qself.is_some() {
+        return false;
+    }
+    let segments = &path.path.segments;
+    let is_opt = segments.len() == 1
+        || (segments.len() == 3
+            && matches!(segments[0].ident.to_string().as_str(), "core" | "std")
+            && segments[1].ident == "option");
+    is_opt
+        && segments.last().is_some_and(|seg| {
+            seg.ident == "Option" && matches!(seg.arguments, syn::PathArguments::AngleBracketed(_))
+        })
 }
 
 fn to_snake(name: &str) -> String {

@@ -187,7 +187,7 @@ fn function_components_reject_unsupported_signatures() {
         ),
         (
             quote! { fn Card(#[unknown] value: u8) -> impl IntoElement { div() } },
-            "only #[prop(...)] and #[children]",
+            "only #[prop(...)], #[children], #[slot] and #[style]",
         ),
     ] {
         let error = expand(TokenStream::new(), source).unwrap_err().to_string();
