@@ -243,6 +243,34 @@ pub fn state_class_unsupported_class_error(
     )
 }
 
+/// 报告同时使用构造参数语法 `<Tag(...)>` 与 `base={...}` 的冲突错误。
+pub fn conflicting_constructor_args_and_base_error(
+    attr_name: &Ident,
+    tag_name: &str,
+) -> syn::Error {
+    syn::Error::new_spanned(
+        attr_name,
+        format!(
+            "Cannot combine constructor arguments `<{tag_name}(...)>` with `base={{...}}`.\n\
+             \x20 help: Pass constructor arguments in `<{tag_name}(...)>` or supply a full builder via `base={{...}}`, not both"
+        ),
+    )
+}
+
+/// 报告内置原生标签不支持 `<tag(...)>` 构造参数简写的错误。
+pub fn unsupported_native_constructor_args_error<T: Spanned>(
+    tag_span: &T,
+    tag_name: &str,
+) -> syn::Error {
+    syn::Error::new(
+        tag_span.span(),
+        format!(
+            "Native tag `<{tag_name}>` does not accept parenthesized constructor arguments.\n\
+             \x20 help: Pass attributes directly on `<{tag_name} ...>` (for example `id={{...}}` or `src={{...}}`)"
+        ),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -335,6 +335,15 @@ fn generate_flattened_nodes(
 fn collect_any_elements(exprs: &[(TokenStream, bool)], element_type: TokenStream) -> TokenStream {
     let children = syn::Ident::new("__rsx_children", Span::mixed_site());
     let child = syn::Ident::new("__rsx_child", Span::mixed_site());
+    let min_capacity = exprs
+        .iter()
+        .filter(|(_, yields_many)| !*yields_many)
+        .count();
+    let init = if min_capacity > 0 {
+        quote! { ::std::vec::Vec::<#element_type>::with_capacity(#min_capacity) }
+    } else {
+        quote! { ::std::vec::Vec::<#element_type>::new() }
+    };
     let append = exprs.iter().map(|(expr, yields_many)| {
         if *yields_many {
             quote! {
@@ -346,7 +355,7 @@ fn collect_any_elements(exprs: &[(TokenStream, bool)], element_type: TokenStream
         }
     });
     quote! {{
-        let mut #children = ::std::vec::Vec::<#element_type>::new();
+        let mut #children = #init;
         #(#append)*
         #children
     }}
@@ -385,13 +394,36 @@ fn generate_element_checked(
     dynamic_used: &mut bool,
     gpui: &OnceCell<syn::Path>,
 ) -> CodegenResult {
+    generate_element_inner(element, false, require_loop_key, mode, dynamic_used, gpui)
+}
+
+fn generate_element_inner(
+    element: &RsxElement,
+    skip_slot_attr: bool,
+    require_loop_key: bool,
+    mode: ClassMode,
+    dynamic_used: &mut bool,
+    gpui: &OnceCell<syn::Path>,
+) -> CodegenResult {
     // 缓存标签名字符串，避免多次 to_string() 堆分配
     let tag_str = element.name.to_string();
 
-    // 快速路径：无属性且无子节点时，跳过所有扫描直接返回基础标签
-    if element.attributes.is_empty() && element.children.is_empty() {
-        return generate_tag(&tag_str, &element.name, None, None, None);
+    // 快速路径：无构造参数、无属性且无子节点时，跳过所有扫描直接返回基础标签
+    if element.args.is_none() && element.attributes.is_empty() && element.children.is_empty() {
+        return generate_tag(
+            &tag_str,
+            &element.name,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        );
     }
+
+    let is_uniform_list = tag_str == "uniform_list" && element.name.as_single_ident().is_some();
 
     // 单次遍历提取所有需要的信息，同时生成用户属性方法。
     let mut user_id = None;
@@ -400,8 +432,10 @@ fn generate_element_checked(
     let mut img_source = None;
     let mut canvas_prepaint = None;
     let mut canvas_paint = None;
+    let mut list_count = None;
+    let mut list_render = None;
     let mut has_styled = false;
-    let mut needs_id = false;
+    let mut needs_id = is_uniform_list;
     let unknown_class_handler = element.attributes.iter().find_map(|attr| match attr {
         RsxAttribute::Value { name, value } if name == "onUnknownClass" => Some(value),
         _ => None,
@@ -415,6 +449,7 @@ fn generate_element_checked(
 
     for attr in &element.attributes {
         match attr {
+            RsxAttribute::Value { name, .. } if skip_slot_attr && name == "slot" => {}
             RsxAttribute::Value { name, value } if name == "id" => {
                 user_id = Some(value);
             }
@@ -434,6 +469,15 @@ fn generate_element_checked(
             }
             RsxAttribute::Value { name, value } if tag_str == "canvas" && name == "paint" => {
                 canvas_paint = Some(value);
+            }
+            RsxAttribute::Value { name, value }
+                if is_uniform_list
+                    && (name == "count" || name == "itemCount" || name == "item_count") =>
+            {
+                list_count = Some(value);
+            }
+            RsxAttribute::Value { name, value } if is_uniform_list && name == "render" => {
+                list_render = Some(value);
             }
             RsxAttribute::Value { name, value } if tag_str == "svg" && name == "src" => {
                 methods.push(quote! { .path(#value) });
@@ -462,6 +506,23 @@ fn generate_element_checked(
         return Err(SemanticDiagnostic::missing_loop_key(&element.name.path, &tag_str).into());
     }
 
+    let list_id_tokens = if is_uniform_list && base_expr.is_none() {
+        Some(if let Some(id_value) = user_id {
+            quote! { #id_value }
+        } else if let Some(key_expr) = user_key {
+            let gpui = gpui.get_or_init(|| mode.gpui_path());
+            make_keyed_auto_id(&element.name, key_expr, gpui)
+        } else {
+            make_auto_id(&element.name)
+        })
+    } else {
+        None
+    };
+
+    let native_tag = element.name.as_single_ident().is_some()
+        && (HTML_TAGS.contains(&tag_str.as_str())
+            || matches!(tag_str.as_str(), "svg" | "img" | "canvas" | "uniform_list"));
+
     // 生成基础元素和 id：
     //  1. 显式 id              → 直接使用，优先级最高
     //  2. 需要 id + key 存在   → 自动 ID 前缀 + key（运行时拼接，保证循环内唯一）
@@ -473,12 +534,18 @@ fn generate_element_checked(
         generate_tag(
             &tag_str,
             &element.name,
+            element.args.as_deref(),
             img_source,
             canvas_prepaint,
             canvas_paint,
+            list_id_tokens,
+            list_count,
+            list_render,
         )?
     };
-    let base = if let Some(id_value) = user_id {
+    let base = if is_uniform_list && base_expr.is_none() {
+        tag
+    } else if let Some(id_value) = user_id {
         quote! { #tag.id(#id_value) }
     } else if needs_id {
         let gpui = gpui.get_or_init(|| mode.gpui_path());
@@ -489,10 +556,7 @@ fn generate_element_checked(
         };
         // Custom constructors and base expressions may return RenderOnce builders whose
         // event setters must run before rendering. Only actual GPUI elements need an ID.
-        let native_tag = element.name.as_single_ident().is_some()
-            && (HTML_TAGS.contains(&tag_str.as_str())
-                || matches!(tag_str.as_str(), "svg" | "img" | "canvas"));
-        if base_expr.is_some() || !native_tag {
+        if base_expr.is_some() || element.args.is_some() || !native_tag {
             super::auto_id::with_auto_id(tag, auto_id, gpui)
         } else {
             quote! { #tag.id(#auto_id) }
@@ -509,9 +573,10 @@ fn generate_element_checked(
             Vec::new()
         };
 
-    // 子节点 → .child() / .children() 调用（含聚合优化）
+    // 子节点 → .child() / .children() / 具名插槽调用
     generate_children_methods(
         &element.children,
+        !native_tag,
         require_loop_key,
         &mut methods,
         mode.clone(),
@@ -522,37 +587,136 @@ fn generate_element_checked(
     Ok(methods.finish(quote! { #base #(#default_methods)* }))
 }
 
+fn extract_child_slot_ident(element: &RsxElement) -> Option<syn::Ident> {
+    let slot_lit = element.attributes.iter().find_map(|attr| match attr {
+        RsxAttribute::Value {
+            name,
+            value:
+                syn::Expr::Lit(syn::ExprLit {
+                    lit: syn::Lit::Str(lit),
+                    ..
+                }),
+        } if name == "slot" => Some(lit),
+        _ => None,
+    })?;
+    let raw = slot_lit.value();
+    let mut snake = String::with_capacity(raw.len() + 2);
+    for (idx, ch) in raw.chars().enumerate() {
+        if ch == '-' {
+            snake.push('_');
+        } else if ch.is_ascii_uppercase() {
+            if idx > 0 {
+                snake.push('_');
+            }
+            snake.push(ch.to_ascii_lowercase());
+        } else {
+            snake.push(ch);
+        }
+    }
+    syn::parse_str::<syn::Ident>(&snake).ok().map(|mut ident| {
+        ident.set_span(slot_lit.span());
+        ident
+    })
+}
+
 /// 生成子节点的方法链片段
 fn generate_children_methods(
     children: &[RsxNode],
+    allow_named_slots: bool,
     require_loop_key: bool,
     methods: &mut ElementMethods,
     mode: ClassMode,
     dynamic_used: &mut bool,
     gpui: &OnceCell<syn::Path>,
 ) -> Result<(), CodegenErrors> {
-    for (expr, yields_many) in
-        generate_flattened_nodes(children, require_loop_key, mode, dynamic_used, gpui)?
-    {
-        methods.push(if yields_many {
-            quote! { .children(#expr) }
-        } else {
-            quote! { .child(#expr) }
-        });
+    let mut errors = TokenStream::new();
+    let mut diagnostics = Vec::new();
+    for node in flattened_nodes(children) {
+        if allow_named_slots
+            && let RsxNode::Element(child_el) = node
+            && let Some(slot_ident) = extract_child_slot_ident(child_el)
+        {
+            match generate_element_inner(
+                child_el,
+                true,
+                require_loop_key,
+                mode.clone(),
+                dynamic_used,
+                gpui,
+            ) {
+                Ok(expr) => methods.push(quote! { .#slot_ident(#expr) }),
+                Err(error) => {
+                    errors.extend(error.tokens);
+                    diagnostics.extend(error.diagnostics);
+                }
+            }
+            continue;
+        }
+        let yields_many = matches!(node, RsxNode::For { .. } | RsxNode::Spread(_));
+        match generate_node_checked(node, require_loop_key, mode.clone(), dynamic_used, gpui) {
+            Ok(expr) => methods.push(if yields_many {
+                quote! { .children(#expr) }
+            } else {
+                quote! { .child(#expr) }
+            }),
+            Err(error) => {
+                errors.extend(error.tokens);
+                diagnostics.extend(error.diagnostics);
+            }
+        }
     }
-    Ok(())
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(CodegenErrors {
+            tokens: quote! {{ #errors }},
+            diagnostics,
+        })
+    }
 }
 
-/// HTML 标签 → `div()`，特殊标签 → 同名函数，自定义组件 → 同名函数调用
+/// HTML 标签 → `div()`，特殊标签 → 同名函数，自定义组件 → 同名函数调用或 `Type::new(args...)`
 ///
 /// 接受预缓存的 `tag_str` 避免重复 `to_string()`
+#[allow(clippy::too_many_arguments)]
 fn generate_tag(
     tag_str: &str,
     name: &RsxElementName,
+    args: Option<&[syn::Expr]>,
     img_source: Option<&syn::Expr>,
     canvas_prepaint: Option<&syn::Expr>,
     canvas_paint: Option<&syn::Expr>,
+    list_id: Option<TokenStream>,
+    list_count: Option<&syn::Expr>,
+    list_render: Option<&syn::Expr>,
 ) -> CodegenResult {
+    if let Some(args) = args {
+        if name.as_single_ident().is_some()
+            && (HTML_TAGS.contains(&tag_str)
+                || matches!(tag_str, "svg" | "img" | "canvas" | "uniform_list"))
+        {
+            let err =
+                crate::diagnostics::unsupported_native_constructor_args_error(&name.path, tag_str);
+            return Err(CodegenErrors {
+                tokens: err.to_compile_error(),
+                diagnostics: Vec::new(),
+            });
+        }
+        let path = &name.path;
+        let is_type_ctor = path.segments.last().is_some_and(|seg| {
+            use syn::ext::IdentExt;
+            seg.ident
+                .unraw()
+                .to_string()
+                .starts_with(|c: char| c.is_ascii_uppercase())
+        });
+        return Ok(if is_type_ctor {
+            quote! { #path::new(#(#args),*) }
+        } else {
+            quote! { #path(#(#args),*) }
+        });
+    }
+
     if name.as_single_ident().is_none() {
         let path = &name.path;
         return Ok(quote! { #path() });
@@ -595,6 +759,28 @@ fn generate_tag(
             };
             quote! { canvas(#prepaint, #paint) }
         }
+        "uniform_list" => {
+            let Some(count) = list_count else {
+                return Err(SemanticDiagnostic::missing_required_attribute(
+                    &name.path,
+                    "uniform_list",
+                    "count",
+                    r#"<uniform_list count={items.len()} render={|range, window, cx| { ... }} />"#,
+                )
+                .into());
+            };
+            let Some(render) = list_render else {
+                return Err(SemanticDiagnostic::missing_required_attribute(
+                    &name.path,
+                    "uniform_list",
+                    "render",
+                    r#"<uniform_list count={items.len()} render={|range, window, cx| { ... }} />"#,
+                )
+                .into());
+            };
+            let id = list_id.unwrap_or_else(|| make_auto_id(name));
+            quote! { uniform_list(#id, #count, #render) }
+        }
         // HTML 标签：统一映射为 div()（与 spec/工具共用同一份 HTML_TAGS 列表）
         tag if HTML_TAGS.contains(&tag) => quote! { div() },
         _ => quote! { #path() },
@@ -614,10 +800,20 @@ mod tests {
 
     #[test]
     fn img_requires_source() {
-        let error = generate_tag("img", &element_name("img"), None, None, None)
-            .expect_err("img without src must fail")
-            .tokens
-            .to_string();
+        let error = generate_tag(
+            "img",
+            &element_name("img"),
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect_err("img without src must fail")
+        .tokens
+        .to_string();
 
         assert!(error.contains("Element `<img>` requires `src`"));
     }
@@ -627,17 +823,112 @@ mod tests {
         let callback: syn::Expr = syn::parse_quote!(callback);
         let name = element_name("canvas");
 
-        let missing_prepaint = generate_tag("canvas", &name, None, None, Some(&callback))
-            .expect_err("canvas without prepaint must fail")
-            .tokens
-            .to_string();
+        let missing_prepaint = generate_tag(
+            "canvas",
+            &name,
+            None,
+            None,
+            None,
+            Some(&callback),
+            None,
+            None,
+            None,
+        )
+        .expect_err("canvas without prepaint must fail")
+        .tokens
+        .to_string();
         assert!(missing_prepaint.contains("Element `<canvas>` requires `prepaint`"));
 
-        let missing_paint = generate_tag("canvas", &name, None, Some(&callback), None)
-            .expect_err("canvas without paint must fail")
-            .tokens
-            .to_string();
+        let missing_paint = generate_tag(
+            "canvas",
+            &name,
+            None,
+            None,
+            Some(&callback),
+            None,
+            None,
+            None,
+            None,
+        )
+        .expect_err("canvas without paint must fail")
+        .tokens
+        .to_string();
         assert!(missing_paint.contains("Element `<canvas>` requires `paint`"));
+    }
+
+    #[test]
+    fn uniform_list_requires_count_and_render_and_supports_auto_or_explicit_id() {
+        let count: syn::Expr = syn::parse_quote!(100);
+        let render: syn::Expr = syn::parse_quote!(render_rows);
+        let name = element_name("uniform_list");
+
+        let missing_count = generate_tag(
+            "uniform_list",
+            &name,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&render),
+        )
+        .expect_err("uniform_list without count must fail")
+        .tokens
+        .to_string();
+        assert!(missing_count.contains("Element `<uniform_list>` requires `count`"));
+
+        let missing_render = generate_tag(
+            "uniform_list",
+            &name,
+            None,
+            None,
+            None,
+            None,
+            None,
+            Some(&count),
+            None,
+        )
+        .expect_err("uniform_list without render must fail")
+        .tokens
+        .to_string();
+        assert!(missing_render.contains("Element `<uniform_list>` requires `render`"));
+
+        let explicit = expand(
+            r#"<uniform_list id="rows" count={100} render={render_rows} class="size-full" />"#,
+        );
+        assert_eq!(
+            explicit,
+            r#"uniform_list ("rows" , 100 , render_rows) . size_full ()"#
+        );
+    }
+
+    #[test]
+    fn constructor_args_and_named_slots_expand_idiomatically() {
+        assert_eq!(
+            expand(r#"<Button("save") label={"Save"} small />"#),
+            r#"Button :: new ("save") . label ("Save") . small ()"#
+        );
+        assert_eq!(
+            expand(r#"<Tab() underline />"#),
+            r#"Tab :: new () . underline ()"#
+        );
+        assert_eq!(
+            expand(r#"<custom_widget("a", 2) compact />"#),
+            r#"custom_widget ("a" , 2) . compact ()"#
+        );
+        assert!(expand(r#"<custom_widget("a", 2) active />"#).contains("__rsx_with_auto_id"));
+        assert_eq!(
+            expand(
+                r#"<Dialog title="Confirm"><div slot="header">{"Title"}</div><span>{"Body"}</span><Button("ok") slot="footer" /></Dialog>"#
+            ),
+            r#"Dialog () . title ("Confirm") . header (div () . child ("Title")) . child (div () . child ("Body")) . footer (Button :: new ("ok"))"#
+        );
+        // HTML containers do not intercept child `slot` props.
+        assert_eq!(
+            expand(r#"<div><Badge slot="lead" /></div>"#),
+            r#"div () . child (Badge () . slot ("lead"))"#
+        );
     }
 
     #[test]
@@ -673,9 +964,19 @@ mod tests {
     #[test]
     fn every_html_tag_maps_to_div() {
         for tag in HTML_TAGS {
-            let tokens = generate_tag(tag, &element_name(tag), None, None, None)
-                .expect("HTML tags need no attributes")
-                .to_string();
+            let tokens = generate_tag(
+                tag,
+                &element_name(tag),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("HTML tags need no attributes")
+            .to_string();
             assert_eq!(tokens, "div ()", "<{tag}> should map to div()");
         }
     }
@@ -688,9 +989,19 @@ mod tests {
             ("ui::Card", "ui :: Card ()"),
         ];
         for (tag, expected) in cases {
-            let tokens = generate_tag(tag, &element_name(tag), None, None, None)
-                .expect("custom tags need no attributes")
-                .to_string();
+            let tokens = generate_tag(
+                tag,
+                &element_name(tag),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+            )
+            .expect("custom tags need no attributes")
+            .to_string();
             assert_eq!(tokens, expected, "<{tag}>");
         }
     }

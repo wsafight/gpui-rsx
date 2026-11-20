@@ -48,12 +48,30 @@ fn lookup_semantic_attr_alias(name: &str) -> Option<&'static str> {
         "roundedBottomRight" => Some("rounded_br"),
         "boxShadow" => Some("shadow"),
         "ariaKeyShortcuts" => Some("aria_keyshortcuts"),
-        // Inherent `Div` / `Img` methods that are not part of the extracted traits.
+        // Inherent `Div` / `Img` / `Svg` / `UniformList` methods that are not part of the extracted traits.
         "imageCache" => Some("image_cache"),
         "objectFit" => Some("object_fit"),
         "onChildrenPrepainted" => Some("on_children_prepainted"),
         "withFallback" => Some("with_fallback"),
         "withLoading" => Some("with_loading"),
+        "externalPath" | "external_path" => Some("external_path"),
+        "withTransformation" | "transformation" | "with_transformation" => {
+            Some("with_transformation")
+        }
+        "withTimedTransformation" | "timedTransformation" | "with_timed_transformation" => {
+            Some("with_timed_transformation")
+        }
+        "withWidthFromItem" | "widthFromItem" | "with_width_from_item" => {
+            Some("with_width_from_item")
+        }
+        "withSizingBehavior" | "sizingBehavior" | "with_sizing_behavior" => {
+            Some("with_sizing_behavior")
+        }
+        "withHorizontalSizingBehavior"
+        | "horizontalSizingBehavior"
+        | "with_horizontal_sizing_behavior" => Some("with_horizontal_sizing_behavior"),
+        "withDecoration" | "decoration" | "with_decoration" => Some("with_decoration"),
+        "yFlipped" | "y_flipped" => Some("y_flipped"),
         "gridCols" => Some("grid_cols"),
         "gridRows" => Some("grid_rows"),
         "gridColsMinContent" => Some("grid_cols_min_content"),
@@ -86,7 +104,7 @@ pub fn lookup_attr_method_info(name: &str) -> Option<AttrMethodInfo> {
     Some(AttrMethodInfo {
         method,
         needs_id,
-        multi_arg: multi_arg || method == "on_click",
+        multi_arg: multi_arg || method == "on_click" || method == "with_timed_transformation",
     })
 }
 

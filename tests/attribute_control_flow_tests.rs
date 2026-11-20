@@ -153,3 +153,40 @@ fn class_conditions_are_evaluated_once_and_unselected_branches_stay_lazy() {
     assert_eq!(then_evaluations, 0);
     assert_eq!(else_evaluations, 1);
 }
+
+#[test]
+fn composable_class_arrays_svg_animations_and_uniform_list_compile_cleanly() {
+    let active = true;
+    let disabled = false;
+    let selected = true;
+    OPACITY_CALLS.with(|c| c.borrow_mut().clear());
+    let _ = rsx! {
+        <div class={[
+            "flex items-center p-2",
+            active.then_some("opacity-80"),
+            disabled && "opacity-25",
+            (selected, "border-1"),
+            if active { "gap-4" },
+        ]} />
+    };
+    OPACITY_CALLS.with(|c| assert_eq!(c.borrow().as_slice(), &[0.8]));
+
+    let _ = rsx! {
+        <svg src="spinner.svg" timedTransformation={("anim", "transform")} class="size-4" />
+    };
+
+    LAST_AUTO_ID.with(|c| *c.borrow_mut() = None);
+    let _ = rsx! {
+        <uniform_list
+            count={50}
+            render={|range, _window, _cx| range.collect::<Vec<_>>()}
+            yFlipped
+            class="size-full"
+        />
+    };
+    assert!(LAST_AUTO_ID.with(|c| {
+        c.borrow()
+            .as_deref()
+            .is_some_and(|id| id.contains("__rsx_uniform_list"))
+    }));
+}

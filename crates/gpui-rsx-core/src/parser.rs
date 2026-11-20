@@ -27,9 +27,10 @@ pub enum RsxBody {
 
 /// RSX 元素
 ///
-/// 表示一个 HTML-like 元素，如 `<div class="container">...</div>`
+/// 表示一个 HTML-like 元素，如 `<div class="container">...</div>` 或带构造参数的 `<Button("save") ... />`
 pub struct RsxElement {
     pub name: RsxElementName,
+    pub args: Option<Vec<Expr>>,
     pub attributes: Vec<RsxAttribute>,
     pub children: Vec<RsxNode>,
 }
@@ -142,9 +143,17 @@ impl Parse for RsxBody {
 
 impl Parse for RsxElement {
     fn parse(input: ParseStream) -> Result<Self> {
-        // 解析开始标签 <tag
+        // 解析开始标签 <tag 或带构造参数简写 <Tag(arg1, arg2)
         input.parse::<Token![<]>()?;
         let name = RsxElementName::parse(input)?;
+        let args = if input.peek(token::Paren) {
+            let content;
+            syn::parenthesized!(content in input);
+            let parsed = content.parse_terminated(Expr::parse, Token![,])?;
+            Some(parsed.into_iter().collect())
+        } else {
+            None
+        };
 
         // 解析属性（预分配容量，典型元素有 3-8 个属性）
         let mut attributes = Vec::with_capacity(4);
@@ -167,7 +176,12 @@ impl Parse for RsxElement {
                 };
 
                 // 特殊处理 when 和 whenSome 属性（直接比较 Ident，避免 to_string() 分配）
-                if is_group_drag_over_attr(&attr_name) {
+                if args.is_some() && attr_name == "base" {
+                    return Err(conflicting_constructor_args_and_base_error(
+                        &attr_name,
+                        &name.to_string(),
+                    ));
+                } else if is_group_drag_over_attr(&attr_name) {
                     return Err(unsupported_generic_attribute_error(&attr_name));
                 } else if attr_name == "whiteSpace" {
                     return Err(unsupported_jsx_attribute_error(&attr_name));
@@ -252,6 +266,7 @@ impl Parse for RsxElement {
 
         Ok(RsxElement {
             name,
+            args,
             attributes,
             children,
         })

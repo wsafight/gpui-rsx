@@ -253,3 +253,69 @@ mod defaults {
         assert_eq!(calls.get(), 1);
     }
 }
+
+mod slots_and_style {
+    use super::*;
+    use gpui::*;
+
+    #[component]
+    fn SingleBadge(
+        #[children] child: Option<gpui::AnyElement>,
+        #[style] style: gpui::StyleRefinement,
+    ) -> impl IntoElement {
+        let mut root = div();
+        root.style().refine(&style);
+        root.when_some(child, |el, child| el.child(child))
+    }
+
+    #[component]
+    fn Dialog(
+        title: String,
+        #[slot] header: Option<gpui::AnyElement>,
+        #[slot] footer: Vec<gpui::AnyElement>,
+        #[children] children: Vec<gpui::AnyElement>,
+    ) -> impl IntoElement {
+        div()
+            .child(title)
+            .when_some(header, |el, h| el.child(h))
+            .children(children)
+            .children(footer)
+    }
+
+    #[test]
+    fn single_option_child_and_style_forwarding_work_without_vec_allocation() {
+        let dynamic = String::from("p-4 gap-2");
+        let built = rsx! {
+            <SingleBadge class="flex mt-4" class={dynamic}>
+                <span>{"New"}</span>
+            </SingleBadge>
+        }
+        .build();
+        assert!(built.child.is_some());
+        let _ = built.render(&mut gpui::Window, &mut gpui::App);
+    }
+
+    #[test]
+    fn named_slots_accept_direct_props_and_child_slot_attributes() {
+        let built = rsx! {
+            <Dialog title="Delete item">
+                <div slot="header" class="font-bold">{"Confirm"}</div>
+                <p>{"This action cannot be undone."}</p>
+                <button slot="footer">{"Cancel"}</button>
+                <button slot="footer">{"Delete"}</button>
+            </Dialog>
+        }
+        .build();
+        assert_eq!(built.title, "Delete item");
+        assert!(built.header.is_some());
+        assert_eq!(built.children.len(), 1);
+        assert_eq!(built.footer.len(), 2);
+
+        let via_prop = rsx! {
+            <Dialog title="Rename" header={rsx! { <span>{"Header"}</span> }} />
+        }
+        .build();
+        assert!(via_prop.header.is_some());
+        assert!(via_prop.footer.is_empty());
+    }
+}

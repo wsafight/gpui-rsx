@@ -21,6 +21,15 @@ where
 {
     MockElement
 }
+#[allow(dead_code)]
+pub fn uniform_list<Id, R, F>(id: Id, _item_count: usize, _f: F) -> MockElement
+where
+    Id: super::element::MockId,
+    R: IntoElement,
+    F: 'static + Fn(std::ops::Range<usize>, &mut Window, &mut App) -> Vec<R>,
+{
+    MockElement.id(id)
+}
 pub fn rgb(hex: u32) -> u32 {
     RGB_CALLS.with(|c| c.borrow_mut().push(hex));
     hex
