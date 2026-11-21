@@ -6,6 +6,23 @@ description: 从手写 GPUI builder 链迁移，升级工具 API，并对齐 GPU
 
 先查看当前版本对应的升级说明。后文另有从 Zed Git 切换依赖、将 builder 链改写为 RSX 的步骤。
 
+## 从 0.12 升级到 0.13
+
+已有 RSX 视图、像素/Tailwind 间距模式与最低 Rust 版本（宏/core 为 Rust 1.88，CLI/工具库为 Rust 1.98）保持兼容。
+
+### 依赖目标与公开契约变更
+
+- **升级到 GPUI Kit 0.10.0 / GPUI Pre 0.3.12**：将 `Cargo.toml` 中的依赖更新为 `gpui = { package = "gpui-kit", version = "=0.10.0" }` 并重新锁定 `Cargo.lock`。注意在 Kit 0.10.0 中，`Input` 控件的退格键改为按完整 Unicode 字素簇（如组合重音、ZWJ Emoji）整簇删除。
+- **`gpui-rsx-core` 语法树调用方**：`gpui_rsx_core::syntax::RsxElement` 新增公开字段 `pub args: Option<Vec<syn::Expr>>` 以表达 `<Tag(...)>` 构造参数，`GPUI_SOURCE_REV` / `GPUI_COMPONENT_REV` 同步为 `gpui-pre@0.3.12` / `gpui-component@0.10.0`。手写结构体字面量请补充 `args: None`，解构匹配可添加 `..`。
+- **动态 `class` 运行时契约**：生成的运行时 class helper 改为就地修改 `gpui::StyleRefinement` 并调用 `.refine_style(&__rsx_style)`，不再通过装箱闭包重建元素。使用运行时 `class={expr}` 的元素需实现 `gpui::Styled`（所有原生 GPUI 元素及声明了 `#[style] style: StyleRefinement` 的组件均已满足）。
+
+### 可选的新写法简化
+
+- 对遵循 `Type::new(...)` 的组件，可将 `<Button base={Button::new("save")} ... />` 简化为 `<Button("save") ... />`（复用预配置实例时仍保留 `base={expr}`）。
+- 将拼装字符串变量改为编译期展开的组合数组：`class={["flex", active && "bg-blue-500", if open { "p-4" }]}`。
+- 在 `#[component]` 中使用 `#[slot]`、`#[style] style: StyleRefinement` 与单子节点零堆分配的 `#[children] child: Option<AnyElement>`。
+- 等高长列表可直接使用 `<uniform_list count={rows.len()} render={...} />`，热更新工作流可使用 `cargo rsx dev [--check]` 一键预检与启动。
+
 ## 从 0.11 升级到 0.12
 
 已有 RSX 标记、像素和 Tailwind 间距模式保持不变。宏/core 仍要求 Rust 1.88，CLI/工具库要求 Rust 1.98。
@@ -14,7 +31,7 @@ description: 从手写 GPUI builder 链迁移，升级工具 API，并对齐 GPU
 
 工具链现在识别 `use gpui_rsx::rsx as view` 等直接宏导入，并保留原宏的间距模式。外围 Rust 尚未写完时，完整宏仍可分析；词法受损的文件则禁止格式化和迁移写回。本地 `macro_rules!` 会遮蔽无路径调用，但 crate 别名和重导出不属于完整 Rust 名称解析支持。
 
-Demo 改用 Kit 0.10.0 / GPUI Pre 0.3.12，大数据事故队列使用虚拟列表，原生性能采样按需启用。新增热更新诊断和探针不代表所有 Dioxus/Kit 热补丁组合都已验证；具体配置和限制见[开发重载流程](/gpui-rsx/zh-cn/guides/performance/#测量开发重载)。
+0.12 的 Demo 使用 Kit 0.9.0 / GPUI Pre 0.3.11，大数据事故队列使用虚拟列表，原生性能采样按需启用。新增热更新诊断和探针不代表所有 Dioxus/Kit 热补丁组合都已验证；具体配置和限制见[开发重载流程](/gpui-rsx/zh-cn/guides/performance/#测量开发重载)。
 
 ## 从 0.10 升级到 0.11
 
@@ -107,7 +124,7 @@ LSP 声明增量同步（`change: 2`）与语义 token；仍支持全文替换�
 UTF-16 位置依次应用，未修改的宏复用诊断结果。同一次 RSX 调用中的动态 class
 共享一个 helper，各属性仍独立求值并调用自己的未知 class 处理器。
 
-## Zed Git 迁移到 GPUI Kit 0.8
+## Zed Git 迁移到 GPUI Kit
 
 用 Kit 替换单独的 Zed Git `gpui`、`gpui_platform` 和 Git `gpui-component`
 依赖；保留 `gpui` crate 名称，供生成代码使用：
@@ -115,7 +132,7 @@ UTF-16 位置依次应用，未修改的宏复用诊断结果。同一次 RSX �
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.10.0" }
-gpui-rsx = "0.12.1"
+gpui-rsx = "0.13.0"
 ```
 
 Kit 0.10.0 固定 `gpui-pre = 0.3.12`。从 `gpui::component` 导入带样式控件，

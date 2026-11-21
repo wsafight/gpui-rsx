@@ -5,13 +5,13 @@ const zh = Astro.locals.starlightRoute.lang.toLowerCase().startsWith('zh');
 const root = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/`;
 const base = `${root}${zh ? 'zh-cn/' : ''}`;
 const features = zh ? [
-  { title: '标签里可以写 Rust', description: '属性、条件和循环直接使用 Rust 表达式。Fragment 组合多个节点，key 为交互列表提供稳定标识。', href: 'usage/syntax/', link: '语法参考' },
-  { title: '样式映射到 GPUI 方法', description: '静态工具类、状态变体和项目设计令牌在编译时展开。动态值也可以直接传给 Rust 属性。', href: 'guides/theming/', link: '主题与设计令牌' },
-  { title: '编辑器和 CLI 都有工具', description: '编辑器提供补全、诊断和展开预览；CLI 可以格式化 RSX、检查主题、转换 JSX。', href: 'guides/tooling/', link: '工具配置' },
+  { title: '标签与原生 Rust 无缝融合', description: '支持 <Button("save")> 构造简写、#[component] 具名插槽、虚拟列表 <uniform_list>，条件与循环直接书写原生 Rust。', href: 'usage/syntax/', link: '语法参考' },
+  { title: '编译期样式与设计令牌', description: '静态工具类、clsx 风格条件数组、状态变体及 rsx.toml 主题令牌在编译期展开，零运行时字符串解析开销。', href: 'guides/theming/', link: '主题与设计令牌' },
+  { title: '完善的编辑器与 CLI 工具链', description: '提供 LSP 补全与诊断、RSX 格式化、主题校验、JSX 转换，以及 cargo rsx dev 热更新预检与启动工作流。', href: 'guides/tooling/', link: '工具配置' },
 ] : [
-  { title: 'Rust expressions inside tags', description: 'Use Rust for attributes, conditions, and loops. Compose nodes with fragments and give interactive lists stable keys.', href: 'usage/syntax/', link: 'Syntax reference' },
-  { title: 'Styles become GPUI methods', description: 'Static utilities, state variants, and project design tokens expand at compile time. Pass dynamic values through Rust attributes.', href: 'guides/theming/', link: 'Themes and design tokens' },
-  { title: 'Editor and CLI tools', description: 'Get completion, diagnostics, and expansion previews in your editor. Format RSX, check themes, and convert JSX with the CLI.', href: 'guides/tooling/', link: 'Tooling setup' },
+  { title: 'Ergonomic tags, native Rust', description: 'Use <Button("save")> constructor shorthand, #[component] slots, and <uniform_list>, while keeping conditions and loops in plain Rust.', href: 'usage/syntax/', link: 'Syntax reference' },
+  { title: 'Compile-time styles & tokens', description: 'Static utilities, clsx-style conditional arrays, state variants, and rsx.toml tokens expand at compile time with zero parser overhead.', href: 'guides/theming/', link: 'Themes and design tokens' },
+  { title: 'Editor LSP & CLI workflow', description: 'Get completions, diagnostics, formatting, theme checks, JSX conversion, and cargo rsx dev hot-reload preflight out of the box.', href: 'guides/tooling/', link: 'Tooling setup' },
 ];
 const paths = zh ? [
   { title: '快速开始', description: '安装依赖，运行第一个视图。', href: 'getting-started/' },

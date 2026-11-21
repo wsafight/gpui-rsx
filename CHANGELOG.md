@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-21
+
+### Breaking Changes
+
+- `gpui_rsx_core::syntax::RsxElement` adds `pub args: Option<Vec<syn::Expr>>` to represent parenthesized constructor arguments (`<Tag(a, b)>`), and `GPUI_SOURCE_REV` / `GPUI_COMPONENT_REV` advance to `gpui-pre@0.3.12` / `gpui-component@0.10.0`. Downstream AST callers constructing `RsxElement` literals should add `args: None` (or `..` when destructuring).
+- Generated runtime dynamic `class` helpers now mutate a `gpui::StyleRefinement` and call `.refine_style(&__rsx_style)` instead of rebuilding elements through boxed closures. Custom types using runtime `class={expr}` must implement `gpui::Styled`.
+
+### Added
+
+- Parenthesized constructor shorthand `<Tag(args...)>`: uppercase type paths expand `<Button("save") ... />` to `Button::new("save")` and `<Tab() ... />` to `Tab::new()`, while lowercase paths call `helper(args...)`. Conflicting combinations with `base={...}` or native HTML/SVG tags fail with targeted diagnostics.
+- First-class `<uniform_list count={...} render={...} />` support with automatic or explicit element IDs, loop-key diagnostics, and `yFlipped` / `sizingBehavior` / `horizontal` attributes.
+- SVG animation attributes: `animation` (`.with_animation(...)`) and `timedTransformation` (`.with_timed_transformation(...)`).
+- Compile-time `clsx`-style conditional class arrays (`class={["flex", active.then_some("bg-blue-500"), disabled && "opacity-50", (selected, "border-1"), if open { "p-4" }]}`).
+- `#[component]` enhancements:
+  - `#[track_caller]` on generated constructors, builders, and `RenderOnce` implementations for caller-accurate GPUI auto-IDs and panic traces.
+  - `#[children]` support for `Option<AnyElement>` (single-child without `Vec` heap allocation).
+  - `#[style] style: StyleRefinement` to implement `gpui::Styled` on generated builders, forwarding static and dynamic `class` attributes.
+  - `#[slot]` for optional single (`Option<AnyElement>`) and multi (`Vec<AnyElement>`) named slots via props or `<div slot="header">` children.
+- `cargo rsx dev` subcommand in `cargo-rsx` to run hot-reload preflight checks, auto-detect `hotreload` / `hot-reload` features, inspect invocations via `--check [--json]`, and launch `dx serve --hot-patch`.
+- Static `rsx.toml` theme token support (`[colors]` hex, `[radius]`, `[spacing]`, `[text-size]`, `[line-height]`, `[opacity]`) in generated runtime dynamic class helpers.
+
+### Performance
+
+- Replace per-macro-call `fs::canonicalize` syscalls in `rsx.toml` discovery with a two-tier raw-directory → canonical-path cache validated by `mtime`.
+- Eliminate `Box<dyn FnMut(T) -> T>` heap allocations and repeated element moves in runtime dynamic `class` matching via length-prefixed `StyleRefinement` mutation.
+
+### Changed
+
+- Upgrade the primary generated API target, demo, and standalone fixtures to GPUI Kit 0.10.0, `gpui-component` 0.10.0, and `gpui-pre` 0.3.12.
+- Refine README, Getting Started, Syntax Reference, Best Practices, and Migration documentation in English and Chinese for clearer structure and scannability.
+
 ## [0.12.1] - 2026-11-08
 
 ### Fixed

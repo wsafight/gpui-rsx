@@ -134,21 +134,50 @@ let badge = rsx! {
 };
 ```
 
-普通参数为必填属性。`#[prop(default)]` 使用 `Default::default()`，
-`#[prop(default = expr)]` 提供显式默认值。带默认值的布尔属性使用 flag setter
-（`highlighted`）或条件 setter（`highlightedIf={active}`）。`#[children]` 将子节点
-收集到 `Vec<AnyElement>`、`SmallVec<[AnyElement; N]>` 或 `Option<AnyElement>`（单子节点零堆分配）。
-`#[slot]` 声明可选具名插槽（`Option<AnyElement>` 或 `Vec<AnyElement>`），既可通过属性（`header={rsx! { ... }}`）传入，也可在直接子元素上标记 `slot="header"`。
-`#[style] style: StyleRefinement` 会为生成的 builder 实现 `gpui::Styled`，使 `<Badge class="mt-4 w-full" />` 支持静态与动态 class 透传。也支持 `<ui::Badge ...>` 这样的模块路径标签。
+| 注解 | 作用 | 支持的类型与说明 |
+| --- | --- | --- |
+| 普通参数 | 必填属性 | 任意拥有型类型或 `'static` 引用；遗漏必填属性在编译期直接报错 |
+| `#[prop(default)]` / `#[prop(default = expr)]` | 可选属性 | `bool` 属性额外支持无参 flag（`highlighted`）与条件 setter（`highlightedIf={cond}`） |
+| `#[prop(callback)]` | 闭包回调属性 | `Rc<dyn Fn...>` 或 `Box<dyn Fn...>`，调用处可直接传 `impl Fn... + 'static` 闭包 |
+| `#[children]` | 默认子节点集合 | `Vec<AnyElement>`、`SmallVec<[AnyElement; N]>` 或 `Option<AnyElement>`（单子节点零堆分配） |
+| `#[slot]` | 可选具名插槽 | `Option<AnyElement>`（单个）或 `Vec<AnyElement>`（多个）；可通过同名属性或 `<div slot="name">` 传入 |
+| `#[style]` | 样式与 `class` 透传 | `gpui::StyleRefinement`，为生成的 builder 自动实现 `gpui::Styled` |
+| `#[context]` | 渲染期 GPUI 上下文 | `&mut Window` 或 `&mut App`，由 GPUI 渲染时注入，调用方无需作为属性传递 |
 
-无后缀数值字面量与纯数值表达式按声明的基础数值类型推断，例如
-`#[prop(default = 7)] value: u32`、`#[prop(default = 7.0)] ratio: f32`。
-带后缀的数值保留 `Into` 转换，字符串默认值也保留转换能力，例如 `SharedString` 的 `"ready"`。
+#### 具名插槽与样式透传示例
 
-可选的 `#[context]` 参数必须是 `&mut Window` 或 `&mut App`，由 GPUI 渲染时传入，
-调用方无需将它们作为属性传递；宏也不会隐式捕获调用方的 `window` 或 `cx`。
-属性使用具体的拥有型类型或 `'static` 引用。暂不支持 async/unsafe 函数或解构参数。原函数名会成为无参 builder 构造函数：
-`Badge().label("Inbox")`。
+结合 `#[slot]` 与 `#[style]`，可以编写支持外层 `class` 与多区域插槽的可复用容器组件：
+
+```rust
+#[component]
+fn Dialog(
+    title: SharedString,
+    #[style] style: StyleRefinement,
+    #[slot] footer: Option<AnyElement>,
+    #[children] body: Vec<AnyElement>,
+) -> impl IntoElement {
+    let mut root = div().flex().flex_col().gap_3();
+    *root.style() = style;
+    rsx! {
+        <div base={root}>
+            <h2 class="text-lg font-bold">{title}</h2>
+            <div class="flex-1">{...body}</div>
+            {if let Some(footer) = footer { footer } else { div().into_any_element() }}
+        </div>
+    }
+}
+
+let modal = rsx! {
+    <Dialog title="确认删除" class="p-16 rounded-lg bg-white">
+        <p>{"删除后无法恢复。"}</p>
+        <div slot="footer" class="flex justify-end gap-8">
+            <Button("confirm") label="确认" />
+        </div>
+    </Dialog>
+};
+```
+
+无后缀数值默认值会按声明的基础数值类型推断（如 `#[prop(default = 7)] value: u32`、`#[prop(default = 7.0)] ratio: f32`），带后缀数值与字符串默认值（如 `SharedString` 的 `"ready"`）保留 `Into` 转换。暂不支持 `async` / `unsafe` 函数或解构参数。原函数名会成为无参 builder 构造函数（`Badge().label("Inbox")`），并原生支持 `<ui::Badge ... />` 模块路径标签。
 
 ### 结构体组件与弃用提示
 

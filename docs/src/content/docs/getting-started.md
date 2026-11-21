@@ -16,7 +16,7 @@ Add GPUI Kit, aliased as `gpui` for macro-generated paths, and GPUI-RSX:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.10.0" }
-gpui-rsx = "0.12.1"
+gpui-rsx = "0.13.0"
 ```
 
 Kit pins its matching `gpui-pre` snapshot and re-exports GPUI, components and assets. Commit `Cargo.lock` to reproduce the complete dependency graph.
@@ -133,34 +133,57 @@ rsx! {
 `p-4` and `gap-4` mean 4px. For Tailwind's 4px units, use `rsx_tw!` or a [project configuration](/gpui-rsx/guides/theming/). Named attributes such as `gap_4` keep GPUI's native units, independently of the class scale.
 :::
 
-Static class strings are parsed by the macro. Dynamic strings are handled by a generated runtime matcher and are useful for values assembled at runtime:
-
-```rust
-let row_class = if selected { "bg-blue-500 text-white" } else { "bg-gray-100" };
-
-rsx! {
-    <div class={row_class}>{label.as_str()}</div>
-}
-```
-
-Dynamic strings support a smaller set of classes: state variants and stateful scroll classes require static markup. Unknown dynamic classes are ignored in permissive release builds; strict mode panics unless an `onUnknownClass` handler is supplied. See [Class Handling](/gpui-rsx/usage/class/) for the support matrix.
-
-Prefer direct attributes when the value is already a Rust expression:
+Static class strings and conditional literal arrays are expanded at compile time with zero parser cost:
 
 ```rust
 rsx! {
-    <div class="flex" w={px(self.sidebar_width)} />
+    <div
+        class={[
+            "flex items-center p-8 rounded-md",
+            if selected { "bg-blue-500 text-white" } else { "bg-gray-100" },
+            disabled && "opacity-50",
+        ]}
+    >
+        {label.as_str()}
+    </div>
 }
 ```
 
-## Events
+When a value is already a computed Rust number or theme color, pass it as a direct attribute:
 
-Event attributes accept normal GPUI listeners:
+```rust
+rsx! {
+    <div class="flex" w={px(self.sidebar_width)} bg={cx.theme().background} />
+}
+```
+
+For strings assembled externally at runtime (`class={row_class}`), GPUI-RSX generates a compact `StyleRefinement` matcher. Dynamic strings do not support state variants (`hover:`, `active:`) or stateful scroll classes; see [Class Handling](/gpui-rsx/usage/class/) for the full matrix.
+
+## Controls, Events, and Lists
+
+Pass constructor arguments in parentheses for `gpui-component` controls (`<Button("id")>` expands to `Button::new("id")`), and use `rsx_listener!(cx, notify, ...)` to update view state and notify GPUI cleanly:
+
+```rust
+use gpui::component::button::{Button, ButtonVariants as _};
+use gpui_rsx::{rsx, rsx_listener};
+
+rsx! {
+    <Button("increment")
+        label="Increment"
+        primary
+        onClick={rsx_listener!(cx, notify, |view, _, _, _| {
+            view.count += 1;
+        })}
+    />
+}
+```
+
+Native GPUI elements also accept `cx.listener(...)` directly:
 
 ```rust
 rsx! {
     <button
-        class="px-4 py-2 bg-blue-500 text-white rounded-md cursor-pointer"
+        class="px-8 py-4 bg-blue-500 text-white rounded-md cursor-pointer"
         onClick={cx.listener(|view, _, _window, cx| {
             view.count += 1;
             cx.notify();
@@ -171,7 +194,7 @@ rsx! {
 }
 ```
 
-For repeated stateful elements inside `{for ...}`, add `key={...}` so each iteration gets a unique identity:
+When rendering interactive elements inside `{for ...}`, add `key={...}` so each row keeps a stable identity across updates (or switch to `<uniform_list>` once a uniform-height list grows past a few hundred items):
 
 ```rust
 rsx! {

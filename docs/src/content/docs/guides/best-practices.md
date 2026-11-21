@@ -91,13 +91,54 @@ rsx! {
 }
 ```
 
+When a list can grow past a few hundred uniform-height rows, switch from `{for ...}` to `<uniform_list>` so GPUI only builds the visible slice on each frame:
+
+```rust
+rsx! {
+    <uniform_list
+        id="incident-rows"
+        count={self.rows.len()}
+        class="flex-1 size-full"
+        render={cx.processor(|view, range, _window, cx| {
+            range.map(|ix| view.render_row(ix, cx)).collect()
+        })}
+    />
+}
+```
+
 ## Style by Stability
+
+Pick the simplest compile-time styling form that matches how dynamic a value is:
+
+| Situation | Recommended form | Cost |
+| --- | --- | --- |
+| Fixed layout and colors | `class="flex flex-col gap-4 p-4"` | Compile-time |
+| Toggling known utility groups | `class={["flex p-8", selected && "bg-blue-500 text-white"]}` or `whenClass` | Compile-time |
+| Computed Rust number or color | `w={px(self.sidebar_width)}` or `bg={cx.theme().background}` | Compile-time |
+| Arbitrary conditional GPUI builder calls | `when={(cond, \|el\| ...)}` / `whenSome` | Compile-time |
+| Externally assembled class strings | `class={runtime_string}` | Runtime `StyleRefinement` matcher |
 
 Use literal classes for stable structure:
 
 ```rust
 rsx! {
     <div class="flex flex-col gap-4 p-4 bg-white border border-gray-200 rounded-md" />
+}
+```
+
+Use composable class arrays or `whenClass` for small static variants:
+
+```rust
+rsx! {
+    <button
+        class={[
+            "px-8 py-4 rounded-md",
+            if selected { "bg-blue-500 text-white" } else { "bg-gray-100 text-gray-900" },
+            disabled && "opacity-50",
+        ]}
+    >
+        {label.as_str()}
+    </button>
 }
 ```
 
@@ -109,21 +150,7 @@ rsx! {
 }
 ```
 
-Use `whenClass` for small static variants:
-
-```rust
-rsx! {
-    <button
-        class="px-3 py-2 rounded-md"
-        whenClass={(selected, "bg-blue-500 text-white")}
-        whenClass={(!selected, "bg-gray-100 text-gray-900")}
-    >
-        {label.as_str()}
-    </button>
-}
-```
-
-Use dynamic `class={expr}` when the whole string is genuinely assembled at runtime. Keep dynamic strings short and predictable.
+Reserve dynamic `class={expr}` for strings genuinely assembled at runtime, and keep them short and predictable.
 
 ## Keep Event Logic Out of Markup
 

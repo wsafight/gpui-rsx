@@ -91,13 +91,54 @@ rsx! {
 }
 ```
 
+当等高列表规模可能超过几百行时，将 `{for ...}` 换为 `<uniform_list>`，让 GPUI 每帧只构建当前视口内的可见切片：
+
+```rust
+rsx! {
+    <uniform_list
+        id="incident-rows"
+        count={self.rows.len()}
+        class="flex-1 size-full"
+        render={cx.processor(|view, range, _window, cx| {
+            range.map(|ix| view.render_row(ix, cx)).collect()
+        })}
+    />
+}
+```
+
 ## 按稳定性选择样式方式
+
+根据值的动态程度，优先选择最简单的编译期写法：
+
+| 场景 | 推荐写法 | 开销 |
+| --- | --- | --- |
+| 固定的布局与配色 | `class="flex flex-col gap-4 p-4"` | 编译期展开 |
+| 按状态切换已知工具类组合 | `class={["flex p-8", selected && "bg-blue-500 text-white"]}` 或 `whenClass` | 编译期展开 |
+| 已是 Rust 表达式的尺寸或颜色 | `w={px(self.sidebar_width)}` 或 `bg={cx.theme().background}` | 编译期展开 |
+| 按条件调用任意 GPUI builder 方法 | `when={(cond, \|el\| ...)}` / `whenSome` | 编译期展开 |
+| 运行时外部组装的 class 字符串 | `class={runtime_string}` | 运行时 `StyleRefinement` 匹配 |
 
 稳定结构使用字面量 class：
 
 ```rust
 rsx! {
     <div class="flex flex-col gap-4 p-4 bg-white border border-gray-200 rounded-md" />
+}
+```
+
+少量静态状态变体使用组合式数组或 `whenClass`：
+
+```rust
+rsx! {
+    <button
+        class={[
+            "px-8 py-4 rounded-md",
+            if selected { "bg-blue-500 text-white" } else { "bg-gray-100 text-gray-900" },
+            disabled && "opacity-50",
+        ]}
+    >
+        {label.as_str()}
+    </button>
 }
 ```
 
@@ -109,21 +150,7 @@ rsx! {
 }
 ```
 
-少量静态变体使用 `whenClass`：
-
-```rust
-rsx! {
-    <button
-        class="px-3 py-2 rounded-md"
-        whenClass={(selected, "bg-blue-500 text-white")}
-        whenClass={(!selected, "bg-gray-100 text-gray-900")}
-    >
-        {label.as_str()}
-    </button>
-}
-```
-
-只有 class 字符串确实需要运行时组装时，再使用动态 `class={expr}`。动态字符串应保持短且可预测。
+只有 class 字符串确实需要运行时外部组装时，再使用动态 `class={expr}`，并保持字符串短且可预测。
 
 ## 不把复杂事件逻辑塞进标记
 

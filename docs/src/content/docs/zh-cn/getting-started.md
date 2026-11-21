@@ -16,7 +16,7 @@ description: 安装 GPUI-RSX 并渲染第一个 GPUI 视图。
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.10.0" }
-gpui-rsx = "0.12.1"
+gpui-rsx = "0.13.0"
 ```
 
 Kit 固定配套的 `gpui-pre` 快照，并导出 GPUI、组件和资源。应用应提交 `Cargo.lock`，固定完整依赖图。
@@ -133,34 +133,57 @@ rsx! {
 `p-4` 和 `gap-4` 表示 4px。若需要每单位 4px 的 Tailwind 刻度，请使用 `rsx_tw!` 或[项目配置](/gpui-rsx/zh-cn/guides/theming/)。`gap_4` 等具名属性继续使用 GPUI 原生单位，不受 class 刻度影响。
 :::
 
-静态 class 字符串由宏在编译期解析。动态字符串由生成的运行时 matcher 处理，适合必须运行时组装的场景：
-
-```rust
-let row_class = if selected { "bg-blue-500 text-white" } else { "bg-gray-100" };
-
-rsx! {
-    <div class={row_class}>{label.as_str()}</div>
-}
-```
-
-动态字符串的支持范围更小：状态前缀和有状态滚动 class 需要静态标记。permissive 模式的 release 构建会忽略未知动态 class；strict 模式默认 panic，除非提供 `onUnknownClass` 处理器。完整范围见 [Class 处理](/gpui-rsx/zh-cn/usage/class/)。
-
-如果值本来就是 Rust 表达式，优先使用直接属性：
+静态 class 字符串以及条件字面量数组都会在编译期直接展开，无运行时解析开销：
 
 ```rust
 rsx! {
-    <div class="flex" w={px(self.sidebar_width)} />
+    <div
+        class={[
+            "flex items-center p-8 rounded-md",
+            if selected { "bg-blue-500 text-white" } else { "bg-gray-100" },
+            disabled && "opacity-50",
+        ]}
+    >
+        {label.as_str()}
+    </div>
 }
 ```
 
-## 事件
+如果尺寸或颜色本来就是计算好的 Rust 表达式，直接写成具名属性最直观：
 
-事件属性接受普通 GPUI listener：
+```rust
+rsx! {
+    <div class="flex" w={px(self.sidebar_width)} bg={cx.theme().background} />
+}
+```
+
+对于必须在运行时外部拼装的字符串（`class={row_class}`），宏会生成基于 `StyleRefinement` 的轻量匹配器。动态字符串不支持状态前缀（`hover:`、`active:`）和有状态滚动类；完整能力边界见 [Class 处理](/gpui-rsx/zh-cn/usage/class/)。
+
+## 控件、事件与列表
+
+使用 `gpui-component` 控件时，可以直接用 `<Button("id")>` 传入构造参数（展开为 `Button::new("id")`），配合 `rsx_listener!(cx, notify, ...)` 更新状态并自动通知重绘：
+
+```rust
+use gpui::component::button::{Button, ButtonVariants as _};
+use gpui_rsx::{rsx, rsx_listener};
+
+rsx! {
+    <Button("increment")
+        label="增加"
+        primary
+        onClick={rsx_listener!(cx, notify, |view, _, _, _| {
+            view.count += 1;
+        })}
+    />
+}
+```
+
+原生 GPUI 容器同样可以直接接收 `cx.listener(...)`：
 
 ```rust
 rsx! {
     <button
-        class="px-4 py-2 bg-blue-500 text-white rounded-md cursor-pointer"
+        class="px-8 py-4 bg-blue-500 text-white rounded-md cursor-pointer"
         onClick={cx.listener(|view, _, _window, cx| {
             view.count += 1;
             cx.notify();
@@ -171,7 +194,7 @@ rsx! {
 }
 ```
 
-在 `{for ...}` 中渲染重复的有状态元素时，添加 `key={...}`，让每次迭代获得唯一身份：
+在 `{for ...}` 中渲染重复的可交互元素时，添加 `key={...}` 让每行保持稳定的元素身份（若等高列表超过几百条，可改用虚拟列表 `<uniform_list>`）：
 
 ```rust
 rsx! {

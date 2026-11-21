@@ -9,6 +9,37 @@
 
 ## [未发布]
 
+## [0.13.0] - 2026-11-21
+
+### 破坏性变更
+
+- `gpui_rsx_core::syntax::RsxElement` 新增公开字段 `pub args: Option<Vec<syn::Expr>>` 用于表达括号构造参数（`<Tag(a, b)>`），`GPUI_SOURCE_REV` / `GPUI_COMPONENT_REV` 更新为 `gpui-pre@0.3.12` / `gpui-component@0.10.0`。直接构造 `RsxElement` 字面量的下游调用方需补充 `args: None`（解构时可使用 `..`）。
+- 生成的运行时动态 `class` 辅助函数改为就地修改 `gpui::StyleRefinement` 并调用 `.refine_style(&__rsx_style)`，不再通过装箱闭包按值重建元素。使用运行时 `class={expr}` 的自定义类型需实现 `gpui::Styled`。
+
+### 新增
+
+- 括号构造参数简写 `<Tag(args...)>`：大写类型路径将 `<Button("save") ... />` 展开为 `Button::new("save")`、`<Tab() ... />` 展开为 `Tab::new()`；小写路径调用 `helper(args...)`。与 `base={...}` 混用或用于原生 HTML/SVG 标签时会给出明确编译错误。
+- 原生 `<uniform_list count={...} render={...} />` 标签支持，具备自动或显式元素 ID、循环 `key` 语义诊断，以及 `yFlipped` / `sizingBehavior` / `horizontal` 属性映射。
+- SVG 动画属性支持：`animation`（`.with_animation(...)`）与 `timedTransformation`（`.with_timed_transformation(...)`）。
+- 编译期展开的 `clsx` 风格条件 class 数组（`class={["flex", active.then_some("bg-blue-500"), disabled && "opacity-50", (selected, "border-1"), if open { "p-4" }]}`）。
+- `#[component]` 能力增强：
+  - 为生成的构造函数、builder 与 `RenderOnce` 实现注入 `#[track_caller]`，保留调用点源码位置以获得准确的自动 ID 与调用栈；
+  - `#[children]` 新增 `Option<AnyElement>` 单子节点模式，省去 `Vec` 堆分配；
+  - `#[style] style: StyleRefinement` 为生成的 builder 实现 `gpui::Styled`，支持静态与动态 `class` 透传；
+  - `#[slot]` 支持单个（`Option<AnyElement>`）或多个（`Vec<AnyElement>`）可选具名插槽，可通过同名属性或子元素 `slot="header"` 传入。
+- `cargo-rsx` 新增 `cargo rsx dev` 子命令，自动执行热补丁预检、识别包内 `hotreload` / `hot-reload` feature、支持 `--check [--json]` 干跑检查并拉起 `dx serve --hot-patch`。
+- 生成的运行时动态 `class` 匹配器支持 `rsx.toml` 中的静态主题令牌（颜色十六进制、圆角、间距、字号、行高、透明度）。
+
+### 性能
+
+- 用基于 `mtime` 校验的「原始目录 → 规范化路径」双层缓存替代每次宏展开的 `fs::canonicalize` 系统调用。
+- 运行时动态 `class` 改用按长度前缀分派的 `StyleRefinement` 原地修改，消除 `Box<dyn FnMut(T) -> T>` 堆分配与重复的元素移动。
+
+### 调整
+
+- 主生成 API 目标、demo 与独立夹具统一升级到 GPUI Kit 0.10.0、`gpui-component` 0.10.0 与 `gpui-pre` 0.3.12。
+- 重构并润色中英文 README、快速开始、语法参考、最佳实践与迁移指南，提升阅读流畅度与速查体验。
+
 ## [0.12.1] - 2026-11-08
 
 ### 修复
