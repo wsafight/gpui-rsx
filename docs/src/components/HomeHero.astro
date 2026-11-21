@@ -9,28 +9,27 @@ const base = `${import.meta.env.BASE_URL.replace(/\/$/, '')}/${zh ? 'zh-cn/' : '
 const text = zh ? {
   first: '用 RSX 编写',
   second: 'GPUI 原生界面',
-  description: '在 Rust 里用标签组织视图，用 class 描述布局。静态 RSX 在编译时展开为 GPUI builder 调用，表达式和类型检查仍然交给 Rust。',
+  description: '用直观的标签与工具类组织视图，把条件、循环和事件留给原生 Rust。静态标记在编译期零开销展开为 GPUI builder 调用，完整保留类型检查。',
   start: '快速开始',
   try: '在线体验',
   installation: '安装说明',
-  codeNote: '这段静态标记会直接编译为 GPUI 调用。',
+  codeNote: '静态标记与构造简写在编译期直接展开为原生 GPUI 调用。',
   syntax: '查看语法',
 } : {
   first: 'Write GPUI views',
   second: 'with RSX.',
-  description: 'Organize views with tags and describe layouts with classes, right inside Rust. Static RSX expands into GPUI builder calls at compile time. Rust handles expressions and type checking.',
+  description: 'Structure desktop views with readable tags and utility classes while keeping state, loops, and type checking in idiomatic Rust. Static RSX compiles straight to native GPUI builder calls.',
   start: 'Getting started',
   try: 'Open playground',
   installation: 'Installation',
-  codeNote: 'This static markup compiles to GPUI calls.',
+  codeNote: 'Static markup and constructor shorthand compile directly to GPUI calls.',
   syntax: 'Read the syntax guide',
 };
 const code = `rsx! {
     <div class="flex flex-col gap-[12px] p-[24px]">
-        <h1 class="text-xl font-bold">
-            {"Hello, GPUI."}
-        </h1>
-        <p>{"A view written in Rust."}</p>
+        <h1 class="text-xl font-bold">{"Hello, GPUI."}</h1>
+        <p class="text-gray-500">{"Native desktop UI, written in Rust."}</p>
+        <Button("save") label="Save" primary />
     </div>
 }`;
 ---
@@ -50,7 +49,7 @@ const code = `rsx! {
         <a class="secondary-action" href={`${base}playground/`}>{text.try}</a>
       </div>
       <a class="install-link" href={`${base}getting-started/`} aria-label={text.installation}>
-        <code>gpui-rsx = "0.12.1"</code>
+        <code>gpui-rsx = "0.13.0"</code>
         <Icon name="right-arrow" size="0.85rem" />
       </a>
     </div>

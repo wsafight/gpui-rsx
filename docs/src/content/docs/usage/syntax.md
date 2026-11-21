@@ -136,22 +136,53 @@ let badge = rsx! {
 };
 ```
 
-Plain parameters are required props. `#[prop(default)]` uses `Default::default()`;
-`#[prop(default = expr)]` supplies an explicit default. Defaulted booleans use flag setters
-(`highlighted`) or conditional setters (`highlightedIf={active}`). `#[children]` collects
-children into `Vec<AnyElement>`, `SmallVec<[AnyElement; N]>`, or `Option<AnyElement>` (single-child without heap allocation).
-`#[slot]` declares optional named slots (`Option<AnyElement>` or `Vec<AnyElement>`), populated either by a prop (`header={rsx! { ... }}`) or by a direct child element carrying `slot="header"`.
-`#[style] style: StyleRefinement` implements `gpui::Styled` on the generated builder so `<Badge class="mt-4 w-full" />` forwards static and dynamic classes. Module-qualified tags such as `<ui::Badge ...>` work too.
+| Annotation | Purpose | Accepted types / notes |
+| --- | --- | --- |
+| Plain parameter | Required prop | Any owned type or `'static` reference; missing props fail at compile time |
+| `#[prop(default)]` / `#[prop(default = expr)]` | Optional prop | `bool` props gain flag (`highlighted`) and conditional (`highlightedIf={cond}`) setters |
+| `#[prop(callback)]` | Closure prop | `Rc<dyn Fn...>` or `Box<dyn Fn...>` — accepts `impl Fn... + 'static` directly |
+| `#[children]` | Child collection | `Vec<AnyElement>`, `SmallVec<[AnyElement; N]>`, or `Option<AnyElement>` (single-child, zero heap allocation) |
+| `#[slot]` | Optional named slot | `Option<AnyElement>` (single) or `Vec<AnyElement>` (multiple); pass via prop or `<div slot="name">` |
+| `#[style]` | Class/style forwarding | `gpui::StyleRefinement` — implements `gpui::Styled` on the generated builder |
+| `#[context]` | Render-time GPUI context | `&mut Window` or `&mut App`, supplied by GPUI rather than passed as a prop |
 
-Unsuffixed numeric literals and pure numeric expressions infer the declared primitive
-field type, such as `#[prop(default = 7)] value: u32` or `#[prop(default = 7.0)] ratio: f32`.
-Suffixed values retain `Into` conversions, as do string defaults such as `"ready"` for `SharedString`.
+#### Named slots and style forwarding
 
-Optional `#[context]` parameters must be `&mut Window` or `&mut App`; they are supplied by
-GPUI, so callers never pass them as props. The macro does not capture the caller's `window`
-or `cx`. Prop types must be concrete and owned (or `'static` references). Async/unsafe
-functions and destructured parameters are unsupported.
-The original function name becomes a zero-argument builder constructor: `Badge().label("Inbox")`.
+Combine `#[slot]` and `#[style]` to build reusable layout shells that accept `class` utilities and named regions cleanly:
+
+```rust
+#[component]
+fn Dialog(
+    title: SharedString,
+    #[style] style: StyleRefinement,
+    #[slot] footer: Option<AnyElement>,
+    #[children] body: Vec<AnyElement>,
+) -> impl IntoElement {
+    let mut root = div().flex().flex_col().gap_3();
+    *root.style() = style;
+    rsx! {
+        <div base={root}>
+            <h2 class="text-lg font-bold">{title}</h2>
+            <div class="flex-1">{...body}</div>
+            {if let Some(footer) = footer { footer } else { div().into_any_element() }}
+        </div>
+    }
+}
+
+let modal = rsx! {
+    <Dialog title="Delete Project" class="p-16 rounded-lg bg-white">
+        <p>{"This action cannot be undone."}</p>
+        <div slot="footer" class="flex justify-end gap-8">
+            <Button("confirm") label="Delete" />
+        </div>
+    </Dialog>
+};
+```
+
+Unsuffixed numeric defaults infer the declared primitive field type (`#[prop(default = 7)] value: u32`,
+`#[prop(default = 7.0)] ratio: f32`), while suffixed numbers and strings (`"ready"` for `SharedString`)
+use `Into` conversions. Async/unsafe functions and destructured parameters are not supported.
+The original function name becomes a zero-argument builder constructor (`Badge().label("Inbox")`), and module-qualified tags (`<ui::Badge ... />`) work without extra configuration.
 
 ### Struct components and deprecation
 

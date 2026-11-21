@@ -8,21 +8,19 @@ English | [简体中文](./README_CN.md)
 [![Documentation](https://docs.rs/gpui-rsx/badge.svg)](https://docs.rs/gpui-rsx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-Write GPUI views with JSX-like markup and Rust expressions. Static RSX expands to native GPUI builder calls; GPUI checks the resulting types.
+Write native GPUI views with JSX-like markup and idiomatic Rust expressions. Static RSX compiles straight to GPUI builder calls at build time — zero virtual DOM, zero runtime template parsing, and full Rust type checking.
 
-## What it supports
+## ✨ Highlights
 
-- Elements, fragments, conditions, loops and function components.
-- Static utility classes for colors and desktop layouts, plus a runtime matcher for dynamic strings.
-- Stable IDs for interactive lists, explicit GPUI paths and shared runtime generation.
-- A CLI, language server and Playground for diagnostics, formatting and expansion previews.
+- **Zero-cost static markup** — tags, flags, attributes, and `clsx`-style conditional arrays (`class={["flex", active && "bg-blue-500"]}`) expand directly into GPUI builder chains.
+- **Ergonomic components & controls** — write `<Button("save") label="Save" primary />` for `Type::new(...)` builders, and use `#[component]` for typed props, `#[slot]` named slots, `#[style]` class forwarding, and `#[track_caller]` diagnostics.
+- **Desktop-grade primitives** — built-in `<uniform_list>`, `<svg>` animations, `<canvas>`, `<img>`, stable loop keys, and `rsx.toml` design tokens.
+- **Full developer toolchain** — `cargo-rsx` CLI (`dev`, `doctor`, `lint`, `fmt`, `migrate`, `convert`, `preview`, `lsp`), VS Code & Zed extensions, and an interactive WASM Playground.
 
-### Semantics and Defaults
-
-- Common HTML-like names, including `button` and `input`, construct GPUI `div()` elements. They do not create browser controls or supply HTML form behavior. Use components such as `Button` with `<Button("save") ... />` or `base={Button::new("save")}` when you need their control behavior.
-- Numeric classes use pixels by default: `gap-4` means 4px. Use `rsx_tw!`, `tailwind-scale`, or project configuration for Tailwind's 4px units. Named GPUI attributes such as `gap_4` keep GPUI's native units.
-- Literal classes have no runtime class parser. Dynamic strings use a runtime matcher with a smaller support surface; see [Class Handling](https://wsafight.github.io/gpui-rsx/usage/class/).
-- Playground and browser previews approximate static layouts. They do not execute Rust event handlers or validate native rendering. `rsx_expand!` shows generated Rust without type checking it; use `cargo check` and a native GPUI application for validation.
+> **Good to know before starting:**
+> - **HTML-like tags are GPUI containers:** `div`, `span`, `button`, `input`, etc. all construct a GPUI `div()`, without browser form behavior. Use component types such as `<Button("save") ... />` when you need interactive controls.
+> - **Pixel spacing by default:** `gap-4` means `4px`. Opt into Tailwind's 4px scale (`gap-4` → `16px`) per macro with `rsx_tw!` or per crate via `rsx.toml`.
+> - **Static vs. dynamic `class`:** String literals and conditional literal branches expand at compile time; runtime strings use a compact `StyleRefinement` matcher (see [Class Handling](https://wsafight.github.io/gpui-rsx/usage/class/)).
 
 ## 📚 Documentation
 
@@ -54,7 +52,7 @@ Add to your `Cargo.toml`:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.10.0" }
-gpui-rsx = "0.12.1"
+gpui-rsx = "0.13.0"
 ```
 
 ### GPUI Version Target
@@ -79,14 +77,14 @@ application lockfile; update Kit and its matching snapshot together. See the
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.12.1` | `0.10.0` | `gpui-pre@0.3.12` | `gpui-component@0.10.0` |
+| `0.13.0` | `0.10.0` | `gpui-pre@0.3.12` | `gpui-component@0.10.0` |
 
 This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.10.0" }
-gpui-rsx = "0.12.1"
+gpui-rsx = "0.13.0"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -120,7 +118,7 @@ impl Render for CounterView {
             <div class="size-full flex flex-col gap-[16px] p-[24px]"
                 bg={cx.theme().background} text_color={cx.theme().foreground}>
                 <h1>{format!("Count: {}", self.count)}</h1>
-                <Button base={Button::new("increment")} label="Increment" primary
+                <Button("increment") label="Increment" primary
                     onClick={rsx_listener!(cx, notify, |view, _, _, _| {
                         view.count += 1;
                     })} />
@@ -226,7 +224,7 @@ Expands to:
 div().flex().flex_col().gap(px(4.0)).p(px(4.0))
 ```
 
-> **Note:** `class` accepts both static strings (compiled at build time) and dynamic expressions (parsed at runtime). GPUI-RSX implements a Tailwind-like subset, not the full Tailwind CSS engine. Static classes expand directly to GPUI builder calls; dynamic class expressions use a small runtime matcher. See [Dynamic Class](#10-dynamic-class-) for details.
+> **Note:** `class` accepts static strings, conditional literal expressions (`if` / `match` / `[...]`), and runtime dynamic strings. Static forms expand directly to GPUI builder calls at compile time; runtime string expressions use a compact `StyleRefinement` matcher. See [Dynamic Class](#10-dynamic-class) for details.
 
 #### Scale, state variants, components and themes
 
@@ -517,13 +515,12 @@ rsx! {
 > in release builds and print each warning once per call site in debug builds. Enable
 > `dynamic-class-report` for an exit summary, or supply `onUnknownClass` for explicit handling.
 >
-> **Recommended alternatives** (in priority order):
-> 1. **String literal** (best): `class="flex gap-4"` — compile-time, supports the documented subset
-> 2. **Conditional/match literal**: `class={if active { "flex gap-4" } else { "block" }}` or
->    `class={match state { State::Active => "flex", _ => "block" }}` — still compile-time expanded
-> 3. **Individual attributes**: `<div flex gap_4 />` — compile-time, type-checked
-> 4. **`when` attribute**: `when={(cond, |el| el.flex())}` — compile-time, fully flexible
-> 5. **Dynamic expression**: `class={expr}` — runtime parser, narrower coverage than static literals
+> **Recommended order** (from zero runtime cost to most dynamic):
+> 1. **String literal**: `class="flex gap-4"` — compile-time expanded
+> 2. **Composable array or branch literals**: `class={["flex", active && "bg-blue-500"]}` or `class={if active { "flex" } else { "hidden" }}` — compile-time expanded
+> 3. **Typed attributes**: `<div flex gap={px(self.gap)} />` — compile-time, type-checked
+> 4. **`when` / `whenSome`**: `when={(cond, |el| el.flex())}` — compile-time, supports any GPUI builder method
+> 5. **Dynamic runtime string**: `class={expr}` — runtime `StyleRefinement` matcher for externally assembled strings
 
 **Common Patterns:**
 
@@ -746,76 +743,69 @@ User attributes are applied after defaults and can override them.
 
 ## 🎯 Complete Example
 
-### Todo App
+### Task Checklist View
 
 ```rust
-use gpui::*;
+use gpui::component::button::{Button, ButtonVariants as _};
 use gpui::prelude::*;
-use gpui_rsx::rsx;
+use gpui::*;
+use gpui_rsx::{rsx, rsx_listener};
 
-struct TodoApp {
-    todos: Vec<Todo>,
-    input: String,
+struct Task {
+    id: u64,
+    title: SharedString,
+    done: bool,
 }
 
-struct Todo {
-    id: usize,
-    text: String,
-    completed: bool,
+struct TaskBoard {
+    tasks: Vec<Task>,
+    next_id: u64,
 }
 
-impl Render for TodoApp {
+impl Render for TaskBoard {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
-            <div class="flex flex-col gap-4 p-4">
-                <h1 class="text-2xl font-bold">
-                    {"Todo List"}
-                </h1>
-
-                <div class="flex gap-2">
-                    <input
-                        placeholder="Add a todo..."
-                        value={self.input.clone()}
-                    />
-                    <button
-                        class="bg-blue-500 text-white px-4 py-2 rounded-md"
-                        onClick={cx.listener(|view, _, _window, cx| {
-                            view.add_todo();
-                            cx.notify();
+            <div class="flex flex-col gap-12 p-20">
+                <header class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">{"Tasks"}</h1>
+                    <Button("add-task")
+                        label="Add Sample Task"
+                        primary
+                        onClick={rsx_listener!(cx, notify, |view, _, _, _| {
+                            let id = view.next_id;
+                            view.next_id += 1;
+                            view.tasks.push(Task {
+                                id,
+                                title: format!("Task #{id}").into(),
+                                done: false,
+                            });
                         })}
-                    >
-                        {"Add"}
-                    </button>
-                </div>
+                    />
+                </header>
 
-                <div class="flex flex-col gap-2">
-                    {for todo in self.todos.iter() {
+                <div class="flex flex-col gap-8">
+                    {for task in &self.tasks {
                         <div
-                            class="flex gap-2 items-center p-2 rounded-md"
-                            bg={if todo.completed {
-                                rgb(0xf3f4f6)
-                            } else {
-                                rgb(0xffffff)
-                            }}
+                            key={task.id}
+                            class={[
+                                "flex items-center justify-between p-10 rounded-md cursor-pointer",
+                                if task.done { "bg-gray-100 text-gray-500" } else { "bg-white text-gray-900" },
+                            ]}
+                            onClick={
+                                let id = task.id;
+                                rsx_listener!(cx, notify, move |view, _, _, _| {
+                                    if let Some(item) = view.tasks.iter_mut().find(|t| t.id == id) {
+                                        item.done = !item.done;
+                                    }
+                                })
+                            }
                         >
-                            <span>{todo.text.clone()}</span>
+                            <span>{task.title.clone()}</span>
+                            <span class="text-xs">{if task.done { "Done" } else { "Open" }}</span>
                         </div>
                     }}
                 </div>
             </div>
-        }
-    }
-}
-
-impl TodoApp {
-    fn add_todo(&mut self) {
-        if !self.input.is_empty() {
-            self.todos.push(Todo {
-                id: self.todos.len(),
-                text: self.input.clone(),
-                completed: false,
-            });
-            self.input.clear();
         }
     }
 }
@@ -1150,7 +1140,7 @@ Inspired by:
 
 ## Development tools
 
-Install `cargo-rsx` 0.12.1 (Rust 1.98+) for `dev`, `doctor`, `lint`, `fmt`, `migrate`, `convert`,
+Install `cargo-rsx` 0.13.0 (Rust 1.98+) for `dev`, `doctor`, `lint`, `fmt`, `migrate`, `convert`,
 `preview --watch`, and the `lsp` server. See the [tooling guide](https://wsafight.github.io/gpui-rsx/guides/tooling/)
 and [WASM Playground](https://wsafight.github.io/gpui-rsx/playground/). VS Code and Zed adapters
 live in `editors/`; release assets include an installable VSIX.

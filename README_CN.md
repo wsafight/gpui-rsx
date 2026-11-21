@@ -8,21 +8,19 @@
 [![Documentation](https://docs.rs/gpui-rsx/badge.svg)](https://docs.rs/gpui-rsx)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
 
-用 JSX-like 标记和 Rust 表达式编写 GPUI 视图。静态 RSX 展开为原生 GPUI builder 调用，由 Rust 检查生成代码的类型。
+用直观的 JSX-like 标签与原生 Rust 表达式编写 GPUI 桌面视图。静态 RSX 在编译期零开销展开为原生 GPUI builder 调用——无虚拟 DOM、无运行时模板解析，完整保留 Rust 类型检查。
 
-## 支持的写法
+## ✨ 核心特性
 
-- 元素、Fragment、条件、循环和函数组件。
-- 用于颜色和桌面布局的静态工具类，以及处理动态字符串的运行时 matcher。
-- 交互列表的稳定 ID、可配置的 GPUI 路径和共享运行时代码。
-- 提供诊断、格式化和展开预览的 CLI、语言服务及 Playground。
+- **零开销编译期展开** — 标签、布尔标志、值属性以及 `clsx` 风格条件数组（`class={["flex", active && "bg-blue-500"]}`）均在编译期直接展开为 GPUI 方法链。
+- **符合直觉的组件与控件写法** — 支持 `<Button("save") label="保存" primary />` 构造简写；`#[component]` 提供编译期必填属性检查、`#[slot]` 具名插槽、`#[style]` 样式透传与 `#[track_caller]` 调用点追踪。
+- **原生桌面图元一等支持** — 内置虚拟列表 `<uniform_list>`、`<svg>` 动画、`<canvas>`、`<img>`、循环稳定 `key` 与 `rsx.toml` 设计令牌。
+- **开箱即用的工具链** — 提供 `cargo-rsx` CLI（`dev`、`doctor`、`lint`、`fmt`、`migrate`、`convert`、`preview`、`lsp`）、VS Code / Zed 插件与在线 WASM Playground。
 
-### 语义与默认行为
-
-- `button`、`input` 等常见 HTML-like 名称构造的是 GPUI `div()`，不会创建浏览器控件或提供 HTML 表单行为。需要组件的控件行为时，使用 `Button` 等真实组件，并通过 `<Button("save") ... />` 或 `base={Button::new("save")}` 指定构造方式。
-- 数值 class 默认按像素解释：`gap-4` 为 4px。使用 `rsx_tw!`、`tailwind-scale` 或项目配置可启用 Tailwind 每单位 4px 的刻度。`gap_4` 等具名 GPUI 属性继续使用 GPUI 原生单位。
-- 字面量 class 无运行时 class 解析成本；动态字符串使用支持范围更小的运行时 matcher，详见 [Class 处理](https://wsafight.github.io/gpui-rsx/zh-cn/usage/class/)。
-- Playground 和浏览器预览近似展示静态布局，不执行 Rust 事件处理器，也不验证原生渲染。`rsx_expand!` 只展示生成的 Rust，不做类型检查；请使用 `cargo check` 和原生 GPUI 应用验证。
+> **上手前建议了解的三个约定：**
+> - **HTML-like 标签对应 GPUI 容器：** `div`、`span`、`button`、`input` 等标签统一构造 GPUI `div()`，不包含浏览器表单行为；需要交互控件时请使用 `<Button("save") ... />` 等真实组件。
+> - **默认像素间距：** `gap-4` 默认表示 `4px`。如需 Tailwind 每单位 4px 刻度（`gap-4` → `16px`），可使用 `rsx_tw!` 或在 `rsx.toml` 中开启。
+> - **静态与动态 `class`：** 字符串字面量与条件字面量分支在编译期直接展开；运行时动态字符串使用基于 `StyleRefinement` 的轻量匹配器（详见 [Class 处理](https://wsafight.github.io/gpui-rsx/zh-cn/usage/class/)）。
 
 ## 📚 文档资源
 
@@ -54,7 +52,7 @@ bun run dev
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.10.0" }
-gpui-rsx = "0.12.1"
+gpui-rsx = "0.13.0"
 ```
 
 ### GPUI 版本目标
@@ -76,14 +74,14 @@ demo 使用 GPUI Kit 0.10.0 及其固定的 `gpui-pre 0.3.12` 快照。Cargo 中
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.12.1` | `0.10.0` | `gpui-pre@0.3.12` | `gpui-component@0.10.0` |
+| `0.13.0` | `0.10.0` | `gpui-pre@0.3.12` | `gpui-component@0.10.0` |
 
 此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.10.0" }
-gpui-rsx = "0.12.1"
+gpui-rsx = "0.13.0"
 ```
 <!-- gpui-rsx:compat:end -->
 
@@ -117,7 +115,7 @@ impl Render for CounterView {
             <div class="size-full flex flex-col gap-[16px] p-[24px]"
                 bg={cx.theme().background} text_color={cx.theme().foreground}>
                 <h1>{format!("Count: {}", self.count)}</h1>
-                <Button base={Button::new("increment")} label="Increment" primary
+                <Button("increment") label="Increment" primary
                     onClick={rsx_listener!(cx, notify, |view, _, _, _| {
                         view.count += 1;
                     })} />
@@ -502,13 +500,12 @@ rsx! {
 > 在 debug 构建中按调用点去重警告；`dynamic-class-report` 可在退出时汇总，
 > 也可通过 `onUnknownClass` 显式处理。
 >
-> **推荐替代方案**（按优先级排序）：
-> 1. **字符串字面量**（最佳）：`class="flex gap-4"` — 编译期，支持文档列出的子集
-> 2. **条件 / match 字面量**：`class={if active { "flex gap-4" } else { "block" }}`
->    或 `class={match state { State::Active => "flex", _ => "block" }}` — 仍会编译期展开
-> 3. **独立属性**：`<div flex gap_4 />` — 编译期，类型检查
-> 4. **`when` 属性**：`when={(cond, |el| el.flex())}` — 编译期，完全灵活
-> 5. **动态表达式**：`class={expr}` — 运行时解析器，覆盖范围比静态字面量窄
+> **推荐顺序**（按零运行时开销到完全动态排列）：
+> 1. **字符串字面量**：`class="flex gap-4"` — 编译期展开
+> 2. **组合数组或条件字面量**：`class={["flex", active && "bg-blue-500"]}` 或 `class={if active { "flex" } else { "hidden" }}` — 同样在编译期展开
+> 3. **类型化属性**：`<div flex gap={px(self.gap)} />` — 编译期展开并做 Rust 类型检查
+> 4. **`when` / `whenSome`**：`when={(cond, |el| el.flex())}` — 编译期展开，支持任意 GPUI 方法
+> 5. **运行时动态字符串**：`class={expr}` — 使用基于 `StyleRefinement` 的运行时匹配器处理外部拼接字符串
 
 **常见模式：**
 
@@ -746,76 +743,69 @@ rsx! {
 
 ## 🎯 完整示例
 
-### Todo 应用
+### 任务清单视图
 
 ```rust
-use gpui::*;
+use gpui::component::button::{Button, ButtonVariants as _};
 use gpui::prelude::*;
-use gpui_rsx::rsx;
+use gpui::*;
+use gpui_rsx::{rsx, rsx_listener};
 
-struct TodoApp {
-    todos: Vec<Todo>,
-    input: String,
+struct Task {
+    id: u64,
+    title: SharedString,
+    done: bool,
 }
 
-struct Todo {
-    id: usize,
-    text: String,
-    completed: bool,
+struct TaskBoard {
+    tasks: Vec<Task>,
+    next_id: u64,
 }
 
-impl Render for TodoApp {
+impl Render for TaskBoard {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         rsx! {
-            <div class="flex flex-col gap-4 p-4">
-                <h1 class="text-2xl font-bold">
-                    {"Todo List"}
-                </h1>
-
-                <div class="flex gap-2">
-                    <input
-                        placeholder="Add a todo..."
-                        value={self.input.clone()}
-                    />
-                    <button
-                        class="bg-blue-500 text-white px-4 py-2 rounded-md"
-                        onClick={cx.listener(|view, _, _window, cx| {
-                            view.add_todo();
-                            cx.notify();
+            <div class="flex flex-col gap-12 p-20">
+                <header class="flex items-center justify-between">
+                    <h1 class="text-2xl font-bold">{"任务清单"}</h1>
+                    <Button("add-task")
+                        label="新增任务"
+                        primary
+                        onClick={rsx_listener!(cx, notify, |view, _, _, _| {
+                            let id = view.next_id;
+                            view.next_id += 1;
+                            view.tasks.push(Task {
+                                id,
+                                title: format!("任务 #{id}").into(),
+                                done: false,
+                            });
                         })}
-                    >
-                        {"Add"}
-                    </button>
-                </div>
+                    />
+                </header>
 
-                <div class="flex flex-col gap-2">
-                    {for todo in self.todos.iter() {
+                <div class="flex flex-col gap-8">
+                    {for task in &self.tasks {
                         <div
-                            class="flex gap-2 items-center p-2 rounded-md"
-                            bg={if todo.completed {
-                                rgb(0xf3f4f6)
-                            } else {
-                                rgb(0xffffff)
-                            }}
+                            key={task.id}
+                            class={[
+                                "flex items-center justify-between p-10 rounded-md cursor-pointer",
+                                if task.done { "bg-gray-100 text-gray-500" } else { "bg-white text-gray-900" },
+                            ]}
+                            onClick={
+                                let id = task.id;
+                                rsx_listener!(cx, notify, move |view, _, _, _| {
+                                    if let Some(item) = view.tasks.iter_mut().find(|t| t.id == id) {
+                                        item.done = !item.done;
+                                    }
+                                })
+                            }
                         >
-                            <span>{todo.text.clone()}</span>
+                            <span>{task.title.clone()}</span>
+                            <span class="text-xs">{if task.done { "已完成" } else { "进行中" }}</span>
                         </div>
                     }}
                 </div>
             </div>
-        }
-    }
-}
-
-impl TodoApp {
-    fn add_todo(&mut self) {
-        if !self.input.is_empty() {
-            self.todos.push(Todo {
-                id: self.todos.len(),
-                text: self.input.clone(),
-                completed: false,
-            });
-            self.input.clear();
         }
     }
 }
@@ -1146,7 +1136,7 @@ MIT License
 
 ## 开发工具
 
-安装 `cargo-rsx` 0.12.1（Rust 1.98+）即可使用 `dev`、`doctor`、`lint`、`fmt`、`migrate`、
+安装 `cargo-rsx` 0.13.0（Rust 1.98+）即可使用 `dev`、`doctor`、`lint`、`fmt`、`migrate`、
 `convert`、`preview --watch` 和 `lsp`。参见[工具指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/tooling/)
 与 [WASM Playground](https://wsafight.github.io/gpui-rsx/zh-cn/playground/)。
 编辑器适配位于 `editors/`，发布附件包含可安装的 VSIX，市场上架状态另行记录。

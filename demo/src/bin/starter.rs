@@ -17,7 +17,7 @@ impl Render for CounterView {
             <div class="size-full flex flex-col gap-[16px] p-[24px]"
                 bg={cx.theme().background} text_color={cx.theme().foreground}>
                 <h1>{format!("Count: {}", self.count)}</h1>
-                <Button base={Button::new("increment")} label="Increment" primary
+                <Button("increment") label="Increment" primary
                     onClick={rsx_listener!(cx, notify, |view, _, _, _| {
                         view.count += 1;
                     })} />

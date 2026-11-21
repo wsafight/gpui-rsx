@@ -6,6 +6,23 @@ description: Upgrade GPUI-RSX, adopt RSX in existing views, and align GPUI depen
 
 Start with the section for your current version. Dependency migration from Zed Git and builder-to-RSX examples follow the version notes.
 
+## From 0.12 to 0.13
+
+Existing RSX views, pixel/Tailwind spacing modes, and MSRV floors (Rust 1.88 for macro/core; Rust 1.98 for CLI/tooling) remain compatible.
+
+### Target & API updates
+
+- **GPUI Kit 0.10.0 / GPUI Pre 0.3.12**: Update your `Cargo.toml` pin to `gpui = { package = "gpui-kit", version = "=0.10.0" }` and refresh `Cargo.lock`. In Kit 0.10.0, `Input` backspace deletes full Unicode grapheme clusters rather than individual codepoints.
+- **`gpui-rsx-core` AST consumers**: `gpui_rsx_core::syntax::RsxElement` adds `pub args: Option<Vec<syn::Expr>>` for `<Tag(...)>` constructor arguments, and `GPUI_SOURCE_REV` / `GPUI_COMPONENT_REV` advance to `gpui-pre@0.3.12` / `gpui-component@0.10.0`. Add `args: None` to manual struct literals or `..` when destructuring.
+- **Dynamic `class` runtime contract**: Generated runtime class helpers now mutate a `gpui::StyleRefinement` and call `.refine_style(&__rsx_style)` instead of rebuilding the element via boxed closures. Any element using runtime `class={expr}` must implement `gpui::Styled` (all GPUI elements and `#[component]` builders with `#[style] style: StyleRefinement` do).
+
+### Recommended ergonomic upgrades (optional)
+
+- Replace `<Button base={Button::new("save")} ... />` with `<Button("save") ... />` where constructors follow `Type::new(...)` (keep `base={expr}` for preconfigured builder values).
+- Replace multi-branch string variables with compile-time `class={["flex", active && "bg-blue-500", if open { "p-4" }]}` arrays.
+- Use `#[slot]`, `#[style] style: StyleRefinement`, and `#[children] child: Option<AnyElement>` in `#[component]` definitions instead of ad-hoc wrapper props.
+- Use `<uniform_list count={rows.len()} render={...} />` directly in RSX for virtualized lists, and `cargo rsx dev [--check]` to preflight and launch Dioxus hot-patching.
+
 ## From 0.11 to 0.12
 
 Existing RSX markup and pixel/Tailwind spacing modes are unchanged. Macro/core still require Rust 1.88; CLI/tooling require Rust 1.98.
@@ -14,7 +31,7 @@ Existing RSX markup and pixel/Tailwind spacing modes are unchanged. Macro/core s
 
 Direct macro imports such as `use gpui_rsx::rsx as view` retain their original spacing mode in tooling. Balanced macros can still be analyzed while surrounding Rust is incomplete, but formatting and migration refuse to write lexically damaged files. Local `macro_rules!` definitions shadow unqualified calls; crate aliases and re-exports are not full Rust name resolution.
 
-The demo targets Kit 0.10.0 / GPUI Pre 0.3.12. Its large incident queue is virtualized, and native profiling is opt-in. New hot-reload diagnostics and probes do not establish that every Dioxus/Kit hot-patch configuration works; see the [development reload workflow](/gpui-rsx/guides/performance/#measure-development-reloads) for the tested configuration and limits.
+The 0.12 demo targeted Kit 0.9.0 / GPUI Pre 0.3.11. Its large incident queue is virtualized, and native profiling is opt-in. New hot-reload diagnostics and probes do not establish that every Dioxus/Kit hot-patch configuration works; see the [development reload workflow](/gpui-rsx/guides/performance/#measure-development-reloads) for the tested configuration and limits.
 
 ## From 0.10 to 0.11
 
@@ -118,7 +135,7 @@ are still accepted; range changes use UTF-16 positions and apply in order. Uncha
 macro bodies reuse their diagnostics. Dynamic classes within one RSX invocation share
 one helper; expressions and unknown-class handlers remain local to each attribute.
 
-## Zed Git to GPUI Kit 0.8
+## Zed Git to GPUI Kit
 
 Replace the separate Zed Git `gpui`, `gpui_platform` and Git `gpui-component`
 dependencies with Kit, preserving the `gpui` crate name for generated code:
@@ -126,7 +143,7 @@ dependencies with Kit, preserving the `gpui` crate name for generated code:
 ```toml
 [dependencies]
 gpui = { package = "gpui-kit", version = "=0.10.0" }
-gpui-rsx = "0.12.1"
+gpui-rsx = "0.13.0"
 ```
 
 Kit 0.10.0 pins `gpui-pre = 0.3.12`. Use `gpui::component` for styled controls and
