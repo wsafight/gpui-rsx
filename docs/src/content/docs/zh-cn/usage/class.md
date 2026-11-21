@@ -39,7 +39,7 @@ rsx_strict! {
 
 ## 编译期条件 Class
 
-如果 `if` 和 `match` 的分支都是字符串字面量，宏也可以在编译期展开：
+如果 `if`、`match` 或组合式数组表达式的叶子都是字符串字面量，宏可以在编译期直接展开：
 
 ```rust
 rsx! {
@@ -52,6 +52,16 @@ rsx! {
         State::Error => "border-red-500",
         _ => "border-gray-300",
     }} />
+}
+
+rsx! {
+    <div class={[
+        "flex items-center p-2",
+        active.then_some("bg-blue-500 text-white"),
+        disabled && "opacity-50",
+        (selected, "border-1"),
+        if open { "gap-4" },
+    ]} />
 }
 ```
 
@@ -98,6 +108,8 @@ permissive 模式下，未知动态 class 会被忽略。debug 构建中，每�
 | 百分比和分数尺寸 | 支持 | 支持 |
 | 完整 Tailwind 色板 | 支持 | 支持 |
 | 任意 hex / RGB / RGBA 颜色 | 支持 | 支持 |
+| `rsx.toml` 静态令牌（颜色 hex、圆角、间距、透明度等） | 支持 | 支持 |
+| `rsx.toml` 渲染期 `{ expr = "cx..." }` 表达式令牌 | 支持 | 不支持 |
 | 静态有状态滚动 class | 支持并自动生成 ID | 不支持 |
 | `hover:` / `focus:` / `active:` / group 状态前缀 | 支持 | 不支持 |
 | 响应式 / `dark:` 前缀 | 警告或 strict 报错 | debug 提示或 strict panic / 自定义回调 |

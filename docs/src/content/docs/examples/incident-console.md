@@ -9,7 +9,7 @@ The Incident Console models an operations queue: filter incidents, assign an own
 
 ## Run It
 
-The demo uses GPUI-RSX 0.11, GPUI Kit 0.9.0, and the repository's pinned Rust toolchain:
+The demo uses GPUI-RSX 0.12.1, GPUI Kit 0.10.0, and the repository's pinned Rust toolchain:
 
 ```bash
 cargo run --manifest-path demo/Cargo.toml --bin incident_console --locked

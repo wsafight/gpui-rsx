@@ -19,7 +19,7 @@
 
 ### 语义与默认行为
 
-- `button`、`input` 等常见 HTML-like 名称构造的是 GPUI `div()`，不会创建浏览器控件或提供 HTML 表单行为。需要组件的控件行为时，使用 `Button` 等真实组件，并通过 `base={Button::new("save")}` 指定构造方式。
+- `button`、`input` 等常见 HTML-like 名称构造的是 GPUI `div()`，不会创建浏览器控件或提供 HTML 表单行为。需要组件的控件行为时，使用 `Button` 等真实组件，并通过 `<Button("save") ... />` 或 `base={Button::new("save")}` 指定构造方式。
 - 数值 class 默认按像素解释：`gap-4` 为 4px。使用 `rsx_tw!`、`tailwind-scale` 或项目配置可启用 Tailwind 每单位 4px 的刻度。`gap_4` 等具名 GPUI 属性继续使用 GPUI 原生单位。
 - 字面量 class 无运行时 class 解析成本；动态字符串使用支持范围更小的运行时 matcher，详见 [Class 处理](https://wsafight.github.io/gpui-rsx/zh-cn/usage/class/)。
 - Playground 和浏览器预览近似展示静态布局，不执行 Rust 事件处理器，也不验证原生渲染。`rsx_expand!` 只展示生成的 Rust，不做类型检查；请使用 `cargo check` 和原生 GPUI 应用验证。
@@ -53,13 +53,13 @@ bun run dev
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = "0.12.1"
 ```
 
 ### GPUI 版本目标
 
-demo 使用 GPUI Kit 0.9.0 及其固定的 `gpui-pre 0.3.11` 快照。Cargo 中的 `gpui`
+demo 使用 GPUI Kit 0.10.0 及其固定的 `gpui-pre 0.3.12` 快照。Cargo 中的 `gpui`
 别名保留了 RSX 展开和 GPUI derive 所需的路径；Kit 统一导出配套的渲染引擎、
 平台入口、组件和资源。宏与 core crate 不依赖 GPUI 运行时。
 
@@ -76,13 +76,13 @@ demo 使用 GPUI Kit 0.9.0 及其固定的 `gpui-pre 0.3.11` 快照。Cargo 中�
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.12.1` | `0.9.0` | `gpui-pre@0.3.11` | `gpui-component@0.9.0` |
+| `0.12.1` | `0.10.0` | `gpui-pre@0.3.12` | `gpui-component@0.10.0` |
 
 此矩阵来自 demo/Cargo.lock。Kit 统一提供 GPUI、组件和资源；以下 Cargo 别名保留 RSX 展开所需的 gpui:: 路径。请提交应用的 lockfile。
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = "0.12.1"
 ```
 <!-- gpui-rsx:compat:end -->
@@ -836,18 +836,17 @@ fn Badge(label: SharedString, #[prop(default)] highlighted: bool) -> impl IntoEl
 let badge = rsx! { <Badge label="Inbox" highlighted /> };
 ```
 
-结构体组件配合 `#[derive(IntoElement)]` 与 `RenderOnce`，使用相同的 prop 规则。
+结构体组件配合 `#[derive(IntoElement)]` 与 `RenderOnce`，使用相同的 prop 规则（包含 `#[slot]` 具名插槽与 `#[style]` 样式透传）。
 `#[deprecated(note = "use NewBadge")]` 会在组件使用处提示迁移。
 完整示例见[组件语法文档](https://wsafight.github.io/gpui-rsx/zh-cn/usage/syntax/)。
 
 ### Builder 构造组件
 
-当组件需要自定义构造函数，而不是默认的 `<Tag />` 展开为 `Tag()` 时，使用 `base={expr}`：
+通过 `Type::new(...)` 构造的组件（或小写工厂函数）可以直接用 `<Tag(...)>` 传参；复用预先配置的 builder 时使用 `base={expr}`：
 
 ```rust
 rsx! {
-    <Button
-        base={Button::new("continue")}
+    <Button("continue")
         label={"继续"}
         small
         primary
@@ -855,28 +854,26 @@ rsx! {
 }
 ```
 
-这会展开为 `Button::new("continue").label("继续").small().primary()`。`base` 属性由宏消费，不会生成 `.base(...)`。
+这会展开为 `Button::new("continue").label("继续").small().primary()`。使用 `base={Button::new("continue")}` 时，`base` 属性由宏消费，不会生成 `.base(...)`。
 
 支持路径型组件 tag，适合组件放在模块里的场景：
 
 ```rust
 rsx! {
-    <ui::TaskCard
-        base={ui::TaskCard::new(task.id)}
+    <ui::TaskCard(task.id)
         title={task.title.clone()}
     />
 }
 ```
 
-混用 `gpui-component` 时，保持 import 显式，并用 `base` 表达需要 ID 或自定义参数的构造函数：
+混用 `gpui-component` 时，保持 import 显式，并用 `<Button(...)>` 或 `base={...}` 表达需要 ID 或自定义参数的构造函数：
 
 ```rust
 use gpui::component::button::{Button, ButtonVariants as _};
 use gpui::component::Sizable as _;
 
 rsx! {
-    <Button
-        base={Button::new("continue")}
+    <Button("continue")
         label={"继续"}
         small
         primary
@@ -1149,7 +1146,7 @@ MIT License
 
 ## 开发工具
 
-安装 `cargo-rsx` 0.12.1（Rust 1.98+）即可使用 `doctor`、`lint`、`fmt`、`migrate`、
+安装 `cargo-rsx` 0.12.1（Rust 1.98+）即可使用 `dev`、`doctor`、`lint`、`fmt`、`migrate`、
 `convert`、`preview --watch` 和 `lsp`。参见[工具指南](https://wsafight.github.io/gpui-rsx/zh-cn/guides/tooling/)
 与 [WASM Playground](https://wsafight.github.io/gpui-rsx/zh-cn/playground/)。
 编辑器适配位于 `editors/`，发布附件包含可安装的 VSIX，市场上架状态另行记录。

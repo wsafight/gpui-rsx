@@ -42,7 +42,10 @@ use gpui_rsx::{
 | `svg` | `svg()` |
 | `img src={source}` 或 `img source={source}` | `img(source)` |
 | `canvas prepaint={a} paint={b}` | `canvas(a, b)` |
+| `uniform_list count={n} render={f}` | `uniform_list(id_or_auto, n, f)` |
 | `MyComponent` | `MyComponent()` |
+| `Button("id")` / `Tab()` | `Button::new("id")` / `Tab::new()` |
+| `widget("a", 1)` | `widget("a", 1)` |
 | `ui::TaskCard` | `ui::TaskCard()` |
 | 任意带 `base={expr}` 的标签 | `expr` |
 
@@ -53,10 +56,12 @@ use gpui_rsx::{
 | `<div flex />` | `.flex()` |
 | `<div gap={px(4.0)} />` | `.gap(px(4.0))` |
 | `<div class="flex gap-4" />` | 编译期 class 方法展开 |
-| `<div class={classes} />` | 生成运行时 class matcher |
+| `<div class={["flex", cond && "gap-4"]} />` | 编译期组合条件方法链 |
+| `<div class={classes} />` | 生成运行时 class matcher（基于 `StyleRefinement`） |
 | `<div visible={cond} />` | `.visible()` 或 `.invisible()` |
-| `<img grayscale />` | `.grayscale(true)` |
-| `<Button base={Button::new("id")} />` | 从 `Button::new("id")` 开始方法链 |
+| `<img grayscale />` / `<uniform_list yFlipped ... />` | `.grayscale(true)` / `.y_flipped(true)` |
+| `<Button("id") />` / `<Button base={Button::new("id")} />` | 从 `Button::new("id")` 开始方法链 |
+| `<div slot="header">...</div>`（组件子节点） | 调用父组件 builder 的 `.header(div()...)` |
 | `<button key={id} onClick={h} />` | 生成复合 `.id(...)` 并调用 `.on_click(h)` |
 
 `id`、`key`、`base` 是宏级属性。`id` 会生成 `.id(...)`；`key` 和 `base` 会被宏消费。

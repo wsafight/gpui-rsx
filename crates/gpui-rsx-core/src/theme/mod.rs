@@ -309,6 +309,22 @@ impl Theme {
         })
     }
 
+    /// Static token classes (`[colors]` hex, `[radius]`, `[spacing]`, `[text-size]`,
+    /// `[line-height]`, `[opacity]`) that do not depend on a render-time `cx` expression.
+    pub(crate) fn static_class_expansions(&self) -> Vec<(String, TokenStream)> {
+        self.class_names()
+            .into_iter()
+            .filter_map(|class| {
+                let (_, _, value, _) = self.class_token(&class)?;
+                if matches!(value, TokenValue::Expr(_)) {
+                    return None;
+                }
+                let tokens = self.expand_class(&class)?;
+                Some((class, tokens))
+            })
+            .collect()
+    }
+
     fn class_token(
         &self,
         class: &str,

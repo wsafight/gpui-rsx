@@ -6,7 +6,7 @@ description: 安装 GPUI-RSX 并渲染第一个 GPUI 视图。
 用 RSX 标签和 Rust 表达式编写 GPUI 视图，宏会在编译期将静态标记展开为 GPUI builder 调用。本页从依赖配置开始，带你打开第一个窗口。
 
 :::note[GPUI 元素与 HTML-like 名称]
-`button`、`input` 等名称是 GPUI `div()` 的别名，不提供 HTML 输入和表单行为。使用组件库控件时，请显式指定构造方式，例如 `<Button base={Button::new("save")} label={"Save"} />`；导入和构造规则见[组件](/gpui-rsx/zh-cn/usage/syntax/#组件)。
+`button`、`input` 等名称是 GPUI `div()` 的别名，不提供 HTML 输入和表单行为。使用组件库控件时，请显式指定构造方式，例如 `<Button("save") label={"Save"} />` 或 `<Button base={Button::new("save")} label={"Save"} />`；导入和构造规则见[组件](/gpui-rsx/zh-cn/usage/syntax/#组件)。
 :::
 
 ## 安装
@@ -15,7 +15,7 @@ description: 安装 GPUI-RSX 并渲染第一个 GPUI 视图。
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = "0.12.1"
 ```
 

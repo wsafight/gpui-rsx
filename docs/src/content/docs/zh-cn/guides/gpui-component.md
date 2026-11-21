@@ -11,20 +11,34 @@ demo 使用：
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = { path = ".." }
 ```
 
 Kit 统一提供配套的 GPUI 快照、组件和资源。应用应提交 lockfile；调用 `gpui::init(cx)` 初始化，再用 `gpui::open_window(...)` 打开窗口。
 
-## 用 `base` 指定构造器
+## 构造参数简写 `<Tag(...)>` 与 `base`
 
-GPUI-RSX 可以从标签名推导简单构造器，但组件 builder 往往需要显式构造器。此时使用宏专用的 `base` 属性：
+通过 `Type::new(...)` 构造的组件可以直接在标签名后传入构造参数：
 
 ```rust
 use gpui::component::button::{Button, ButtonVariants as _};
 use gpui::component::Sizable as _;
 
+rsx! {
+    <Button("save")
+        label={"Save"}
+        small
+        primary
+    />
+}
+```
+
+大写类型路径会将 `<Button("save") ... />` 展开为 `Button::new("save")`、将 `<Tab() ... />` 展开为 `Tab::new()`；小写函数路径则调用 `helper(...)`。
+
+如果需要复用预先配置的 builder，或调用不适合作为属性书写的方法链，仍可使用宏专用的 `base` 属性：
+
+```rust
 rsx! {
     <Button
         base={Button::new("save")}

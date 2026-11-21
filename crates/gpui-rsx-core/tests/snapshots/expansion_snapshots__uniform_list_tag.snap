@@ -1,0 +1,7 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<uniform_list id=\"rows\" count={items.len()} render={render_rows} yFlipped class=\"size-full\" />"
+---
+fn expanded() {
+    let _ = uniform_list("rows", items.len(), render_rows).y_flipped(true).size_full();
+}

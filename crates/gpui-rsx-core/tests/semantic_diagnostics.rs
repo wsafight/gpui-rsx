@@ -68,3 +68,76 @@ fn sibling_errors_share_codes_spans_and_compile_messages() {
         assert!(!diagnostic.message.is_empty());
     }
 }
+
+#[test]
+fn uniform_list_and_composable_class_arrays_participate_in_semantic_diagnostics() {
+    let source = "<><uniform_list/><uniform_list count={10}/>{for item in items {<uniform_list count={10} render={render_rows}/><div class={[\"flex\", active && \"active:opacity-75\"]}/>}}</>";
+    let body: RsxBody = syn::parse_str(source).unwrap();
+    let expansion = generate_body_with_diagnostics(&body, ClassMode::STRICT);
+    let codes: Vec<_> = expansion.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(
+        codes,
+        [
+            SemanticDiagnosticCode::MissingRequiredAttribute,
+            SemanticDiagnosticCode::MissingRequiredAttribute,
+            SemanticDiagnosticCode::MissingLoopKey,
+            SemanticDiagnosticCode::MissingLoopKey,
+        ]
+    );
+    assert!(
+        expansion.diagnostics[0]
+            .message
+            .contains("requires `count`")
+    );
+    assert!(
+        expansion.diagnostics[1]
+            .message
+            .contains("requires `render`")
+    );
+
+    // Keyed uniform_list and keyed stateful class array pass cleanly.
+    let valid = "<div>{for item in items {<uniform_list key={item.id} count={10} render={render_rows}/><div key={item.id} class={[\"flex\", active && \"active:opacity-75\"]}/>}}</div>";
+    let valid_body: RsxBody = syn::parse_str(valid).unwrap();
+    let valid_expansion = generate_body_with_diagnostics(&valid_body, ClassMode::STRICT);
+    assert!(valid_expansion.diagnostics.is_empty());
+}
+
+#[test]
+fn constructor_args_reject_base_conflicts_and_native_tags() {
+    let conflict = syn::parse_str::<RsxBody>(r#"<Button("save") base={Button::new("other")} />"#)
+        .err()
+        .expect("conflicting args and base must fail")
+        .to_string();
+    assert!(
+        conflict.contains("Cannot combine constructor arguments"),
+        "{conflict}"
+    );
+
+    for native in [r#"<div("id") />"#, r#"<svg("icon.svg") />"#] {
+        let body: RsxBody = syn::parse_str(native).unwrap();
+        let expansion = generate_body_with_diagnostics(&body, ClassMode::PERMISSIVE);
+        let tokens = expansion.tokens.to_string();
+        assert!(tokens.contains("compile_error"), "{native}: {tokens}");
+        assert!(
+            tokens.contains("does not accept parenthesized constructor arguments"),
+            "{native}: {tokens}"
+        );
+    }
+}
+
+#[test]
+fn inline_dynamic_helper_includes_static_theme_tokens() {
+    let theme = std::sync::Arc::new(
+        gpui_rsx_core::Theme::parse(
+            "[colors]\nbrand = \"#2563eb\"\n[radius]\ncard = \"12px\"\n[spacing]\ngutter = \"18px\"\n",
+        )
+        .unwrap(),
+    );
+    let mode = ClassMode::STRICT.with_theme(Some(theme));
+    let expanded = gpui_rsx_core::expand_str("<div class={cls} />", mode)
+        .unwrap()
+        .to_string();
+    assert!(expanded.contains("\"bg-brand\""), "{expanded}");
+    assert!(expanded.contains("\"rounded-card\""), "{expanded}");
+    assert!(expanded.contains("\"p-gutter\""), "{expanded}");
+}

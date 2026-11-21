@@ -31,6 +31,7 @@ pub(super) fn print(command: &str, operation: Option<&str>) -> Result<(), String
                 "error|warning|information  Filter diagnostics (default: information)"
             }
             "--quiet" => "Show only errors (alias: -q)",
+            "--check" if command == "dev" => "Run hot-reload preflight without launching dx",
             "--check" => "Fail if formatting or migration would change files",
             "--write" => "Apply formatting or migration to files",
             "--watch" => "Refresh the preview when source files change",

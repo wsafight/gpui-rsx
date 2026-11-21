@@ -218,8 +218,15 @@ pub struct Svg;
 #[derive(Default)]
 pub struct Img;
 pub struct Canvas<T>(PhantomData<T>);
+#[derive(Default)]
+pub struct UniformList;
 #[derive(Default, Debug)]
 pub struct StyleRefinement;
+
+impl StyleRefinement {
+    pub fn refine(&mut self, _other: &Self) {}
+}
+
 pub struct AnyElement;
 pub struct Bounds;
 
@@ -234,6 +241,7 @@ impl Element for Div {}
 impl Element for Svg {}
 impl Element for Img {}
 impl<T> Element for Canvas<T> {}
+impl Element for UniformList {}
 impl<E: Element> Element for Stateful<E> {
     fn id(&self) -> Option<ElementId> {
         Some(self.id.clone())
@@ -255,9 +263,46 @@ pub fn canvas<T>(
 ) -> Canvas<T> {
     Canvas(PhantomData)
 }
+pub fn uniform_list<R: IntoElement>(
+    _id: impl Into<ElementId>,
+    _item_count: usize,
+    _f: impl 'static + Fn(std::ops::Range<usize>, &mut Window, &mut App) -> Vec<R>,
+) -> UniformList {
+    UniformList
+}
 
 impl Svg {
     pub fn path(self, _path: impl Into<SharedString>) -> Self {
+        self
+    }
+    pub fn external_path(self, _path: impl Into<SharedString>) -> Self {
+        self
+    }
+    pub fn with_transformation<T>(self, _transformation: T) -> Self {
+        self
+    }
+    pub fn with_timed_transformation<T, F>(self, _animation: T, _transform: F) -> Self {
+        self
+    }
+}
+
+impl UniformList {
+    pub fn track_scroll<T>(self, _handle: T) -> Self {
+        self
+    }
+    pub fn with_sizing_behavior<T>(self, _behavior: T) -> Self {
+        self
+    }
+    pub fn with_horizontal_sizing_behavior<T>(self, _behavior: T) -> Self {
+        self
+    }
+    pub fn with_width_from_item(self, _item_index: Option<usize>) -> Self {
+        self
+    }
+    pub fn with_decoration<T>(self, _decoration: T) -> Self {
+        self
+    }
+    pub fn y_flipped(self, _y_flipped: bool) -> Self {
         self
     }
 }
@@ -283,6 +328,7 @@ self_into_element!(
     Div,
     Svg,
     Img,
+    UniformList,
     AnyElement,
     &'static str,
     String,
@@ -317,7 +363,7 @@ impl<T: IntoElement> IntoElement for Option<T> {
     }
 }
 
-pub trait Styled: GeneratedStyled {
+pub trait Styled: Sized {
     fn style(&mut self) -> &mut StyleRefinement;
 }
 
@@ -347,6 +393,11 @@ impl Styled for Img {
     }
 }
 impl<T> Styled for Canvas<T> {
+    fn style(&mut self) -> &mut StyleRefinement {
+        Box::leak(Box::default())
+    }
+}
+impl Styled for UniformList {
     fn style(&mut self) -> &mut StyleRefinement {
         Box::leak(Box::default())
     }
@@ -409,6 +460,7 @@ impl InteractiveElement for Div {}
 impl<E: InteractiveElement> InteractiveElement for Stateful<E> {}
 impl InteractiveElement for Svg {}
 impl InteractiveElement for Img {}
+impl InteractiveElement for UniformList {}
 
 pub trait StatefulInteractiveElement: InteractiveElement + GeneratedStateful {
     fn active(self, f: impl FnOnce(StyleRefinement) -> StyleRefinement) -> Self {

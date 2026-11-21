@@ -21,7 +21,7 @@ fn command(args: &[&str], source: Option<&str>) -> std::process::Output {
 #[test]
 fn every_command_and_theme_operation_has_help() {
     for cmd in [
-        "doctor", "lint", "fmt", "migrate", "convert", "expand", "preview", "theme", "lsp",
+        "dev", "doctor", "lint", "fmt", "migrate", "convert", "expand", "preview", "theme", "lsp",
     ] {
         let output = command(&[cmd, "--help"], None);
         assert!(output.status.success(), "{cmd}");

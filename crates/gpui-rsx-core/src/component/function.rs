@@ -142,11 +142,11 @@ pub(super) fn expand_function(
             let prop_attrs = &arg.attrs;
             if prop_attrs
                 .iter()
-                .any(|attr| !attr_is_one_of(attr, &["prop", "children", "doc"]))
+                .any(|attr| !attr_is_one_of(attr, &["prop", "children", "slot", "style", "doc"]))
             {
                 return Err(syn::Error::new_spanned(
                     arg,
-                    "component props support only #[prop(...)] and #[children] annotations",
+                    "component props support only #[prop(...)], #[children], #[slot] and #[style] annotations",
                 ));
             }
             fields.push(quote! { #(#prop_attrs)* #ident: #ty });

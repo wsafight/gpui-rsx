@@ -184,7 +184,27 @@ gutter = "18px"                                # p-gutter, gap-gutter, w-gutter,
 ```
 
 Expression tokens are evaluated where the RSX is written, so `cx` must be in scope.
-Tokens are compile-time only: they are not available in dynamic `class={expr}` strings.
+Static tokens (`[colors]` hex values, `[radius]`, `[spacing]`, `[text-size]`, `[line-height]`, `[opacity]`) also resolve in dynamic `class={expr}` strings and [`rsx_runtime!`]; render-time `cx` expression tokens are compile-time only.
+
+### Composable Conditional Class Arrays
+
+Pass an array literal to `class={...}` to combine base classes and independent conditional classes at compile time without generating a runtime matcher:
+
+```
+# use gpui::prelude::*;
+# use gpui::*;
+# use gpui_rsx::rsx;
+let (active, disabled, selected) = (true, false, true);
+let _el = rsx! {
+    <div class={[
+        "flex items-center p-2",
+        active.then_some("bg-blue-500 text-white"),
+        disabled && "opacity-50",
+        (selected, "border-1"),
+        if active { "gap-4" },
+    ]} />
+};
+```
 
 ### The `class` Attribute — Dynamic (Runtime)
 

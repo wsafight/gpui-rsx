@@ -18,7 +18,11 @@ cargo rsx doctor --manifest-path demo/Cargo.toml
 
 ```sh
 cargo run -p cargo-rsx -- doctor --manifest-path tests/fixtures/hot-reload/Cargo.toml --features hotreload,kit --hot-reload --json
+cargo rsx dev --check --manifest-path tests/fixtures/hot-reload/Cargo.toml --features hotreload,kit
+cargo rsx dev my-bin
 ```
+
+`cargo rsx dev` 会自动执行热补丁预检（未显式传入 `--features` 时自动识别包内的 `hotreload` / `hot-reload` feature），通过后启动 `dx serve --hot-patch --hot-reload true`。传入 `--check`（可搭配 `--json`）只输出就绪检查与将要执行的 `dx` 命令而不实际拉起进程。
 
 检查包括选中后端的 `hot-reload` feature、`dx serve` 是否支持 `--hot-patch`，以及可能
 被 Dioxus CLI 0.7.10 拦截的 `rsx` 宏。可用 `RSX_DX` 指定独立的 CLI 安装路径。

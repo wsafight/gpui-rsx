@@ -78,7 +78,7 @@ fn kit_input_handles_combining_marks_and_unicode_selection_replacement(cx: &mut 
         input.focus_handle(cx).focus(window, cx);
         window.render_frame(cx);
         window.input("A👩🏽‍💻é中", cx);
-        for expected in ["A👩🏽‍💻é", "A👩🏽‍💻e", "A👩🏽‍💻"] {
+        for expected in ["A👩🏽‍💻é", "A👩🏽‍💻", "A"] {
             window.press("backspace", cx);
             assert_eq!(input.read(cx).value(), expected);
         }

@@ -1,4 +1,5 @@
 mod config;
+mod dev;
 mod doctor;
 mod help;
 mod hot_reload;
@@ -70,7 +71,8 @@ fn run() -> Result<i32, String> {
         .to_owned();
     if matches!(command.as_str(), "help" | "--help" | "-h") {
         println!(
-            "cargo rsx <doctor|lint|fmt|migrate|convert|expand|preview|theme|lsp> [path] [options]\n\
+            "cargo rsx <dev|doctor|lint|fmt|migrate|convert|expand|preview|theme|lsp> [path] [options]\n\
+  dev          Run hot-reload preflight checks and launch `dx serve --hot-patch`\n\
   doctor       Check resolved GPUI identities and Kit/component compatibility\n\
   lint         Diagnose RSX macros throughout the Cargo workspace\n\
   fmt          Format RSX macros; prints a file unless --write or --check\n\
@@ -258,6 +260,7 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
             Ok(0)
         }
         "preview" => preview::run(&opt),
+        "dev" => dev::run(&opt),
         _ => Err(format!("unknown command {command}; run cargo rsx --help")),
     }
 }
@@ -265,6 +268,13 @@ Formatting preserves surrounding Rust and leaves commented macro bodies unchange
 /// Options each command reads; anything else would be silently ignored, so it is rejected.
 fn allowed_options(command: &str) -> Option<&'static [&'static str]> {
     Some(match command {
+        "dev" => &[
+            "--manifest-path",
+            "--json",
+            "--offline",
+            "--features",
+            "--check",
+        ],
         "doctor" => &[
             "--manifest-path",
             "--json",

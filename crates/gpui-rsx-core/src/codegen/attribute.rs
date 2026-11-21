@@ -67,8 +67,14 @@ pub(crate) fn generate_attr_methods_with_mode(
                     name_storage = name.to_string();
                     &name_storage
                 };
-                if name_str == "grayscale" {
-                    out.push(quote! { .grayscale(true) });
+                if name_str == "grayscale" || name_str == "y_flipped" || name_str == "yFlipped" {
+                    let method_name = if name_str == "grayscale" {
+                        "grayscale"
+                    } else {
+                        "y_flipped"
+                    };
+                    let method_ident = syn::Ident::new(method_name, name.span());
+                    out.push(quote! { .#method_ident(true) });
                     return;
                 }
                 if let Some(mapped) = lookup_attr_flag_method(name_str) {
@@ -194,6 +200,21 @@ pub fn static_class_literals(expr: &syn::Expr) -> Option<Vec<&syn::LitStr>> {
     fn block(block: &syn::Block) -> Option<Vec<&syn::LitStr>> {
         static_class_literals(block_tail_expr(block)?)
     }
+    fn array_item(expr: &syn::Expr) -> Option<Vec<&syn::LitStr>> {
+        match expr {
+            syn::Expr::Tuple(tuple) if tuple.elems.len() == 2 => {
+                static_class_literals(&tuple.elems[1])
+            }
+            syn::Expr::MethodCall(call) if call.method == "then_some" && call.args.len() == 1 => {
+                static_class_literals(&call.args[0])
+            }
+            syn::Expr::Binary(bin) if matches!(bin.op, syn::BinOp::And(_)) => {
+                static_class_literals(&bin.right)
+            }
+            syn::Expr::If(expr_if) if expr_if.else_branch.is_none() => block(&expr_if.then_branch),
+            _ => static_class_literals(expr),
+        }
+    }
     match expr {
         syn::Expr::Lit(syn::ExprLit {
             lit: syn::Lit::Str(lit),
@@ -211,10 +232,71 @@ pub fn static_class_literals(expr: &syn::Expr) -> Option<Vec<&syn::LitStr>> {
             }
             Some(literals)
         }
+        syn::Expr::Array(array) => {
+            let mut literals = Vec::new();
+            for elem in &array.elems {
+                literals.extend(array_item(elem)?);
+            }
+            Some(literals)
+        }
         syn::Expr::Paren(expr) => static_class_literals(&expr.expr),
         syn::Expr::Group(expr) => static_class_literals(&expr.expr),
         syn::Expr::Block(expr) => block(&expr.block),
         _ => None,
+    }
+}
+
+fn generate_static_class_array_item(
+    expr: &syn::Expr,
+    mode: ClassMode,
+    el: &syn::Ident,
+) -> Option<TokenStream> {
+    match expr {
+        syn::Expr::Tuple(tuple) if tuple.elems.len() == 2 => {
+            let cond = &tuple.elems[0];
+            let body = generate_static_class_expr_code(&tuple.elems[1], mode, el)?;
+            Some(quote! {
+                if #cond {
+                    #body
+                } else {
+                    #el
+                }
+            })
+        }
+        syn::Expr::MethodCall(call) if call.method == "then_some" && call.args.len() == 1 => {
+            let cond = &call.receiver;
+            let body = generate_static_class_expr_code(&call.args[0], mode, el)?;
+            Some(quote! {
+                if #cond {
+                    #body
+                } else {
+                    #el
+                }
+            })
+        }
+        syn::Expr::Binary(bin) if matches!(bin.op, syn::BinOp::And(_)) => {
+            let cond = &bin.left;
+            let body = generate_static_class_expr_code(&bin.right, mode, el)?;
+            Some(quote! {
+                if #cond {
+                    #body
+                } else {
+                    #el
+                }
+            })
+        }
+        syn::Expr::If(expr_if) if expr_if.else_branch.is_none() => {
+            let condition = &expr_if.cond;
+            let then_code = generate_static_class_block_code(&expr_if.then_branch, mode, el)?;
+            Some(quote! {
+                if #condition {
+                    #then_code
+                } else {
+                    #el
+                }
+            })
+        }
+        _ => generate_static_class_expr_code(expr, mode, el),
     }
 }
 
@@ -263,6 +345,20 @@ fn generate_static_class_expr_code(
                     #(#arms)*
                 }
             })
+        }
+        syn::Expr::Array(array) => {
+            let steps = array
+                .elems
+                .iter()
+                .map(|elem| {
+                    let step = generate_static_class_array_item(elem, mode.clone(), el)?;
+                    Some(quote! { let #el = #step; })
+                })
+                .collect::<Option<Vec<_>>>()?;
+            Some(quote! {{
+                #(#steps)*
+                #el
+            }})
         }
         syn::Expr::Lit(syn::ExprLit {
             lit: syn::Lit::Str(lit_str),

@@ -19,7 +19,7 @@ Write GPUI views with JSX-like markup and Rust expressions. Static RSX expands t
 
 ### Semantics and Defaults
 
-- Common HTML-like names, including `button` and `input`, construct GPUI `div()` elements. They do not create browser controls or supply HTML form behavior. Use components such as `Button` with `base={Button::new("save")}` when you need their control behavior.
+- Common HTML-like names, including `button` and `input`, construct GPUI `div()` elements. They do not create browser controls or supply HTML form behavior. Use components such as `Button` with `<Button("save") ... />` or `base={Button::new("save")}` when you need their control behavior.
 - Numeric classes use pixels by default: `gap-4` means 4px. Use `rsx_tw!`, `tailwind-scale`, or project configuration for Tailwind's 4px units. Named GPUI attributes such as `gap_4` keep GPUI's native units.
 - Literal classes have no runtime class parser. Dynamic strings use a runtime matcher with a smaller support surface; see [Class Handling](https://wsafight.github.io/gpui-rsx/usage/class/).
 - Playground and browser previews approximate static layouts. They do not execute Rust event handlers or validate native rendering. `rsx_expand!` shows generated Rust without type checking it; use `cargo check` and a native GPUI application for validation.
@@ -53,13 +53,13 @@ Add to your `Cargo.toml`:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = "0.12.1"
 ```
 
 ### GPUI Version Target
 
-The demo uses GPUI Kit 0.9.0 and its exact `gpui-pre 0.3.11` snapshot. The Cargo
+The demo uses GPUI Kit 0.10.0 and its exact `gpui-pre 0.3.12` snapshot. The Cargo
 alias `gpui` preserves the paths used by RSX expansions and GPUI derives. Kit
 re-exports the matching engine, platform entry point, components and assets.
 The macro and core crates have no GPUI runtime dependency.
@@ -79,13 +79,13 @@ application lockfile; update Kit and its matching snapshot together. See the
 
 | GPUI-RSX | GPUI Kit | GPUI snapshot | Component |
 | --- | --- | --- | --- |
-| `0.12.1` | `0.9.0` | `gpui-pre@0.3.11` | `gpui-component@0.9.0` |
+| `0.12.1` | `0.10.0` | `gpui-pre@0.3.12` | `gpui-component@0.10.0` |
 
 This matrix comes from demo/Cargo.lock. Kit supplies GPUI, components and assets; the Cargo alias below preserves the gpui:: path used by RSX expansions. Commit the application lockfile.
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = "0.12.1"
 ```
 <!-- gpui-rsx:compat:end -->
@@ -837,18 +837,18 @@ fn Badge(label: SharedString, #[prop(default)] highlighted: bool) -> impl IntoEl
 let badge = rsx! { <Badge label="Inbox" highlighted /> };
 ```
 
-Struct components pair `#[derive(IntoElement)]` with `RenderOnce` and use the same prop rules.
+Struct components pair `#[derive(IntoElement)]` with `RenderOnce` and use the same prop rules,
+including `#[slot]` for named slots (`<div slot="header">`) and `#[style]` for `class` forwarding.
 `#[deprecated(note = "use NewBadge")]` warns at component call sites.
 See the [component syntax guide](https://wsafight.github.io/gpui-rsx/usage/syntax/) for complete examples.
 
 ### Builder-backed Components
 
-Use `base={expr}` when a component needs a custom constructor instead of the default `<Tag />` to `Tag()` expansion:
+Pass constructor arguments directly with `<Tag(...)>` for `Type::new(...)` builders (or lowercase factory functions), or use `base={expr}` when passing a preconfigured builder:
 
 ```rust
 rsx! {
-    <Button
-        base={Button::new("continue")}
+    <Button("continue")
         label={"Continue"}
         small
         primary
@@ -856,28 +856,26 @@ rsx! {
 }
 ```
 
-This expands to `Button::new("continue").label("Continue").small().primary()`. The `base` attribute is consumed by the macro and does not generate `.base(...)`.
+This expands to `Button::new("continue").label("Continue").small().primary()`. When using `base={Button::new("continue")}`, the `base` attribute is consumed by the macro and does not generate `.base(...)`.
 
 Path-qualified component tags are supported, which is useful when components live in modules:
 
 ```rust
 rsx! {
-    <ui::TaskCard
-        base={ui::TaskCard::new(task.id)}
+    <ui::TaskCard(task.id)
         title={task.title.clone()}
     />
 }
 ```
 
-For `gpui-component`, keep imports explicit and use `base` for constructors that need IDs or custom arguments:
+For `gpui-component`, keep imports explicit and pass IDs or constructor arguments via `<Button(...)>` or `base={...}`:
 
 ```rust
 use gpui::component::button::{Button, ButtonVariants as _};
 use gpui::component::Sizable as _;
 
 rsx! {
-    <Button
-        base={Button::new("continue")}
+    <Button("continue")
         label={"Continue"}
         small
         primary
@@ -1152,7 +1150,7 @@ Inspired by:
 
 ## Development tools
 
-Install `cargo-rsx` 0.12.1 (Rust 1.98+) for `doctor`, `lint`, `fmt`, `migrate`, `convert`,
+Install `cargo-rsx` 0.12.1 (Rust 1.98+) for `dev`, `doctor`, `lint`, `fmt`, `migrate`, `convert`,
 `preview --watch`, and the `lsp` server. See the [tooling guide](https://wsafight.github.io/gpui-rsx/guides/tooling/)
 and [WASM Playground](https://wsafight.github.io/gpui-rsx/playground/). VS Code and Zed adapters
 live in `editors/`; release assets include an installable VSIX.

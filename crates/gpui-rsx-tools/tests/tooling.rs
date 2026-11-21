@@ -961,3 +961,54 @@ fn erased_fragment_macros_are_discovered_formatted_and_expanded() {
     assert!(summary.contains("::gpui::AnyElement"), "{summary}");
     assert_eq!(summary.matches("into_any_element()").count(), 2);
 }
+
+#[test]
+fn formatter_and_linter_support_constructor_args_slots_styles_and_class_arrays() {
+    let source = "fn view() {\n    rsx! {\n        <Dialog title=\"Confirm\">\n            <div slot=\"header\" class={[\"flex\", active.then_some(\"flex-colum\"), disabled && \"md:flex\"]} />\n            <Button(\"save\", 42) label=\"Save\" small />\n            <Tab() underline />\n        </Dialog>\n    };\n}\n";
+    let formatted = format::rust(source).unwrap();
+    assert!(
+        formatted.contains("<Button(\"save\", 42) label=\"Save\" small />"),
+        "{formatted}"
+    );
+    assert!(formatted.contains("<Tab() underline />"), "{formatted}");
+    assert_eq!(format::rust(&formatted).unwrap(), formatted);
+
+    let analysis = gpui_rsx_tools::analyze_rust_document(source, ClassMode::PERMISSIVE);
+    assert!(
+        analysis
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("flex-colum")),
+        "{:?}",
+        analysis.diagnostics
+    );
+    assert!(
+        analysis
+            .diagnostics
+            .iter()
+            .any(|d| d.message.contains("Responsive variant `md:`")),
+        "{:?}",
+        analysis.diagnostics
+    );
+
+    let comp_src = r#"
+        #[component]
+        fn Card(
+            title: String,
+            #[style] style: StyleRefinement,
+            #[slot] header: Option<AnyElement>,
+            #[children] body: Option<AnyElement>,
+        ) -> impl IntoElement { div() }
+
+        fn use_card() {
+            rsx! { <Card title="Ok" class="p-4"><span slot="header">{"H"}</span></Card> };
+            rsx! { <Card("prebuilt") /> };
+        }
+    "#;
+    let comp_analysis = gpui_rsx_tools::analyze_rust_document(comp_src, ClassMode::STRICT);
+    assert!(
+        comp_analysis.diagnostics.is_empty(),
+        "{:?}",
+        comp_analysis.diagnostics
+    );
+}

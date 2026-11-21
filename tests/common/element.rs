@@ -224,11 +224,17 @@ impl MockElement {
     mock_no_arg_methods!(debug);
     mock_value_methods!(
         path,
+        external_path,
+        with_transformation,
         object_fit,
         with_fallback,
         with_loading,
         image_cache,
         on_children_prepainted,
+        with_sizing_behavior,
+        with_horizontal_sizing_behavior,
+        with_width_from_item,
+        with_decoration,
         flex_basis,
         inset,
         rounded_t,
@@ -239,8 +245,13 @@ impl MockElement {
         rounded_br,
         placeholder,
     );
+    mock_two_value_methods!(with_timed_transformation);
 
     pub fn grayscale(self, _: bool) -> Self {
+        self
+    }
+
+    pub fn y_flipped(self, _: bool) -> Self {
         self
     }
 }

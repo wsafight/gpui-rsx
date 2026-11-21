@@ -72,6 +72,22 @@ snapshot!(
     r#"<Button base={Button::new("save")} label={"Save"} small />"#
 );
 snapshot!(
+    constructor_shorthand,
+    r#"<><Button("save") label={"Save"} small /><Tab() underline /><widget("row", 1) compact /></>"#
+);
+snapshot!(
+    composable_class_array,
+    r#"<div class={["flex items-center", active.then_some("bg-blue-500"), disabled && "opacity-50", (selected, "border-1"), if open { "p-4" }]} />"#
+);
+snapshot!(
+    named_child_slots,
+    r#"<Dialog title="Confirm"><div slot="header">{"Title"}</div><p>{"Body"}</p><Button("ok") slot="footer" /></Dialog>"#
+);
+snapshot!(
+    uniform_list_tag,
+    r#"<uniform_list id="rows" count={items.len()} render={render_rows} yFlipped class="size-full" />"#
+);
+snapshot!(
     component_auto_id,
     r#"<ui::card key={item.id} onClick={handler} />"#
 );

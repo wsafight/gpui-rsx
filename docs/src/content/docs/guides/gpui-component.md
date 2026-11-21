@@ -11,20 +11,34 @@ The demo uses:
 
 ```toml
 [dependencies]
-gpui = { package = "gpui-kit", version = "=0.9.0" }
+gpui = { package = "gpui-kit", version = "=0.10.0" }
 gpui-rsx = { path = ".." }
 ```
 
 Kit supplies the matching GPUI snapshot, component library and assets. Commit the application lockfile. Initialize with `gpui::init(cx)` and open windows with `gpui::open_window(...)`.
 
-## Use `base` for Constructors
+## Constructor Arguments and `base`
 
-GPUI-RSX can infer simple constructors from tag names, but component builders often need explicit constructors. Use the macro-only `base` attribute:
+Component builders that construct via `Type::new(...)` can pass arguments directly in `<Tag(...)>`:
 
 ```rust
 use gpui::component::button::{Button, ButtonVariants as _};
 use gpui::component::Sizable as _;
 
+rsx! {
+    <Button("save")
+        label={"Save"}
+        small
+        primary
+    />
+}
+```
+
+Uppercase type paths expand `<Button("save") ... />` to `Button::new("save")` and `<Tab() ... />` to `Tab::new()`, while lowercase helper paths call `helper(...)`.
+
+When you already have a preconfigured builder or need methods that cannot be written as attributes, use the macro-only `base` attribute:
+
+```rust
 rsx! {
     <Button
         base={Button::new("save")}

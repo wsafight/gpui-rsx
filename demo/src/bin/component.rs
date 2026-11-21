@@ -31,15 +31,18 @@ fn StatusBadge(
 #[component]
 fn StatusCard(
     title: SharedString,
+    #[style] style: StyleRefinement,
     #[children] children: Vec<AnyElement>,
     #[context] cx: &mut App,
 ) -> impl IntoElement {
-    rsx! {
+    let mut card = rsx! {
         <section class="flex flex-col gap-[16px] p-[20px] rounded-lg border border-border" textColor={cx.theme().foreground}>
             <h2 class="text-lg font-semibold">{title}</h2>
             <div class="flex flex-wrap gap-[8px]">{...children}</div>
         </section>
-    }
+    };
+    card.style().refine(&style);
+    card
 }
 
 #[derive(Default)]
@@ -50,7 +53,7 @@ struct ComponentView {
 #[allow(dead_code)]
 fn stateful_input_contract(window: &mut Window, cx: &mut App) -> impl IntoElement {
     let state = cx.new(|cx| InputState::new(window, cx));
-    rsx! { <Input base={Input::new(&state)} /> }
+    rsx! { <Input(&state) /> }
 }
 
 #[allow(dead_code)]
@@ -75,7 +78,7 @@ impl Render for ComponentView {
                     </p>
                 </header>
 
-                <StatusCard title="Function components">
+                <StatusCard title="Function components" class="w-full">
                     <>
                         <StatusBadge label="Required props checked" highlighted />
                         <StatusBadge label="Children without wrappers" />
@@ -83,38 +86,34 @@ impl Render for ComponentView {
                 </StatusCard>
 
                 <section class="flex flex-col gap-[20px] p-[20px] rounded-lg border border-border">
-                    <Label
-                        base={Label::new("Component label").secondary("rendered by gpui-component")}
+                    <Label("Component label")
+                        secondary={"rendered by gpui-component"}
                         class="text-sm"
                     />
 
-                    <Input base={Input::new(&*input)} />
+                    <Input(&*input) />
 
                     <div class="flex flex-wrap gap-[12px]">
-                        <Button
-                            base={Button::new("component-primary")}
+                        <Button("component-primary")
                             label={"Primary"}
                             primary
                             small
                         />
-                        <Button
-                            base={Button::new("component-success")}
+                        <Button("component-success")
                             label={"Success"}
                             success
                             small
                         />
-                        <Button
-                            base={Button::new("component-ghost")}
+                        <Button("component-ghost")
                             label={"Ghost"}
                             ghost
                             small
                         />
                     </div>
 
-                    <Tab
-                        base={Tab::new()
-                            .label("Overview")
-                            .aria_label("Overview tab")}
+                    <Tab()
+                        label={"Overview"}
+                        ariaLabel={"Overview tab"}
                         underline
                     />
 

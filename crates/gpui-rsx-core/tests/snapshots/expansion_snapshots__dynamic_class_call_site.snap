@@ -19,16 +19,17 @@ expression: tail
                 if __class_str.is_empty() {
                     __el
                 } else {
-                    __class_str
+                    let mut __el = __el;
+                    let __style = Styled::style(&mut __el);
+                    *__style = __class_str
                         .split_ascii_whitespace()
                         .fold(
-                            __el,
-                            |__el, __class| __rsx_apply_class(
-                                __el,
-                                __class,
-                                &mut __on_unknown,
-                            ),
-                        )
+                            ::core::mem::take(__style),
+                            |__style, __class| {
+                                __rsx_apply_class(__style, __class, &mut __on_unknown)
+                            },
+                        );
+                    __el
                 }
             }
         }

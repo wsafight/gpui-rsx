@@ -72,6 +72,10 @@ pub fn body(source: &str) -> Result<String, String> {
         let indent = "    ".repeat(depth);
         let expression = |value: &dyn ExprLike| value.text(source, &indent);
         out.push_str(&format!("{indent}<{}", el.name));
+        if let Some(args) = &el.args {
+            let rendered: Vec<_> = args.iter().map(|arg| expression(arg)).collect();
+            out.push_str(&format!("({})", rendered.join(", ")));
+        }
         for attr in &el.attributes {
             let attr = match attr {
                 RsxAttribute::Flag(name) => name.to_string(),

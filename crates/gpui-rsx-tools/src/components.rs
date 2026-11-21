@@ -42,8 +42,16 @@ fn has_default(attrs: &[syn::Attribute]) -> bool {
 }
 
 fn prop(name: &syn::Ident, ty: &syn::Type, attrs: &[syn::Attribute]) -> Option<ComponentProp> {
-    if annotated(attrs, "children") {
+    if annotated(attrs, "children") || annotated(attrs, "style") {
         return None;
+    }
+    if annotated(attrs, "slot") {
+        return Some(ComponentProp {
+            name: name.to_string(),
+            ty: ty.to_token_stream().to_string(),
+            required: false,
+            flag: false,
+        });
     }
     let default = has_default(attrs);
     Some(ComponentProp {
@@ -128,11 +136,12 @@ pub(crate) fn diagnostics(
         let Some(component) = find(components, &name) else {
             return;
         };
-        // A custom builder may already contain props; avoid false missing-prop reports.
-        if el
-            .attributes
-            .iter()
-            .any(|a| matches!(a, RsxAttribute::Value {name, ..} if name == "base"))
+        // A custom builder or constructor args may already contain props; avoid false missing-prop reports.
+        if el.args.is_some()
+            || el
+                .attributes
+                .iter()
+                .any(|a| matches!(a, RsxAttribute::Value {name, ..} if name == "base"))
         {
             return;
         }

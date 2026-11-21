@@ -1,0 +1,11 @@
+---
+source: crates/gpui-rsx-core/tests/expansion_snapshots.rs
+expression: "<Dialog title=\"Confirm\"><div slot=\"header\">{\"Title\"}</div><p>{\"Body\"}</p><Button(\"ok\") slot=\"footer\" /></Dialog>"
+---
+fn expanded() {
+    let _ = Dialog()
+        .title("Confirm")
+        .header(div().child("Title"))
+        .child(div().child("Body"))
+        .footer(Button::new("ok"));
+}

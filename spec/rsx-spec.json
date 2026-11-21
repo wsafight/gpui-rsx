@@ -16573,6 +16573,7 @@
       "id",
       "key",
       "base",
+      "slot",
       "styled",
       "when",
       "whenSome",
@@ -16596,10 +16597,11 @@
       "rem",
       "% (sizing only)"
     ],
+    "composable_arrays": "class={[\"flex\", cond.then_some(\"gap-2\"), cond && \"opacity-50\", (cond, \"border-1\"), if cond { \"p-4\" }]}",
     "default_numeric_unit_px": 1,
     "dynamic_limitations": [
       "No state variants",
-      "No rsx.toml tokens",
+      "No runtime cx expr tokens from rsx.toml (static rsx.toml tokens are supported)",
       "Only Styled methods; stateful classes need static literals"
     ],
     "length_families": [
@@ -17940,14 +17942,16 @@
   },
   "component_attribute_macro": "component",
   "components": {
-    "children": "#[children] Vec<AnyElement>",
+    "children": "#[children] Vec<AnyElement>, SmallVec<[AnyElement; N]>, or Option<AnyElement>",
     "declarations": [
       "struct with named fields",
       "synchronous function with concrete prop types"
     ],
     "function_context": "#[context] &mut Window or &mut App; supplied during RenderOnce, not as props",
+    "named_slots": "#[slot] Option<AnyElement> or Vec<AnyElement>; supplied via prop or <child slot=\"name\">",
     "optional_props": "#[prop(default)] or #[prop(default = expr)]",
-    "required_props": "compile-time checked"
+    "required_props": "compile-time checked",
+    "style_forwarding": "#[style] StyleRefinement implements gpui::Styled on the generated builder"
   },
   "examples": [
     "<div class=\"flex flex-col gap-4 p-4 bg-blue-500\"><span>{\"Hello\"}</span></div>",
@@ -17956,8 +17960,8 @@
     "<div class=\"w-[280px] h-1/2 gap-[14px]\" />",
     "<div><><span>{\"One\"}</span><span>{\"Two\"}</span></></div>"
   ],
-  "gpui_component_revision": "gpui-component@0.9.0",
-  "gpui_revision": "gpui-pre@0.3.11",
+  "gpui_component_revision": "gpui-component@0.10.0",
+  "gpui_revision": "gpui-pre@0.3.12",
   "listener_macro": {
     "forms": [
       "rsx_listener!(cx, handler)",
@@ -18001,7 +18005,7 @@
     "nested_fragments": "allowed in elements, fragments and loops; no wrapper element"
   },
   "tags": {
-    "custom": "Rust path; use base={constructor} when arguments are required",
+    "custom": "Rust path; <Tag(args...)> expands to Tag::new(args...) for uppercase types or func(args...) for lowercase functions, or use base={constructor}",
     "div_aliases": [
       "div",
       "span",
@@ -18033,7 +18037,8 @@
     "special": [
       "img",
       "svg",
-      "canvas"
+      "canvas",
+      "uniform_list"
     ]
   }
 }
